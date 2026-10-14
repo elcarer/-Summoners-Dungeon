@@ -216,7 +216,8 @@
                 { y: 156, label: t("filter.rarity"), key: "rarity",
                     opts: [["common", "rare", "epic"].map((v) => ({ value: v, label: t(`rarity.${v}.short`) }))] },
                 { y: 156, label: t("filter.elem"), key: "elem",
-                    opts: [["fire", "frost", "nature", "shadow", "neutral"].map((v) => ({ value: v, label: t(`elem.${v}.short`) }))], dx: 300 },
+                    opts: [[...new Set(Object.values(CARDS).map((d) => d.elem))]
+                        .map((v) => ({ value: v, label: t(`elem.${v}.short`) }))], dx: 300 },
             ];
             for (const r of rows) {
                 const x0 = r.dx ? 524 + r.dx : 524;

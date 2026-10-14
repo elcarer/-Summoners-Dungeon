@@ -47,6 +47,13 @@
         // фоны арен с нарисованной сеткой поля
         uiTextures["scenes/1.png"] = await assets.loadTexture("./images/scenes/1.png");
         uiTextures["scenes/2.png"] = await assets.loadTexture("./images/scenes/2.png");
+        // лица карт стихий: images/cards/<elem>/<№>.png (def.img в dataCards)
+        say("карты…");
+        await frame();
+        for (const def of Object.values(GAME_DATA.CARDS)) {
+            if (def.img) uiTextures[`cards/${def.img}.png`] =
+                await assets.loadTexture(`./images/cards/${def.img}.png`);
+        }
         const uiTex = (name) => {
             const t = uiTextures[name];
             if (!t) throw new Error(`нет текстуры ui/${name}`);
@@ -100,12 +107,20 @@
             world, ECS, COMPONENTS, DATA, blocked, input: createCharacterInput(), addSystem,
         });
 
+        // Миграция сейва: карты прошлых версий (тестовые id) отфильтровываются;
+        // если после фильтра колода/коллекция пусты — новые базовые значения.
+        const savedDeck = savedMeta ? savedMeta.deck.filter((id) => GAME_DATA.CARDS[id]) : [];
+        const savedColl = savedMeta
+            ? Object.fromEntries(Object.entries(savedMeta.collection || {})
+                .filter(([id]) => GAME_DATA.CARDS[id]))
+            : {};
+
         const G = {
             hero: { hp: 10, maxHp: 10 }, gold: 0,
             run: { floor: 1 },
             settings,
-            deck: savedMeta ? savedMeta.deck.filter((id) => GAME_DATA.CARDS[id]) : [...DEFAULT_DECK],
-            collection: savedMeta ? savedMeta.collection : { ...DEFAULT_COLLECTION },
+            deck: savedDeck.length ? savedDeck : [...DEFAULT_DECK],
+            collection: Object.keys(savedColl).length ? savedColl : { ...DEFAULT_COLLECTION },
             dungeon: null, activeEnemy: null, battle: null,
             uiReturn: null, // откуда открыты настройки/колода (кнопка «Назад»)
             resetRun() {

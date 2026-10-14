@@ -37,11 +37,13 @@
         const delay = (s) => new Promise((r) => scheduler.after(s, r));
         let root = null, B = null;
 
-        // Лист существ поля боя: пока один (goblin) на всех. Стандарт листа —
-        // 256×256, ряды front/back/right/left по 6 кадров. Взгляд по стороне:
-        // юниты игрока идут вверх (виден затылок), врага — вниз (анфас).
-        const CREATURE = ctx.creatureSheets && ctx.creatureSheets.goblin;
+        // Листы существ поля боя — по карте (def.creature), пока все гоблины.
+        // Стандарт листа — 256×256, ряды front/back/right/left по 6 кадров.
+        // Взгляд по стороне: юниты игрока идут вверх (виден затылок), врага —
+        // вниз (анфас).
         const SPRITE_SCALE = 0.35; // кадр 256 → ~90px, фигура ~68px в клетке
+        const sheetOf = (u) => ctx.creatureSheets
+            && ((u.def.creature && ctx.creatureSheets[u.def.creature]) || ctx.creatureSheets.goblin);
 
         const T = (text, size, fill, opts = {}) => new PIXI.Text({
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
@@ -120,7 +122,19 @@
                 root.board.userData.baseZone.eventMode = "none";
                 return;
             }
-            if (B.spellTarget) { // прицел заклинания: враги + база
+            if (B.spellTarget) { // прицел заклинания
+                const def = CARDS[B.hand[B.selected]];
+                if (def && def.spell.target === "anyUnit") {
+                    // цель — любое существо: подсвечены все юниты обеих сторон
+                    root.board.userData.baseZone.eventMode = "none";
+                    for (const u of B.units) if (u.def.type === "unit") {
+                        const rc = cellRect(u.col, u.row);
+                        hi.rect(rc.x, rc.y, rc.w, rc.h);
+                        hi.fill({ color: u.side === "p" ? 0x7dc95e : 0xd05a3c, alpha: 0.4 });
+                        hi.stroke({ width: 2, color: u.side === "p" ? 0xa8e890 : 0xef9f8c });
+                    }
+                    return;
+                }
                 for (const u of B.units) if (u.side === "e") {
                     const rc = cellRect(u.col, u.row);
                     hi.rect(rc.x, rc.y, rc.w, rc.h);
@@ -144,7 +158,8 @@
         // ── Жетоны на поле: существо / строение ────────────────────────────
         function makeUnitNode(u) {
             const c = new PIXI.Container();
-            const spr = u.def.type !== "building" && CREATURE; // спрайт-существо
+            const sheet = sheetOf(u);
+            const spr = u.def.type !== "building" && sheet; // спрайт-существо
             if (u.def.type === "building") {
                 const g = new PIXI.Graphics();
                 g.moveTo(-26, -8); g.lineTo(0, -26); g.lineTo(26, -8); // крыша
@@ -152,7 +167,8 @@
                 g.fill(u.def.color);
                 g.stroke({ width: 2.5, color: 0xffd98c });
                 c.addChild(g);
-                const aura = T("✦", 20, 0xffe9b0);
+                // метка эффекта: лагерь даёт +1 урона соседям, прочие ауры — ✦
+                const aura = T(u.def.campAura ? `+${u.def.campAura}⚔` : "✦", 20, 0xffe9b0);
                 aura.anchor.set(0.5);
                 aura.position.set(0, -2);
                 aura.name = "auraMark";
@@ -171,10 +187,10 @@
                 ring.fill({ color: u.side === "p" ? 0x2f4f7a : 0x7a3430, alpha: 0.45 });
                 ring.eventMode = "none";
                 c.addChild(ring);
-                const body = new PIXI.AnimatedSprite(CREATURE.animations[face], false);
+                const body = new PIXI.AnimatedSprite(sheet.animations[face], false);
                 body.anchor.set(0.5, 0.85); // ноги (y≈0.93 кадра) чуть ниже центра клетки
                 body.scale.set(SPRITE_SCALE);
-                body.animationSpeed = CREATURE.animationSpeed || 0.2;
+                body.animationSpeed = sheet.animationSpeed || 0.2;
                 body.gotoAndStop(0); // стоит — статичный кадр, играет только в движении
                 body.eventMode = "none"; // клики уходят в клетки поля под существом
                 body.name = "body";
@@ -215,7 +231,10 @@
             return c;
         }
 
-        // ── Ауры строений: пересчёт атак/здоровья своих существ ────────────
+        // ── Ауры строений + перманентные бонусы ──────────────────────────
+        // curAtk = база + bonusAtk (кровожадность, лагерь при призыве) + ауры.
+        // Ауры строений пересчитываются при каждом addUnit/гибели строения;
+        // bonusAtk переживает всё — это «навсегда».
         function recalcAuras() {
             for (const side of ["p", "e"]) {
                 let atk = 0, hp = 0;
@@ -224,7 +243,7 @@
                     hp += (u.def.aura && u.def.aura.hp) || 0;
                 }
                 for (const u of B.units) if (u.side === side && u.def.type === "unit") {
-                    const newAtk = u.def.atk + atk;
+                    const newAtk = u.def.atk + (u.bonusAtk || 0) + atk;
                     if (u.curAtk !== newAtk) {
                         u.curAtk = newAtk;
                         const n = u.node.getChildByName("atk");
@@ -243,7 +262,7 @@
 
         function addUnit(side, cardId, col, row) {
             const def = CARDS[cardId];
-            const u = { side, def, col, row, hp: def.hp, curAtk: def.atk || 0, auraHp: 0 };
+            const u = { side, def, col, row, hp: def.hp, curAtk: def.atk || 0, auraHp: 0, bonusAtk: 0 };
             const node = makeUnitNode(u);
             u.node = node;
             node.scale.set(0.2);
@@ -251,6 +270,21 @@
             root.unitsLayer.addChild(node);
             B.units.push(u);
             recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда
+            if (def.type === "unit") {
+                // военный лагерь: существо, призванное рядом (верт/гориз),
+                // получает +1 к урону за каждый лагерь — перманентно
+                let camp = 0;
+                for (const o of B.units) if (o !== u && o.side === side
+                    && o.def.type === "building" && o.def.campAura
+                    && Math.abs(o.col - col) + Math.abs(o.row - row) === 1) camp += o.def.campAura;
+                if (camp) {
+                    u.bonusAtk += camp;
+                    recalcAuras();
+                    const p = cellXY(col, row);
+                    floatText(p.x, p.y - 40, `+${camp}⚔`, 0x9fd489);
+                }
+                if (def.ability === "dash1") summonDash(u); // «Скорость 1»
+            }
             return u;
         }
 
@@ -277,14 +311,54 @@
         // «к врагу»: игрок видит спину, враг — анфас), on=false — стоп-кадр.
         function setWalk(u, on, face) {
             const body = u.node && u.node.getChildByName("body");
-            if (!body || !body.textures || !CREATURE) return;
+            const sheet = sheetOf(u);
+            if (!body || !body.textures || !sheet) return;
             const name = face || (u.side === "p" ? "walk_back" : "walk_front");
-            if (!CREATURE.animations[name]) return;
+            if (!sheet.animations[name]) return;
             if (body.userData_face !== name) {
-                body.textures = CREATURE.animations[name];
+                body.textures = sheet.animations[name];
                 body.userData_face = name;
             }
             if (on) body.gotoAndPlay(0); else body.gotoAndStop(0);
+        }
+
+        // «Скорость 1»: сразу после призыва — шаг на клетку вперёд; если там
+        // противник — удар по нему (урон с текущими бонусами). Своим не пройти,
+        // своих не бить — стоим.
+        function summonDash(u) {
+            const dir = u.side === "p" ? -1 : 1;
+            const ahead = u.row + dir;
+            if (ahead < 0 || ahead >= GRID) return;
+            const occ = unitAt(u.col, ahead);
+            if (occ) {
+                if (occ.side !== u.side) {
+                    damageUnit(occ, u.curAtk, u);
+                    refreshHud();
+                    checkEnd();
+                }
+                return;
+            }
+            u.row = ahead;
+            const p = cellXY(u.col, u.row);
+            glide(u, p.x, p.y);
+            setWalk(u, true);
+            afterMoved(u); // перемещение — вражеские ловушки могут сработать
+        }
+
+        // Перемещение завершилось: ловушки врага с триггером «на перемещение»
+        // бьют по переместившемуся существу (одна ловушка за событие).
+        function afterMoved(u) {
+            if (!B.units.includes(u) || u.def.type !== "unit") return;
+            const foe = u.side === "p" ? "e" : "p";
+            const i = B.traps[foe].findIndex((t) => t.def.trap.event === "onEnemyMove");
+            if (i < 0) return;
+            const trap = B.traps[foe].splice(i, 1)[0];
+            redrawTraps();
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 40, "?!", 0xe08cd0);
+            damageUnit(u, trap.def.trap.amount, null);
+            refreshHud();
+            checkEnd();
         }
 
         function removeUnit(u) {
@@ -377,9 +451,17 @@
         function makeCardNode(card, idx) {
             const def = CARDS[card];
             const c = new PIXI.Container();
-            const face = new PIXI.Sprite(uiTex("card_back_small.png"));
-            face.anchor.set(0.5, 1);
-            face.tint = def.type === "unit" ? 0xffffff : (def.color || 0xffffff);
+            // лицо: готовая картинка карты, иначе тонированная рубашка
+            let face;
+            if (def.img) {
+                face = new PIXI.Sprite(uiTex(`cards/${def.img}.png`));
+                face.anchor.set(0.5, 1);
+                face.scale.set(143 / face.texture.height); // к высоте малой рубашки
+            } else {
+                face = new PIXI.Sprite(uiTex("card_back_small.png"));
+                face.anchor.set(0.5, 1);
+                face.tint = def.type === "unit" ? 0xffffff : (def.color || 0xffffff);
+            }
             c.addChild(face);
             const plate = new PIXI.Graphics();
             plate.roundRect(-44, def.type === "unit" ? -132 : -150, 88, def.type === "unit" ? 44 : 62, 6);
@@ -797,6 +879,8 @@
                     setWalk(u, true);
                     await delay(0.52); // глиссада 0.5с + пауза: полный шаг походки
                     if (B.stopped) return;
+                    afterMoved(u); // перемещение — ловушки врага
+                    if (checkEnd()) return;
                 }
             }
         }
@@ -867,6 +951,16 @@
                     }
                     if (def.type === "spell") {
                         if (def.spell.draw && B.eHand.length > 4) continue;
+                        if (def.spell.target === "anyUnit") { // усиление — своему сильнейшему
+                            const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
+                            if (!own.length) continue;
+                            const best = own.sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                            best.bonusAtk = (best.bonusAtk || 0) + def.spell.buffAtk;
+                            recalcAuras();
+                            const p = cellXY(best.col, best.row);
+                            floatText(p.x, p.y - 26, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                            punch(best.node);
+                        }
                         const cardId = B.eHand[pick.i];
                         B.eHand.splice(pick.i, 1);
                         B.eMana -= def.cost;
@@ -954,9 +1048,12 @@
             if (B.phase !== "player" || B.selected === null) return;
             const def = CARDS[B.hand[B.selected]];
             if (!def) return;
-            if (B.spellTarget) { // прицел: только по врагу
+            if (B.spellTarget) { // прицел: по врагу или по любому существу
+                const sdef = CARDS[B.hand[B.selected]];
                 const u = unitAt(col, row);
-                if (u && u.side === "e") castSpell(B.selected, { col, row });
+                const okUnit = u && u.def.type === "unit"
+                    && (sdef.spell.target === "anyUnit" || u.side === "e");
+                if (okUnit) castSpell(B.selected, { col, row });
                 return;
             }
             if (!deployRows("p").includes(row)) return;
@@ -976,6 +1073,16 @@
             const cardId = B.hand[handIdx];
             const def = CARDS[cardId];
             if (!def || def.type !== "spell" || def.cost > B.mana) return false;
+            if (def.spell.target === "anyUnit") { // усиление: любое существо
+                if (!target || target.col === undefined) return false;
+                const u = unitAt(target.col, target.row);
+                if (!u || u.def.type !== "unit") return false;
+                u.bonusAtk = (u.bonusAtk || 0) + def.spell.buffAtk;
+                recalcAuras();
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 26, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                punch(u.node);
+            }
             if (def.spell.target === "enemyAny") {
                 if (!target) return false;
                 if (target.base === true) {

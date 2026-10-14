@@ -63,11 +63,28 @@
         return c;
     }
 
-    // Крупная карта (колода/награда): рубашка + имя + стоимость + тип + описание
+    // Крупная карта (колода/награда). Если у карты есть img — это готовое
+    // лицо-картинка (рамка/имя/тексты нарисованы), поверх только точка
+    // редкости; иначе — процедурная сборка из рубашки и подписей.
     function cardFace(ctx, cardId, { scale = 1, dim = false } = {}) {
         const { CARDS, RARITY_COLORS } = globalThis.GAME_DATA;
         const def = CARDS[cardId];
         const c = new PIXI.Container();
+        if (def.img) {
+            const face = new PIXI.Sprite(ctx.uiTex(`cards/${def.img}.png`));
+            face.anchor.set(0.5);
+            face.scale.set(330 / face.texture.height); // к высоте эталонной рубашки
+            c.addChild(face);
+            const rDot = new PIXI.Graphics();
+            rDot.circle(84, -118, 6);
+            rDot.fill(RARITY_COLORS[def.rarity] || 0x9a9a9a);
+            rDot.stroke({ width: 1.5, color: 0x1c1207 });
+            rDot.eventMode = "none";
+            c.addChild(rDot);
+            c.scale.set(scale);
+            if (dim) c.alpha = 0.45;
+            return c;
+        }
         const face = new PIXI.Sprite(ctx.uiTex("card_back_min.png"));
         face.anchor.set(0.5);
         if (def.type !== "unit") face.tint = def.color || 0xffffff;
