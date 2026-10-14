@@ -443,7 +443,14 @@
         }
 
         // ── Карты в руке ────────────────────────────────────────────────────
-        function cardBottom(def) {
+        // Лицо — сама картинка карты в оригинальном размере (230×338), без
+        // технических подписей и затемнения. Неразыгрываемая (не хватает маны) —
+        // НЕ полупрозрачная, а затемнённая тинтом. Пока выбрана карта — все
+        // карты руки неинтерактивны: клики уходят в поле (крупные карты
+        // перекрывают нижние ряды); снять выбор — Esc, клик по фону или мимо
+        // подсвеченных клеток.
+        const HAND_Y = 690, HAND_RAISED_Y = 610;
+        function cardBottom(def) { // подпись нижней плашки (фолбэк без картинки)
             if (def.type === "unit") return { text: `${def.atk}⚔ ${def.hp}♥ ${def.speed}→`, small: false };
             const key = `card.${Object.keys(CARDS).find((k) => CARDS[k] === def)}.desc`;
             return { text: GAME_LOC.t(key), small: true };
@@ -451,48 +458,48 @@
         function makeCardNode(card, idx) {
             const def = CARDS[card];
             const c = new PIXI.Container();
-            // лицо: готовая картинка карты, иначе тонированная рубашка
-            let face;
             if (def.img) {
-                face = new PIXI.Sprite(uiTex(`cards/${def.img}.png`));
-                face.anchor.set(0.5, 1);
-                face.scale.set(143 / face.texture.height); // к высоте малой рубашки
-            } else {
-                face = new PIXI.Sprite(uiTex("card_back_small.png"));
+                const face = new PIXI.Sprite(uiTex(`cards/${def.img}.png`));
+                face.anchor.set(0.5, 1); // оригинальный размер спрайта
+                face.tint = def.cost > B.mana ? 0x9f9f9f : 0xffffff;
+                c.addChild(face);
+            } else { // фолбэк без картинки: рубашка + подписи
+                const face = new PIXI.Sprite(uiTex("card_back_small.png"));
                 face.anchor.set(0.5, 1);
                 face.tint = def.type === "unit" ? 0xffffff : (def.color || 0xffffff);
+                if (def.cost > B.mana) face.tint = (face.tint & 0x9f9f9f) >>> 0;
+                c.addChild(face);
+                const plate = new PIXI.Graphics();
+                plate.roundRect(-44, def.type === "unit" ? -132 : -150, 88, def.type === "unit" ? 44 : 62, 6);
+                plate.fill({ color: 0x120d09, alpha: 0.66 });
+                c.addChild(plate);
+                const name = T(GAME_LOC.t(`card.${card}.name`), 13, 0xf3e6c2);
+                name.anchor.set(0.5, 0);
+                name.position.set(0, -128);
+                globalThis.GAME_UI.fit(name, 84, 10);
+                c.addChild(name);
+                const bottom = cardBottom(def);
+                const stats = T(bottom.text, bottom.small ? 11 : 14, 0xd8c79d,
+                    bottom.small ? { wordWrap: true, wordWrapWidth: 84, breakWords: true, align: "center" } : {});
+                stats.anchor.set(0.5, 1);
+                stats.position.set(0, -92);
+                if (!bottom.small) globalThis.GAME_UI.fit(stats, 84, 10);
+                c.addChild(stats);
+                const tag = T(GAME_LOC.t(`type.${def.type}.short`), 10, 0xcfc4a6);
+                tag.anchor.set(0, 1);
+                tag.position.set(-40, -34);
+                c.addChild(tag);
+                const cost = new PIXI.Graphics();
+                cost.circle(34, -136, 13);
+                cost.fill(0x2f6fb0);
+                cost.stroke({ width: 2, color: 0xbfe0ff });
+                c.addChild(cost);
+                const costT = T(String(def.cost), 15, 0xffffff);
+                costT.anchor.set(0.5);
+                costT.position.set(34, -136);
+                c.addChild(costT);
             }
-            c.addChild(face);
-            const plate = new PIXI.Graphics();
-            plate.roundRect(-44, def.type === "unit" ? -132 : -150, 88, def.type === "unit" ? 44 : 62, 6);
-            plate.fill({ color: 0x120d09, alpha: 0.66 });
-            c.addChild(plate);
-            const name = T(GAME_LOC.t(`card.${card}.name`), 13, 0xf3e6c2);
-            name.anchor.set(0.5, 0);
-            name.position.set(0, -128);
-            globalThis.GAME_UI.fit(name, 84, 10);
-            c.addChild(name);
-            const bottom = cardBottom(def);
-            const stats = T(bottom.text, bottom.small ? 11 : 14, 0xd8c79d,
-                bottom.small ? { wordWrap: true, wordWrapWidth: 84, breakWords: true, align: "center" } : {});
-            stats.anchor.set(0.5, 1);
-            stats.position.set(0, -92);
-            if (!bottom.small) globalThis.GAME_UI.fit(stats, 84, 10);
-            c.addChild(stats);
-            const tag = T(GAME_LOC.t(`type.${def.type}.short`), 10, 0xcfc4a6);
-            tag.anchor.set(0, 1);
-            tag.position.set(-40, -34);
-            c.addChild(tag);
-            const cost = new PIXI.Graphics();
-            cost.circle(34, -136, 13);
-            cost.fill(0x2f6fb0);
-            cost.stroke({ width: 2, color: 0xbfe0ff });
-            c.addChild(cost);
-            const costT = T(String(def.cost), 15, 0xffffff);
-            costT.anchor.set(0.5);
-            costT.position.set(34, -136);
-            c.addChild(costT);
-            c.eventMode = "static";
+            c.eventMode = B.selected === null ? "static" : "none";
             c.cursor = "pointer";
             c.on("pointertap", () => onCardTap(idx));
             // альтернативный режим призыва (Настройки): наведение увеличивает
@@ -501,7 +508,6 @@
             c.on("pointerout", () => hoverCard(idx, false));
             c.on("pointerdown", (e) => startCardDrag(idx, e));
             c.on("globalpointermove", (e) => moveCardDrag(e));
-            c.alpha = def.cost > B.mana ? 0.55 : 1;
             return c;
         }
 
@@ -511,9 +517,10 @@
             const n = B.hand.length;
             B.hand.forEach((card, idx) => {
                 const node = makeCardNode(card, idx);
-                const spread = Math.min(112, 700 / Math.max(1, n));
+                // крупные карты (230px): веер пошире, перекрытие допустимо
+                const spread = Math.min(190, 1150 / Math.max(1, n));
                 node.x = 640 + (idx - (n - 1) / 2) * spread;
-                node.y = B.selected === idx ? 616 : 656;
+                node.y = B.selected === idx ? HAND_RAISED_Y : HAND_Y;
                 node.rotation = (idx - (n - 1) / 2) * 0.035;
                 if (B.selected === idx) node.scale.set(1.12);
                 root.cardsLayer.addChild(node);
@@ -543,7 +550,7 @@
             const node = root.cardsLayer.children[idx];
             if (!node) return;
             const raised = on || B.selected === idx;
-            node.y = raised ? 616 : 656;
+            node.y = raised ? HAND_RAISED_Y : HAND_Y;
             node.scale.set(raised ? 1.12 : 1);
         }
         function startCardDrag(idx, e) {
@@ -574,10 +581,12 @@
             drawDragFx();
         }
         function drawDragFx() {
-            if (!dragFx) {
+            // после exit() сцены dragFx мог остаться ссылкой на уничтоженный
+            // Graphics (в Pixi v8 у него внутрь null) — проверяем живость
+            if (!dragFx || dragFx.destroyed) {
                 dragFx = new PIXI.Graphics();
                 dragFx.eventMode = "none";
-                root.addChild(dragFx); // поверх HUD (добавляется последним)
+                if (root) root.addChild(dragFx); // поверх HUD (добавляется последним)
             }
             dragFx.clear();
             if (!drag || !drag.moved || !drag.over) return;
@@ -602,7 +611,7 @@
             if (!drag) return;
             const d = drag;
             drag = null;
-            if (dragFx) dragFx.clear();
+            if (dragFx && !dragFx.destroyed) dragFx.clear();
             if (!d.moved) { layoutHand(); return; } // короткий клик — выбор уже сыграл pointertap
             let over = d.over;
             if (ev && ev.clientX !== undefined) { // отпустили за пределами канваса — отмена
@@ -1017,6 +1026,16 @@
             return cardId;
         }
 
+        // снять выбор карты: карты руки снова интерактивны
+        function deselect() {
+            if (B.selected === null && !B.spellTarget) return;
+            B.selected = null;
+            B.spellTarget = false;
+            layoutHand();
+            redrawHighlight();
+            refreshHud();
+        }
+
         function onCardTap(idx) {
             if (B.phase !== "player") return;
             const def = CARDS[B.hand[idx]];
@@ -1054,11 +1073,16 @@
                 const okUnit = u && u.def.type === "unit"
                     && (sdef.spell.target === "anyUnit" || u.side === "e");
                 if (okUnit) castSpell(B.selected, { col, row });
+                else deselect(); // мимо цели — снять выбор
                 return;
             }
-            if (!deployRows("p").includes(row)) return;
-            if (unitAt(col, row)) return;
-            if (def.cost > B.mana) return;
+            // мимо допустимых клеток (не в зоне / занято / не хватает маны) —
+            // снять выбор: карты руки снова кликабельны (при выбранной карте
+            // они неинтерактивны, чтобы крупные карты не съедали клики полем)
+            if (!deployRows("p").includes(row) || unitAt(col, row) || def.cost > B.mana) {
+                deselect();
+                return;
+            }
             B.mana -= def.cost;
             const cardId = spendCard(B.selected);
             addUnit("p", cardId, col, row);
@@ -1183,6 +1207,7 @@
             moves.length = 0; floats.length = 0; punches.length = 0; // хвосты прошлого боя
             overlay = null;
             drag = null;
+            dragFx = null; // прошлого боя Graphics уничтожен вместе с root
 
             root = new PIXI.Container();
             root.eventMode = "static";
@@ -1226,6 +1251,7 @@
             drag = null;
             if (root) { root.destroy({ children: true }); root = null; }
             overlay = null;
+            dragFx = null; // Graphics умер вместе с root — не держим мёртвую ссылку
             G.battle = null;
         }
 
@@ -1285,11 +1311,7 @@
                 return;
             }
             if (B.phase === "player" && B.selected !== null && ctx.input.wasPressed("Escape")) {
-                B.selected = null;
-                B.spellTarget = false;
-                layoutHand();
-                redrawHighlight();
-                refreshHud();
+                deselect();
             }
         }
 
