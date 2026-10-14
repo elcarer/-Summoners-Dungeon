@@ -16,6 +16,9 @@
         function applySound() {
             if (ctx.audio && ctx.audio.setVolume) ctx.audio.setVolume(G.settings.sound / 10);
         }
+        function applyMusic() {
+            if (ctx.audio && ctx.audio.setMusicVolume) ctx.audio.setMusicVolume(G.settings.music / 10);
+        }
         function save() { globalThis.GAME_META.saveSettings(G.settings); }
 
         // Степпер: [−] ▮▮▮▮▯▯ [+]
@@ -37,6 +40,7 @@
                     if (ctx.sfx) ctx.sfx();
                     G.settings[key] = Math.max(0, Math.min(10, G.settings[key] + delta));
                     if (key === "sound") applySound();
+                    else if (key === "music") applyMusic();
                     save();
                     rebuild();
                 });
@@ -136,7 +140,7 @@
             }));
         }
         rebuild();
-        return { node: outer, rebuild, applySound };
+        return { node: outer, rebuild, applySound, applyMusic };
     }
 
     function createSettingsScene(ctx) {
@@ -166,6 +170,7 @@
                 setStep(key, v) {
                     G.settings[key] = Math.max(0, Math.min(10, v));
                     if (key === "sound") panel && panel.applySound();
+                    else if (key === "music") panel && panel.applyMusic();
                     globalThis.GAME_META.saveSettings(G.settings);
                     panel && panel.rebuild();
                 },

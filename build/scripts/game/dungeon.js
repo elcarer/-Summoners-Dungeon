@@ -165,6 +165,7 @@
 
         return {
             enter() {
+                if (ctx.music) ctx.music("dungeon");
                 if (!G.dungeon) G.dungeon = newDungeonState(G.run.floor);
                 const st = G.dungeon;
                 layer = new PIXI.Container();

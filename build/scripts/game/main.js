@@ -93,9 +93,61 @@
         const savedMeta = GAME_META.loadMeta();
         const { DEFAULT_DECK, DEFAULT_COLLECTION } = GAME_DATA;
 
-        // ── Звук: мастер движка = ползунок «звук»; клики UI ────────────────
+        // ── Звук: два канала движка — эффекты («звук») и музыка («музыка») ──
         const audio = createAudio();
         audio.setVolume(settings.sound / 10);
+        audio.setMusicVolume(settings.music / 10);
+
+        // Файлы из build/sound: sfx-эффекты боя/UI + музыка сцен.
+        // Музыка грузится лениво при первом вызове music() (треки тяжёлые);
+        // короткие sfx предзагружаются сразу, фоном.
+        const SFX_FILES = {
+            menu: "menu.mp3",      // клики UI
+            chpoc: "chpoc.mp3",    // добор карты / сброс
+            use: "use.mp3",        // призыв существа/строения
+            mine: "mine.mp3",      // установка ловушки
+            sword: "sword.mp3",    // атака существом
+            dam: "dam.mp3",        // урон (прочие источники)
+            acid: "acid.mp3",      // сработала ловушка
+            rocket: "rocket.mp3",  // заклинание-снаряд
+            up: "up.mp3",          // усиление (+ к урону)
+            die: "die.mp3",        // гибель существа / поражение
+            crash: "crash.mp3",    // удар по базе
+            step: "step.mp3",      // шаг существа (марш/рывок)
+            aqua: "aqua.mp3",      // сфера → +1 энергия
+            coins: "coins.mp3",    // выбор трофея
+            lvlUp: "lvlUp.mp3",    // победа
+            openRoom: "openRoom.mp3", // начало боя
+        };
+        // Тихие/частые звуки — множитель поверх ползунка «звук»
+        const SFX_VOL = {
+            menu: 0.7, step: 0.45, chpoc: 0.9, dam: 0.8, use: 1.0, sword: 0.9,
+            die: 0.9, crash: 1.0, up: 0.85, mine: 0.9, acid: 0.9, rocket: 0.85,
+            aqua: 0.8, coins: 0.9, lvlUp: 1.0, openRoom: 0.8,
+        };
+        const MUSIC_FILES = {
+            menu: "CoinCreek.mp3",
+            dungeon: "Hearthside Tankard R1.mp3",
+            battle: "Dungeon Run.mp3",
+        };
+        for (const [name, file] of Object.entries(SFX_FILES)) {
+            audio.registerFile(name, "./sound/" + encodeURI(file));
+        }
+        for (const [name, file] of Object.entries(MUSIC_FILES)) {
+            audio.registerFile("music:" + name, "./sound/" + encodeURI(file));
+        }
+        audio.preload(Object.keys(SFX_FILES));
+        // Аудио разрешён только после жеста юзера — ловим любой
+        const unlockAudio = () => { try { audio.unlock(); } catch (e) { /* нет WebAudio */ } };
+        window.addEventListener("pointerdown", unlockAudio);
+        window.addEventListener("keydown", unlockAudio);
+        const sfxCounts = {};
+        const gameSfx = (name) => {
+            const key = name || "menu";
+            sfxCounts[key] = (sfxCounts[key] || 0) + 1;
+            audio.playFile(key, SFX_VOL[key] !== undefined ? SFX_VOL[key] : 1);
+        };
+        const gameMusic = (name) => { audio.music(name); };
 
         // ── Общий контекст для сцен ────────────────────────────────────────
         const scheduler = createScheduler();
@@ -144,12 +196,8 @@
         const ctx = {
             app, world, ECS, COMPONENTS, DATA, worldContainer, addSystem,
             assets, uiTex, scheduler, input, camera, characters, knight, creatureSheets, G, ui, audio,
-            sfx() {
-                try {
-                    audio.unlock();
-                    audio.tone({ freq: 660, dur: 0.045, type: "triangle", volume: 0.3 });
-                } catch (e) { /* аудио может быть недоступно до жеста */ }
-            },
+            sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
+            music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
         };
 
         const scenes = createScenes({ addSystem });
@@ -166,6 +214,7 @@
         }
         scenes.add("menu", {
             enter() {
+                gameMusic("menu");
                 menuRoot = new PIXI.Container();
                 menuRoot.eventMode = "static";
                 const bg = new PIXI.Sprite(uiTex("bg_corridor_1.png"));
@@ -271,6 +320,11 @@
             dungeon: dungeonScene, arena: arenaScene,
             arenaApi: arenaScene.api, deckApi: deckScene.api,
             rewardApi: rewardScene.api, settingsApi: settingsScene.api,
+            audio: {
+                track: () => audio.status().track,
+                status: () => audio.status(),
+                sfxCounts: () => ({ ...sfxCounts }),
+            },
             toScreen: (x, y) => ({ x: ui.x + x * ui.scale.x, y: ui.y + y * ui.scale.y }),
             test: {
                 COMPONENTS,

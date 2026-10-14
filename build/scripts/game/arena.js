@@ -33,12 +33,16 @@
     // получает 3 сферы; в конце хода каждую сферу он обращает в «+1 карта»
     // (немедленный добор) или «+1 энергия» (на следующий ход). Потратив все
     // сферы, игрок завершает ход автоматически.
-    const ORBS_PER_TURN = 3, HAND_MAX = 6;
+    // Лимит руки — 7 карт, проверяется ТОЛЬКО в конце хода: пока ход идёт,
+    // добор ничем не ограничен; когда все сферы потрачены, лишнее (сверх 7)
+    // игрок сбрасывает по своему выбору (панель сброса), и ход переходит врагу.
+    const ORBS_PER_TURN = 3, HAND_MAX = 7;
     const { CARDS, ENCOUNTERS, TRAP_SLOTS } = globalThis.GAME_DATA;
 
     function createArenaScene(ctx) {
         const { scenes, G, uiTex, scheduler } = ctx;
         const t = (k, v) => GAME_LOC.t(k, v);
+        const sfx = (name) => { if (ctx.sfx) ctx.sfx(name); };
         const delay = (s) => new Promise((r) => scheduler.after(s, r));
         let root = null, B = null;
 
@@ -273,6 +277,7 @@
             node.scale.set(0.2);
             punches.push({ node, life: 0.3 });
             root.unitsLayer.addChild(node);
+            sfx("use"); // призыв (обе стороны)
             B.units.push(u);
             recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда
             if (def.type === "unit") {
@@ -337,7 +342,7 @@
             const occ = unitAt(u.col, ahead);
             if (occ) {
                 if (occ.side !== u.side) {
-                    damageUnit(occ, u.curAtk, u);
+                    damageUnit(occ, u.curAtk, u, "sword");
                     refreshHud();
                     checkEnd();
                 }
@@ -347,6 +352,7 @@
             const p = cellXY(u.col, u.row);
             glide(u, p.x, p.y);
             setWalk(u, true);
+            sfx("step");
             afterMoved(u); // перемещение — вражеские ловушки могут сработать
         }
 
@@ -361,7 +367,7 @@
             redrawTraps();
             const p = cellXY(u.col, u.row);
             floatText(p.x, p.y - 40, "?!", 0xe08cd0);
-            damageUnit(u, trap.def.trap.amount, null);
+            damageUnit(u, trap.def.trap.amount, null, "acid");
             refreshHud();
             checkEnd();
         }
@@ -374,6 +380,7 @@
 
         function killUnit(u, killer) {
             removeUnit(u);
+            sfx("die");
             if (u.def.type === "building") recalcAuras();
             // ловушки стороны погибшего: триггер «при гибели своего существа»
             if (killer && killer.def && killer.def.type === "unit" && killer.side !== u.side) {
@@ -381,17 +388,21 @@
             }
         }
 
-        function damageUnit(target, amount, killer = null) {
+        // snd — звук удара: "sword" (атака существом), "acid" (ловушка),
+        // "rocket" (заклинание), по умолчанию "dam"
+        function damageUnit(target, amount, killer = null, snd = "dam") {
             target.hp -= amount;
             const n = target.node.getChildByName("hp");
             if (n) n.text = String(Math.max(0, target.hp));
             const p = cellXY(target.col, target.row);
             floatText(p.x, p.y - 24, `−${amount}`, 0xffb26e);
             punch(target.node);
+            sfx(snd);
             if (target.hp <= 0) killUnit(target, killer);
         }
 
         function baseHit(side, u) {
+            sfx("crash");
             if (side === "p") {
                 B.enemyBase -= u.curAtk;
                 const p = cellXY(u.col, 0);
@@ -409,6 +420,7 @@
             if (B.traps[side].length >= TRAP_SLOTS) return false;
             B.traps[side].push({ def: CARDS[cardId] });
             redrawTraps();
+            sfx("mine");
             return true;
         }
         function triggerTraps(side, killer) {
@@ -421,7 +433,7 @@
                 const amount = trap.def.trap.amount;
                 const victims = B.units.filter((v) => v.side !== side && v.row === killer.row);
                 for (const v of victims) {
-                    if (B.units.includes(v)) damageUnit(v, amount, null);
+                    if (B.units.includes(v)) damageUnit(v, amount, null, "acid");
                 }
                 refreshHud();
                 checkEnd();
@@ -551,7 +563,7 @@
                 && def.cost <= B.energy && deployRows("p").includes(row) && !unitAt(col, row);
         }
         function hoverCard(idx, on) {
-            if (!G.settings.dragSummon || drag || B.phase !== "player" || overlay) return;
+            if (!G.settings.dragSummon || drag || B.phase !== "player" || overlay || B.discarding) return;
             const node = root.cardsLayer.children[idx];
             if (!node) return;
             const raised = on || B.selected === idx;
@@ -559,7 +571,7 @@
             node.scale.set(raised ? 1.12 : 1);
         }
         function startCardDrag(idx, e) {
-            if (!G.settings.dragSummon || B.phase !== "player" || overlay) return;
+            if (!G.settings.dragSummon || B.phase !== "player" || overlay || B.discarding) return;
             const def = CARDS[B.hand[idx]];
             if (!def || (def.type !== "unit" && def.type !== "building")) return;
             const node = root.cardsLayer.children[idx];
@@ -640,7 +652,8 @@
         // ── Панель энергосфер (конец хода) ─────────────────────────────────
         // Каждую из оставшихся сфер игрок обращает в «+1 карта» или
         // «+1 энергия» (на следующий ход); потратив все — ход завершается
-        // сам. Добор недоступен только при полной руке (лимит 6).
+        // сам. Добор не ограничен: если рука выросла сверх лимита (7), перед
+        // концом хода откроется панель сброса лишних карт.
         let orbPanel = null;
         function closeOrbPanel() {
             if (!orbPanel) return;
@@ -680,13 +693,10 @@
             hint.position.set(640, 302);
             hint.eventMode = "none";
             node.addChild(hint);
-            const canDraw = B.hand.length < HAND_MAX;
-            const bDraw = button(ctx, {
+            node.addChild(button(ctx, {
                 tex: "button_stone.png", label: t("orb.draw"), x: 505, y: 405, scale: 0.95,
                 onTap: () => pickOrb("draw"),
-            });
-            if (!canDraw) bDraw.alpha = 0.45;
-            node.addChild(bDraw);
+            }));
             node.addChild(button(ctx, {
                 tex: "button_stone.png", label: t("orb.energy"), x: 775, y: 405, scale: 0.95,
                 onTap: () => pickOrb("energy"),
@@ -697,18 +707,101 @@
         function pickOrb(kind) {
             if (!B || B.phase !== "player" || !orbPanel || B.orbs <= 0) return false;
             if (kind === "draw") {
-                if (B.hand.length >= HAND_MAX) return false; // рука полна — только энергия
                 drawCards(1);
+                sfx("chpoc");
             } else if (kind === "energy") {
                 B.energy += 1; // к следующему ходу (ход сейчас же и завершится)
+                sfx("aqua");
             } else return false;
             B.orbs -= 1;
             refreshHud();
             if (B.orbs <= 0) {
                 closeOrbPanel();
-                enemyTurn(); // все сферы потрачены — ход окончен
+                if (B.hand.length > HAND_MAX) buildDiscardPanel(); // лимит руки — на конце хода
+                else enemyTurn(); // все сферы потрачены — ход окончен
             } else buildOrbPanel();
             return true;
+        }
+
+        // ── Панель сброса лишних карт (конец хода при руке > 7) ─────────────
+        // Лимит руки проверяется только здесь: игрок кликами сбрасывает
+        // карты по своему выбору, пока в руке не останется 7 — тогда ход
+        // переходит врагу.
+        let discardPanel = null;
+        function closeDiscardPanel() {
+            if (!discardPanel) return;
+            discardPanel.destroy({ children: true });
+            discardPanel = null;
+            if (B) B.discarding = false;
+        }
+        function buildDiscardPanel() {
+            closeDiscardPanel();
+            B.discarding = true;
+            const node = new PIXI.Container();
+            node.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(0, 0, 1280, 720);
+            dim.fill({ color: 0x000000, alpha: 0.6 });
+            dim.eventMode = "static";
+            node.addChild(dim);
+            const frame = new PIXI.Graphics();
+            frame.roundRect(150, 160, 980, 350, 12);
+            frame.fill({ color: 0x171310, alpha: 0.96 });
+            frame.stroke({ width: 2, color: 0x6b5c40 });
+            node.addChild(frame);
+            const title = T(t("discard.title"), 26, 0xf0c96a, { stroke: { color: 0x241505, width: 5 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(640, 182);
+            title.eventMode = "none";
+            node.addChild(title);
+            const hint = T(t("discard.hint", { n: B.hand.length - HAND_MAX }), 17, 0xd8c79d);
+            hint.anchor.set(0.5, 0);
+            hint.position.set(640, 226);
+            hint.eventMode = "none";
+            node.addChild(hint);
+            const n = B.hand.length;
+            const spread = Math.min(100, 900 / Math.max(1, n));
+            B.hand.forEach((card, idx) => {
+                const def = CARDS[card];
+                const c = new PIXI.Container();
+                if (def.img) {
+                    const face = new PIXI.Sprite(uiTex(`cards/${def.img}.png`));
+                    face.anchor.set(0.5, 0.5);
+                    face.scale.set(0.55);
+                    c.addChild(face);
+                } else { // фолбэк без картинки: рубашка + имя
+                    const face = new PIXI.Sprite(uiTex("card_back_small.png"));
+                    face.anchor.set(0.5, 0.5);
+                    c.addChild(face);
+                    const nm = T(GAME_LOC.t(`card.${card}.name`), 12, 0xf3e6c2);
+                    nm.anchor.set(0.5);
+                    nm.position.set(0, 46);
+                    nm.eventMode = "none";
+                    c.addChild(nm);
+                }
+                c.position.set(640 + (idx - (n - 1) / 2) * spread, 400);
+                c.eventMode = "static";
+                c.cursor = "pointer";
+                c.on("pointertap", () => pickDiscard(idx));
+                node.addChild(c);
+            });
+            root.addChild(node);
+            discardPanel = node;
+        }
+        function pickDiscard(idx) {
+            if (!B || !B.discarding || !discardPanel) return;
+            const cardId = B.hand.splice(idx, 1)[0];
+            if (cardId) B.discard.push(cardId);
+            sfx("chpoc");
+            if (B.hand.length <= HAND_MAX) {
+                closeDiscardPanel();
+                layoutHand();
+                refreshHud();
+                enemyTurn(); // сброс завершён — ход переходит врагу
+            } else {
+                layoutHand();
+                buildDiscardPanel(); // пересборка: новый состав руки и счётчик
+            }
         }
 
         // ── HUD боя ────────────────────────────────────────────────────────
@@ -816,6 +909,7 @@
             if (drag) endCardDrag(); // защита от пересечения состояний
         }
         function openOverlay(name) {
+            if (overlay || (B && B.discarding)) return; // поверх сброса — ничего
             if (overlay) closeOverlay();
             const node = new PIXI.Container();
             node.eventMode = "static"; // глотает клики — поле под ним молчит
@@ -920,8 +1014,9 @@
             return arr;
         }
         function drawCards(count) {
+            // в процессе хода рука ничем не ограничена — лимит 7 проверяется
+            // только в конце хода (панель сброса)
             for (let k = 0; k < count; k++) {
-                if (B.hand.length >= HAND_MAX) break;
                 if (!B.deck.length) { B.deck = shuffle(B.discard); B.discard = []; }
                 if (!B.deck.length) break;
                 B.hand.push(B.deck.pop());
@@ -955,7 +1050,7 @@
                     const occ = unitAt(u.col, ahead);
                     if (occ) {
                         if (occ.side !== u.side) {
-                            damageUnit(occ, u.curAtk, u);
+                            damageUnit(occ, u.curAtk, u, "sword");
                             refreshHud();
                             if (checkEnd()) return;
                         }
@@ -965,6 +1060,7 @@
                     const p = cellXY(u.col, u.row);
                     glide(u, p.x, p.y);
                     setWalk(u, true);
+                    sfx("step");
                     await delay(0.52); // глиссада 0.5с + пауза: полный шаг походки
                     if (B.stopped) return;
                     afterMoved(u); // перемещение — ловушки врага
@@ -1042,29 +1138,31 @@
                     }
                     if (def.type === "spell") {
                         if (def.spell.draw && B.eHand.length > 4) continue;
-                        if (def.spell.target === "anyUnit") { // усиление — своему сильнейшему
-                            const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
-                            if (!own.length) continue;
-                            const best = own.sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
-                            best.bonusAtk = (best.bonusAtk || 0) + def.spell.buffAtk;
-                            recalcAuras();
-                            const p = cellXY(best.col, best.row);
-                            floatText(p.x, p.y - 26, `+${def.spell.buffAtk}⚔`, 0x9fd489);
-                            punch(best.node);
+                    if (def.spell.target === "anyUnit") { // усиление — своему сильнейшему
+                        const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
+                        if (!own.length) continue;
+                        const best = own.sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                        best.bonusAtk = (best.bonusAtk || 0) + def.spell.buffAtk;
+                        recalcAuras();
+                        const p = cellXY(best.col, best.row);
+                        floatText(p.x, p.y - 26, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                        punch(best.node);
+                        sfx("up");
+                    }
+                    const cardId = B.eHand[pick.i];
+                    B.eHand.splice(pick.i, 1);
+                    B.eEnergy -= def.cost;
+                    if (def.spell.target === "enemyAny") {
+                        const targets = B.units.filter((u) => u.side === "p");
+                        if (targets.length) {
+                            const best = targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                            damageUnit(best, def.spell.dmg, null, "rocket");
+                        } else {
+                            B.playerBase -= def.spell.dmg;
+                            floatText(640, 560, `−${def.spell.dmg}`, 0xff5f4e);
+                            sfx("rocket");
                         }
-                        const cardId = B.eHand[pick.i];
-                        B.eHand.splice(pick.i, 1);
-                        B.eEnergy -= def.cost;
-                        if (def.spell.target === "enemyAny") {
-                            const targets = B.units.filter((u) => u.side === "p");
-                            if (targets.length) {
-                                const best = targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
-                                damageUnit(best, def.spell.dmg, null);
-                            } else {
-                                B.playerBase -= def.spell.dmg;
-                                floatText(640, 560, `−${def.spell.dmg}`, 0xff5f4e);
-                            }
-                        }
+                    }
                         if (def.spell.draw) drawEnemy(def.spell.draw);
                         B.eDiscard.push(cardId);
                         refreshHud();
@@ -1118,7 +1216,7 @@
         }
 
         function onCardTap(idx) {
-            if (B.phase !== "player") return;
+            if (B.phase !== "player" || B.discarding) return;
             const def = CARDS[B.hand[idx]];
             if (!def) return;
             if (ctx.sfx) ctx.sfx();
@@ -1145,7 +1243,7 @@
         }
 
         function onCellTap(col, row) {
-            if (B.phase !== "player" || B.selected === null) return;
+            if (B.phase !== "player" || B.discarding || B.selected === null) return;
             const def = CARDS[B.hand[B.selected]];
             if (!def) return;
             if (B.spellTarget) { // прицел: по врагу или по любому существу
@@ -1174,7 +1272,7 @@
         }
 
         function castSpell(handIdx, target) {
-            if (B.phase !== "player") return false;
+            if (B.phase !== "player" || B.discarding) return false;
             const cardId = B.hand[handIdx];
             const def = CARDS[cardId];
             if (!def || def.type !== "spell" || def.cost > B.energy) return false;
@@ -1187,6 +1285,7 @@
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 26, `+${def.spell.buffAtk}⚔`, 0x9fd489);
                 punch(u.node);
+                sfx("up");
             }
             if (def.spell.target === "enemyAny") {
                 if (!target) return false;
@@ -1194,10 +1293,11 @@
                     B.enemyBase -= def.spell.dmg;
                     floatText(640, 40, `−${def.spell.dmg}`, 0xff8f6e);
                     punch(root.hud);
+                    sfx("rocket");
                 } else if (target.col !== undefined) {
                     const u = unitAt(target.col, target.row);
                     if (!u || u.side === "p") return false;
-                    damageUnit(u, def.spell.dmg, null);
+                    damageUnit(u, def.spell.dmg, null, "rocket");
                 } else return false;
             }
             if (def.spell.draw) drawCards(def.spell.draw);
@@ -1214,6 +1314,7 @@
         function finish(victory) {
             B.phase = "over";
             B.spellTarget = false;
+            sfx(victory ? "lvlUp" : "die");
             refreshHud();
             const ov = new PIXI.Container();
             const dim = new PIXI.Graphics();
@@ -1273,6 +1374,7 @@
             const encId = G.activeEnemy ? G.activeEnemy.enc : "gob";
             const enc = ENCOUNTERS[encId] || ENCOUNTERS.gob;
             curScene = enc.scene || 1;
+            if (ctx.music) ctx.music("battle");
             B = {
                 encId, phase: "player", stopped: false, turnNo: 1,
                 energy: 1, eEnergy: 1, orbs: ORBS_PER_TURN,
@@ -1282,6 +1384,7 @@
                 eDeck: shuffle([...enc.deck]), eDiscard: [], eHand: [],
                 units: [], traps: { p: [], e: [] },
                 selected: null, spellTarget: false, result: null,
+                discarding: false,
             };
             G.battle = B;
             drawCards(4);
@@ -1290,6 +1393,8 @@
             drag = null;
             dragFx = null; // прошлого боя Graphics уничтожен вместе с root
             orbPanel = null;
+            discardPanel = null;
+            sfx("openRoom"); // начало боя
 
             root = new PIXI.Container();
             root.eventMode = "static";
@@ -1332,6 +1437,7 @@
             window.removeEventListener("pointerup", endCardDrag); // хвост незавершённого drag
             drag = null;
             closeOrbPanel();
+            closeDiscardPanel();
             if (root) { root.destroy({ children: true }); root = null; }
             overlay = null;
             dragFx = null; // Graphics умер вместе с root — не держим мёртвую ссылку
@@ -1400,10 +1506,13 @@
 
         const api = {
             endTurn() {
-                if (!B || B.phase !== "player" || orbPanel) return;
+                if (!B || B.phase !== "player" || orbPanel || B.discarding) return;
                 buildOrbPanel(); // конец хода = распределение энергосфер
             },
             orbChoice(kind) { return pickOrb(kind); },
+            // панель сброса лишних карт (конец хода, рука > 7)
+            discardPick(idx) { pickDiscard(idx); },
+            discardNeeded: () => (B ? Math.max(0, B.hand.length - HAND_MAX) : 0),
             playCardAt(handIdx, col, row) {
                 B.selected = handIdx;
                 B.spellTarget = false;
@@ -1429,6 +1538,7 @@
                     phase: B.phase, result: B.result,
                     pBase: B.playerBase, eBase: B.enemyBase,
                     energy: B.energy, eEnergy: B.eEnergy, orbs: B.orbs, hand: [...B.hand],
+                    discarding: !!B.discarding,
                     units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body") })),
                     traps: { p: B.traps.p.length, e: B.traps.e.length },
                 };

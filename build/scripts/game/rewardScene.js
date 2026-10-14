@@ -23,6 +23,7 @@
             const id = options[index];
             G.collection[id] = (G.collection[id] || 0) + 1;
             globalThis.GAME_META.saveMeta(G.collection, G.deck);
+            if (ctx.sfx) ctx.sfx("coins");
             rebuild();
             // подсветка выбора видна ~0.7с, затем карта сама ведёт в подземелье
             scheduler.after(0.7, () => {
