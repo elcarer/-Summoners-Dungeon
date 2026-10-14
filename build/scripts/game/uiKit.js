@@ -241,7 +241,11 @@
             scrollBy,
             debug() {
                 const b = inner.getLocalBounds();
-                return { children: inner.children.length, bounds: { x: b.x, y: b.y, w: b.width, h: b.height }, contentH };
+                return {
+                    children: inner.children.length,
+                    grandchildren: inner.children[0] && inner.children[0].children ? inner.children[0].children.length : 0,
+                    bounds: { x: b.x, y: b.y, w: b.width, h: b.height }, contentH,
+                };
             },
             get state() { return { t, contentH, viewH: h }; },
         };

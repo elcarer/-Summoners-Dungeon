@@ -1,11 +1,12 @@
 // СЦЕНА «КОЛОДА И КОЛЛЕКЦИЯ» — редактор колоды из меню.
-// Слева — текущая колода (клик по строке убирает копию), справа — коллекция
-// (клик добавляет копию). Фильтры по типу/цене/редкости/стихии; оба окна —
-// скролл-панели (колесо мыши, ползунок, клик по треку). Сохранение сразу.
+// Слева — текущая колода карточками (клик по карте убирает копию),
+// справа — коллекция (клик добавляет копию). Фильтры по типу/цене/редкости/
+// стихии; оба окна — скролл-панели (колесо мыши, ползунок, клик по треку).
+// Сохранение сразу.
 (function () {
     function createDeckScene(ctx) {
         const { scenes, G, ui, uiTex } = ctx;
-        const { CARDS, DECK_MAX, DECK_MIN, RARITY_COLORS, ELEM_LOGO } = globalThis.GAME_DATA;
+        const { CARDS, DECK_MAX, DECK_MIN, ELEM_LOGO } = globalThis.GAME_DATA;
         const { T, fit, button, chip, cardFace, dimBg, scrollPane } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
         let root = null, leftPane = null, rightPane = null;
@@ -25,54 +26,30 @@
         }
         function save() { globalThis.GAME_META.saveMeta(G.collection, G.deck); }
 
-        // ── левое окно: список колоды ──────────────────────────────────────
+        // ── левое окно: колода карточками (как коллекция) ──────────────────
         function buildDeckList() {
             const c = new PIXI.Container();
             const ids = [...new Set(G.deck)].sort((a, b) => {
                 const da = CARDS[a], db = CARDS[b];
                 return (da.cost - db.cost) || a.localeCompare(b);
             }).filter(passes);
+            const locked = G.deck.length <= DECK_MIN; // минимум — убирать нельзя
             ids.forEach((id, i) => {
-                const def = CARDS[id];
-                const row = new PIXI.Container();
-                const chipG = new PIXI.Graphics();
-                chipG.roundRect(0, 2, 22, 20, 4);
-                chipG.fill(def.color || 0x666666);
-                chipG.eventMode = "none";
-                row.addChild(chipG);
-                const rDot = new PIXI.Graphics();
-                rDot.circle(11, 26, 3);
-                rDot.fill(RARITY_COLORS[def.rarity] || 0x9a9a9a);
-                rDot.eventMode = "none";
-                row.addChild(rDot);
-                const name = T(`${t(`card.${id}.name`)}  ×${countIn(id)}`, 16, 0xf3e6c2);
-                name.position.set(32, 0);
-                name.eventMode = "none";
-                fit(name, 300, 11);
-                row.addChild(name);
-                const cost = T(String(def.cost), 14, 0xbfe0ff);
-                cost.position.set(344, 0);
-                cost.eventMode = "none";
-                row.addChild(cost);
-                const type = T(t(`type.${def.type}.short`), 11, 0x8a7c5e);
-                type.position.set(366, 3);
-                type.eventMode = "none";
-                row.addChild(type);
-                const hit = new PIXI.Graphics();
-                hit.rect(-4, -4, 396, 32);
-                hit.fill({ color: 0xffffff, alpha: 0.001 });
-                hit.eventMode = "static";
-                hit.on("pointertap", () => api.remove(id));
-                row.addChild(hit);
-                row.position.set(4, i * 32);
-                c.addChild(row);
+                const col = i % 3, rowI = (i / 3) | 0;
+                const cx = 62 + col * 132, cy = 92 + rowI * 205;
+                const card = cardFace(ctx, id, { scale: 0.5, dim: locked });
+                card.position.set(cx, cy);
+                card.eventMode = "static";
+                card.on("pointertap", () => api.remove(id));
+                c.addChild(card);
+                const cnt = T(`×${countIn(id)}`, 13, locked ? 0x8a7c5e : 0xd8c79d);
+                cnt.anchor.set(0.5, 0);
+                cnt.position.set(cx, cy + 102); // под картинкой карты, как в коллекции
+                cnt.eventMode = "none";
+                c.addChild(cnt);
             });
-            if (!ids.length) {
-                const empty = T(t("filter.all"), 14, 0x8a7c5e);
-                empty.position.set(4, 4);
-                c.addChild(empty);
-            }
-            c.userData = { contentH: ids.length * 32 + 12 };
+            const rowsN = Math.ceil(ids.length / 3);
+            c.userData = { contentH: ids.length ? (92 + (rowsN - 1) * 205 + 155) : 40 };
             return c;
         }
 
@@ -154,7 +131,7 @@
             left.stroke({ width: 2, color: 0x6b5c40 });
             root.addChild(left);
             const deckH = T("", 20, 0xf3e6c2);
-            deckH.position.set(66, 98);
+            deckH.position.set(66, 88); // на 10px выше (просил юзер)
             deckH.eventMode = "none";
             root.addChild(deckH);
             const minH = T("", 13, 0x8a7c5e);
