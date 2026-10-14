@@ -47,20 +47,22 @@
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
         });
 
-        // ── Зона призыва: [перед своей базой .. ряд перед самым выдвинутым
-        //    своим юнитом/строением]. По умолчанию — ОДИН ряд перед базой;
-        //    призыв и продвижение расширяют зону. ─────────────────────────
+        // ── Зона призыва: [свой последний ряд .. ряд перед самым выдвинутым
+        //    своим существом/строением]. Базы — ЗА пределами сетки (ниже ряда 4
+        //    игрока, выше ряда 0 врага), поэтому «ряд перед базой» = крайний
+        //    ряд сетки. По умолчанию — ОДИН ряд ([4] у игрока, [0] у врага);
+        //    призыв и продвижение расширяют зону к центру. ────────────────
         function deployRows(side) {
             const own = B.units.filter((u) => u.side === side);
             const rows = [];
             if (side === "p") {
-                let front = 3; // перед базой (ряд 4)
-                if (own.length) front = Math.max(1, Math.min(...own.map((u) => u.row)) - 1);
-                for (let r = front; r <= 3; r++) rows.push(r);
+                let front = 4; // ряд у своей базы
+                if (own.length) front = Math.max(0, Math.min(...own.map((u) => u.row)) - 1);
+                for (let r = front; r <= 4; r++) rows.push(r);
             } else {
-                let front = 1; // перед базой врага (ряд 0)
-                if (own.length) front = Math.min(3, Math.max(...own.map((u) => u.row)) + 1);
-                for (let r = 1; r <= front; r++) rows.push(r);
+                let back = 0; // ряд у базы врага
+                if (own.length) back = Math.min(4, Math.max(...own.map((u) => u.row)) + 1);
+                for (let r = 0; r <= back; r++) rows.push(r);
             }
             return rows;
         }
@@ -263,8 +265,10 @@
         }
         function punch(node) { punches.push({ node, life: 0.22 }); }
 
-        // Плавный переезд в центр клетки (анимация/позиция доигрываются в update)
-        function glide(u, x, y, dur = 0.16) {
+        // Плавный переезд в центр клетки (анимация/позиция доигрываются в update).
+        // 0.3с на шаг: походная анимация (6 кадров, 12fps) успевает показать
+        // 3-4 кадра — шаг читается, а не мелькает.
+        function glide(u, x, y, dur = 0.3) {
             const i = moves.findIndex((m) => m.u === u);
             if (i >= 0) moves.splice(i, 1);
             moves.push({ u, node: u.node, fx: u.node.x, fy: u.node.y, tx: x, ty: y, life: dur, total: dur });
@@ -594,8 +598,7 @@
                     const p = cellXY(u.col, u.row);
                     glide(u, p.x, p.y);
                     setWalk(u, true);
-                    punch(u.node);
-                    await delay(0.18);
+                    await delay(0.34); // глиссада 0.3с + пауза: шаг видно целиком
                     if (B.stopped) return;
                 }
             }
