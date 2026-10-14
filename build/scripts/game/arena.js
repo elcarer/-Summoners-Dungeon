@@ -51,17 +51,19 @@
         //    своим существом/строением]. Базы — ЗА пределами сетки (ниже ряда 4
         //    игрока, выше ряда 0 врага), поэтому «ряд перед базой» = крайний
         //    ряд сетки. По умолчанию — ОДИН ряд ([4] у игрока, [0] у врага);
-        //    призыв и продвижение расширяют зону к центру. ────────────────
+        //    призыв и продвижение расширяют зону к центру. КРАЙНИЙ ряд у
+        //    ЧУЖОЙ базы (0 для игрока, 4 для врага) для призыва закрыт
+        //    всегда — до него существа только «доходят» маршем. ──────────
         function deployRows(side) {
             const own = B.units.filter((u) => u.side === side);
             const rows = [];
             if (side === "p") {
                 let front = 4; // ряд у своей базы
-                if (own.length) front = Math.max(0, Math.min(...own.map((u) => u.row)) - 1);
+                if (own.length) front = Math.max(1, Math.min(...own.map((u) => u.row)) - 1);
                 for (let r = front; r <= 4; r++) rows.push(r);
             } else {
                 let back = 0; // ряд у базы врага
-                if (own.length) back = Math.min(4, Math.max(...own.map((u) => u.row)) + 1);
+                if (own.length) back = Math.min(3, Math.max(...own.map((u) => u.row)) + 1);
                 for (let r = 0; r <= back; r++) rows.push(r);
             }
             return rows;
@@ -135,8 +137,7 @@
             for (const [col, r] of freeCells(deployRows("p"))) {
                 const rc = cellRect(col, r);
                 hi.rect(rc.x, rc.y, rc.w, rc.h);
-                hi.fill({ color: 0x7dc95e, alpha: 0.38 });
-                hi.stroke({ width: 2, color: 0xa8e890 });
+                hi.fill({ color: 0x7dc95e, alpha: 0.28 }); // без рамок, полупрозрачно
             }
         }
 
@@ -165,10 +166,9 @@
             }
             if (spr) {
                 const face = u.side === "p" ? "walk_back" : "walk_front";
-                const ring = new PIXI.Graphics(); // командная тень-кольцо под ногами
+                const ring = new PIXI.Graphics(); // командная тень под ногами
                 ring.ellipse(0, 8, 30, 10);
                 ring.fill({ color: u.side === "p" ? 0x2f4f7a : 0x7a3430, alpha: 0.45 });
-                ring.stroke({ width: 1.5, color: u.side === "p" ? 0x9fc4ef : 0xef9f8c });
                 ring.eventMode = "none";
                 c.addChild(ring);
                 const body = new PIXI.AnimatedSprite(CREATURE.animations[face], false);
@@ -266,9 +266,9 @@
         function punch(node) { punches.push({ node, life: 0.22 }); }
 
         // Плавный переезд в центр клетки (анимация/позиция доигрываются в update).
-        // 0.3с на шаг: походная анимация (6 кадров, 12fps) успевает показать
-        // 3-4 кадра — шаг читается, а не мелькает.
-        function glide(u, x, y, dur = 0.3) {
+        // 0.5с на шаг = ровно один полный цикл походки (6 кадров × 12fps):
+        // клетка проходится целым шагом, анимация читается целиком.
+        function glide(u, x, y, dur = 0.5) {
             const i = moves.findIndex((m) => m.u === u);
             if (i >= 0) moves.splice(i, 1);
             moves.push({ u, node: u.node, fx: u.node.x, fy: u.node.y, tx: x, ty: y, life: dur, total: dur });
@@ -413,6 +413,12 @@
             c.eventMode = "static";
             c.cursor = "pointer";
             c.on("pointertap", () => onCardTap(idx));
+            // альтернативный режим призыва (Настройки): наведение увеличивает
+            // карту, перетаскивание на клетку поля — призыв
+            c.on("pointerover", () => hoverCard(idx, true));
+            c.on("pointerout", () => hoverCard(idx, false));
+            c.on("pointerdown", (e) => startCardDrag(idx, e));
+            c.on("globalpointermove", (e) => moveCardDrag(e));
             c.alpha = def.cost > B.mana ? 0.55 : 1;
             return c;
         }
@@ -430,6 +436,109 @@
                 if (B.selected === idx) node.scale.set(1.12);
                 root.cardsLayer.addChild(node);
             });
+        }
+
+        // ── Перетаскивание карт (режим «Перетаскивание» в Настройках) ────────
+        // Наведение увеличивает карту; перетаскивание рисует кривую от её
+        // слота в руке до центра клетки, отпускание — призыв. Спеллы и ловушки
+        // ставятся кликом как раньше.
+        let drag = null, dragFx = null; // drag: {idx,node,homeX,homeY,sx,sy,moved,over}
+        const toDesign = (g) => ({ x: (g.x - ctx.ui.x) / ctx.ui.scale.x, y: (g.y - ctx.ui.y) / ctx.ui.scale.y });
+
+        function cellAt(x, y) {
+            const g = SCENE_GRID[curScene] || SCENE_GRID[1];
+            for (let r = 0; r < GRID; r++) if (y >= g.rows[r] && y < g.rows[r + 1])
+                for (let c2 = 0; c2 < GRID; c2++) if (x >= g.cols[c2] && x < g.cols[c2 + 1]) return [c2, r];
+            return null;
+        }
+        function canDropAt(handIdx, col, row) {
+            const def = CARDS[B.hand[handIdx]];
+            return !!def && (def.type === "unit" || def.type === "building")
+                && def.cost <= B.mana && deployRows("p").includes(row) && !unitAt(col, row);
+        }
+        function hoverCard(idx, on) {
+            if (!G.settings.dragSummon || drag || B.phase !== "player" || overlay) return;
+            const node = root.cardsLayer.children[idx];
+            if (!node) return;
+            const raised = on || B.selected === idx;
+            node.y = raised ? 616 : 656;
+            node.scale.set(raised ? 1.12 : 1);
+        }
+        function startCardDrag(idx, e) {
+            if (!G.settings.dragSummon || B.phase !== "player" || overlay) return;
+            const def = CARDS[B.hand[idx]];
+            if (!def || (def.type !== "unit" && def.type !== "building")) return;
+            const node = root.cardsLayer.children[idx];
+            if (!node) return;
+            const p = toDesign(e.global);
+            drag = { idx, node, homeX: node.x, homeY: node.y, sx: p.x, sy: p.y, moved: false, over: null };
+            window.addEventListener("pointerup", endCardDrag);
+        }
+        function moveCardDrag(e) {
+            if (!drag || !B || B.phase !== "player" || B.stopped || overlay) return;
+            const p = toDesign(e.global);
+            if (!drag.moved) {
+                if (Math.hypot(p.x - drag.sx, p.y - drag.sy) < 8) return; // это клик
+                drag.moved = true;
+                root.cardsLayer.addChild(drag.node); // карта поверх остальных
+                B.selected = drag.idx; // подсветить зону призыва
+                B.spellTarget = false;
+                redrawHighlight();
+            }
+            drag.node.x = p.x;
+            drag.node.y = Math.min(p.y, 690);
+            drag.node.scale.set(1.12);
+            drag.over = cellAt(p.x, p.y);
+            drawDragFx();
+        }
+        function drawDragFx() {
+            if (!dragFx) {
+                dragFx = new PIXI.Graphics();
+                dragFx.eventMode = "none";
+                root.addChild(dragFx); // поверх HUD (добавляется последним)
+            }
+            dragFx.clear();
+            if (!drag || !drag.moved || !drag.over) return;
+            const [c2, r2] = drag.over;
+            const target = cellXY(c2, r2);
+            const ok = canDropAt(drag.idx, c2, r2);
+            // кривая от домашнего слота карты к центру клетки (дуга набок)
+            const dx = target.x - drag.homeX, dy = target.y - drag.homeY;
+            const len = Math.hypot(dx, dy) || 1;
+            const bow = Math.min(140, len * 0.3);
+            dragFx.moveTo(drag.homeX, drag.homeY - 50);
+            dragFx.quadraticCurveTo(drag.homeX + dx / 2 - dy / len * bow, drag.homeY + dy / 2 + dx / len * bow, target.x, target.y);
+            dragFx.stroke({ width: 3, color: ok ? 0xa8e890 : 0xef9f8c, alpha: 0.9 });
+            dragFx.circle(drag.homeX, drag.homeY - 50, 5);
+            dragFx.fill({ color: ok ? 0xa8e890 : 0xef9f8c });
+            const rc = cellRect(c2, r2);
+            dragFx.rect(rc.x + 2, rc.y + 2, rc.w - 4, rc.h - 4);
+            dragFx.fill({ color: ok ? 0x7dc95e : 0xd05a3c, alpha: 0.4 });
+        }
+        function endCardDrag(ev) {
+            window.removeEventListener("pointerup", endCardDrag);
+            if (!drag) return;
+            const d = drag;
+            drag = null;
+            if (dragFx) dragFx.clear();
+            if (!d.moved) { layoutHand(); return; } // короткий клик — выбор уже сыграл pointertap
+            let over = d.over;
+            if (ev && ev.clientX !== undefined) { // отпустили за пределами канваса — отмена
+                const r = ctx.app.canvas.getBoundingClientRect();
+                if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) over = null;
+            }
+            if (over && canDropAt(d.idx, over[0], over[1])) {
+                B.selected = d.idx;
+                B.spellTarget = false;
+                onCellTap(over[0], over[1]);
+                if (ctx.sfx) ctx.sfx();
+            } else {
+                B.selected = null;
+                B.spellTarget = false;
+                layoutHand();
+                redrawHighlight();
+                refreshHud();
+            }
         }
 
         // ── HUD боя ────────────────────────────────────────────────────────
@@ -505,8 +614,96 @@
             banner.position.set(640, 300);
             banner.alpha = 0;
             c.addChild(banner);
+
+            // настройки и колода (просмотр) — оверлеи поверх боя, битва не
+            // прерывается: сцена боя при выходе умерла бы вместе с состоянием
+            const mkIcon = (tex, x, y, sc, onTap) => {
+                const sp = new PIXI.Sprite(uiTex(tex));
+                sp.anchor.set(0.5);
+                sp.scale.set(sc);
+                sp.eventMode = "static";
+                sp.cursor = "pointer";
+                sp.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onTap(); });
+                const w = new PIXI.Container();
+                w.position.set(x, y);
+                w.addChild(sp);
+                w.name = tex;
+                return w;
+            };
+            c.addChild(mkIcon("icon_setting.png", 40, 44, 0.8, () => openOverlay("settings")));
+            c.addChild(mkIcon("card_back_small.png", 40, 106, 0.42, () => openOverlay("deck")));
+
             c.userData = { eBar, eInfo, title, pBar, pName, manaT, deckT, endBtn, banner, targetHint };
             return c;
+        }
+
+        // ── Оверлеи поверх боя: настройки / колода (просмотр) ────────────────
+        let overlay = null; // { name, node }
+        function closeOverlay() {
+            if (!overlay) return;
+            overlay.node.destroy({ children: true });
+            overlay = null;
+            if (drag) endCardDrag(); // защита от пересечения состояний
+        }
+        function openOverlay(name) {
+            if (overlay) closeOverlay();
+            const node = new PIXI.Container();
+            node.eventMode = "static"; // глотает клики — поле под ним молчит
+            const dim = new PIXI.Graphics();
+            dim.rect(0, 0, 1280, 720);
+            dim.fill({ color: 0x000000, alpha: 0.72 });
+            dim.eventMode = "static";
+            node.addChild(dim);
+            if (name === "settings") {
+                const panel = globalThis.GAME_SETTINGS_SCENE.buildPanel(ctx, { onBack: closeOverlay });
+                panel.applySound();
+                node.addChild(panel.node);
+            } else { // deck — только просмотр, без редактирования
+                const { T, button, cardFace, scrollPane } = globalThis.GAME_UI;
+                const { CARDS } = globalThis.GAME_DATA;
+                const frame = new PIXI.Graphics();
+                frame.roundRect(190, 54, 900, 590, 12);
+                frame.fill({ color: 0x171310, alpha: 0.95 });
+                frame.stroke({ width: 2, color: 0x6b5c40 });
+                node.addChild(frame);
+                const title = T(t("deck.viewTitle"), 30, 0xf0c96a, { stroke: { color: 0x241505, width: 5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(640, 70);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("deck.viewHint"), 14, 0x8a7c5e);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(640, 108);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const pane = scrollPane(ctx, { x: 210, y: 132, w: 860, h: 440 });
+                const grid = new PIXI.Container();
+                const ids = [...new Set(G.deck)].sort((a, b) =>
+                    (CARDS[a].cost - CARDS[b].cost) || a.localeCompare(b));
+                ids.forEach((id, i) => {
+                    const col = i % 4, rowI = (i / 4) | 0;
+                    const cx = 115 + col * 215, cy = 110 + rowI * 205;
+                    const card = cardFace(ctx, id, { scale: 0.5 });
+                    card.position.set(cx, cy);
+                    card.eventMode = "none";
+                    grid.addChild(card);
+                    const n = G.deck.reduce((s, c) => s + (c === id ? 1 : 0), 0);
+                    const cnt = T(`×${n}`, 18, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4 } });
+                    cnt.anchor.set(0.5);
+                    cnt.position.set(cx + 48, cy - 64);
+                    cnt.eventMode = "none";
+                    grid.addChild(cnt);
+                });
+                const rowsN = Math.ceil(ids.length / 4);
+                pane.setContent(grid, ids.length ? 110 + (rowsN - 1) * 205 + 150 : 40);
+                node.addChild(pane.node);
+                node.addChild(button(ctx, {
+                    tex: "button_stone.png", label: t("settings.back"), x: 640, y: 684, scale: 0.95,
+                    onTap: closeOverlay,
+                }));
+            }
+            root.addChild(node);
+            overlay = { name, node };
         }
 
         function drawBar(g, x, y, w, h, ratio, color) {
@@ -598,7 +795,7 @@
                     const p = cellXY(u.col, u.row);
                     glide(u, p.x, p.y);
                     setWalk(u, true);
-                    await delay(0.34); // глиссада 0.3с + пауза: шаг видно целиком
+                    await delay(0.52); // глиссада 0.5с + пауза: полный шаг походки
                     if (B.stopped) return;
                 }
             }
@@ -877,6 +1074,8 @@
             G.battle = B;
             drawCards(4);
             moves.length = 0; floats.length = 0; punches.length = 0; // хвосты прошлого боя
+            overlay = null;
+            drag = null;
 
             root = new PIXI.Container();
             root.eventMode = "static";
@@ -916,7 +1115,10 @@
 
         function exit() {
             if (B) B.stopped = true;
+            window.removeEventListener("pointerup", endCardDrag); // хвост незавершённого drag
+            drag = null;
             if (root) { root.destroy({ children: true }); root = null; }
+            overlay = null;
             G.battle = null;
         }
 
@@ -971,6 +1173,10 @@
                 b.alpha = Math.min(1, bannerT / 0.35);
                 b.scale.set(b.scale.x + (1.0 - b.scale.x) * 0.12);
             } else root.hud.userData.banner.alpha = 0;
+            if (overlay && B.phase !== "over" && ctx.input.wasPressed("Escape")) {
+                closeOverlay();
+                return;
+            }
             if (B.phase === "player" && B.selected !== null && ctx.input.wasPressed("Escape")) {
                 B.selected = null;
                 B.spellTarget = false;
@@ -997,6 +1203,14 @@
                 onCardTapTrapForApi(handIdx);
             },
             deployRows,
+            // оверлеи боя (настройки / колода-просмотр)
+            openPanel(name) { if (B && root && B.phase !== "over") openOverlay(name); },
+            closePanel() { closeOverlay(); },
+            panel: () => (overlay && overlay.name) || null,
+            // drag&drop (режим «Перетаскивание»): состояние для тестов
+            dragState() {
+                return drag ? { idx: drag.idx, moved: drag.moved, over: drag.over } : null;
+            },
             state() {
                 return {
                     phase: B.phase, result: B.result,

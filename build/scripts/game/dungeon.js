@@ -104,6 +104,20 @@
             return c;
         }
 
+        // Иконка-кнопка HUD (настройки/колода): спрайт-иконка без подписи
+        function hudIcon(texName, x, y, onTap, scale = 0.9) {
+            const sp = new PIXI.Sprite(uiTex(texName));
+            sp.anchor.set(0.5);
+            sp.scale.set(scale);
+            sp.eventMode = "static";
+            sp.cursor = "pointer";
+            sp.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onTap(); });
+            const c = new PIXI.Container();
+            c.position.set(x, y);
+            c.addChild(sp);
+            return c;
+        }
+
         function buildHud() {
             const c = new PIXI.Container();
             const panel = new PIXI.Sprite(uiTex("panel_label.png"));
@@ -116,6 +130,15 @@
             hpT.position.set(126, 10);
             c.addChild(floorT, hpT);
             c.userData = { floorT, hpT, fit: true };
+            // настройки и колода — доступны и из подземелья; «Назад» вернёт сюда
+            c.addChild(hudIcon("icon_setting.png", 1226, 44, () => {
+                G.uiReturn = "dungeon";
+                scenes.go("settings");
+            }));
+            c.addChild(hudIcon("card_back_small.png", 1226, 108, () => {
+                G.uiReturn = "dungeon";
+                scenes.go("deck");
+            }, 0.45));
             const hint = new PIXI.Text({
                 text: GAME_LOC.t("dungeon.hint"),
                 style: { fontFamily: "Kereru", fontSize: 15, fill: 0xbfae87 },

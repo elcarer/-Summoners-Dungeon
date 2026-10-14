@@ -1,9 +1,10 @@
 // СЦЕНА «ТРОФЕЙ» — после победы в бою: выбор 1 из 3 карт в коллекцию.
+// Клик по карте сам ведёт в подземелье (кнопки «Продолжить» нет).
 (function () {
     function createRewardScene(ctx) {
-        const { scenes, G, ui } = ctx;
+        const { scenes, G, ui, scheduler } = ctx;
         const { REWARD_POOL } = globalThis.GAME_DATA;
-        const { T, button, cardFace, dimBg } = globalThis.GAME_UI;
+        const { T, cardFace, dimBg } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
         let root = null, options = [], picked = null;
 
@@ -23,6 +24,10 @@
             G.collection[id] = (G.collection[id] || 0) + 1;
             globalThis.GAME_META.saveMeta(G.collection, G.deck);
             rebuild();
+            // подсветка выбора видна ~0.7с, затем карта сама ведёт в подземелье
+            scheduler.after(0.7, () => {
+                if (root && picked !== null) scenes.go("dungeon");
+            });
         }
 
         function rebuild() {
@@ -62,12 +67,6 @@
                 root.addChild(card);
             });
 
-            if (picked !== null) {
-                root.addChild(button(ctx, {
-                    tex: "button_stone.png", label: t("reward.continue"), x: 640, y: 596, scale: 1.1,
-                    onTap: () => scenes.go("dungeon"),
-                }));
-            }
             ui.addChild(root);
         }
 

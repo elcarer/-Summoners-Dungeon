@@ -4,7 +4,9 @@
     const LS_SETTINGS = "sd_settings";
     const LS_META = "sd_meta";
 
-    const DEFAULT_SETTINGS = { sound: 5, music: 5, lang: "ru" }; // 0..10 шаги
+    // dragSummon — способ призыва на поле: false — клик по карте + клик по
+    // клетке; true — перетаскивание карты на клетку (drag&drop)
+    const DEFAULT_SETTINGS = { sound: 5, music: 5, lang: "ru", dragSummon: false };
 
     function loadSettings() {
         try {

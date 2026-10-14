@@ -107,6 +107,7 @@
             deck: savedMeta ? savedMeta.deck.filter((id) => GAME_DATA.CARDS[id]) : [...DEFAULT_DECK],
             collection: savedMeta ? savedMeta.collection : { ...DEFAULT_COLLECTION },
             dungeon: null, activeEnemy: null, battle: null,
+            uiReturn: null, // откуда открыты настройки/колода (кнопка «Назад»)
             resetRun() {
                 // забег сбрасывается, коллекция/колода/настройки — нет
                 this.hero.hp = this.hero.maxHp;

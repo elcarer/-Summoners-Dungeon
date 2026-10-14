@@ -1,11 +1,17 @@
-// СЦЕНА «НАСТРОЙКИ» — звук, музыка, язык (RU/EN). Значения 0..10,
-// сохраняются в localStorage; звук применяется к мастеру движкового аудио.
+// СЦЕНА «НАСТРОЙКИ» — звук, музыка, язык (RU/EN), способ призыва (клик /
+// перетаскивание). Панель — переиспользуемый компонент buildPanel: её
+// встраивает и сцена из меню, и оверлей прямо в бою (arena.js).
+// Значения 0..10 сохраняются в localStorage; звук применяется к мастеру
+// движкового аудио.
 (function () {
-    function createSettingsScene(ctx) {
-        const { scenes, G, ui } = ctx;
-        const { T, button, dimBg } = globalThis.GAME_UI;
+    // Панель настроек: стабильный корень outer, содержимое пересобирается
+    // rebuild()-ом (степперы/язык/призыв). onBack — куда ведёт «Назад».
+    function buildPanel(ctx, { onBack }) {
+        const { G } = ctx;
+        const { T, button } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
-        let root = null;
+        const outer = new PIXI.Container();
+        outer.eventMode = "static";
 
         function applySound() {
             if (ctx.audio && ctx.audio.setVolume) ctx.audio.setVolume(G.settings.sound / 10);
@@ -53,89 +59,131 @@
             return row;
         }
 
+        // Сегмент из двух кнопок (язык / способ призыва)
+        function segmented(label, y, options, isOn, onPick) {
+            const name = T(label, 22, 0xf3e6c2);
+            name.anchor.set(1, 0.5);
+            name.position.set(520, y);
+            name.eventMode = "none";
+            outer.addChild(name);
+            for (const [code, lab, x, w] of options) {
+                const active = isOn(code);
+                const b = new PIXI.Graphics();
+                b.roundRect(x - w / 2, y - 28, w, 56, 8);
+                b.fill(active ? 0x3f5f2a : 0x2e2822);
+                b.stroke({ width: 2, color: active ? 0x9fd489 : 0x6b5c40 });
+                b.eventMode = "static";
+                b.cursor = "pointer";
+                b.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onPick(code); });
+                const lt = T(lab, 17, active ? 0xe6ffd9 : 0xd8c79d);
+                lt.anchor.set(0.5);
+                lt.position.set(x, y);
+                lt.eventMode = "none";
+                outer.addChild(b, lt);
+            }
+        }
+
         function rebuild() {
-            if (root) root.destroy({ children: true });
-            root = new PIXI.Container();
-            root.eventMode = "static";
-            root.addChild(dimBg(ctx, 0.85));
+            for (const ch of outer.removeChildren()) ch.destroy({ children: true });
 
             const title = T(t("settings.title"), 36, 0xf0c96a, { stroke: { color: 0x241505, width: 6 } });
             title.anchor.set(0.5, 0);
             title.position.set(640, 60);
             title.eventMode = "none";
-            root.addChild(title);
+            outer.addChild(title);
 
             const panel = new PIXI.Graphics();
             panel.roundRect(340, 130, 600, 400, 12);
             panel.fill({ color: 0x171310, alpha: 0.92 });
             panel.stroke({ width: 2, color: 0x6b5c40 });
-            root.addChild(panel);
+            panel.eventMode = "static"; // глотает клики мимо рядов
+            outer.addChildAt(panel, 0);
 
-            root.addChild(stepper(t("settings.sound"), "sound", 200));
-            root.addChild(stepper(t("settings.music"), "music", 270));
+            outer.addChild(stepper(t("settings.sound"), "sound", 200));
+            outer.addChild(stepper(t("settings.music"), "music", 270));
 
-            const langLabel = T(t("settings.lang"), 22, 0xf3e6c2);
-            langLabel.anchor.set(1, 0.5);
-            langLabel.position.set(520, 360);
-            langLabel.eventMode = "none";
-            root.addChild(langLabel);
-            for (const [code, label, x] of [["ru", "РУССКИЙ", 610], ["en", "ENGLISH", 770]]) {
-                const active = GAME_LOC.lang === code;
-                const b = new PIXI.Graphics();
-                b.roundRect(x - 72, 332, 144, 56, 8);
-                b.fill(active ? 0x3f5f2a : 0x2e2822);
-                b.stroke({ width: 2, color: active ? 0x9fd489 : 0x6b5c40 });
-                b.eventMode = "static";
-                b.cursor = "pointer";
-                b.on("pointertap", () => {
+            segmented(t("settings.lang"), 360,
+                [["ru", "РУССКИЙ", 610, 144], ["en", "ENGLISH", 770, 144]],
+                (code) => GAME_LOC.lang === code,
+                (code) => {
                     if (ctx.sfx) ctx.sfx();
                     G.settings.lang = code;
                     GAME_LOC.setLang(code);
                     save();
                     rebuild();
                 });
-                const lt = T(label, 17, active ? 0xe6ffd9 : 0xd8c79d);
-                lt.anchor.set(0.5);
-                lt.position.set(x, 360);
-                lt.eventMode = "none";
-                root.addChild(b, lt);
-            }
+
+            // способ призыва: клик по карте → клетка, или перетаскивание
+            segmented(t("settings.summon"), 430,
+                [[false, t("settings.summonClick"), 610, 144], [true, t("settings.summonDrag"), 770, 144]],
+                (v) => !!G.settings.dragSummon === v,
+                (v) => {
+                    if (ctx.sfx) ctx.sfx();
+                    G.settings.dragSummon = !!v;
+                    save();
+                    rebuild();
+                });
 
             const note = T(t("settings.musicNote"), 13, 0x8a7c5e);
             note.anchor.set(0.5, 0);
-            note.position.set(640, 452);
+            note.position.set(640, 486);
             note.eventMode = "none";
-            root.addChild(note);
+            outer.addChild(note);
 
-            root.addChild(button(ctx, {
+            outer.addChild(button(ctx, {
                 tex: "button_stone.png", label: t("settings.back"), x: 640, y: 596, scale: 1.0,
-                onTap: () => scenes.go("menu"),
+                onTap: onBack,
             }));
-            ui.addChild(root);
+        }
+        rebuild();
+        return { node: outer, rebuild, applySound };
+    }
+
+    function createSettingsScene(ctx) {
+        const { scenes, G, ui } = ctx;
+        const { dimBg } = globalThis.GAME_UI;
+        let root = null, panel = null;
+
+        // «Назад» возвращает туда, откуда открыли (меню/подземелье)
+        function goBack() {
+            const to = G.uiReturn || "menu";
+            G.uiReturn = null;
+            scenes.go(to);
         }
 
-        const api = {
-            setStep(key, v) {
-                G.settings[key] = Math.max(0, Math.min(10, v));
-                if (key === "sound") applySound();
-                save();
-                rebuild();
-            },
-            setLang(code) {
-                G.settings.lang = code;
-                GAME_LOC.setLang(code);
-                save();
-                rebuild();
-            },
-            state() { return { ...G.settings, lang: GAME_LOC.lang }; },
-        };
-
         return {
-            enter() { applySound(); rebuild(); },
-            exit() { if (root) { root.destroy({ children: true }); root = null; } },
-            api,
+            enter() {
+                panel = buildPanel(ctx, { onBack: goBack });
+                panel.applySound();
+                root = new PIXI.Container();
+                root.eventMode = "static";
+                root.addChild(dimBg(ctx, 0.85));
+                root.addChild(panel.node);
+                ui.addChild(root);
+            },
+            exit() { if (root) { root.destroy({ children: true }); root = null; } panel = null; },
+            api: {
+                setStep(key, v) {
+                    G.settings[key] = Math.max(0, Math.min(10, v));
+                    if (key === "sound") panel && panel.applySound();
+                    globalThis.GAME_META.saveSettings(G.settings);
+                    panel && panel.rebuild();
+                },
+                setLang(code) {
+                    G.settings.lang = code;
+                    GAME_LOC.setLang(code);
+                    globalThis.GAME_META.saveSettings(G.settings);
+                    panel && panel.rebuild();
+                },
+                setDragSummon(v) {
+                    G.settings.dragSummon = !!v;
+                    globalThis.GAME_META.saveSettings(G.settings);
+                    panel && panel.rebuild();
+                },
+                state() { return { ...G.settings, lang: GAME_LOC.lang }; },
+            },
         };
     }
 
-    globalThis.GAME_SETTINGS_SCENE = { createSettingsScene };
+    globalThis.GAME_SETTINGS_SCENE = { createSettingsScene, buildPanel };
 })();
