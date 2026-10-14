@@ -413,20 +413,29 @@
         // «Шаман гоблинов»: после призыва бесплатно разыгрывает случайного
         // Гоблина (цена ≤ 2) из колоды своей стороны на пустую соседнюю
         // (верт/гориз) клетку — карта уходит из колоды прямо на поле.
+        // Гоблин-ловушка (приманка) ставится как ловушка: нужен свободный
+        // слот и клетка без своей ловушки.
         function summonShaman(u) {
             if (!B.units.includes(u)) return; // мог умереть от мины при призыве
             const deck = u.side === "p" ? B.deck : B.eDeck;
+            const traps = u.side === "p" ? B.traps.p : B.traps.e;
+            const near = [[-1, 0], [1, 0], [0, -1], [0, 1]]
+                .map(([dc, dr]) => [u.col + dc, u.row + dr]);
+            const cellOk = (def, c2, r2) => c2 >= 0 && c2 < GRID && r2 >= 0 && r2 < GRID
+                && !unitAt(c2, r2)
+                && (def.type !== "trap" || !traps.some((tr) => tr.col === c2 && tr.row === r2));
             const goblins = deck
-                .map((id, i) => ({ id, i }))
-                .filter((x) => isGoblin(CARDS[x.id]) && CARDS[x.id].cost <= 2);
-            const cells = [[-1, 0], [1, 0], [0, -1], [0, 1]]
-                .map(([dc, dr]) => [u.col + dc, u.row + dr])
-                .filter(([c2, r2]) => c2 >= 0 && c2 < GRID && r2 >= 0 && r2 < GRID && !unitAt(c2, r2));
-            if (!goblins.length || !cells.length) return;
+                .map((id, i) => ({ id, i, def: CARDS[id] }))
+                .filter((x) => isGoblin(x.def) && x.def.cost <= 2
+                    && (x.def.type !== "trap" || traps.length < TRAP_SLOTS)
+                    && near.some(([c2, r2]) => cellOk(x.def, c2, r2)));
+            if (!goblins.length) return;
             const pick = goblins[(Math.random() * goblins.length) | 0];
             deck.splice(pick.i, 1);
+            const cells = near.filter(([c2, r2]) => cellOk(pick.def, c2, r2));
             const [col, row] = cells[(Math.random() * cells.length) | 0];
-            addUnit(u.side, pick.id, col, row);
+            if (pick.def.type === "trap") armTrap(u.side, pick.id, col, row);
+            else addUnit(u.side, pick.id, col, row);
             const p = cellXY(u.col, u.row);
             floatText(p.x, p.y - 46, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
         }
