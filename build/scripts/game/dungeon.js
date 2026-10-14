@@ -95,7 +95,7 @@
             g.stroke({ width: 2, color: 0xcfa94e });
             for (let k = 0; k < 4; k++) { g.rect(-12, -10 + k * 7, 24, 4); g.fill(k % 2 ? 0x8a7548 : 0x584a2a); }
             c.addChild(g);
-            const t = new PIXI.Text({ text: "ВЫХОД", style: { fontFamily: "Kereru", fontSize: 12, fill: 0xffe9b0 } });
+            const t = new PIXI.Text({ text: GAME_LOC.t("dungeon.exitLabel"), style: { fontFamily: "Kereru", fontSize: 12, fill: 0xffe9b0 } });
             t.anchor.set(0.5, 1);
             t.position.set(0, -18);
             c.addChild(t);
@@ -116,7 +116,7 @@
             hpT.position.set(150, 12);
             c.addChild(floorT, hpT);
             const hint = new PIXI.Text({
-                text: "WASD/стрелки — движение  ·  коснись врага — бой",
+                text: GAME_LOC.t("dungeon.hint"),
                 style: { fontFamily: "Kereru", fontSize: 15, fill: 0xbfae87 },
             });
             hint.anchor.set(0.5, 0);
@@ -199,8 +199,8 @@
                     uiHud.userData.toast.text = st.toast;
                     uiHud.userData.toast.alpha = Math.min(1, st.toastT);
                 } else uiHud.userData.toast.alpha = 0;
-                uiHud.userData.floorT.text = `Этаж ${st.floor}`;
-                uiHud.userData.hpT.text = `HP ${G.hero.hp}/${G.hero.maxHp}`;
+                uiHud.userData.floorT.text = GAME_LOC.t("dungeon.floor", { n: st.floor });
+                uiHud.userData.hpT.text = GAME_LOC.t("dungeon.hp", { hp: G.hero.hp, max: G.hero.maxHp });
 
                 // триггеры: враги и выход
                 for (const t of tokens) {
@@ -212,7 +212,7 @@
                     }
                 }
                 if (st.exit && Math.hypot(st.exit.x - hx, st.exit.y - hy) < TS * 0.85) {
-                    if (!st.bossDead) showToast("Выход запечатан: победите главаря!");
+                    if (!st.bossDead) showToast(GAME_LOC.t("dungeon.exitSealed"));
                     else {
                         G.run.floor += 1;
                         G.dungeon = null; // новый этаж — новая карта (v0: тот же шаблон)

@@ -1,6 +1,7 @@
-// БУТ «Подземелье призывателей»: движок → ассеты → шрифт → сцены → меню.
-// Все сцены (кроме подземелья с ECS-миром) рисуются в UI-корне 1280×720,
-// который вписывается в окно с сохранением пропорций (letterbox).
+// БУТ «Подземелье призывателей»: движок → ассеты → шрифт → мета/настройки →
+// сцены → меню. UI-корень 1280×720 вписывается в окно (letterbox).
+// Коллекция/колода/настройки живут в localStorage (meta.js) и переживают
+// забеги; язык применяется через loc.js при старте и смене в настройках.
 (async function () {
     const boot = document.getElementById("boot");
     const say = (m) => { boot.textContent = m; };
@@ -8,7 +9,7 @@
 
     if (location.protocol === "file:") {
         say("Игра грузит ассеты fetch-ем — по file:// не работает.\n" +
-            "Запустите:  python nocache-server.py 8147\n" +
+            "Запустите:  python dev_server.py 8147\n" +
             "и откройте  http://127.0.0.1:8147/index.html");
         return;
     }
@@ -64,6 +65,16 @@
         fitUi();
         app.renderer.on("resize", fitUi);
 
+        // ── Настройки и мета (localStorage) ────────────────────────────────
+        const settings = GAME_META.loadSettings();
+        GAME_LOC.setLang(settings.lang);
+        const savedMeta = GAME_META.loadMeta();
+        const { DEFAULT_DECK, DEFAULT_COLLECTION } = GAME_DATA;
+
+        // ── Звук: мастер движка = ползунок «звук»; клики UI ────────────────
+        const audio = createAudio();
+        audio.setVolume(settings.sound / 10);
+
         // ── Общий контекст для сцен ────────────────────────────────────────
         const scheduler = createScheduler();
         const input = createInput();
@@ -83,24 +94,36 @@
         const G = {
             hero: { hp: 10, maxHp: 10 }, gold: 0,
             run: { floor: 1 },
-            deck: [...GAME_DATA.PLAYER_DECK],
+            settings,
+            deck: savedMeta ? savedMeta.deck.filter((id) => GAME_DATA.CARDS[id]) : [...DEFAULT_DECK],
+            collection: savedMeta ? savedMeta.collection : { ...DEFAULT_COLLECTION },
             dungeon: null, activeEnemy: null, battle: null,
             resetRun() {
+                // забег сбрасывается, коллекция/колода/настройки — нет
                 this.hero.hp = this.hero.maxHp;
                 this.gold = 0;
                 this.run.floor = 1;
-                this.deck = [...GAME_DATA.PLAYER_DECK];
                 this.dungeon = null;
                 this.activeEnemy = null;
                 this.battle = null;
             },
         };
+        if (!G.deck.length) G.deck = [...DEFAULT_DECK];
 
-        const ctx = { app, world, ECS, COMPONENTS, DATA, worldContainer, addSystem,
-                      assets, uiTex, scheduler, input, camera, characters, knight, G, ui };
+        const ctx = {
+            app, world, ECS, COMPONENTS, DATA, worldContainer, addSystem,
+            assets, uiTex, scheduler, input, camera, characters, knight, G, ui, audio,
+            sfx() {
+                try {
+                    audio.unlock();
+                    audio.tone({ freq: 660, dur: 0.045, type: "triangle", volume: 0.3 });
+                } catch (e) { /* аудио может быть недоступно до жеста */ }
+            },
+        };
 
         const scenes = createScenes({ addSystem });
         ctx.scenes = scenes;
+        const t = (k, v) => GAME_LOC.t(k, v);
 
         // ── Сцена «Меню» ───────────────────────────────────────────────────
         let menuRoot = null;
@@ -108,19 +131,7 @@
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
         });
         function menuButton(texName, label, x, y, scale, onTap) {
-            const c = new PIXI.Container();
-            const sp = new PIXI.Sprite(uiTex(texName));
-            sp.anchor.set(0.5);
-            sp.scale.set(scale);
-            c.addChild(sp);
-            const t = T(label, 20, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4 } });
-            t.anchor.set(0.5);
-            c.addChild(t);
-            c.position.set(x, y);
-            c.eventMode = "static";
-            c.cursor = "pointer";
-            c.on("pointertap", onTap);
-            return c;
+            return globalThis.GAME_UI.button(ctx, { tex: texName, label, x, y, scale, onTap });
         }
         scenes.add("menu", {
             enter() {
@@ -132,32 +143,39 @@
                 bg.position.set((1280 - bg.texture.width * s) / 2, (720 - bg.texture.height * s) / 2);
                 menuRoot.addChild(bg);
 
-                const t1 = T("ПОДЗЕМЕЛЬЕ", 78, 0xf0c96a, { stroke: { color: 0x241505, width: 10 } });
+                const t1 = T(t("menu.title1"), 74, 0xf0c96a, { stroke: { color: 0x241505, width: 10 } });
                 t1.anchor.set(0.5, 1);
-                t1.position.set(640, 168);
-                const t2 = T("ПРИЗЫВАТЕЛЕЙ", 78, 0xf0c96a, { stroke: { color: 0x241505, width: 10 } });
+                t1.position.set(640, 138);
+                const t2 = T(t("menu.title2"), 74, 0xf0c96a, { stroke: { color: 0x241505, width: 10 } });
                 t2.anchor.set(0.5, 0);
-                t2.position.set(640, 176);
+                t2.position.set(640, 146);
+                t1.eventMode = "none"; t2.eventMode = "none";
                 menuRoot.addChild(t1, t2);
-                const sub = T("карточный рогалик о спуске в глубину", 20, 0xd8c79d);
-                sub.anchor.set(0.5);
-                sub.position.set(640, 252);
+                const sub = T(t("menu.subtitle"), 19, 0xd8c79d);
+                sub.anchor.set(0.5, 0);
+                sub.position.set(640, 222);
+                sub.eventMode = "none";
                 menuRoot.addChild(sub);
 
-                menuRoot.addChild(menuButton("button_1.png", "ВОЙТИ", 640, 420, 1.25, () => {
-                    G.resetRun();
-                    scenes.go("dungeon");
-                }));
-                const bye = T("До встречи в глубине…", 26, 0xffe2a8, { stroke: { color: 0x1c1207, width: 5 } });
+                menuRoot.addChild(menuButton("button_1.png", t("menu.play"), 640, 366, 1.18,
+                    () => { G.resetRun(); scenes.go("dungeon"); }));
+                menuRoot.addChild(menuButton("button_stone.png", t("menu.deck"), 640, 462, 0.92,
+                    () => scenes.go("deck")));
+                menuRoot.addChild(menuButton("button_stone.png", t("menu.settings"), 640, 542, 0.92,
+                    () => scenes.go("settings")));
+                menuRoot.addChild(menuButton("button_red.png", t("menu.exit"), 640, 622, 0.92,
+                    () => { menuRoot.userData.bye.visible = true; }));
+
+                const bye = T(t("menu.bye"), 24, 0xffe2a8, { stroke: { color: 0x1c1207, width: 5 } });
                 bye.anchor.set(0.5);
-                bye.position.set(640, 646);
+                bye.position.set(640, 688);
                 bye.visible = false;
+                bye.eventMode = "none";
                 menuRoot.addChild(bye);
-                menuRoot.addChild(menuButton("button_stone.png", "ВЫХОД", 640, 566, 1.0, () => {
-                    bye.visible = true;
-                }));
-                const ver = T("v0.1 · zero_engine", 14, 0x8a7c5e);
+                menuRoot.userData = { bye };
+                const ver = T("v0.2 · zero_engine", 14, 0x8a7c5e);
                 ver.position.set(12, 700);
+                ver.eventMode = "none";
                 menuRoot.addChild(ver);
                 ui.addChild(menuRoot);
                 worldContainer.visible = false;
@@ -182,17 +200,15 @@
                 panel.scale.set(1.5);
                 panel.position.set(640, 290);
                 fwRoot.addChild(panel);
-                const t = T(`ЭТАЖ ${G.run.floor - 1} ПРОЙДЕН!`, 38, 0xffe9b0, { stroke: { color: 0x1c1207, width: 7 } });
-                t.anchor.set(0.5);
-                t.position.set(640, 252);
-                fwRoot.addChild(t);
-                fwRoot.addChild(menuButton("button_stone.png", "Спуститься ниже", 640, 386, 1.0, () => {
-                    scenes.go("dungeon");
-                }));
-                fwRoot.addChild(menuButton("button_red.png", "В меню", 640, 486, 1.0, () => {
-                    G.resetRun();
-                    scenes.go("menu");
-                }));
+                const ft = T(t("floorWin.title", { n: G.run.floor - 1 }), 36, 0xffe9b0, { stroke: { color: 0x1c1207, width: 7 } });
+                ft.anchor.set(0.5);
+                ft.position.set(640, 252);
+                ft.eventMode = "none";
+                fwRoot.addChild(ft);
+                fwRoot.addChild(menuButton("button_stone.png", t("floorWin.next"), 640, 386, 0.95,
+                    () => scenes.go("dungeon")));
+                fwRoot.addChild(menuButton("button_red.png", t("floorWin.menu"), 640, 486, 0.95,
+                    () => { G.resetRun(); scenes.go("menu"); }));
                 ui.addChild(fwRoot);
             },
             exit() {
@@ -200,11 +216,17 @@
             },
         });
 
-        // ── Подземелье и арена ─────────────────────────────────────────────
+        // ── Подземелье, арена, колода, награда, настройки ──────────────────
         const dungeonScene = GAME_DUNGEON.createDungeonScene(ctx);
         scenes.add("dungeon", dungeonScene);
         const arenaScene = GAME_ARENA.createArenaScene(ctx);
         scenes.add("arena", arenaScene);
+        const deckScene = GAME_DECK.createDeckScene(ctx);
+        scenes.add("deck", deckScene);
+        const rewardScene = GAME_REWARD.createRewardScene(ctx);
+        scenes.add("reward", rewardScene);
+        const settingsScene = GAME_SETTINGS_SCENE.createSettingsScene(ctx);
+        scenes.add("settings", settingsScene);
 
         // ── Конец кадра: планировщик после сцен, ввод в самом конце ────────
         addSystem((ticker) => {
@@ -214,8 +236,10 @@
 
         // ── Хендл для консоли и автотестов ─────────────────────────────────
         window.__GAME = {
-            scenes, G, ui,
-            dungeon: dungeonScene, arena: arenaScene, arenaApi: arenaScene.api,
+            scenes, G, ui, loc: GAME_LOC,
+            dungeon: dungeonScene, arena: arenaScene,
+            arenaApi: arenaScene.api, deckApi: deckScene.api,
+            rewardApi: rewardScene.api, settingsApi: settingsScene.api,
             toScreen: (x, y) => ({ x: ui.x + x * ui.scale.x, y: ui.y + y * ui.scale.y }),
             test: {
                 COMPONENTS,
@@ -234,17 +258,15 @@
                     const id = dungeonScene.heroId();
                     return id !== null ? { x: COMPONENTS.positionX[id], y: COMPONENTS.positionY[id] } : null;
                 })(),
+                lang: GAME_LOC.lang,
+                deck: { size: G.deck.length, cards: [...G.deck] },
+                collection: { ...G.collection },
+                settings: { ...G.settings },
                 dungeon: G.dungeon ? {
                     enemies: G.dungeon.enemies.filter((e) => e.alive).length,
                     bossDead: G.dungeon.bossDead,
                 } : null,
-                battle: G.battle ? {
-                    phase: G.battle.phase, turn: G.battle.turnNo,
-                    mana: G.battle.mana, hand: [...G.battle.hand],
-                    pBase: G.battle.playerBase, eBase: G.battle.enemyBase,
-                    units: G.battle.units.map((u) => `${u.side}:${u.def.name}@${u.col},${u.row} hp${u.hp}`),
-                    result: G.battle.result,
-                } : null,
+                battle: G.battle ? arenaScene.api.state() : null,
                 error: window.__gameError || null,
             }),
             ready: true,

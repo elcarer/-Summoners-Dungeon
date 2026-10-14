@@ -1,0 +1,88 @@
+// СЦЕНА «ТРОФЕЙ» — после победы в бою: выбор 1 из 3 карт в коллекцию.
+(function () {
+    function createRewardScene(ctx) {
+        const { scenes, G, ui } = ctx;
+        const { REWARD_POOL } = globalThis.GAME_DATA;
+        const { T, button, cardFace, dimBg } = globalThis.GAME_UI;
+        const t = (k, v) => GAME_LOC.t(k, v);
+        let root = null, options = [], picked = null;
+
+        function pickThree() {
+            const pool = [...REWARD_POOL];
+            const out = [];
+            while (out.length < 3 && pool.length) {
+                out.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
+            }
+            return out;
+        }
+
+        function choose(index) {
+            if (picked !== null || !options[index]) return;
+            picked = index;
+            const id = options[index];
+            G.collection[id] = (G.collection[id] || 0) + 1;
+            globalThis.GAME_META.saveMeta(G.collection, G.deck);
+            rebuild();
+        }
+
+        function rebuild() {
+            if (root) root.destroy({ children: true });
+            root = new PIXI.Container();
+            root.eventMode = "static";
+            root.addChild(dimBg(ctx, 0.85));
+            const title = T(t("reward.title"), 40, 0xf0c96a, { stroke: { color: 0x241505, width: 7 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(640, 44);
+            title.eventMode = "none";
+            root.addChild(title);
+            const sub = T(t("reward.pick"), 20, 0xd8c79d);
+            sub.anchor.set(0.5, 0);
+            sub.position.set(640, 106);
+            sub.eventMode = "none";
+            root.addChild(sub);
+
+            options.forEach((id, i) => {
+                const isPicked = picked === i;
+                const card = cardFace(ctx, id, {
+                    scale: picked === null || isPicked ? 0.92 : 0.78,
+                    dim: picked !== null && !isPicked,
+                });
+                card.position.set(340 + i * 300, 330);
+                if (isPicked) {
+                    const glow = new PIXI.Graphics();
+                    glow.roundRect(-112, -162, 224, 324, 10);
+                    glow.stroke({ width: 5, color: 0xf0c96a });
+                    card.addChildAt(glow, 0);
+                }
+                if (picked === null) {
+                    card.eventMode = "static";
+                    card.cursor = "pointer";
+                    card.on("pointertap", () => choose(i));
+                }
+                root.addChild(card);
+            });
+
+            if (picked !== null) {
+                root.addChild(button(ctx, {
+                    tex: "button_stone.png", label: t("reward.continue"), x: 640, y: 596, scale: 1.1,
+                    onTap: () => scenes.go("dungeon"),
+                }));
+            }
+            ui.addChild(root);
+        }
+
+        const api = {
+            options: () => [...options],
+            picked: () => picked,
+            pick: choose,
+        };
+
+        return {
+            enter() { options = pickThree(); picked = null; rebuild(); },
+            exit() { if (root) { root.destroy({ children: true }); root = null; } },
+            api,
+        };
+    }
+
+    globalThis.GAME_REWARD = { createRewardScene };
+})();

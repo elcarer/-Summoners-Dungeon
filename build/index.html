@@ -45,10 +45,16 @@
 </head>
 <body>
     <div id="boot">запуск…</div>
-    <!-- ИГРА: данные → сцены → бут (в body: main.js ищет #boot) -->
+    <!-- ИГРА: локализация → мета → данные → кит → сцены → бут (в body: main.js ищет #boot) -->
+    <script src="./scripts/game/loc.js"></script>
+    <script src="./scripts/game/meta.js"></script>
     <script src="./scripts/game/dataCards.js"></script>
+    <script src="./scripts/game/uiKit.js"></script>
     <script src="./scripts/game/dungeon.js"></script>
     <script src="./scripts/game/arena.js"></script>
+    <script src="./scripts/game/deckScene.js"></script>
+    <script src="./scripts/game/rewardScene.js"></script>
+    <script src="./scripts/game/settingsScene.js"></script>
     <script src="./scripts/game/main.js"></script>
 </body>
 </html>
