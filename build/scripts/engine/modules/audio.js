@@ -27,16 +27,21 @@ function createAudio() {
     let musicName = null;        // трек, который реально играет
     let musicSrc = null;
     let pendingMusic = null;     // выбранный до разблокировки — стартует после
+    const pendingSfx = [];       // sfx, вызванные в момент разблокировки (resume асинхронный — первый клик иначе теряет свой звук)
+    const failedUrls = [];       // неудачные загрузки — видно в status() (404 и пр.)
 
     function ensureCtx() {
         if (!ctx) {
             ctx = new (window.AudioContext || window.webkitAudioContext)();
             // авто-resume может дозреть позже вызова unlock — ловим момент
             ctx.onstatechange = () => {
-                if (ctx.state === "running" && pendingMusic) {
-                    const name = pendingMusic;
-                    pendingMusic = null;
-                    music(name);
+                if (ctx.state === "running") {
+                    flushPendingSfx();
+                    if (pendingMusic) {
+                        const name = pendingMusic;
+                        pendingMusic = null;
+                        music(name);
+                    }
                 }
             };
         }
@@ -47,10 +52,13 @@ function createAudio() {
     function unlock() {
         ensureCtx();
         if (ctx.state === "suspended") ctx.resume();
-        if (ctx.state === "running" && pendingMusic) {
-            const name = pendingMusic;
-            pendingMusic = null;
-            music(name);
+        if (ctx.state === "running") {
+            flushPendingSfx();
+            if (pendingMusic) {
+                const name = pendingMusic;
+                pendingMusic = null;
+                music(name);
+            }
         }
         return ctx.state === "running";
     }
@@ -78,7 +86,10 @@ function createAudio() {
             p = fetch(url)
                 .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status + " " + url); return r.arrayBuffer(); })
                 .then((ab) => ensureCtx().decodeAudioData(ab));
-            p.catch(() => buffers.delete(key));
+            p.catch((e) => {
+                buffers.delete(key);
+                if (failedUrls.length < 12 && !failedUrls.includes(url)) failedUrls.push(url);
+            });
             buffers.set(key, p);
         }
         return p;
@@ -139,13 +150,21 @@ function createAudio() {
             if (url) loadBuffer(name, url).catch(() => { /* тишина лучше падения */ });
         }
     }
-    // Разовый sfx-файл; volume — множитель поверх ползунка «звук»
+    // Разовый sfx-файл; volume — множитель поверх ползунка «звук».
+    // Если контекст есть, но ещё suspended (resume в силе), звук ставится в
+    // короткую очередь и сыграет в момент разблокировки — клик, разблокирующий
+    // аудио, свой звук больше не теряет.
     async function playFile(name, volume = 1) {
         const url = files.get(name);
-        if (!url || !isReady()) return false;
+        if (!url || !ctx) return false;
+        if (ctx.state !== "running") {
+            pendingSfx.push({ name, volume });
+            if (pendingSfx.length > 8) pendingSfx.shift();
+            return true;
+        }
         try {
             const buf = await loadBuffer(name, url);
-            if (!isReady()) return false;
+            if (ctx.state !== "running") return false;
             const src = ctx.createBufferSource();
             src.buffer = buf;
             const g = ctx.createGain();
@@ -154,6 +173,11 @@ function createAudio() {
             src.start();
             return true;
         } catch (e) { return false; }
+    }
+    function flushPendingSfx() {
+        if (!pendingSfx.length || !isReady()) return;
+        const queue = pendingSfx.splice(0, pendingSfx.length);
+        for (const p of queue) playFile(p.name, p.volume);
     }
     // Музыка сцены: луп; повторный вызов с тем же треком ничего не перезапускает
     function music(name) {
@@ -191,11 +215,13 @@ function createAudio() {
         pendingMusic = null;
         stopMusicNode();
     }
-    // Состояние — для тестов и отладки: track (желаемая), playing (фактическая)
+    // Состояние — для тестов и отладки: track (желаемая), playing (фактическая),
+    // volumes (ползунки 0..1), failed (URL, которые не загрузились — 404 и пр.)
     function status() {
         return {
             ready: isReady(), track: musicTrack, playing: musicName,
-            decoded: [...buffers.keys()],
+            decoded: [...buffers.keys()], volumes: { sfx: masterVolume, music: musicVolume },
+            failed: [...failedUrls],
         };
     }
 

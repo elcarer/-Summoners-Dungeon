@@ -27,16 +27,16 @@
         const rc = cellRect(col, row);
         return { x: rc.x + rc.w / 2, y: rc.y + rc.h / 2 };
     };
-    // ── Энергия и энергосферы ─────────────────────────────────────────────
+    // ── Энергия и шкала конца хода ────────────────────────────────────────
     // Старт боя: 1 энергия, 4 карты в руке. Энергия НЕ обнуляется и сама не
-    // восстанавливается — приходит только с энергосферами. Каждый ход игрок
-    // получает 3 сферы; в конце хода каждую сферу он обращает в «+1 карта»
-    // (немедленный добор) или «+1 энергия» (на следующий ход). Потратив все
-    // сферы, игрок завершает ход автоматически.
-    // Лимит руки — 7 карт, проверяется ТОЛЬКО в конце хода: пока ход идёт,
-    // добор ничем не ограничен; когда все сферы потрачены, лишнее (сверх 7)
-    // игрок сбрасывает по своему выбору (панель сброса), и ход переходит врагу.
-    const ORBS_PER_TURN = 3, HAND_MAX = 7;
+    // восстанавливается — приходит только со шкалы. У игрока есть ПОСТОЯННАЯ
+    // шкала «+карты ↔ +энергия» с ползунком (в HUD у кнопки «Конец»):
+    // положение можно менять в любой момент хода. По кнопке «Конец» шкала
+    // применяется автоматически: добор карт и энергия на следующий ход.
+    // Всего сфер на шкале: 3 на первом ходу, каждый следующий ход +1 (4, 5, …).
+    // Лимит руки — 7 карт, проверяется ТОЛЬКО в конце хода (после добора со
+    // шкалы): лишнее игрок сбрасывает по своему выбору (панель сброса).
+    const HAND_MAX = 7;
     const { CARDS, ENCOUNTERS, TRAP_SLOTS } = globalThis.GAME_DATA;
 
     function createArenaScene(ctx) {
@@ -44,6 +44,8 @@
         const t = (k, v) => GAME_LOC.t(k, v);
         const sfx = (name) => { if (ctx.sfx) ctx.sfx(name); };
         const delay = (s) => new Promise((r) => scheduler.after(s, r));
+        // всего сфер на шкале конца хода: 3 на первом ходу, каждый ход +1
+        const spheresTotal = () => B.turnNo + 2;
         let root = null, B = null;
 
         // Листы существ поля боя — по карте (def.creature), пока все гоблины.
@@ -459,14 +461,15 @@
             }
         }
 
-        // ── Карты в руке ────────────────────────────────────────────────────
-        // Лицо — сама картинка карты в оригинальном размере (230×338), без
-        // технических подписей и затемнения. Неразыгрываемая (не хватает маны) —
-        // НЕ полупрозрачная, а затемнённая тинтом. Пока выбрана карта — все
-        // карты руки неинтерактивны: клики уходят в поле (крупные карты
-        // перекрывают нижние ряды); снять выбор — Esc, клик по фону или мимо
-        // подсвеченных клеток.
-        const HAND_Y = 690, HAND_RAISED_Y = 610;
+    // ── Карты в руке ────────────────────────────────────────────────────
+    // Лицо — сама картинка карты в 2/3 размера (230×338 → ~153×225), нижний
+    // край уходит за экран: верх карты ниже поля (поле кончается на y=517) —
+    // клетки боя не закрываются. Выбор/наведение — лёгкое увеличение и
+    // золотая рамка, БЕЗ подъёма вверх. Неразыгрываемая (не хватает энергии)
+    // карта — затемнённая тинтом. Пока выбрана карта — все карты руки
+    // неинтерактивны: клики уходят в поле; снять выбор — Esc, клик по фону
+    // или мимо подсвеченных клеток.
+    const HAND_Y = 754, HAND_SCALE = 2 / 3;
         function cardBottom(def) { // подпись нижней плашки (фолбэк без картинки)
             if (def.type === "unit") return { text: `${def.atk}⚔ ${def.hp}♥ ${def.speed}→`, small: false };
             const key = `card.${Object.keys(CARDS).find((k) => CARDS[k] === def)}.desc`;
@@ -480,6 +483,14 @@
                 face.anchor.set(0.5, 1); // оригинальный размер спрайта
                 face.tint = def.cost > B.energy ? 0x9f9f9f : 0xffffff;
                 c.addChild(face);
+                // рамка выбора/наведения (видна у выделенной карты)
+                const frame = new PIXI.Graphics();
+                frame.roundRect(-118, -341, 236, 344, 12);
+                frame.stroke({ width: 5, color: 0xf0c96a });
+                frame.visible = false;
+                frame.name = "selframe";
+                frame.eventMode = "none";
+                c.addChild(frame);
             } else { // фолбэк без картинки: рубашка + подписи
                 const face = new PIXI.Sprite(uiTex("card_back_small.png"));
                 face.anchor.set(0.5, 1);
@@ -534,12 +545,14 @@
             const n = B.hand.length;
             B.hand.forEach((card, idx) => {
                 const node = makeCardNode(card, idx);
-                // крупные карты (230px): веер пошире, перекрытие допустимо
-                const spread = Math.min(190, 1150 / Math.max(1, n));
+                const spread = Math.min(150, 1050 / Math.max(1, n));
                 node.x = 640 + (idx - (n - 1) / 2) * spread;
-                node.y = B.selected === idx ? HAND_RAISED_Y : HAND_Y;
+                node.y = HAND_Y;
                 node.rotation = (idx - (n - 1) / 2) * 0.035;
-                if (B.selected === idx) node.scale.set(1.12);
+                const sel = B.selected === idx;
+                node.scale.set((sel ? 1.12 : 1) * HAND_SCALE);
+                const f = node.getChildByName("selframe");
+                if (f) f.visible = sel;
                 root.cardsLayer.addChild(node);
             });
         }
@@ -567,8 +580,9 @@
             const node = root.cardsLayer.children[idx];
             if (!node) return;
             const raised = on || B.selected === idx;
-            node.y = raised ? HAND_RAISED_Y : HAND_Y;
-            node.scale.set(raised ? 1.12 : 1);
+            node.scale.set((raised ? 1.12 : 1) * HAND_SCALE);
+            const f = node.getChildByName("selframe");
+            if (f) f.visible = raised;
         }
         function startCardDrag(idx, e) {
             if (!G.settings.dragSummon || B.phase !== "player" || overlay || B.discarding) return;
@@ -593,7 +607,7 @@
             }
             drag.node.x = p.x;
             drag.node.y = Math.min(p.y, 690);
-            drag.node.scale.set(1.12);
+            drag.node.scale.set(1.12); // перетаскиваемая карта — полноразмерная
             drag.over = cellAt(p.x, p.y);
             drawDragFx();
         }
@@ -649,78 +663,65 @@
             }
         }
 
-        // ── Панель энергосфер (конец хода) ─────────────────────────────────
-        // Каждую из оставшихся сфер игрок обращает в «+1 карта» или
-        // «+1 энергия» (на следующий ход); потратив все — ход завершается
-        // сам. Добор не ограничен: если рука выросла сверх лимита (7), перед
-        // концом хода откроется панель сброса лишних карт.
-        let orbPanel = null;
-        function closeOrbPanel() {
-            if (!orbPanel) return;
-            orbPanel.destroy({ children: true });
-            orbPanel = null;
-        }
-        function buildOrbPanel() {
-            closeOrbPanel();
-            const { button } = globalThis.GAME_UI;
-            const node = new PIXI.Container();
-            node.eventMode = "static";
-            const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1280, 720);
-            dim.fill({ color: 0x000000, alpha: 0.6 });
-            dim.eventMode = "static";
-            node.addChild(dim);
-            const frame = new PIXI.Graphics();
-            frame.roundRect(390, 168, 500, 300, 12);
-            frame.fill({ color: 0x171310, alpha: 0.96 });
-            frame.stroke({ width: 2, color: 0x6b5c40 });
-            node.addChild(frame);
-            const title = T(t("orb.title"), 26, 0xf0c96a, { stroke: { color: 0x241505, width: 5 } });
-            title.anchor.set(0.5, 0);
-            title.position.set(640, 190);
-            title.eventMode = "none";
-            node.addChild(title);
-            const orbs = new PIXI.Graphics(); // осталось — светлые, потрачены — тёмные
-            for (let i = 0; i < ORBS_PER_TURN; i++) {
-                orbs.circle(560 + i * 60, 266, 16);
-                orbs.fill(i < B.orbs ? 0x7ec8f0 : 0x2a251e);
-                orbs.stroke({ width: 2, color: i < B.orbs ? 0xbfe8ff : 0x55493a });
+        // ── Шкала конца хода: «+карты ↔ +энергия» ──────────────────────────
+        // Постоянный ползунок в HUD (под кнопкой «Конец»). Положение можно
+        // менять в любой момент хода (тап/перетаскивание по треку); выбранное
+        // сохраняется между ходами. По кнопке «Конец» шкала применяется
+        // автоматически: слева — добор карт, справа — энергия на след. ход.
+        const SLIDER_W = 240, SLIDER_X = 1090, SLIDER_Y = 430;
+        let sliderHeld = false;
+        function refreshSlider() {
+            if (!root || !B) return;
+            const sl = root.hud.userData.slider;
+            const total = spheresTotal();
+            B.split = Math.max(0, Math.min(total, B.split));
+            sl.cards.text = `+${B.split}`;
+            sl.energy.text = `+${total - B.split}`;
+            const on = B.phase === "player" && !B.discarding;
+            sl.track.eventMode = on ? "static" : "none";
+            sl.thumb.eventMode = on ? "static" : "none";
+            sl.wrap.alpha = on ? 1 : 0.45;
+            const g = sl.track;
+            g.clear();
+            const w = SLIDER_W, h = 14, x0 = -w / 2;
+            g.roundRect(x0, -h / 2, w, h, 7);
+            g.fill(0x1c1712);
+            g.roundRect(x0 + 3, -h / 2 + 3, Math.max(0, (B.split / total) * (w - 6)), h - 6, 4);
+            g.fill(0x3a5f8a); // доля «в карты»
+            g.roundRect(x0, -h / 2, w, h, 7);
+            g.stroke({ width: 2, color: 0x6b5c40 });
+            for (let i = 0; i <= total; i++) { // деления — по числу сфер
+                g.circle(x0 + (i / total) * w, h / 2 + 6, 1.5);
+                g.fill(0x6b5c40);
             }
-            orbs.eventMode = "none";
-            node.addChild(orbs);
-            const hint = T(t("orb.hint"), 14, 0x8a7c5e, { align: "center", wordWrap: true, wordWrapWidth: 450 });
-            hint.anchor.set(0.5, 0);
-            hint.position.set(640, 302);
-            hint.eventMode = "none";
-            node.addChild(hint);
-            node.addChild(button(ctx, {
-                tex: "button_stone.png", label: t("orb.draw"), x: 505, y: 405, scale: 0.95,
-                onTap: () => pickOrb("draw"),
-            }));
-            node.addChild(button(ctx, {
-                tex: "button_stone.png", label: t("orb.energy"), x: 775, y: 405, scale: 0.95,
-                onTap: () => pickOrb("energy"),
-            }));
-            root.addChild(node);
-            orbPanel = node;
+            sl.thumb.clear();
+            sl.thumb.circle(x0 + (B.split / total) * w, 0, 11);
+            sl.thumb.fill(0xbfe0ff);
+            sl.thumb.stroke({ width: 3, color: 0x2f4f7a });
         }
-        function pickOrb(kind) {
-            if (!B || B.phase !== "player" || !orbPanel || B.orbs <= 0) return false;
-            if (kind === "draw") {
-                drawCards(1);
-                sfx("chpoc");
-            } else if (kind === "energy") {
-                B.energy += 1; // к следующему ходу (ход сейчас же и завершится)
-                sfx("aqua");
-            } else return false;
-            B.orbs -= 1;
-            refreshHud();
-            if (B.orbs <= 0) {
-                closeOrbPanel();
-                if (B.hand.length > HAND_MAX) buildDiscardPanel(); // лимит руки — на конце хода
-                else enemyTurn(); // все сферы потрачены — ход окончен
-            } else buildOrbPanel();
-            return true;
+        function sliderApply(e) {
+            const p = toDesign(e.global);
+            const total = spheresTotal();
+            let v = Math.round(((p.x - SLIDER_X + SLIDER_W / 2) / SLIDER_W) * total);
+            v = Math.max(0, Math.min(total, v));
+            if (v !== B.split) {
+                B.split = v;
+                if (ctx.sfx) ctx.sfx();
+                refreshSlider();
+            }
+        }
+        function sliderGrab(e) {
+            if (!B || B.phase !== "player" || B.discarding) return;
+            sliderHeld = true;
+            sliderApply(e);
+            window.addEventListener("pointermove", sliderMove);
+            window.addEventListener("pointerup", sliderUp);
+        }
+        function sliderMove(e) { if (sliderHeld && B && !B.stopped) sliderApply(e); }
+        function sliderUp() {
+            sliderHeld = false;
+            window.removeEventListener("pointermove", sliderMove);
+            window.removeEventListener("pointerup", sliderUp);
         }
 
         // ── Панель сброса лишних карт (конец хода при руке > 7) ─────────────
@@ -866,6 +867,44 @@
             endBtn.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); api.endTurn(); });
             c.addChild(endBtn);
 
+            // шкала конца хода «+карты ↔ +энергия» (применится по «Конец»)
+            const slWrap = new PIXI.Container();
+            slWrap.position.set(1090, 430);
+            const slTitle = T(t("orb.scaleTitle"), 14, 0xcfc4a6);
+            slTitle.anchor.set(0.5, 1);
+            slTitle.position.set(0, -18);
+            slTitle.eventMode = "none";
+            slWrap.addChild(slTitle);
+            const slCards = T("", 22, 0xbfe0ff, { stroke: { color: 0x1c1207, width: 4 } });
+            slCards.anchor.set(1, 0.5);
+            slCards.position.set(-146, 0);
+            slCards.eventMode = "none";
+            slWrap.addChild(slCards);
+            const slCardsL = T(t("orb.cardsLabel"), 12, 0x8a7c5e);
+            slCardsL.anchor.set(1, 0);
+            slCardsL.position.set(-146, 8);
+            slCardsL.eventMode = "none";
+            slWrap.addChild(slCardsL);
+            const slEnergy = T("", 22, 0xffd98c, { stroke: { color: 0x1c1207, width: 4 } });
+            slEnergy.anchor.set(0, 0.5);
+            slEnergy.position.set(146, 0);
+            slEnergy.eventMode = "none";
+            slWrap.addChild(slEnergy);
+            const slEnergyL = T(t("orb.energyLabel"), 12, 0x8a7c5e);
+            slEnergyL.anchor.set(0, 0);
+            slEnergyL.position.set(146, 8);
+            slEnergyL.eventMode = "none";
+            slWrap.addChild(slEnergyL);
+            const slTrack = new PIXI.Graphics();
+            slTrack.cursor = "ew-resize";
+            slWrap.addChild(slTrack);
+            const slThumb = new PIXI.Graphics();
+            slThumb.cursor = "ew-resize";
+            slWrap.addChild(slThumb);
+            slTrack.on("pointerdown", sliderGrab);
+            slThumb.on("pointerdown", sliderGrab);
+            c.addChild(slWrap);
+
             const targetHint = T("", 16, 0xef9f8c, { stroke: { color: 0x1c1207, width: 4 } });
             targetHint.anchor.set(0.5);
             targetHint.position.set(640, 566);
@@ -896,7 +935,8 @@
             c.addChild(mkIcon("icon_setting.png", 40, 44, 0.8, () => openOverlay("settings")));
             c.addChild(mkIcon("card_back_small.png", 40, 106, 0.42, () => openOverlay("deck")));
 
-            c.userData = { eBar, eInfo, title, pBar, pName, manaT, deckT, endBtn, banner, targetHint };
+            c.userData = { eBar, eInfo, title, pBar, pName, manaT, deckT, endBtn, banner, targetHint,
+                slider: { wrap: slWrap, cards: slCards, energy: slEnergy, track: slTrack, thumb: slThumb } };
             return c;
         }
 
@@ -994,6 +1034,7 @@
             ud.endBtn.alpha = B.phase === "player" ? 1 : 0.45;
             ud.endBtn.eventMode = B.phase === "player" ? "static" : "none";
             ud.targetHint.text = B.spellTarget ? t("arena.pickTarget") : "";
+            refreshSlider();
         }
 
         let bannerT = 0;
@@ -1090,11 +1131,12 @@
             if (B.stopped || B.phase === "over") return;
             await aiPlay();
             if (B.stopped || B.phase === "over") return;
-            // энергосферы врага (те же правила): рука мала — добор, иначе энергия
-            for (let k = 0; k < ORBS_PER_TURN; k++) {
-                if (B.eHand.length < 4) drawEnemy(1);
-                else B.eEnergy += 1;
-            }
+            // шкала врага (те же правила): рука мала — добор, остальное — энергия
+            const total = spheresTotal();
+            let eCards = 0;
+            if (B.eHand.length < 4) eCards = Math.min(4 - B.eHand.length, total);
+            drawEnemy(eCards);
+            B.eEnergy += total - eCards;
             refreshHud();
             await delay(0.25);
             if (B.stopped) return;
@@ -1178,8 +1220,7 @@
         }
 
         async function playerTurnStart() {
-            B.turnNo += 1;
-            B.orbs = ORBS_PER_TURN; // новый ход — новые сферы; энергия не трогается
+            B.turnNo += 1; // шкала подросла: сфер теперь на одну больше
             B.phase = "anim";
             B.selected = null;
             B.spellTarget = false;
@@ -1377,7 +1418,8 @@
             if (ctx.music) ctx.music("battle");
             B = {
                 encId, phase: "player", stopped: false, turnNo: 1,
-                energy: 1, eEnergy: 1, orbs: ORBS_PER_TURN,
+                energy: 1, eEnergy: 1,
+                split: 1, // положение ползунка «карты↔энергия» (1 карта / 2 энергии)
                 playerBase: 15, playerBaseMax: 15,
                 enemyBase: enc.baseHp, enemyBaseMax: enc.baseHp,
                 deck: shuffle([...G.deck]), discard: [], hand: [],
@@ -1392,7 +1434,6 @@
             overlay = null;
             drag = null;
             dragFx = null; // прошлого боя Graphics уничтожен вместе с root
-            orbPanel = null;
             discardPanel = null;
             sfx("openRoom"); // начало боя
 
@@ -1435,8 +1476,10 @@
         function exit() {
             if (B) B.stopped = true;
             window.removeEventListener("pointerup", endCardDrag); // хвост незавершённого drag
+            window.removeEventListener("pointermove", sliderMove); // хвост шкалы
+            window.removeEventListener("pointerup", sliderUp);
+            sliderHeld = false;
             drag = null;
-            closeOrbPanel();
             closeDiscardPanel();
             if (root) { root.destroy({ children: true }); root = null; }
             overlay = null;
@@ -1506,10 +1549,27 @@
 
         const api = {
             endTurn() {
-                if (!B || B.phase !== "player" || orbPanel || B.discarding) return;
-                buildOrbPanel(); // конец хода = распределение энергосфер
+                if (!B || B.phase !== "player" || B.discarding) return;
+                // шкала применяется автоматически: слева карты, справа энергия
+                const total = spheresTotal();
+                const cards = Math.max(0, Math.min(B.split, total));
+                const energy = total - cards;
+                if (cards > 0) { drawCards(cards); sfx("chpoc"); }
+                if (energy > 0) { B.energy += energy; sfx("aqua"); } // на следующий ход
+                layoutHand();
+                refreshHud();
+                if (B.hand.length > HAND_MAX) buildDiscardPanel(); // лимит — на конце хода
+                else enemyTurn();
             },
-            orbChoice(kind) { return pickOrb(kind); },
+            // шкала «карты↔энергия»: total сфер (3 + ход−1), split — доля в карты
+            sliderGet: () => (B ? { total: spheresTotal(), split: B.split } : null),
+            sliderSet(n) {
+                if (!B) return null;
+                const total = spheresTotal();
+                B.split = Math.max(0, Math.min(total, n | 0));
+                refreshSlider();
+                return B.split;
+            },
             // панель сброса лишних карт (конец хода, рука > 7)
             discardPick(idx) { pickDiscard(idx); },
             discardNeeded: () => (B ? Math.max(0, B.hand.length - HAND_MAX) : 0),
@@ -1533,11 +1593,23 @@
             dragState() {
                 return drag ? { idx: drag.idx, moved: drag.moved, over: drag.over } : null;
             },
+            // геометрия первой карты руки (дизайн-координаты) — тесты «не закрывает поле»
+            handGeom() {
+                if (!root || !B || !root.cardsLayer.children.length) return null;
+                const b = root.cardsLayer.children[0].getBounds();
+                const s = ctx.ui.scale.x || 1;
+                return {
+                    x: (b.x - ctx.ui.x) / s, top: (b.y - ctx.ui.y) / s,
+                    w: b.width / s, h: b.height / s,
+                };
+            },
             state() {
                 return {
                     phase: B.phase, result: B.result,
                     pBase: B.playerBase, eBase: B.enemyBase,
-                    energy: B.energy, eEnergy: B.eEnergy, orbs: B.orbs, hand: [...B.hand],
+                    energy: B.energy, eEnergy: B.eEnergy,
+                    spheres: { total: spheresTotal(), split: B.split },
+                    hand: [...B.hand],
                     discarding: !!B.discarding,
                     units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body") })),
                     traps: { p: B.traps.p.length, e: B.traps.e.length },
@@ -1549,6 +1621,14 @@
                 if (!u) return false;
                 const killer = (killerCol !== undefined && killerCol !== null) ? unitAt(killerCol, killerRow) : null;
                 killUnit(u, killer || null);
+                return true;
+            },
+            // тест-хук: принудительный итог (бои с растущей шкалой длинные —
+            // смоук проверяет механики, а не ждёт органического финиша)
+            _finish(victory) {
+                if (!B || B.phase === "over" || B.discarding) return false;
+                if (victory) B.enemyBase = 0; else B.playerBase = 0;
+                finish(!!victory);
                 return true;
             },
             // тест-хук: разместить юнита любой стороны

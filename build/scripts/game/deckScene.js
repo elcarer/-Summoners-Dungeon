@@ -92,7 +92,7 @@
                 c.addChild(card);
                 const cnt = T(t("deck.owned", { n: owned }), 13, canAdd ? 0xd8c79d : 0x8a7c5e);
                 cnt.anchor.set(0.5, 0);
-                cnt.position.set(cx, cy + 62);
+                cnt.position.set(cx, cy + 102); // ниже картинки карты, под ней свободно
                 cnt.eventMode = "none";
                 c.addChild(cnt);
                 if (inDeck > 0) {

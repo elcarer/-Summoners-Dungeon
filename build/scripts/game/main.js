@@ -114,7 +114,7 @@
             die: "die.mp3",        // гибель существа / поражение
             crash: "crash.mp3",    // удар по базе
             step: "step.mp3",      // шаг существа (марш/рывок)
-            aqua: "aqua.mp3",      // сфера → +1 энергия
+            aqua: "aqua.mp3",      // шкала: +энергия в конце хода
             coins: "coins.mp3",    // выбор трофея
             lvlUp: "lvlUp.mp3",    // победа
             openRoom: "openRoom.mp3", // начало боя
