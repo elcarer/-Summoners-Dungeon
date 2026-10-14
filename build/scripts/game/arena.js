@@ -7,16 +7,29 @@
 // расширяют зону. Пошаговая логика — FSM + объекты поверх Pixi.
 (function () {
     const GRID = 5;          // 5×5
-    const CELL = 74, GAP = 5;
-    const BOARD_X = 445, BOARD_Y = 96;
+    // Геометрия поля — поверх НАРИСОВАННОЙ сетки бэкграунда арены
+    // (images/scenes/N.png). Границы клеток по колонкам/рядам в координатах
+    // дизайна 1280×720 (сетка на арте слегка неравномерная — потому массивы,
+    // а не один шаг). Измерено по градиентам краев клеток.
+    const SCENE_GRID = {
+        1: { cols: [427, 509, 594, 679, 765, 850], rows: [112, 198, 276, 353, 433, 517] },
+        2: { cols: [427, 509, 594, 679, 765, 850], rows: [119, 198, 276, 353, 433, 517] },
+    };
+    let curScene = 1;
+    const cellRect = (col, row) => {
+        const g = SCENE_GRID[curScene] || SCENE_GRID[1];
+        return {
+            x: g.cols[col] + 2, y: g.rows[row] + 2,
+            w: g.cols[col + 1] - g.cols[col] - 4, h: g.rows[row + 1] - g.rows[row] - 4,
+        };
+    };
+    const cellXY = (col, row) => {
+        const rc = cellRect(col, row);
+        return { x: rc.x + rc.w / 2, y: rc.y + rc.h / 2 };
+    };
     const MANA_CAP = 10, ENEMY_MANA_CAP = 8;
     const HAND_MAX = 6, DRAW_PER_TURN = 2;
     const { CARDS, ENCOUNTERS, TRAP_SLOTS } = globalThis.GAME_DATA;
-
-    const cellXY = (col, row) => ({
-        x: BOARD_X + col * (CELL + GAP) + CELL / 2,
-        y: BOARD_Y + row * (CELL + GAP) + CELL / 2,
-    });
 
     function createArenaScene(ctx) {
         const { scenes, G, uiTex, scheduler } = ctx;
@@ -28,19 +41,20 @@
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
         });
 
-        // ── Зона призыва: [front .. своя база]; front = ряд перед самым
-        //    выдвинутым своим юнитом/строением (по умолчанию перед базой) ──
+        // ── Зона призыва: [перед своей базой .. ряд перед самым выдвинутым
+        //    своим юнитом/строением]. По умолчанию — ОДИН ряд перед базой;
+        //    призыв и продвижение расширяют зону. ─────────────────────────
         function deployRows(side) {
             const own = B.units.filter((u) => u.side === side);
             const rows = [];
             if (side === "p") {
-                let front = 3;
+                let front = 3; // перед базой (ряд 4)
                 if (own.length) front = Math.max(1, Math.min(...own.map((u) => u.row)) - 1);
-                for (let r = front; r <= 4; r++) rows.push(r);
+                for (let r = front; r <= 3; r++) rows.push(r);
             } else {
-                let front = 1;
+                let front = 1; // перед базой врага (ряд 0)
                 if (own.length) front = Math.min(3, Math.max(...own.map((u) => u.row)) + 1);
-                for (let r = 0; r <= front; r++) rows.push(r);
+                for (let r = 1; r <= front; r++) rows.push(r);
             }
             return rows;
         }
@@ -56,31 +70,17 @@
             return out;
         }
 
-        // ── Визуал клетки: фон-сетка + подсветка ───────────────────────────
+        // ── Поле: нарисованная сетка бэкграунда + полупрозрачная подсветка ─
         function buildBoard() {
             const c = new PIXI.Container();
-            const back = new PIXI.Sprite(uiTex("board.png"));
-            back.anchor.set(0.5);
-            back.scale.set(0.44);
-            back.position.set(BOARD_X + (GRID * (CELL + GAP) - GAP) / 2, BOARD_Y + (GRID * (CELL + GAP) - GAP) / 2);
-            back.alpha = 0.95;
-            c.addChild(back);
-
-            const grid = new PIXI.Graphics();
-            for (let r = 0; r < GRID; r++) for (let col = 0; col < GRID; col++) {
-                grid.rect(BOARD_X + col * (CELL + GAP), BOARD_Y + r * (CELL + GAP), CELL, CELL);
-                grid.fill((r + col) % 2 ? 0x5a5044 : 0x4e463a);
-                grid.stroke({ width: 1, color: 0x2e2822 });
-            }
-            c.addChild(grid);
-
             const hi = new PIXI.Graphics();
             c.addChild(hi);
 
             const zones = [];
             for (let r = 0; r < GRID; r++) for (let col = 0; col < GRID; col++) {
+                const rc = cellRect(col, r);
                 const z = new PIXI.Graphics();
-                z.rect(BOARD_X + col * (CELL + GAP), BOARD_Y + r * (CELL + GAP), CELL, CELL);
+                z.rect(rc.x, rc.y, rc.w, rc.h);
                 z.fill({ color: 0xffffff, alpha: 0.001 });
                 z.eventMode = "static";
                 z.cursor = "pointer";
@@ -112,7 +112,8 @@
             }
             if (B.spellTarget) { // прицел заклинания: враги + база
                 for (const u of B.units) if (u.side === "e") {
-                    hi.rect(BOARD_X + u.col * (CELL + GAP), BOARD_Y + u.row * (CELL + GAP), CELL, CELL);
+                    const rc = cellRect(u.col, u.row);
+                    hi.rect(rc.x, rc.y, rc.w, rc.h);
                     hi.fill({ color: 0xd05a3c, alpha: 0.4 });
                     hi.stroke({ width: 2, color: 0xef9f8c });
                 }
@@ -124,7 +125,8 @@
             }
             root.board.userData.baseZone.eventMode = "none";
             for (const [col, r] of freeCells(deployRows("p"))) {
-                hi.rect(BOARD_X + col * (CELL + GAP), BOARD_Y + r * (CELL + GAP), CELL, CELL);
+                const rc = cellRect(col, r);
+                hi.rect(rc.x, rc.y, rc.w, rc.h);
                 hi.fill({ color: 0x7dc95e, alpha: 0.38 });
                 hi.stroke({ width: 2, color: 0xa8e890 });
             }
@@ -331,12 +333,14 @@
             const name = T(GAME_LOC.t(`card.${card}.name`), 13, 0xf3e6c2);
             name.anchor.set(0.5, 0);
             name.position.set(0, -128);
+            globalThis.GAME_UI.fit(name, 84, 10);
             c.addChild(name);
             const bottom = cardBottom(def);
             const stats = T(bottom.text, bottom.small ? 11 : 14, 0xd8c79d,
                 bottom.small ? { wordWrap: true, wordWrapWidth: 84, breakWords: true, align: "center" } : {});
             stats.anchor.set(0.5, 1);
             stats.position.set(0, -92);
+            if (!bottom.small) globalThis.GAME_UI.fit(stats, 84, 10);
             c.addChild(stats);
             const tag = T(GAME_LOC.t(`type.${def.type}.short`), 10, 0xcfc4a6);
             tag.anchor.set(0, 1);
@@ -466,6 +470,7 @@
             ud.title.text = t(`enc.${B.encId}.title`);
             drawBar(ud.eBar, 470, 44, 340, 14, B.enemyBase / B.enemyBaseMax, 0xc0503c);
             ud.eInfo.text = `${t("arena.baseEnemy")} ${Math.max(0, B.enemyBase)}/${B.enemyBaseMax}  ·  ${t("arena.mana")} ${B.eMana}  ·  ${t("arena.manaCards", { n: B.eHand.length })}`;
+            globalThis.GAME_UI.fit(ud.eInfo, 430, 11);
             drawBar(ud.pBar, 170, 552, 100, 12, B.playerBase / B.playerBaseMax, 0x5d9c4a);
             ud.pName.text = t("arena.hero");
             ud.manaT.text = `${B.mana}/${MANA_CAP}`;
@@ -687,7 +692,7 @@
             }
             // unit/building/spell с прицелом — выбор клетки
             B.selected = B.selected === idx ? null : idx;
-            B.spellTarget = def.type === "spell";
+            B.spellTarget = B.selected !== null && def.type === "spell";
             layoutHand();
             redrawHighlight();
             refreshHud();
@@ -803,6 +808,7 @@
         function enter() {
             const encId = G.activeEnemy ? G.activeEnemy.enc : "gob";
             const enc = ENCOUNTERS[encId] || ENCOUNTERS.gob;
+            curScene = enc.scene || 1;
             B = {
                 encId, phase: "player", stopped: false, turnNo: 1,
                 mana: 1, eMana: 1,
@@ -818,7 +824,8 @@
 
             root = new PIXI.Container();
             root.eventMode = "static";
-            const bg = new PIXI.Sprite(uiTex("bg_corridor_2.png"));
+            // фон арены — нарисованная сцена с сеткой поля (по энкаунтеру)
+            const bg = new PIXI.Sprite(uiTex(`scenes/${enc.scene || 1}.png`));
             const s = Math.max(1280 / bg.texture.width, 720 / bg.texture.height);
             bg.scale.set(s);
             bg.position.set((1280 - bg.texture.width * s) / 2, (720 - bg.texture.height * s) / 2);
@@ -909,6 +916,7 @@
                 B.spellTarget = false;
                 onCellTap(col, row);
             },
+            select(handIdx) { onCardTap(handIdx); },
             castSpell,
             playTrap(handIdx) {
                 B.selected = null;

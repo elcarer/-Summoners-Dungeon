@@ -44,6 +44,9 @@
         for (const name of UI_FILES) {
             uiTextures[`${name}.png`] = await assets.loadTexture(`./images/ui/${name}.png`);
         }
+        // фоны арен с нарисованной сеткой поля
+        uiTextures["scenes/1.png"] = await assets.loadTexture("./images/scenes/1.png");
+        uiTextures["scenes/2.png"] = await assets.loadTexture("./images/scenes/2.png");
         const uiTex = (name) => {
             const t = uiTextures[name];
             if (!t) throw new Error(`нет текстуры ui/${name}`);

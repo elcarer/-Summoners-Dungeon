@@ -107,14 +107,15 @@
         function buildHud() {
             const c = new PIXI.Container();
             const panel = new PIXI.Sprite(uiTex("panel_label.png"));
-            panel.scale.set(0.62);
+            panel.scale.set(0.7); // 341×87 → ~239×61
             c.addChild(panel);
-            const style = { fontFamily: "Kereru", fontSize: 20, fill: 0xf3e6c2 };
+            const style = { fontFamily: "Kereru", fontSize: 18, fill: 0xf3e6c2 };
             const floorT = new PIXI.Text({ text: "", style });
-            floorT.position.set(30, 12);
+            floorT.position.set(26, 10);
             const hpT = new PIXI.Text({ text: "", style });
-            hpT.position.set(150, 12);
+            hpT.position.set(126, 10);
             c.addChild(floorT, hpT);
+            c.userData = { floorT, hpT, fit: true };
             const hint = new PIXI.Text({
                 text: GAME_LOC.t("dungeon.hint"),
                 style: { fontFamily: "Kereru", fontSize: 15, fill: 0xbfae87 },
@@ -201,6 +202,8 @@
                 } else uiHud.userData.toast.alpha = 0;
                 uiHud.userData.floorT.text = GAME_LOC.t("dungeon.floor", { n: st.floor });
                 uiHud.userData.hpT.text = GAME_LOC.t("dungeon.hp", { hp: G.hero.hp, max: G.hero.maxHp });
+                globalThis.GAME_UI.fit(uiHud.userData.floorT, 95, 11);
+                globalThis.GAME_UI.fit(uiHud.userData.hpT, 105, 11);
 
                 // триггеры: враги и выход
                 for (const t of tokens) {
