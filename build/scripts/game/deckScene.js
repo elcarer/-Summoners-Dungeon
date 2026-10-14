@@ -4,8 +4,8 @@
 // скролл-панели (колесо мыши, ползунок, клик по треку). Сохранение сразу.
 (function () {
     function createDeckScene(ctx) {
-        const { scenes, G, ui } = ctx;
-        const { CARDS, DECK_MAX, DECK_MIN, RARITY_COLORS } = globalThis.GAME_DATA;
+        const { scenes, G, ui, uiTex } = ctx;
+        const { CARDS, DECK_MAX, DECK_MIN, RARITY_COLORS, ELEM_LOGO } = globalThis.GAME_DATA;
         const { T, fit, button, chip, cardFace, dimBg, scrollPane } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
         let root = null, leftPane = null, rightPane = null;
@@ -230,6 +230,32 @@
                 const opts = [{ value: null, label: t("filter.all") }, ...r.opts[0]];
                 for (const o of opts) {
                     const active = filters[r.key] === o.value;
+                    // фильтры стихий — кнопки-логотипы (images/ui/logo)
+                    if (r.key === "elem" && o.value && ELEM_LOGO[o.value]) {
+                        const c2 = new PIXI.Container();
+                        const g = new PIXI.Graphics();
+                        g.circle(19, 19, 19);
+                        g.fill(active ? 0x3a4a2e : 0x2e2822);
+                        g.stroke({ width: 2, color: active ? 0xa8e890 : 0x6b5c40 });
+                        g.eventMode = "static";
+                        g.cursor = "pointer";
+                        g.on("pointertap", () => {
+                            if (ctx.sfx) ctx.sfx();
+                            filters[r.key] = o.value;
+                            rebuildPanes();
+                        });
+                        const sp = new PIXI.Sprite(uiTex(ELEM_LOGO[o.value]));
+                        sp.anchor.set(0.5);
+                        sp.scale.set(30 / sp.texture.width);
+                        sp.position.set(19, 19);
+                        sp.eventMode = "none";
+                        if (!active) sp.alpha = 0.6;
+                        c2.addChild(g, sp);
+                        c2.userData = { w: 38, h: 38, isChip: true };
+                        root.addChild(c2);
+                        cx += 38 + 6;
+                        continue;
+                    }
                     const ch = chip(ctx, {
                         label: o.label, x: cx, y: r.y, active,
                         onTap: () => { filters[r.key] = o.value; rebuildPanes(); },

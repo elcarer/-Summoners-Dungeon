@@ -55,8 +55,19 @@
     };
     const MOB_POOL = ["gob", "gobBig", "gobTrap"];
 
+    // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
+    // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.
+    const ELEM_LOGO = {
+        strength: "logo/strength_logo.png",
+        growth: "logo/growth.png",
+        decay: "logo/decay_logo.png",
+        honor: "logo/honor_logo.png",
+        time: "logo/time_logo.png",
+        wisdom: "logo/wisdom_logo.png",
+    };
+
     globalThis.GAME_DATA = {
         CARDS, RARITY_COLORS, DEFAULT_DECK, DEFAULT_COLLECTION, DECK_MAX, DECK_MIN, TRAP_SLOTS,
-        REWARD_POOL, ENCOUNTERS, MOB_POOL,
+        REWARD_POOL, ENCOUNTERS, MOB_POOL, ELEM_LOGO,
     };
 })();

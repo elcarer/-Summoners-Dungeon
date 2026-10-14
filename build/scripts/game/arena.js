@@ -27,8 +27,13 @@
         const rc = cellRect(col, row);
         return { x: rc.x + rc.w / 2, y: rc.y + rc.h / 2 };
     };
-    const MANA_CAP = 10, ENEMY_MANA_CAP = 8;
-    const HAND_MAX = 6, DRAW_PER_TURN = 2;
+    // ── Энергия и энергосферы ─────────────────────────────────────────────
+    // Старт боя: 1 энергия, 4 карты в руке. Энергия НЕ обнуляется и сама не
+    // восстанавливается — приходит только с энергосферами. Каждый ход игрок
+    // получает 3 сферы; в конце хода каждую сферу он обращает в «+1 карта»
+    // (немедленный добор) или «+1 энергия» (на следующий ход). Потратив все
+    // сферы, игрок завершает ход автоматически.
+    const ORBS_PER_TURN = 3, HAND_MAX = 6;
     const { CARDS, ENCOUNTERS, TRAP_SLOTS } = globalThis.GAME_DATA;
 
     function createArenaScene(ctx) {
@@ -461,13 +466,13 @@
             if (def.img) {
                 const face = new PIXI.Sprite(uiTex(`cards/${def.img}.png`));
                 face.anchor.set(0.5, 1); // оригинальный размер спрайта
-                face.tint = def.cost > B.mana ? 0x9f9f9f : 0xffffff;
+                face.tint = def.cost > B.energy ? 0x9f9f9f : 0xffffff;
                 c.addChild(face);
             } else { // фолбэк без картинки: рубашка + подписи
                 const face = new PIXI.Sprite(uiTex("card_back_small.png"));
                 face.anchor.set(0.5, 1);
                 face.tint = def.type === "unit" ? 0xffffff : (def.color || 0xffffff);
-                if (def.cost > B.mana) face.tint = (face.tint & 0x9f9f9f) >>> 0;
+                if (def.cost > B.energy) face.tint = (face.tint & 0x9f9f9f) >>> 0;
                 c.addChild(face);
                 const plate = new PIXI.Graphics();
                 plate.roundRect(-44, def.type === "unit" ? -132 : -150, 88, def.type === "unit" ? 44 : 62, 6);
@@ -543,7 +548,7 @@
         function canDropAt(handIdx, col, row) {
             const def = CARDS[B.hand[handIdx]];
             return !!def && (def.type === "unit" || def.type === "building")
-                && def.cost <= B.mana && deployRows("p").includes(row) && !unitAt(col, row);
+                && def.cost <= B.energy && deployRows("p").includes(row) && !unitAt(col, row);
         }
         function hoverCard(idx, on) {
             if (!G.settings.dragSummon || drag || B.phase !== "player" || overlay) return;
@@ -630,6 +635,80 @@
                 redrawHighlight();
                 refreshHud();
             }
+        }
+
+        // ── Панель энергосфер (конец хода) ─────────────────────────────────
+        // Каждую из оставшихся сфер игрок обращает в «+1 карта» или
+        // «+1 энергия» (на следующий ход); потратив все — ход завершается
+        // сам. Добор недоступен только при полной руке (лимит 6).
+        let orbPanel = null;
+        function closeOrbPanel() {
+            if (!orbPanel) return;
+            orbPanel.destroy({ children: true });
+            orbPanel = null;
+        }
+        function buildOrbPanel() {
+            closeOrbPanel();
+            const { button } = globalThis.GAME_UI;
+            const node = new PIXI.Container();
+            node.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(0, 0, 1280, 720);
+            dim.fill({ color: 0x000000, alpha: 0.6 });
+            dim.eventMode = "static";
+            node.addChild(dim);
+            const frame = new PIXI.Graphics();
+            frame.roundRect(390, 168, 500, 300, 12);
+            frame.fill({ color: 0x171310, alpha: 0.96 });
+            frame.stroke({ width: 2, color: 0x6b5c40 });
+            node.addChild(frame);
+            const title = T(t("orb.title"), 26, 0xf0c96a, { stroke: { color: 0x241505, width: 5 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(640, 190);
+            title.eventMode = "none";
+            node.addChild(title);
+            const orbs = new PIXI.Graphics(); // осталось — светлые, потрачены — тёмные
+            for (let i = 0; i < ORBS_PER_TURN; i++) {
+                orbs.circle(560 + i * 60, 266, 16);
+                orbs.fill(i < B.orbs ? 0x7ec8f0 : 0x2a251e);
+                orbs.stroke({ width: 2, color: i < B.orbs ? 0xbfe8ff : 0x55493a });
+            }
+            orbs.eventMode = "none";
+            node.addChild(orbs);
+            const hint = T(t("orb.hint"), 14, 0x8a7c5e, { align: "center", wordWrap: true, wordWrapWidth: 450 });
+            hint.anchor.set(0.5, 0);
+            hint.position.set(640, 302);
+            hint.eventMode = "none";
+            node.addChild(hint);
+            const canDraw = B.hand.length < HAND_MAX;
+            const bDraw = button(ctx, {
+                tex: "button_stone.png", label: t("orb.draw"), x: 505, y: 405, scale: 0.95,
+                onTap: () => pickOrb("draw"),
+            });
+            if (!canDraw) bDraw.alpha = 0.45;
+            node.addChild(bDraw);
+            node.addChild(button(ctx, {
+                tex: "button_stone.png", label: t("orb.energy"), x: 775, y: 405, scale: 0.95,
+                onTap: () => pickOrb("energy"),
+            }));
+            root.addChild(node);
+            orbPanel = node;
+        }
+        function pickOrb(kind) {
+            if (!B || B.phase !== "player" || !orbPanel || B.orbs <= 0) return false;
+            if (kind === "draw") {
+                if (B.hand.length >= HAND_MAX) return false; // рука полна — только энергия
+                drawCards(1);
+            } else if (kind === "energy") {
+                B.energy += 1; // к следующему ходу (ход сейчас же и завершится)
+            } else return false;
+            B.orbs -= 1;
+            refreshHud();
+            if (B.orbs <= 0) {
+                closeOrbPanel();
+                enemyTurn(); // все сферы потрачены — ход окончен
+            } else buildOrbPanel();
+            return true;
         }
 
         // ── HUD боя ────────────────────────────────────────────────────────
@@ -812,11 +891,11 @@
             const ud = root.hud.userData;
             ud.title.text = t(`enc.${B.encId}.title`);
             drawBar(ud.eBar, 470, 44, 340, 14, B.enemyBase / B.enemyBaseMax, 0xc0503c);
-            ud.eInfo.text = `${t("arena.baseEnemy")} ${Math.max(0, B.enemyBase)}/${B.enemyBaseMax}  ·  ${t("arena.mana")} ${B.eMana}  ·  ${t("arena.manaCards", { n: B.eHand.length })}`;
+            ud.eInfo.text = `${t("arena.baseEnemy")} ${Math.max(0, B.enemyBase)}/${B.enemyBaseMax}  ·  ${t("arena.energy")} ${B.eEnergy}  ·  ${t("arena.manaCards", { n: B.eHand.length })}`;
             globalThis.GAME_UI.fit(ud.eInfo, 430, 11);
             drawBar(ud.pBar, 170, 552, 100, 12, B.playerBase / B.playerBaseMax, 0x5d9c4a);
             ud.pName.text = t("arena.hero");
-            ud.manaT.text = `${B.mana}/${MANA_CAP}`;
+            ud.manaT.text = `${B.energy}`;
             ud.deckT.text = `${B.deck.length}+${B.discard.length}`;
             ud.endBtn.alpha = B.phase === "player" ? 1 : 0.45;
             ud.endBtn.eventMode = B.phase === "player" ? "static" : "none";
@@ -911,13 +990,16 @@
             banner(t("arena.enemyTurn"));
             await delay(0.5);
             if (B.stopped) return;
-            B.eMana = Math.min(ENEMY_MANA_CAP, B.eMana + 1);
-            for (let k = 0; k < DRAW_PER_TURN; k++) drawEnemy(1);
-            refreshHud();
             await marchSide("e");
             if (B.stopped || B.phase === "over") return;
             await aiPlay();
             if (B.stopped || B.phase === "over") return;
+            // энергосферы врага (те же правила): рука мала — добор, иначе энергия
+            for (let k = 0; k < ORBS_PER_TURN; k++) {
+                if (B.eHand.length < 4) drawEnemy(1);
+                else B.eEnergy += 1;
+            }
+            refreshHud();
             await delay(0.25);
             if (B.stopped) return;
             await playerTurnStart();
@@ -928,7 +1010,7 @@
                 if (B.stopped || B.phase === "over") return;
                 const affordable = B.eHand
                     .map((c, i) => ({ i, def: CARDS[c] }))
-                    .filter((x) => x.def.cost <= B.eMana)
+                    .filter((x) => x.def.cost <= B.eEnergy)
                     .sort((a, b) => b.def.cost - a.def.cost);
                 if (!affordable.length) return;
                 let played = false;
@@ -944,7 +1026,7 @@
                         const [col, row] = pool[(Math.random() * pool.length) | 0];
                         const cardId = B.eHand[pick.i];
                         B.eHand.splice(pick.i, 1);
-                        B.eMana -= def.cost;
+                        B.eEnergy -= def.cost;
                         addUnit("e", cardId, col, row);
                         played = true;
                         break;
@@ -953,7 +1035,7 @@
                         if (B.traps.e.length >= TRAP_SLOTS) continue;
                         const cardId = B.eHand[pick.i];
                         B.eHand.splice(pick.i, 1);
-                        B.eMana -= def.cost;
+                        B.eEnergy -= def.cost;
                         armTrap("e", cardId);
                         played = true;
                         break;
@@ -972,7 +1054,7 @@
                         }
                         const cardId = B.eHand[pick.i];
                         B.eHand.splice(pick.i, 1);
-                        B.eMana -= def.cost;
+                        B.eEnergy -= def.cost;
                         if (def.spell.target === "enemyAny") {
                             const targets = B.units.filter((u) => u.side === "p");
                             if (targets.length) {
@@ -999,8 +1081,7 @@
 
         async function playerTurnStart() {
             B.turnNo += 1;
-            B.mana = Math.min(MANA_CAP, B.turnNo);
-            drawCards(DRAW_PER_TURN);
+            B.orbs = ORBS_PER_TURN; // новый ход — новые сферы; энергия не трогается
             B.phase = "anim";
             B.selected = null;
             B.spellTarget = false;
@@ -1046,8 +1127,8 @@
                 return;
             }
             if (def.type === "trap") {
-                if (def.cost > B.mana || B.traps.p.length >= TRAP_SLOTS) return;
-                B.mana -= def.cost;
+                if (def.cost > B.energy || B.traps.p.length >= TRAP_SLOTS) return;
+                B.energy -= def.cost;
                 spendCard(idx);
                 armTrap("p", Object.keys(CARDS).find((k) => CARDS[k] === def));
                 layoutHand();
@@ -1079,11 +1160,11 @@
             // мимо допустимых клеток (не в зоне / занято / не хватает маны) —
             // снять выбор: карты руки снова кликабельны (при выбранной карте
             // они неинтерактивны, чтобы крупные карты не съедали клики полем)
-            if (!deployRows("p").includes(row) || unitAt(col, row) || def.cost > B.mana) {
+            if (!deployRows("p").includes(row) || unitAt(col, row) || def.cost > B.energy) {
                 deselect();
                 return;
             }
-            B.mana -= def.cost;
+            B.energy -= def.cost;
             const cardId = spendCard(B.selected);
             addUnit("p", cardId, col, row);
             if (ctx.sfx) ctx.sfx();
@@ -1096,7 +1177,7 @@
             if (B.phase !== "player") return false;
             const cardId = B.hand[handIdx];
             const def = CARDS[cardId];
-            if (!def || def.type !== "spell" || def.cost > B.mana) return false;
+            if (!def || def.type !== "spell" || def.cost > B.energy) return false;
             if (def.spell.target === "anyUnit") { // усиление: любое существо
                 if (!target || target.col === undefined) return false;
                 const u = unitAt(target.col, target.row);
@@ -1120,7 +1201,7 @@
                 } else return false;
             }
             if (def.spell.draw) drawCards(def.spell.draw);
-            B.mana -= def.cost;
+            B.energy -= def.cost;
             spendCard(handIdx);
             layoutHand();
             redrawHighlight();
@@ -1194,7 +1275,7 @@
             curScene = enc.scene || 1;
             B = {
                 encId, phase: "player", stopped: false, turnNo: 1,
-                mana: 1, eMana: 1,
+                energy: 1, eEnergy: 1, orbs: ORBS_PER_TURN,
                 playerBase: 15, playerBaseMax: 15,
                 enemyBase: enc.baseHp, enemyBaseMax: enc.baseHp,
                 deck: shuffle([...G.deck]), discard: [], hand: [],
@@ -1208,6 +1289,7 @@
             overlay = null;
             drag = null;
             dragFx = null; // прошлого боя Graphics уничтожен вместе с root
+            orbPanel = null;
 
             root = new PIXI.Container();
             root.eventMode = "static";
@@ -1249,6 +1331,7 @@
             if (B) B.stopped = true;
             window.removeEventListener("pointerup", endCardDrag); // хвост незавершённого drag
             drag = null;
+            closeOrbPanel();
             if (root) { root.destroy({ children: true }); root = null; }
             overlay = null;
             dragFx = null; // Graphics умер вместе с root — не держим мёртвую ссылку
@@ -1317,9 +1400,10 @@
 
         const api = {
             endTurn() {
-                if (!B || B.phase !== "player") return;
-                enemyTurn();
+                if (!B || B.phase !== "player" || orbPanel) return;
+                buildOrbPanel(); // конец хода = распределение энергосфер
             },
+            orbChoice(kind) { return pickOrb(kind); },
             playCardAt(handIdx, col, row) {
                 B.selected = handIdx;
                 B.spellTarget = false;
@@ -1344,7 +1428,7 @@
                 return {
                     phase: B.phase, result: B.result,
                     pBase: B.playerBase, eBase: B.enemyBase,
-                    mana: B.mana, hand: [...B.hand],
+                    energy: B.energy, eEnergy: B.eEnergy, orbs: B.orbs, hand: [...B.hand],
                     units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body") })),
                     traps: { p: B.traps.p.length, e: B.traps.e.length },
                 };
@@ -1368,8 +1452,8 @@
         }
         function onCardTapTrapForApi(handIdx) {
             const def = CARDS[B.hand[handIdx]];
-            if (!def || def.type !== "trap" || def.cost > B.mana) return;
-            B.mana -= def.cost;
+            if (!def || def.type !== "trap" || def.cost > B.energy) return;
+            B.energy -= def.cost;
             const id = cardIdOf(def);
             spendCard(handIdx);
             armTrap("p", id);

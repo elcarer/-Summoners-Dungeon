@@ -54,6 +54,12 @@
             if (def.img) uiTextures[`cards/${def.img}.png`] =
                 await assets.loadTexture(`./images/cards/${def.img}.png`);
         }
+        // логотипы стихий (кнопки фильтров): images/ui/logo/<…>.png
+        say("стихии…");
+        await frame();
+        for (const file of Object.values(GAME_DATA.ELEM_LOGO)) {
+            if (!uiTextures[file]) uiTextures[file] = await assets.loadTexture(`./images/ui/${file}`);
+        }
         const uiTex = (name) => {
             const t = uiTextures[name];
             if (!t) throw new Error(`нет текстуры ui/${name}`);
