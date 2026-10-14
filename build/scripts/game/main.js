@@ -161,8 +161,11 @@
             if (gx < 0 || gy < 0 || gx >= DW || gy >= DH) return true;
             return DROWS[gy][gx] === "#";
         }
+        // Инстанс ввода героя наружу: подземелье читает оси (клик-перемещение
+        // отдаёт герою виртуальные оси, а без пути просто повторяет эти)
+        const charInput = createCharacterInput();
         const characters = createCharacterSystem({
-            world, ECS, COMPONENTS, DATA, blocked, input: createCharacterInput(), addSystem,
+            world, ECS, COMPONENTS, DATA, blocked, input: charInput, addSystem,
         });
 
         // Миграция сейва: карты прошлых версий (тестовые id) отфильтровываются;
@@ -195,7 +198,8 @@
 
         const ctx = {
             app, world, ECS, COMPONENTS, DATA, worldContainer, addSystem,
-            assets, uiTex, scheduler, input, camera, characters, knight, creatureSheets, G, ui, audio,
+            assets, uiTex, scheduler, input, camera, characters, charInput,
+            knight, creatureSheets, G, ui, audio,
             sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
         };

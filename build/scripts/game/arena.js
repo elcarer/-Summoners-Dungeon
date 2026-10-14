@@ -94,22 +94,30 @@
         }
 
         // ── Поле: нарисованная сетка бэкграунда + полупрозрачная подсветка ─
+        // Клик-зона ОДНА на всё поле (не 25 зон-клеток): у зоны-клетки с полем
+        // 2px по краям и на линиях сетки были мёртвые полосы, а микросдвиг
+        // мыши между press и release через границу ронял pointertap совсем —
+        // «клик на некоторые места клетки не призывает» (баг юзера). Теперь
+        // клетку считает cellAt по точке отпускания кнопки, границы никогда
+        // не мертвы (x ∈ [cols[c], cols[c+1]) — детерминированно в одну из
+        // соседних клеток).
         function buildBoard() {
             const c = new PIXI.Container();
             const hi = new PIXI.Graphics();
             c.addChild(hi);
+            const g = SCENE_GRID[curScene] || SCENE_GRID[1];
 
-            const zones = [];
-            for (let r = 0; r < GRID; r++) for (let col = 0; col < GRID; col++) {
-                const rc = cellRect(col, r);
-                const z = new PIXI.Graphics();
-                z.rect(rc.x, rc.y, rc.w, rc.h);
-                z.fill({ color: 0xffffff, alpha: 0.001 });
-                z.eventMode = "static";
-                z.on("pointertap", () => onCellTap(col, r));
-                c.addChild(z);
-                zones.push(z);
-            }
+            const zone = new PIXI.Graphics();
+            zone.rect(g.cols[0], g.rows[0], g.cols[GRID] - g.cols[0], g.rows[GRID] - g.rows[0]);
+            zone.fill({ color: 0xffffff, alpha: 0.001 });
+            zone.eventMode = "static";
+            zone.on("pointertap", (e) => {
+                const p = zone.toLocal(e.global); // локальные = дизайн-координаты
+                const hit = cellAt(p.x, p.y);
+                if (hit) onCellTap(hit[0], hit[1]);
+                else deselect(); // щель в разметке поля — как клик мимо клеток
+            });
+            c.addChild(zone);
 
             // зона клика по базе врага (для заклинаний с прицелом)
             const baseZone = new PIXI.Graphics();
@@ -121,7 +129,7 @@
             });
             c.addChild(baseZone);
 
-            c.userData = { hi, zones, baseZone };
+            c.userData = { hi, baseZone };
             return c;
         }
 

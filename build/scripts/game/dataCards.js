@@ -36,6 +36,7 @@
     ];
     const DEFAULT_COLLECTION = { str1: 3, str2: 3, str3: 3, str4: 3, str5: 0, str6: 0 };
     const DECK_MAX = 60, DECK_MIN = 12, TRAP_SLOTS = 2;
+    const DECK_COPIES = 3; // максимум одинаковых карт в колоде
 
     // Пул наград «1 из 3»: вес повторами — обычные чаще, эпик реже.
     const REWARD_POOL = [
@@ -68,6 +69,6 @@
 
     globalThis.GAME_DATA = {
         CARDS, RARITY_COLORS, DEFAULT_DECK, DEFAULT_COLLECTION, DECK_MAX, DECK_MIN, TRAP_SLOTS,
-        REWARD_POOL, ENCOUNTERS, MOB_POOL, ELEM_LOGO,
+        DECK_COPIES, REWARD_POOL, ENCOUNTERS, MOB_POOL, ELEM_LOGO,
     };
 })();

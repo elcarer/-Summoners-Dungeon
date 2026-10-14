@@ -44,13 +44,49 @@
     }
 
     function createDungeonScene(ctx) {
-        const { COMPONENTS, camera, characters, scenes, G, worldContainer, uiTex } = ctx;
+        const { COMPONENTS, camera, characters, charInput, ECS, world, scenes, G, worldContainer, uiTex } = ctx;
         let layer = null, heroId = null, tokens = [], uiHud = null;
+        let path = null; // клик-перемещение: очередь центров клеток (мировые px)
 
         function blocked(px, py) {
             const gx = Math.floor(px / TS), gy = Math.floor(py / TS);
             if (gx < 0 || gy < 0 || gx >= W || gy >= H) return true;
             return ROWS[gy][gx] === "#";
+        }
+
+        // ── Клик-перемещение: BFS по клеткам + ведение героя по пути ────────
+        // Путь — очередь центров соседних клеток; герой движется виртуальными
+        // осями (ctrlVI/ctrlVJ — механизм ИИ): работают коллизии-скольжение и
+        // походка из character-системы. Клавиши движения путь отменяют.
+        function walkable(gx, gy) {
+            return gx >= 0 && gy >= 0 && gx < W && gy < H && ROWS[gy][gx] !== "#";
+        }
+        function bfsPath(sx, sy, tx, ty) {
+            if (sx === tx && sy === ty) return null;
+            if (!walkable(sx, sy) || !walkable(tx, ty)) return null;
+            const key = (x, y) => y * W + x;
+            const prev = new Map([[key(sx, sy), null]]);
+            const q = [[sx, sy]];
+            for (let qi = 0; qi < q.length; qi++) {
+                const [cx, cy] = q[qi];
+                if (cx === tx && cy === ty) break;
+                for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                    const nx = cx + dx, ny = cy + dy, k = key(nx, ny);
+                    if (walkable(nx, ny) && !prev.has(k)) {
+                        prev.set(k, [cx, cy]);
+                        q.push([nx, ny]);
+                    }
+                }
+            }
+            if (!prev.has(key(tx, ty))) return null; // стена/недостижимо
+            const cells = [];
+            for (let c = [tx, ty]; c; c = prev.get(key(c[0], c[1]))) cells.push(c);
+            cells.reverse();
+            return cells.slice(1).map(([cx, cy]) => ({ x: cx * TS + TS / 2, y: cy * TS + TS / 2 }));
+        }
+        function setHeroAxes(ix, iy) {
+            COMPONENTS.ctrlVI[heroId] = ix;
+            COMPONENTS.ctrlVJ[heroId] = iy;
         }
 
         function buildMapGfx() {
@@ -121,6 +157,7 @@
             const c = new PIXI.Container();
             const panel = new PIXI.Sprite(uiTex("panel_label.png"));
             panel.scale.set(0.7); // 341×87 → ~239×61
+            panel.eventMode = "static"; // панель — «хром» HUD: клики по ней не ведут героя
             c.addChild(panel);
             const style = { fontFamily: "Kereru", fontSize: 18, fill: 0xf3e6c2 };
             const floorT = new PIXI.Text({ text: "", style });
@@ -169,6 +206,21 @@
                 const st = G.dungeon;
                 layer = new PIXI.Container();
                 layer.sortableChildren = true;
+                // клик-зона на всю карту (ниже всех — рисуется прозрачной):
+                // клик по полу = построить путь и идти
+                const zone = new PIXI.Graphics();
+                zone.rect(0, 0, W * TS, H * TS);
+                zone.fill({ color: 0xffffff, alpha: 0.001 });
+                zone.eventMode = "static";
+                zone.on("pointertap", (e) => {
+                    if (heroId === null) return;
+                    const p = zone.toLocal(e.global); // мировые координаты (камера учтена)
+                    const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
+                    const next = bfsPath(Math.floor(hx / TS), Math.floor(hy / TS),
+                        Math.floor(p.x / TS), Math.floor(p.y / TS));
+                    if (next) path = next; // в стену/сам в себя — не идём
+                });
+                layer.addChild(zone);
                 layer.addChild(buildMapGfx());
                 layer.addChild(makeExit());
                 tokens = [];
@@ -186,6 +238,10 @@
                     x: st.heroPos.x, y: st.heroPos.y, sprite, anims: ctx.knight.animations,
                     speed: 170, fps: ctx.knight.fps, halfW: 7, halfH: 5,
                 });
+                // виртуальные оси: их пишет и путь (клик-перемещение), и
+                // зеркало клавиш/джойстика в update — герой всегда на них
+                ECS.addComponent(world, heroId, "ctrlVI", 0);
+                ECS.addComponent(world, heroId, "ctrlVJ", 0);
                 layer.addChild(sprite);
                 worldContainer.visible = true;
                 camera.follow({
@@ -204,6 +260,7 @@
                     st.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
                 }
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
+                path = null;
                 if (layer) { layer.destroy({ children: true }); layer = null; }
                 tokens = [];
                 if (uiHud) { uiHud.destroy({ children: true }); uiHud = null; }
@@ -214,6 +271,32 @@
                 if (!st || heroId === null || !uiHud) return;
                 const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
                 const dt = ticker.deltaMS / 1000;
+
+                // ── ведение по пути (клик-перемещение) ─────────────────────
+                if (path && (charInput.ix || charInput.iy)) path = null; // клавиши главнее
+                if (path && !path.length) path = null;
+                if (path) {
+                    const dx = path[0].x - hx, dy = path[0].y - hy;
+                    if (Math.hypot(dx, dy) < 5) {
+                        const last = path.length === 1 ? path[0] : null;
+                        path.shift();
+                        if (!path.length) { // финальная клетка — встать ровно в центр
+                            if (last) {
+                                COMPONENTS.positionX[heroId] = last.x;
+                                COMPONENTS.positionY[heroId] = last.y;
+                            }
+                            path = null;
+                        }
+                    }
+                }
+                if (path) {
+                    const dx = path[0].x - hx, dy = path[0].y - hy;
+                    const d = Math.hypot(dx, dy) || 1;
+                    setHeroAxes(dx / d, dy / d);
+                } else {
+                    setHeroAxes(charInput.ix, charInput.iy); // зеркало обычного ввода
+                }
+
                 for (const t of tokens) {
                     t.phase += dt * 3;
                     t.node.y = t.base + Math.sin(t.phase) * 3;
@@ -249,6 +332,11 @@
             },
             blocked,
             heroId: () => heroId,
+            // клик-перемещение: состояние пути и перевод мировых координат
+            // в экранные (тесты кликают по полу через реальные события мыши);
+            // layer стоит в (0,0) мира — его трансформ и есть мировая матрица
+            path: () => path,
+            worldToScreen: (x, y) => (layer ? layer.toGlobal({ x, y }) : null),
         };
     }
 

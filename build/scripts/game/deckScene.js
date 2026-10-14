@@ -6,7 +6,7 @@
 (function () {
     function createDeckScene(ctx) {
         const { scenes, G, ui, uiTex } = ctx;
-        const { CARDS, DECK_MAX, DECK_MIN, ELEM_LOGO } = globalThis.GAME_DATA;
+        const { CARDS, DECK_MAX, DECK_MIN, DECK_COPIES, ELEM_LOGO } = globalThis.GAME_DATA;
         const { T, fit, button, chip, cardFace, dimBg, scrollPane } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
         let root = null, leftPane = null, rightPane = null;
@@ -61,9 +61,10 @@
                 const col = i % 5, rowI = (i / 5) | 0;
                 const owned = G.collection[id] || 0;
                 const inDeck = countIn(id);
-                const canAdd = owned > inDeck && G.deck.length < DECK_MAX;
+                const capped = inDeck >= DECK_COPIES; // лимит одинаковых карт
+                const canAdd = owned > inDeck && !capped && G.deck.length < DECK_MAX;
                 const cx = 62 + col * 132, cy = 92 + rowI * 205;
-                const card = cardFace(ctx, id, { scale: 0.5, dim: owned <= inDeck });
+                const card = cardFace(ctx, id, { scale: 0.5, dim: owned <= inDeck || capped });
                 card.position.set(cx, cy);
                 c.addChild(card);
                 const cnt = T(t("deck.owned", { n: owned }), 13, canAdd ? 0xd8c79d : 0x8a7c5e);
@@ -245,6 +246,7 @@
             add(id) {
                 if (G.deck.length >= DECK_MAX) return false;
                 if (countIn(id) >= (G.collection[id] || 0)) return false;
+                if (countIn(id) >= DECK_COPIES) return false; // не более 3 одинаковых
                 G.deck.push(id);
                 save();
                 rebuildPanes();
