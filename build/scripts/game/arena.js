@@ -158,6 +158,16 @@
                 return;
             }
             root.board.userData.baseZone.eventMode = "none";
+            const selDef = CARDS[B.hand[B.selected]];
+            if (selDef && selDef.type === "trap") { // мина: любая пустая клетка
+                for (let r = 0; r < GRID; r++) for (let col = 0; col < GRID; col++) {
+                    if (unitAt(col, r)) continue;
+                    const rc = cellRect(col, r);
+                    hi.rect(rc.x, rc.y, rc.w, rc.h);
+                    hi.fill({ color: 0xb07ad5, alpha: 0.3 }); // фиолетово, как «эпик»
+                }
+                return;
+            }
             for (const [col, r] of freeCells(deployRows("p"))) {
                 const rc = cellRect(col, r);
                 hi.rect(rc.x, rc.y, rc.w, rc.h);
@@ -296,6 +306,8 @@
                 }
                 if (def.ability === "dash1") summonDash(u); // «Скорость 1»
             }
+            // мина врага на клетке призыва (и существа, и строения)
+            triggerCellMines(u);
             return u;
         }
 
@@ -337,6 +349,7 @@
         // противник — удар по нему (урон с текущими бонусами). Своим не пройти,
         // своих не бить — стоим.
         function summonDash(u) {
+            if (!B.units.includes(u)) return; // мог умереть от мины при призыве
             const dir = u.side === "p" ? -1 : 1;
             const ahead = u.row + dir;
             if (ahead < 0 || ahead >= GRID) return;
@@ -357,18 +370,29 @@
             afterMoved(u); // перемещение — вражеские ловушки могут сработать
         }
 
-        // Перемещение завершилось: ловушки врага с триггером «на перемещение»
-        // бьют по переместившемуся существу (одна ловушка за событие).
+        // Перемещение завершилось: мина врага на этой клетке взрывается
         function afterMoved(u) {
             if (!B.units.includes(u) || u.def.type !== "unit") return;
+            triggerCellMines(u);
+        }
+        // «Гоблинская мина»: взрывается, когда вражеское юнит призван или
+        // переместился на её клетку: 3 урона этому юниту + 1 урона соседним
+        // с клеткой (верт/гориз, как у лагеря) существам и строениям.
+        function triggerCellMines(u) {
+            if (!B.units.includes(u)) return; // умер раньше (рывок+мина на шаге)
             const foe = u.side === "p" ? "e" : "p";
-            const i = B.traps[foe].findIndex((t) => t.def.trap.event === "onEnemyMove");
+            const i = B.traps[foe].findIndex((t) => t.col === u.col && t.row === u.row);
             if (i < 0) return;
             const trap = B.traps[foe].splice(i, 1)[0];
             redrawTraps();
             const p = cellXY(u.col, u.row);
             floatText(p.x, p.y - 40, "?!", 0xe08cd0);
             damageUnit(u, trap.def.trap.amount, null, "acid");
+            for (const v of B.units.slice()) {
+                if (v !== u && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1) {
+                    damageUnit(v, trap.def.trap.splash, null, "acid");
+                }
+            }
             refreshHud();
             checkEnd();
         }
@@ -417,9 +441,9 @@
         }
 
         // ── Ловушки ─────────────────────────────────────────────────────────
-        function armTrap(side, cardId) {
+        function armTrap(side, cardId, col, row) {
             if (B.traps[side].length >= TRAP_SLOTS) return false;
-            B.traps[side].push({ def: CARDS[cardId] });
+            B.traps[side].push({ def: CARDS[cardId], col, row });
             redrawTraps();
             sfx("mine");
             return true;
@@ -444,17 +468,19 @@
             const layer = root.trapLayer;
             layer.removeChildren().forEach((n) => n.destroy({ children: true }));
             for (const side of ["p", "e"]) {
-                B.traps[side].forEach((tr, i) => {
+                B.traps[side].forEach((tr) => {
+                    // «?» стоит прямо на заминированной клетке
                     const c = new PIXI.Container();
                     const g = new PIXI.Graphics();
-                    g.circle(0, 0, 17);
-                    g.fill(side === "p" ? 0x3f5f8a : 0x7a3f3f);
+                    g.circle(0, 0, 14);
+                    g.fill({ color: side === "p" ? 0x3f5f8a : 0x7a3f3f, alpha: 0.62 });
                     g.stroke({ width: 2, color: 0xd8c79d });
                     c.addChild(g);
-                    const q = T("?", 20, 0xffe9b0);
+                    const q = T("?", 18, 0xffe9b0);
                     q.anchor.set(0.5);
                     c.addChild(q);
-                    c.position.set(886, side === "p" ? 470 - i * 44 : 130 + i * 44);
+                    const p = cellXY(tr.col, tr.row);
+                    c.position.set(p.x, p.y);
                     layer.addChild(c);
                 });
             }
@@ -997,7 +1023,7 @@
                 pane.setContent(grid, ids.length ? 110 + (rowsN - 1) * 205 + 150 : 40);
                 node.addChild(pane.node);
                 node.addChild(button(ctx, {
-                    tex: "button_stone.png", label: t("settings.back"), x: 640, y: 684, scale: 0.95,
+                    tex: "button_menu.png", label: t("settings.back"), x: 640, y: 684, scale: 0.95,
                     onTap: closeOverlay,
                 }));
             }
@@ -1166,10 +1192,17 @@
                     }
                     if (def.type === "trap") {
                         if (B.traps.e.length >= TRAP_SLOTS) continue;
+                        // минируем зону призыва игрока: ряд 4 (там призыв), затем 3, 2
+                        const spots = [];
+                        for (const r of [4, 3, 2]) for (let cc = 0; cc < GRID; cc++) {
+                            if (!unitAt(cc, r) && !B.traps.e.some((t) => t.col === cc && t.row === r)) spots.push([cc, r]);
+                        }
+                        if (!spots.length) continue;
+                        const [col, row] = spots[(Math.random() * spots.length) | 0];
                         const cardId = B.eHand[pick.i];
                         B.eHand.splice(pick.i, 1);
                         B.eEnergy -= def.cost;
-                        armTrap("e", cardId);
+                        armTrap("e", cardId, col, row);
                         played = true;
                         break;
                     }
@@ -1262,9 +1295,9 @@
             }
             if (def.type === "trap") {
                 if (def.cost > B.energy || B.traps.p.length >= TRAP_SLOTS) return;
-                B.energy -= def.cost;
-                spendCard(idx);
-                armTrap("p", Object.keys(CARDS).find((k) => CARDS[k] === def));
+                // мина ставится на выбранную пустую клетку — выбор как у юнитов
+                B.selected = B.selected === idx ? null : idx;
+                B.spellTarget = false;
                 layoutHand();
                 redrawHighlight();
                 refreshHud();
@@ -1289,6 +1322,16 @@
                     && (sdef.spell.target === "anyUnit" || u.side === "e");
                 if (okUnit) castSpell(B.selected, { col, row });
                 else deselect(); // мимо цели — снять выбор
+                return;
+            }
+            if (def.type === "trap") { // мина — только пустая клетка
+                if (unitAt(col, row)) { deselect(); return; }
+                const cardId = spendCard(B.selected);
+                armTrap("p", cardId, col, row);
+                deselect();
+                layoutHand();
+                redrawHighlight();
+                refreshHud();
                 return;
             }
             // мимо допустимых клеток (не в зоне / занято / не хватает маны) —
@@ -1387,14 +1430,15 @@
                     if (B && !B.stopped && B.phase === "over" && B.result === "win") B.continueAction();
                 });
             } else {
-                const btn = new PIXI.Sprite(uiTex("button_red.png"));
+                const btn = new PIXI.Sprite(uiTex("button_menu.png"));
                 btn.anchor.set(0.5);
                 btn.scale.set(1.15);
                 btn.position.set(640, 390);
                 btn.eventMode = "static";
                 ov.addChild(btn);
-                const bt = T(t("arena.toMenu"), 18, 0xf3e6c2);
+                const bt = T(t("arena.toMenu"), 24, 0xf3e6c2);
                 bt.anchor.set(0.5);
+                globalThis.GAME_UI.fit(bt, btn.texture.width * btn.scale.x * 0.8, 11); // не шире кнопки
                 bt.position.set(640, 390);
                 bt.eventMode = "none";
                 ov.addChild(bt);
@@ -1574,9 +1618,10 @@
             },
             select(handIdx) { onCardTap(handIdx); },
             castSpell,
-            playTrap(handIdx) {
-                B.selected = null;
-                onCardTapTrapForApi(handIdx);
+            playTrap(handIdx, col, row) { // мина — выбрать карту и пустую клетку
+                B.selected = handIdx;
+                B.spellTarget = false;
+                onCellTap(col, row);
             },
             deployRows,
             // оверлеи боя (настройки / колода-просмотр)
@@ -1633,17 +1678,6 @@
         };
         function cardIdOf(def) {
             return Object.keys(CARDS).find((k) => CARDS[k] === def);
-        }
-        function onCardTapTrapForApi(handIdx) {
-            const def = CARDS[B.hand[handIdx]];
-            if (!def || def.type !== "trap" || def.cost > B.energy) return;
-            B.energy -= def.cost;
-            const id = cardIdOf(def);
-            spendCard(handIdx);
-            armTrap("p", id);
-            layoutHand();
-            redrawHighlight();
-            refreshHud();
         }
 
         return { enter, exit, update, api };

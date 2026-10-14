@@ -32,7 +32,7 @@
         const assets = createAssets();
         const UI_FILES = [
             "arc_rune", "bg_corridor_1", "bg_corridor_2", "board", "button_1", "button_attack",
-            "button_end", "button_red", "button_stone", "card_back_min", "card_back_screen",
+            "button_end", "button_menu", "card_back_min", "card_back_screen",
             "card_back_small", "icon_bag", "icon_gold", "icon_map", "icon_rune", "icon_setting",
             "panel_1", "panel_2", "panel_allert", "panel_buff", "panel_buff_circle",
             "panel_down", "panel_label", "panel_minimap", "panel_skill", "panel_top",
@@ -239,11 +239,11 @@
 
                 menuRoot.addChild(menuButton("button_1.png", t("menu.play"), 640, 366, 1.18,
                     () => { G.resetRun(); scenes.go("dungeon"); }));
-                menuRoot.addChild(menuButton("button_stone.png", t("menu.deck"), 640, 462, 0.92,
+                menuRoot.addChild(menuButton("button_menu.png", t("menu.deck"), 640, 462, 0.92,
                     () => scenes.go("deck")));
-                menuRoot.addChild(menuButton("button_stone.png", t("menu.settings"), 640, 542, 0.92,
+                menuRoot.addChild(menuButton("button_menu.png", t("menu.settings"), 640, 542, 0.92,
                     () => scenes.go("settings")));
-                menuRoot.addChild(menuButton("button_red.png", t("menu.exit"), 640, 622, 0.92,
+                menuRoot.addChild(menuButton("button_menu.png", t("menu.exit"), 640, 622, 0.92,
                     () => { menuRoot.userData.bye.visible = true; }));
 
                 const bye = T(t("menu.bye"), 24, 0xffe2a8, { stroke: { color: 0x1c1207, width: 5 } });
@@ -285,9 +285,9 @@
                 ft.position.set(640, 252);
                 ft.eventMode = "none";
                 fwRoot.addChild(ft);
-                fwRoot.addChild(menuButton("button_stone.png", t("floorWin.next"), 640, 386, 0.95,
+                fwRoot.addChild(menuButton("button_menu.png", t("floorWin.next"), 640, 386, 0.95,
                     () => scenes.go("dungeon")));
-                fwRoot.addChild(menuButton("button_red.png", t("floorWin.menu"), 640, 486, 0.95,
+                fwRoot.addChild(menuButton("button_menu.png", t("floorWin.menu"), 640, 486, 0.95,
                     () => { G.resetRun(); scenes.go("menu"); }));
                 ui.addChild(fwRoot);
             },

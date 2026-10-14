@@ -23,7 +23,7 @@
         str5: { type: "building", cost: 3, atk: 0, hp: 2, campAura: 1,
                 rarity: "rare", elem: "strength",
                 color: 0x8a5a3e, img: "strength/5" },
-        str6: { type: "trap", cost: 1, trap: { event: "onEnemyMove", effect: "moveDmg", amount: 3 },
+        str6: { type: "trap", cost: 2, trap: { event: "onEnemyCell", effect: "cellDmg", amount: 3, splash: 1 },
                 rarity: "epic", elem: "strength",
                 color: 0x6e4a2e, img: "strength/6" },
     };

@@ -165,7 +165,7 @@
             headerText();
 
             root.addChild(button(ctx, {
-                tex: "button_stone.png", label: t("deck.back"), x: 110, y: 52, scale: 0.9,
+                tex: "button_menu.png", label: t("deck.back"), x: 110, y: 52, scale: 0.9,
                 onTap: () => {
                     const to = G.uiReturn || "menu"; // откуда пришли (меню/подземелье)
                     G.uiReturn = null;

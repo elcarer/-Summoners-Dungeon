@@ -133,7 +133,7 @@
             outer.addChild(note);
 
             outer.addChild(button(ctx, {
-                tex: "button_stone.png", label: t("settings.back"), x: 640, y: 596, scale: 1.0,
+                tex: "button_menu.png", label: t("settings.back"), x: 640, y: 596, scale: 1.0,
                 onTap: onBack,
             }));
         }

@@ -21,7 +21,7 @@
     }
 
     // Кнопка: спириm + подпись (текст не ловит клики и вписан в ширину)
-    function button(ctx, { tex, label, x, y, scale = 1, onTap, fontSize = 20 }) {
+    function button(ctx, { tex, label, x, y, scale = 1, onTap, fontSize = 24 }) {
         const c = new PIXI.Container();
         const sp = new PIXI.Sprite(ctx.uiTex(tex));
         sp.anchor.set(0.5);
