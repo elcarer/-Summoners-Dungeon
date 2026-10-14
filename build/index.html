@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подземелье призывателей</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        /* Плашка этапов бута; после загрузки main.js её прячет */
+        #boot {
+            position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            color: #cfc4a6; font: 18px/1.5 monospace; white-space: pre; text-align: center;
+        }
+    </style>
+    <!-- Отладка в средах без отрисовки (?raf=timeout): requestAnimationFrame на
+         setTimeout — загрузка и тик идут без реальных кадров композитора -->
+    <script>
+        if (new URLSearchParams(location.search).get("raf") === "timeout") {
+            window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
+        }
+    </script>
+    <!-- ЛОКАЛЬНЫЙ PixiJS -->
+    <script src="./dll/pixi.min.js"></script>
+    <!-- Дата-файл ядра (UNIT_CONFIGS читается в init) -->
+    <script src="./scripts/data/units.js"></script>
+    <!-- ДВИЖОК zero_engine в dual-mode (глобали): порядок важен -->
+    <script src="./scripts/engine/eventSystem.js"></script>
+    <script src="./scripts/engine/engine.js"></script>
+    <script src="./scripts/engine/modules/math.js"></script>
+    <script src="./scripts/engine/modules/pool.js"></script>
+    <script src="./scripts/engine/modules/scheduler.js"></script>
+    <script src="./scripts/engine/modules/input.js"></script>
+    <script src="./scripts/engine/modules/camera.js"></script>
+    <script src="./scripts/engine/modules/character.js"></script>
+    <script src="./scripts/engine/modules/ai.js"></script>
+    <script src="./scripts/engine/modules/tilemap.js"></script>
+    <script src="./scripts/engine/modules/health.js"></script>
+    <script src="./scripts/engine/modules/fx.js"></script>
+    <script src="./scripts/engine/modules/audio.js"></script>
+    <script src="./scripts/engine/modules/assets.js"></script>
+    <script src="./scripts/engine/modules/hud.js"></script>
+    <script src="./scripts/engine/modules/scenes.js"></script>
+    <script src="./scripts/engine/modules/debug.js"></script>
+    <script src="./scripts/engine/modules/dualgrid.js"></script>
+</head>
+<body>
+    <div id="boot">запуск…</div>
+    <!-- ИГРА: данные → сцены → бут (в body: main.js ищет #boot) -->
+    <script src="./scripts/game/dataCards.js"></script>
+    <script src="./scripts/game/dungeon.js"></script>
+    <script src="./scripts/game/arena.js"></script>
+    <script src="./scripts/game/main.js"></script>
+</body>
+</html>
