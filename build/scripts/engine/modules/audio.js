@@ -68,12 +68,20 @@ function createAudio() {
     }
 
     function channel(which) {
+        // Гейн ОБЯЗАН быть подключен к destination: нода вне графа вывода
+        // молчит (статус при этом выглядит рабочим —-ready/playing честные)
         if (which === "music") {
-            if (!musicGain) musicGain = ctx.createGain();
+            if (!musicGain) {
+                musicGain = ctx.createGain();
+                musicGain.connect(ctx.destination);
+            }
             musicGain.gain.value = musicVolume;
             return musicGain;
         }
-        if (!sfxGain) sfxGain = ctx.createGain();
+        if (!sfxGain) {
+            sfxGain = ctx.createGain();
+            sfxGain.connect(ctx.destination);
+        }
         sfxGain.gain.value = masterVolume;
         return sfxGain;
     }
@@ -219,7 +227,8 @@ function createAudio() {
     // volumes (ползунки 0..1), failed (URL, которые не загрузились — 404 и пр.)
     function status() {
         return {
-            ready: isReady(), track: musicTrack, playing: musicName,
+            ready: isReady(), state: ctx ? ctx.state : null,
+            track: musicTrack, playing: musicName,
             decoded: [...buffers.keys()], volumes: { sfx: masterVolume, music: musicVolume },
             failed: [...failedUrls],
         };

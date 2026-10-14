@@ -106,7 +106,6 @@
                 z.rect(rc.x, rc.y, rc.w, rc.h);
                 z.fill({ color: 0xffffff, alpha: 0.001 });
                 z.eventMode = "static";
-                z.cursor = "pointer";
                 z.on("pointertap", () => onCellTap(col, r));
                 c.addChild(z);
                 zones.push(z);
@@ -528,7 +527,6 @@
                 c.addChild(costT);
             }
             c.eventMode = B.selected === null ? "static" : "none";
-            c.cursor = "pointer";
             c.on("pointertap", () => onCardTap(idx));
             // альтернативный режим призыва (Настройки): наведение увеличивает
             // карту, перетаскивание на клетку поля — призыв
@@ -700,7 +698,9 @@
             sl.thumb.stroke({ width: 3, color: 0x2f4f7a });
         }
         function sliderApply(e) {
-            const p = toDesign(e.global);
+            // Pixi-событие несёт .global; DOM-событие window (pointermove
+            // при перетаскивании) — только clientX/clientY
+            const p = toDesign(e.global ? e.global : { x: e.clientX, y: e.clientY });
             const total = spheresTotal();
             let v = Math.round(((p.x - SLIDER_X + SLIDER_W / 2) / SLIDER_W) * total);
             v = Math.max(0, Math.min(total, v));
@@ -782,7 +782,6 @@
                 }
                 c.position.set(640 + (idx - (n - 1) / 2) * spread, 400);
                 c.eventMode = "static";
-                c.cursor = "pointer";
                 c.on("pointertap", () => pickDiscard(idx));
                 node.addChild(c);
             });
@@ -863,7 +862,6 @@
             endBtn.scale.set(0.82);
             endBtn.position.set(1160, 330);
             endBtn.eventMode = "static";
-            endBtn.cursor = "pointer";
             endBtn.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); api.endTurn(); });
             c.addChild(endBtn);
 
@@ -896,10 +894,8 @@
             slEnergyL.eventMode = "none";
             slWrap.addChild(slEnergyL);
             const slTrack = new PIXI.Graphics();
-            slTrack.cursor = "ew-resize";
             slWrap.addChild(slTrack);
             const slThumb = new PIXI.Graphics();
-            slThumb.cursor = "ew-resize";
             slWrap.addChild(slThumb);
             slTrack.on("pointerdown", sliderGrab);
             slThumb.on("pointerdown", sliderGrab);
@@ -924,7 +920,6 @@
                 sp.anchor.set(0.5);
                 sp.scale.set(sc);
                 sp.eventMode = "static";
-                sp.cursor = "pointer";
                 sp.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onTap(); });
                 const w = new PIXI.Container();
                 w.position.set(x, y);
@@ -1397,7 +1392,6 @@
                 btn.scale.set(1.15);
                 btn.position.set(640, 390);
                 btn.eventMode = "static";
-                btn.cursor = "pointer";
                 ov.addChild(btn);
                 const bt = T(t("arena.toMenu"), 18, 0xf3e6c2);
                 bt.anchor.set(0.5);

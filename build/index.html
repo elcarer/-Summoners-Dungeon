@@ -7,6 +7,9 @@
     <link rel="icon" href="data:,"> <!-- без favicon-запроса (404 в консоли) -->
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
+        /* Единый курсор-картинка (23×32) на всей игре; canvas с !important —
+            чтобы hover Pixi-объектов не подменял его inline-стилем */
+        body, canvas { cursor: url("images/ui/cur.png") 0 0, auto !important; }
         /* Плашка этапов бута; после загрузки main.js её прячет */
         #boot {
             position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);

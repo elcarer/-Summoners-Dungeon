@@ -11,7 +11,7 @@ Git-правило: `build/`, `PLAN.md`, `README.md`, этот файл — ко
 
 ```bash
 cd build && python dev_server.py 8147     # http://127.0.0.1:8147/index.html
-bash for_work/smoke.sh                    # полный смоук: 111 проверок (сейчас 111/111)
+bash for_work/smoke.sh                    # полный смоук: 114 проверок (сейчас 114/114)
 ```
 
 `smoke.sh` поднимает сервер 8147 + headless Chrome (порт 9333, --mute-audio,
@@ -184,7 +184,15 @@ wolf/fireball/banner/mine и пр.) УДАЛЕНЫ. Стихия «Сила» (�
   coins — трофей; lvlUp — победа; openRoom — начало боя. Множители
   громкости — SFX_VOL в main.js (частые/тихие — ниже). Разблокировка
   WebAudio — по первому pointerdown/keydown (unlockAudio в main.js);
-  трек, выбранный до жеста, стартует сам после разблокировки. Звук самого
+  трек, выбранный до жеста, стартует сам после разблокировки. Гейны
+  каналов (sfxGain/musicGain) подключаются к ctx.destination при создании
+  (audio.js channel()) — нода вне графа вывода молчит, а status() выглядит
+  рабочим. status() показывает state контекста (running/suspended),
+  volumes и failed — по нему ищется «тишина».
+- **Курсор**: единый `images/ui/cur.png` (23×32, hotspot 0,0) — CSS в
+  index.html на body+canvas с `!important` (перебивает даже inline-стиль
+  Pixi). Кодовых смен курсора в скриптах НЕТ (все `cursor = "pointer"` /
+  `"ew-resize"` / `"grab"` удалены) — новый UI курсор не трогает. Звук самого
   первого клика НЕ теряется: playFile на suspended-контексте ставится в
   короткую очередь pendingSfx и доигрывает по resume (unlock/onstatechange).
   Диагностика «тишины»: `__GAME.audio.status()` показывает volumes
@@ -238,7 +246,15 @@ arena.js): cols [427, 509, 594, 679, 765, 850], rows сцена1
 - Аудио: два канала — `audio.setVolume(0..1)` (sfx) и
   `audio.setMusicVolume(0..1)` (музыка); файлы — `registerFile(имя, url)` +
   `playFile(имя, множитель)` / `music(трек)` (кэш декода ленивый, музыка —
-  ключи "music:<имя>"); шаги настроек 0..10 → /10.
+  ключи "music:<имя>"); шаги настроек 0..10 → /10. ЛОВУШКА «звука нет,
+  а статус рабочий»: гейн-нода без `connect(ctx.destination)` молчит —
+  decoded/playing/volumes при этом честные; искать в channel(), не в
+  загрузке.
+- События: у Pixi-события (pointerdown на объекте) есть `.global`; у
+  DOM-события на window (pointermove/pointerup при перетаскивании) —
+  ТОЛЬКО clientX/clientY. Общий обработчик координат обязан принимать
+  оба: `e.global ? e.global : { x: e.clientX, y: e.clientY }` — иначе
+  drag умирает молча в первом же move (клик при этом работает).
 - Игровые скрипты — в конце `<body>` (main.js ищет #boot).
 
 **Харнесс / среда:**
@@ -344,6 +360,14 @@ arena.js): cols [427, 509, 594, 679, 765, 850], rows сцена1
   шкалы, рост 0-3→0-4, сохранение ползунка, рука 9→панель сброса,
   handGeom (верх карты ниже поля), пакетный драйвер боя + _finish
   (длинные бои), фикс watchdog-паттерна «конец».
+- **Тишина/курсор/drag (в1f)**: ГЛАВНЫЙ БАГ «в игре нет звука» — гейны
+  каналов не были подключены к ctx.destination (сигнал обрывался на
+  гейне, все статусы честные); фикс в channel(), статус дополнен state.
+  Drag ползунка шкалы: sliderMove падал на DOM-событии без .global —
+  теперь обработчик принимает и Pixi-, и DOM-событие. Курсор: все
+  кодовые смены удалены (18 мест, 6 файлов), единый images/ui/cur.png
+  через CSS body+canvas !important. Смоук 114/114 (drag мышей по треку
+  1050→1090→1190, computed cursor, state running).
 
 ## Дальше (этап 1 из PLAN.md)
 

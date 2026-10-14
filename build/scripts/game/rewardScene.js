@@ -62,7 +62,6 @@
                 }
                 if (picked === null) {
                     card.eventMode = "static";
-                    card.cursor = "pointer";
                     card.on("pointertap", () => choose(i));
                 }
                 root.addChild(card);

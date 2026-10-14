@@ -35,7 +35,6 @@
                 b.fill(0x2e2822);
                 b.stroke({ width: 2, color: 0x6b5c40 });
                 b.eventMode = "static";
-                b.cursor = "pointer";
                 b.on("pointertap", () => {
                     if (ctx.sfx) ctx.sfx();
                     G.settings[key] = Math.max(0, Math.min(10, G.settings[key] + delta));
@@ -77,7 +76,6 @@
                 b.fill(active ? 0x3f5f2a : 0x2e2822);
                 b.stroke({ width: 2, color: active ? 0x9fd489 : 0x6b5c40 });
                 b.eventMode = "static";
-                b.cursor = "pointer";
                 b.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onPick(code); });
                 const lt = T(lab, 17, active ? 0xe6ffd9 : 0xd8c79d);
                 lt.anchor.set(0.5);

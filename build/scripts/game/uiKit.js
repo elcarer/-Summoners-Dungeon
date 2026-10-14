@@ -37,7 +37,6 @@
         }
         c.position.set(x, y);
         c.eventMode = "static";
-        c.cursor = "pointer";
         c.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onTap && onTap(); });
         c.userData = { sprite: sp };
         return c;
@@ -54,7 +53,6 @@
         g.fill(active ? 0x7dc95e : 0x2e2822);
         g.stroke({ width: 1.5, color: active ? 0xa8e890 : 0x6b5c40 });
         g.eventMode = "static";
-        g.cursor = "pointer";
         g.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onTap && onTap(); });
         c.addChild(g, t);
         t.position.set(tw / 2 - t.width / 2, h / 2 - t.height / 2);
@@ -172,7 +170,6 @@
         handle.fill(0x9a8a68);
         handle.stroke({ width: 1, color: 0x1c1207 });
         handle.eventMode = "static";
-        handle.cursor = "grab";
         root.addChild(handle);
 
         // зона скролла: клики сквозь неё НЕ проходят — контент интерактивен

@@ -110,7 +110,6 @@
             sp.anchor.set(0.5);
             sp.scale.set(scale);
             sp.eventMode = "static";
-            sp.cursor = "pointer";
             sp.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onTap(); });
             const c = new PIXI.Container();
             c.position.set(x, y);

@@ -62,7 +62,6 @@
                 hit.rect(-4, -4, 396, 32);
                 hit.fill({ color: 0xffffff, alpha: 0.001 });
                 hit.eventMode = "static";
-                hit.cursor = "pointer";
                 hit.on("pointertap", () => api.remove(id));
                 row.addChild(hit);
                 row.position.set(4, i * 32);
@@ -104,7 +103,6 @@
                 }
                 if (canAdd) {
                     card.eventMode = "static";
-                    card.cursor = "pointer";
                     card.on("pointertap", () => api.add(id));
                 }
             });
@@ -238,7 +236,6 @@
                         g.fill(active ? 0x3a4a2e : 0x2e2822);
                         g.stroke({ width: 2, color: active ? 0xa8e890 : 0x6b5c40 });
                         g.eventMode = "static";
-                        g.cursor = "pointer";
                         g.on("pointertap", () => {
                             if (ctx.sfx) ctx.sfx();
                             filters[r.key] = o.value;
