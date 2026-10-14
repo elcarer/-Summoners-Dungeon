@@ -60,6 +60,20 @@
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
         });
 
+        // ── Гоблины и Вождь: «карты Гоблинов» = существа с листом goblin и
+        //    ловушка-приманка (def.race); пока Вождь (leaderAura) на поле,
+        //    сторона платит за них на 1 энергию меньше (не ниже 0).
+        const isGoblin = (def) => !!def && (def.creature === "goblin" || def.race === "goblin");
+        function goblinDiscount(side) {
+            return B.units.some((u) => u.side === side && u.def.leaderAura) ? 1 : 0;
+        }
+        function effCost(cardId, side = "p") {
+            const def = CARDS[cardId];
+            if (!def) return 0;
+            const d = isGoblin(def) && B ? goblinDiscount(side) : 0;
+            return Math.max(0, def.cost - d);
+        }
+
         // ── Зона призыва: [свой последний ряд .. ряд перед самым выдвинутым
         //    своим существом/строением]. Базы — ЗА пределами сетки (ниже ряда 4
         //    игрока, выше ряда 0 врага), поэтому «ряд перед базой» = крайний
@@ -142,14 +156,28 @@
             }
             if (B.spellTarget) { // прицел заклинания
                 const def = CARDS[B.hand[B.selected]];
-                if (def && def.spell.target === "anyUnit") {
-                    // цель — любое существо: подсвечены все юниты обеих сторон
+                const tg = def && def.spell && def.spell.target;
+                if (tg === "anyUnit" || tg === "anyUnitDmg") {
+                    // усиление — любые существа; дротик — существа и строения
                     root.board.userData.baseZone.eventMode = "none";
-                    for (const u of B.units) if (u.def.type === "unit") {
+                    for (const u of B.units) {
+                        const ok = u.def.type === "unit"
+                            || (tg === "anyUnitDmg" && u.def.type === "building");
+                        if (!ok) continue;
                         const rc = cellRect(u.col, u.row);
                         hi.rect(rc.x, rc.y, rc.w, rc.h);
                         hi.fill({ color: u.side === "p" ? 0x7dc95e : 0xd05a3c, alpha: 0.4 });
                         hi.stroke({ width: 2, color: u.side === "p" ? 0xa8e890 : 0xef9f8c });
+                    }
+                    return;
+                }
+                if (tg === "ownUnit") { // жертва — только своё существо
+                    root.board.userData.baseZone.eventMode = "none";
+                    for (const u of B.units) if (u.side === "p" && u.def.type === "unit") {
+                        const rc = cellRect(u.col, u.row);
+                        hi.rect(rc.x, rc.y, rc.w, rc.h);
+                        hi.fill({ color: 0x7dc95e, alpha: 0.4 });
+                        hi.stroke({ width: 2, color: 0xa8e890 });
                     }
                     return;
                 }
@@ -167,7 +195,7 @@
             }
             root.board.userData.baseZone.eventMode = "none";
             const selDef = CARDS[B.hand[B.selected]];
-            if (selDef && selDef.type === "trap") { // мина: любая пустая клетка
+            if (selDef && selDef.type === "trap") { // ловушка: любая пустая клетка
                 for (let r = 0; r < GRID; r++) for (let col = 0; col < GRID; col++) {
                     if (unitAt(col, r)) continue;
                     const rc = cellRect(col, r);
@@ -313,6 +341,7 @@
                     floatText(p.x, p.y - 40, `+${camp}⚔`, 0x9fd489);
                 }
                 if (def.ability === "dash1") summonDash(u); // «Скорость 1»
+                else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
             }
             // мина врага на клетке призыва (и существа, и строения)
             triggerCellMines(u);
@@ -370,12 +399,53 @@
                 }
                 return;
             }
-            u.row = ahead;
+            const dest = lureRedirect(u, u.col, u.row, u.col, ahead);
+            if (!B.units.includes(u)) return; // приманка убила шагнувшего
+            u.col = dest[0];
+            u.row = dest[1];
             const p = cellXY(u.col, u.row);
             glide(u, p.x, p.y);
             setWalk(u, true);
             sfx("step");
             afterMoved(u); // перемещение — вражеские ловушки могут сработать
+        }
+
+        // «Шаман гоблинов»: после призыва бесплатно разыгрывает случайного
+        // Гоблина (цена ≤ 2) из колоды своей стороны на пустую соседнюю
+        // (верт/гориз) клетку — карта уходит из колоды прямо на поле.
+        function summonShaman(u) {
+            if (!B.units.includes(u)) return; // мог умереть от мины при призыве
+            const deck = u.side === "p" ? B.deck : B.eDeck;
+            const goblins = deck
+                .map((id, i) => ({ id, i }))
+                .filter((x) => isGoblin(CARDS[x.id]) && CARDS[x.id].cost <= 2);
+            const cells = [[-1, 0], [1, 0], [0, -1], [0, 1]]
+                .map(([dc, dr]) => [u.col + dc, u.row + dr])
+                .filter(([c2, r2]) => c2 >= 0 && c2 < GRID && r2 >= 0 && r2 < GRID && !unitAt(c2, r2));
+            if (!goblins.length || !cells.length) return;
+            const pick = goblins[(Math.random() * goblins.length) | 0];
+            deck.splice(pick.i, 1);
+            const [col, row] = cells[(Math.random() * cells.length) | 0];
+            addUnit(u.side, pick.id, col, row);
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 46, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
+        }
+
+        // «Гоблинская приманка»: существо врага, шагающее С КЛЕТКИ, соседней
+        // с ловушкой, сходит на клетку приманки вместо намеченной — и получает
+        // 1 урона. Приманка одноразовая; занятая клетка приманки не манит.
+        function lureRedirect(u, fromCol, fromRow, toCol, toRow) {
+            const foe = u.side === "p" ? "e" : "p";
+            const i = B.traps[foe].findIndex((tr) => tr.def.trap.effect === "lure"
+                && Math.abs(tr.col - fromCol) + Math.abs(tr.row - fromRow) === 1
+                && !unitAt(tr.col, tr.row));
+            if (i < 0) return [toCol, toRow];
+            const trap = B.traps[foe].splice(i, 1)[0];
+            redrawTraps();
+            const p = cellXY(trap.col, trap.row);
+            floatText(p.x, p.y - 40, "?!", 0xe08cd0);
+            damageUnit(u, trap.def.trap.dmg, null, "acid");
+            return [trap.col, trap.row];
         }
 
         // Перемещение завершилось: мина врага на этой клетке взрывается
@@ -386,10 +456,12 @@
         // «Гоблинская мина»: взрывается, когда вражеское юнит призван или
         // переместился на её клетку: 3 урона этому юниту + 1 урона соседним
         // с клеткой (верт/гориз, как у лагеря) существам и строениям.
+        // Только мины (cellDmg): приманка на той же клетке — не мина.
         function triggerCellMines(u) {
             if (!B.units.includes(u)) return; // умер раньше (рывок+мина на шаге)
             const foe = u.side === "p" ? "e" : "p";
-            const i = B.traps[foe].findIndex((t) => t.col === u.col && t.row === u.row);
+            const i = B.traps[foe].findIndex((t) => t.col === u.col && t.row === u.row
+                && t.def.trap.effect === "cellDmg");
             if (i < 0) return;
             const trap = B.traps[foe].splice(i, 1)[0];
             redrawTraps();
@@ -514,7 +586,7 @@
             if (def.img) {
                 const face = new PIXI.Sprite(uiTex(`cards/${def.img}.png`));
                 face.anchor.set(0.5, 1); // оригинальный размер спрайта
-                face.tint = def.cost > B.energy ? 0x9f9f9f : 0xffffff;
+                face.tint = effCost(card) > B.energy ? 0x9f9f9f : 0xffffff;
                 c.addChild(face);
                 // рамка выбора/наведения (видна у выделенной карты)
                 const frame = new PIXI.Graphics();
@@ -528,7 +600,7 @@
                 const face = new PIXI.Sprite(uiTex("card_back_small.png"));
                 face.anchor.set(0.5, 1);
                 face.tint = def.type === "unit" ? 0xffffff : (def.color || 0xffffff);
-                if (def.cost > B.energy) face.tint = (face.tint & 0x9f9f9f) >>> 0;
+                if (effCost(card) > B.energy) face.tint = (face.tint & 0x9f9f9f) >>> 0;
                 c.addChild(face);
                 const plate = new PIXI.Graphics();
                 plate.roundRect(-44, def.type === "unit" ? -132 : -150, 88, def.type === "unit" ? 44 : 62, 6);
@@ -605,7 +677,8 @@
         function canDropAt(handIdx, col, row) {
             const def = CARDS[B.hand[handIdx]];
             return !!def && (def.type === "unit" || def.type === "building")
-                && def.cost <= B.energy && deployRows("p").includes(row) && !unitAt(col, row);
+                && effCost(B.hand[handIdx]) <= B.energy
+                && deployRows("p").includes(row) && !unitAt(col, row);
         }
         function hoverCard(idx, on) {
             if (!G.settings.dragSummon || drag || B.phase !== "player" || overlay || B.discarding) return;
@@ -1126,7 +1199,10 @@
                         }
                         break; // занято — стоим (своим не даём пройти, своих не бьём)
                     }
-                    u.row = ahead;
+                    const dest = lureRedirect(u, u.col, u.row, u.col, ahead);
+                    if (!B.units.includes(u)) break; // приманка убила шагнувшего
+                    u.col = dest[0];
+                    u.row = dest[1];
                     const p = cellXY(u.col, u.row);
                     glide(u, p.x, p.y);
                     setWalk(u, true);
@@ -1176,9 +1252,9 @@
             for (;;) {
                 if (B.stopped || B.phase === "over") return;
                 const affordable = B.eHand
-                    .map((c, i) => ({ i, def: CARDS[c] }))
-                    .filter((x) => x.def.cost <= B.eEnergy)
-                    .sort((a, b) => b.def.cost - a.def.cost);
+                    .map((c, i) => ({ i, id: c, def: CARDS[c] }))
+                    .filter((x) => effCost(x.id, "e") <= B.eEnergy)
+                    .sort((a, b) => effCost(b.id, "e") - effCost(a.id, "e"));
                 if (!affordable.length) return;
                 let played = false;
                 for (const pick of affordable) {
@@ -1193,7 +1269,7 @@
                         const [col, row] = pool[(Math.random() * pool.length) | 0];
                         const cardId = B.eHand[pick.i];
                         B.eHand.splice(pick.i, 1);
-                        B.eEnergy -= def.cost;
+                        B.eEnergy -= effCost(cardId, "e");
                         addUnit("e", cardId, col, row);
                         played = true;
                         break;
@@ -1209,7 +1285,7 @@
                         const [col, row] = spots[(Math.random() * spots.length) | 0];
                         const cardId = B.eHand[pick.i];
                         B.eHand.splice(pick.i, 1);
-                        B.eEnergy -= def.cost;
+                        B.eEnergy -= effCost(cardId, "e");
                         armTrap("e", cardId, col, row);
                         played = true;
                         break;
@@ -1227,9 +1303,15 @@
                         punch(best.node);
                         sfx("up");
                     }
+                    if (def.spell.target === "anyUnitDmg") { // дротик — сильнейшему игроку
+                        const targets = B.units.filter((v) => v.side === "p");
+                        if (!targets.length) continue;
+                        const best = targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                        damageUnit(best, def.spell.dmg, null, "rocket");
+                    }
                     const cardId = B.eHand[pick.i];
                     B.eHand.splice(pick.i, 1);
-                    B.eEnergy -= def.cost;
+                    B.eEnergy -= effCost(cardId, "e");
                     if (def.spell.target === "enemyAny") {
                         const targets = B.units.filter((u) => u.side === "p");
                         if (targets.length) {
@@ -1302,7 +1384,7 @@
                 return;
             }
             if (def.type === "trap") {
-                if (def.cost > B.energy || B.traps.p.length >= TRAP_SLOTS) return;
+                if (effCost(B.hand[idx]) > B.energy || B.traps.p.length >= TRAP_SLOTS) return;
                 // мина ставится на выбранную пустую клетку — выбор как у юнитов
                 B.selected = B.selected === idx ? null : idx;
                 B.spellTarget = false;
@@ -1323,12 +1405,16 @@
             if (B.phase !== "player" || B.discarding || B.selected === null) return;
             const def = CARDS[B.hand[B.selected]];
             if (!def) return;
-            if (B.spellTarget) { // прицел: по врагу или по любому существу
+            if (B.spellTarget) { // прицел: по врагу, любому существу или строению
                 const sdef = CARDS[B.hand[B.selected]];
                 const u = unitAt(col, row);
-                const okUnit = u && u.def.type === "unit"
-                    && (sdef.spell.target === "anyUnit" || u.side === "e");
-                if (okUnit) castSpell(B.selected, { col, row });
+                const tg = sdef.spell.target;
+                const typeOk = u && (tg === "anyUnitDmg"
+                    ? (u.def.type === "unit" || u.def.type === "building")
+                    : u.def.type === "unit");
+                const sideOk = !u || tg !== "ownUnit" || u.side === "p";
+                const known = tg === "anyUnit" || tg === "anyUnitDmg" || tg === "ownUnit";
+                if (u && typeOk && sideOk && known) castSpell(B.selected, { col, row });
                 else deselect(); // мимо цели — снять выбор
                 return;
             }
@@ -1345,11 +1431,11 @@
             // мимо допустимых клеток (не в зоне / занято / не хватает маны) —
             // снять выбор: карты руки снова кликабельны (при выбранной карте
             // они неинтерактивны, чтобы крупные карты не съедали клики полем)
-            if (!deployRows("p").includes(row) || unitAt(col, row) || def.cost > B.energy) {
+            if (!deployRows("p").includes(row) || unitAt(col, row) || effCost(B.hand[B.selected]) > B.energy) {
                 deselect();
                 return;
             }
-            B.energy -= def.cost;
+            B.energy -= effCost(B.hand[B.selected]);
             const cardId = spendCard(B.selected);
             addUnit("p", cardId, col, row);
             if (ctx.sfx) ctx.sfx();
@@ -1362,7 +1448,7 @@
             if (B.phase !== "player" || B.discarding) return false;
             const cardId = B.hand[handIdx];
             const def = CARDS[cardId];
-            if (!def || def.type !== "spell" || def.cost > B.energy) return false;
+            if (!def || def.type !== "spell" || effCost(cardId) > B.energy) return false;
             if (def.spell.target === "anyUnit") { // усиление: любое существо
                 if (!target || target.col === undefined) return false;
                 const u = unitAt(target.col, target.row);
@@ -1373,6 +1459,31 @@
                 floatText(p.x, p.y - 26, `+${def.spell.buffAtk}⚔`, 0x9fd489);
                 punch(u.node);
                 sfx("up");
+            }
+            if (def.spell.target === "anyUnitDmg") { // дротик: существо или строение
+                if (!target || target.col === undefined) return false;
+                const u = unitAt(target.col, target.row);
+                if (!u || (u.def.type !== "unit" && u.def.type !== "building")) return false;
+                damageUnit(u, def.spell.dmg, null, "rocket");
+            }
+            if (def.spell.target === "ownUnit") { // жертва: убить своё, ударить соседей
+                if (!target || target.col === undefined) return false;
+                const u = unitAt(target.col, target.row);
+                if (!u || u.side !== "p" || u.def.type !== "unit") return false;
+                const p = cellXY(u.col, u.row);
+                killUnit(u, null);
+                floatText(p.x, p.y - 30, "☠", 0xef9f8c);
+                for (const v of B.units.slice()) {
+                    if (Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1) {
+                        damageUnit(v, def.spell.dmg, null, "rocket");
+                    }
+                }
+            }
+            if (def.spell.target === "none" && def.spell.baseDmg) { // землетрясение
+                B.enemyBase -= def.spell.baseDmg;
+                floatText(640, 40, `−${def.spell.baseDmg}`, 0xff8f6e);
+                punch(root.hud);
+                sfx("rocket");
             }
             if (def.spell.target === "enemyAny") {
                 if (!target) return false;
@@ -1388,7 +1499,7 @@
                 } else return false;
             }
             if (def.spell.draw) drawCards(def.spell.draw);
-            B.energy -= def.cost;
+            B.energy -= effCost(cardId);
             spendCard(handIdx);
             layoutHand();
             redrawHighlight();
