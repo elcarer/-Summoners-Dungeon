@@ -47,6 +47,29 @@
                  trap: { event: "onEnemyMoveFromAdj", effect: "lure", dmg: 1 },
                  rarity: "common", elem: "strength",
                  color: 0x6e4a2e, img: "strength/12" },
+        str13: { type: "unit", cost: 2, atk: 2, hp: 1, speed: 1,
+                 creature: "goblin", ability: "archer",
+                 rarity: "rare", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/13" },
+        str14: { type: "unit", cost: 2, atk: 1, hp: 1, speed: 1,
+                 creature: "goblin", ability: "bombling",
+                 rarity: "rare", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/14" },
+        str15: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
+                 creature: "goblin", ability: "assassin",
+                 rarity: "common", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/15" },
+        str16: { type: "unit", cost: 4, atk: 5, hp: 5, speed: 1,
+                 creature: "goblin",
+                 rarity: "common", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/16" },
+        str17: { type: "spell", cost: 1,
+                 spell: { target: "anyUnitDmg", dmg: 1, noBuildings: true, brew: true },
+                 rarity: "rare", elem: "strength",
+                 color: 0xb0402e, img: "strength/17" },
+        str18: { type: "building", cost: 2, atk: 0, hp: 5, mycelium: 1,
+                 rarity: "epic", elem: "strength",
+                 color: 0x8a5a3e, img: "strength/18" },
     };
     const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
 
@@ -58,6 +81,7 @@
     const DEFAULT_COLLECTION = {
         str1: 3, str2: 3, str3: 3, str4: 3,
         str5: 0, str6: 0, str7: 0, str8: 0, str9: 0, str10: 0, str11: 0, str12: 0,
+        str13: 0, str14: 0, str15: 0, str16: 0, str17: 0, str18: 0,
     };
     const DECK_MAX = 60, DECK_MIN = 12, TRAP_SLOTS = 2;
     const DECK_COPIES = 3; // максимум одинаковых карт в колоде
@@ -67,18 +91,22 @@
         "str1", "str1", "str1", "str2", "str2", "str2",
         "str3", "str3", "str3", "str4", "str4", "str4",
         "str9", "str9", "str9", "str12", "str12", "str12",
+        "str15", "str15", "str15", "str16", "str16", "str16",
         "str5", "str5", "str7", "str7", "str11", "str11",
-        "str6", "str8", "str10",
+        "str13", "str13", "str14", "str14", "str17", "str17",
+        "str6", "str8", "str10", "str18",
     ];
 
     // Энкаунтеры подземелья: 'e' — обычный (случайный), 'B' — главарь.
     // Название — ключ локализации enc.<id>.title; scene — фон арены (images/scenes).
     const ENCOUNTERS = {
-        gob:     { scene: 1, baseHp: 10, deck: ["str1", "str1", "str1", "str1", "str2", "str2"] },
-        gobBig:  { scene: 1, baseHp: 14, deck: ["str1", "str1", "str2", "str2", "str3", "str4", "str9"] },
-        gobTrap: { scene: 2, baseHp: 12, deck: ["str1", "str1", "str3", "str3", "str6", "str12"] },
+        gob:     { scene: 1, baseHp: 10, deck: ["str1", "str1", "str1", "str1", "str2", "str2", "str15"] },
+        gobBig:  { scene: 1, baseHp: 14, deck: ["str1", "str1", "str2", "str2", "str3", "str4", "str9",
+                                                 "str16", "str13"] },
+        gobTrap: { scene: 2, baseHp: 12, deck: ["str1", "str1", "str3", "str3", "str6", "str12", "str14"] },
         boss:    { scene: 2, baseHp: 20, deck: ["str1", "str1", "str2", "str2", "str3", "str3",
-                                                 "str4", "str4", "str5", "str6", "str7", "str8"] },
+                                                 "str4", "str4", "str5", "str6", "str7", "str8",
+                                                 "str13", "str17", "str18"] },
     };
     const MOB_POOL = ["gob", "gobBig", "gobTrap"];
 

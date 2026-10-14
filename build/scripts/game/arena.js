@@ -73,6 +73,11 @@
             const d = isGoblin(def) && B ? goblinDiscount(side) : 0;
             return Math.max(0, def.cost - d);
         }
+        // Урон заклинания с ростом: «Колдовское варево» — +1 за каждое
+        // разыгранное ранее в этом бою (счёт общий на обе стороны).
+        function spellDmg(def) {
+            return (def.spell.dmg || 0) + (def.spell.brew ? (B.brewCasts || 0) : 0);
+        }
 
         // ── Зона призыва: [свой последний ряд .. ряд перед самым выдвинутым
         //    своим существом/строением]. Базы — ЗА пределами сетки (ниже ряда 4
@@ -159,10 +164,12 @@
                 const tg = def && def.spell && def.spell.target;
                 if (tg === "anyUnit" || tg === "anyUnitDmg") {
                     // усиление — любые существа; дротик — существа и строения
+                    // (варево строения не берёт — только существа)
                     root.board.userData.baseZone.eventMode = "none";
                     for (const u of B.units) {
                         const ok = u.def.type === "unit"
-                            || (tg === "anyUnitDmg" && u.def.type === "building");
+                            || (tg === "anyUnitDmg" && u.def.type === "building"
+                                && !def.spell.noBuildings);
                         if (!ok) continue;
                         const rc = cellRect(u.col, u.row);
                         hi.rect(rc.x, rc.y, rc.w, rc.h);
@@ -342,6 +349,7 @@
                 }
                 if (def.ability === "dash1") summonDash(u); // «Скорость 1»
                 else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
+                else if (def.ability === "bombling") summonBombling(u); // бомблинг
             }
             // мина врага на клетке призыва (и существа, и строения)
             triggerCellMines(u);
@@ -440,6 +448,23 @@
             floatText(p.x, p.y - 46, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
         }
 
+        // «Бомблинг»: после призыва находит в колоде владельца случайную
+        // карту ловушки и кладёт её в руку (карта уходит из колоды).
+        function summonBombling(u) {
+            if (!B.units.includes(u)) return; // мог умереть от мины при призыве
+            const deck = u.side === "p" ? B.deck : B.eDeck;
+            const hand = u.side === "p" ? B.hand : B.eHand;
+            const traps = deck.map((id, i) => ({ id, i }))
+                .filter((x) => CARDS[x.id].type === "trap");
+            if (!traps.length) return;
+            const pick = traps[(Math.random() * traps.length) | 0];
+            deck.splice(pick.i, 1);
+            hand.push(pick.id);
+            sfx("chpoc");
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 46, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
+        }
+
         // «Гоблинская приманка»: существо врага, шагающее С КЛЕТКИ, соседней
         // с ловушкой, сходит на клетку приманки вместо намеченной — и получает
         // 1 урона. Приманка одноразовая; занятая клетка приманки не манит.
@@ -457,10 +482,12 @@
             return [trap.col, trap.row];
         }
 
-        // Перемещение завершилось: мина врага на этой клетке взрывается
+        // Перемещение завершилось: мина врага на этой клетке взрывается,
+        // затем «Выстрел 1» лучника (перемещение состоялось)
         function afterMoved(u) {
             if (!B.units.includes(u) || u.def.type !== "unit") return;
             triggerCellMines(u);
+            archerShot(u);
         }
         // «Гоблинская мина»: взрывается, когда вражеское юнит призван или
         // переместился на её клетку: 3 урона этому юниту + 1 урона соседним
@@ -482,6 +509,36 @@
                     damageUnit(v, trap.def.trap.splash, null, "acid");
                 }
             }
+            refreshHud();
+            checkEnd();
+        }
+
+        // «Выстрел 1» (Гоблинский лучник): после перемещения — 1 урон
+        // ближайшему существу или строению впереди по вертикали (любой
+        // стороны); если вертикаль перед ним пуста — 1 урон базе противника.
+        function archerShot(u) {
+            if (!B.units.includes(u) || u.def.ability !== "archer") return;
+            const dir = u.side === "p" ? -1 : 1;
+            for (let r = u.row + dir; r >= 0 && r < GRID; r += dir) {
+                const o = unitAt(u.col, r);
+                if (o) {
+                    damageUnit(o, 1, u, "dam");
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
+            }
+            sfx("crash");
+            if (u.side === "p") {
+                B.enemyBase -= 1;
+                const p = cellXY(u.col, 0);
+                floatText(p.x, p.y - 10, "−1", 0xff8f6e);
+            } else {
+                B.playerBase -= 1;
+                const p = cellXY(u.col, GRID - 1);
+                floatText(p.x, p.y + 10, "−1", 0xff5f4e);
+            }
+            punch(root.hud);
             refreshHud();
             checkEnd();
         }
@@ -512,7 +569,14 @@
             floatText(p.x, p.y - 24, `−${amount}`, 0xffb26e);
             punch(target.node);
             sfx(snd);
-            if (target.hp <= 0) killUnit(target, killer);
+            if (target.hp <= 0) { killUnit(target, killer); return; }
+            // «Гоблин-асассин»: существо, оставшееся после его урона
+            // с 1 жизнью, добивается
+            if (target.hp === 1 && target.def.type === "unit"
+                && killer && killer.def.ability === "assassin") {
+                floatText(p.x, p.y - 44, "☠", 0xef9f8c);
+                killUnit(target, killer);
+            }
         }
 
         function baseHit(side, u) {
@@ -527,6 +591,20 @@
                 floatText(p.x, p.y + 10, `−${u.curAtk}`, 0xff5f4e);
             }
             punch(root.hud);
+        }
+
+        // «Грибница»: в начало хода владельца даёт 1 энергию и теряет 1 жизнь
+        // (энергия начисляется даже если грибница от этого урона погибает).
+        function upkeep(side) {
+            for (const b of B.units.slice()) {
+                if (b.side !== side || b.def.type !== "building" || !b.def.mycelium) continue;
+                if (side === "p") B.energy += 1; else B.eEnergy += 1;
+                sfx("aqua");
+                const p = cellXY(b.col, b.row);
+                floatText(p.x, p.y - 40, "+1⚡", 0xffd98c);
+                damageUnit(b, 1, null, "dam");
+            }
+            refreshHud();
         }
 
         // ── Ловушки ─────────────────────────────────────────────────────────
@@ -1241,6 +1319,7 @@
             banner(t("arena.enemyTurn"));
             await delay(0.5);
             if (B.stopped) return;
+            upkeep("e"); // грибницы врага
             await marchSide("e");
             if (B.stopped || B.phase === "over") return;
             await aiPlay();
@@ -1312,11 +1391,13 @@
                         punch(best.node);
                         sfx("up");
                     }
-                    if (def.spell.target === "anyUnitDmg") { // дротик — сильнейшему игроку
-                        const targets = B.units.filter((v) => v.side === "p");
+                    if (def.spell.target === "anyUnitDmg") { // дротик/варево — сильнейшему игроку
+                        const targets = B.units.filter((v) => v.side === "p"
+                            && (v.def.type === "unit"
+                                || (v.def.type === "building" && !def.spell.noBuildings)));
                         if (!targets.length) continue;
                         const best = targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
-                        damageUnit(best, def.spell.dmg, null, "rocket");
+                        damageUnit(best, spellDmg(def), null, "rocket");
                     }
                     const cardId = B.eHand[pick.i];
                     B.eHand.splice(pick.i, 1);
@@ -1333,6 +1414,7 @@
                         }
                     }
                         if (def.spell.draw) drawEnemy(def.spell.draw);
+                        if (def.spell.brew) B.brewCasts = (B.brewCasts || 0) + 1;
                         B.eDiscard.push(cardId);
                         refreshHud();
                         if (checkEnd()) return;
@@ -1355,6 +1437,7 @@
             banner(t("arena.yourTurn"));
             await delay(0.4);
             if (B.stopped) return;
+            upkeep("p"); // грибницы игрока
             await marchSide("p");
             if (B.stopped || B.phase === "over") return;
             B.phase = "player";
@@ -1419,7 +1502,8 @@
                 const u = unitAt(col, row);
                 const tg = sdef.spell.target;
                 const typeOk = u && (tg === "anyUnitDmg"
-                    ? (u.def.type === "unit" || u.def.type === "building")
+                    ? (u.def.type === "unit"
+                        || (u.def.type === "building" && !sdef.spell.noBuildings))
                     : u.def.type === "unit");
                 const sideOk = !u || tg !== "ownUnit" || u.side === "p";
                 const known = tg === "anyUnit" || tg === "anyUnitDmg" || tg === "ownUnit";
@@ -1469,11 +1553,12 @@
                 punch(u.node);
                 sfx("up");
             }
-            if (def.spell.target === "anyUnitDmg") { // дротик: существо или строение
+            if (def.spell.target === "anyUnitDmg") { // дротик: существо или строение; варево — только существо
                 if (!target || target.col === undefined) return false;
                 const u = unitAt(target.col, target.row);
-                if (!u || (u.def.type !== "unit" && u.def.type !== "building")) return false;
-                damageUnit(u, def.spell.dmg, null, "rocket");
+                if (!u || (u.def.type !== "unit"
+                    && (u.def.type !== "building" || def.spell.noBuildings))) return false;
+                damageUnit(u, spellDmg(def), null, "rocket");
             }
             if (def.spell.target === "ownUnit") { // жертва: убить своё, ударить соседей
                 if (!target || target.col === undefined) return false;
@@ -1508,6 +1593,7 @@
                 } else return false;
             }
             if (def.spell.draw) drawCards(def.spell.draw);
+            if (def.spell.brew) B.brewCasts = (B.brewCasts || 0) + 1;
             B.energy -= effCost(cardId);
             spendCard(handIdx);
             layoutHand();
@@ -1592,7 +1678,7 @@
                 eDeck: shuffle([...enc.deck]), eDiscard: [], eHand: [],
                 units: [], traps: { p: [], e: [] },
                 selected: null, spellTarget: false, result: null,
-                discarding: false,
+                discarding: false, brewCasts: 0,
             };
             G.battle = B;
             drawCards(4);
