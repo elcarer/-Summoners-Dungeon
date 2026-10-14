@@ -55,6 +55,12 @@
         say("спрайты…");
         await frame();
         const knight = await assets.loadCharacter("./images/sprites/knight_64");
+        // Листы существ поля боя. Стандарт: <имя>_256.png — сетка 256×256,
+        // 4 ряда анимаций (спереди/сзади/справа/слева) по 6 кадров + json-манифест.
+        // Пока один лист на всех существ; новые добавлять сюда записью.
+        const creatureSheets = {
+            goblin: await assets.loadCharacter("./images/sprites/goblin_256"),
+        };
 
         // ── UI-корень 1280×720 с вписыванием в окно ────────────────────────
         const ui = new PIXI.Container();
@@ -115,7 +121,7 @@
 
         const ctx = {
             app, world, ECS, COMPONENTS, DATA, worldContainer, addSystem,
-            assets, uiTex, scheduler, input, camera, characters, knight, G, ui, audio,
+            assets, uiTex, scheduler, input, camera, characters, knight, creatureSheets, G, ui, audio,
             sfx() {
                 try {
                     audio.unlock();

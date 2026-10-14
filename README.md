@@ -29,10 +29,12 @@ python dev_server.py 8147
 
 - `build/` — билд: движок + `scripts/game/` (loc, meta, dataCards, uiKit,
   dungeon, arena, deckScene, rewardScene, settingsScene, main) + арт
-  (`images/ui`, `images/scenes` — арены, `font/Kereru.otf`)
+  (`images/ui`, `images/scenes` — арены, `images/sprites` — листы существ,
+  `font/Kereru.otf`)
 - `for_work/` — рабочие материалы (арт-исходники, тесты) — в git не входят
 - `PLAN.md` — план разработки и правила боя
 - `HANDOFF.md` — сводка для продолжения работы (устройство, ловушки, журнал)
 
-Статус: этап 0 + механические волны 2–3 готовы (смоук 45/45), существа и
-лицевые стороны карт — заглушки. Подробности — в PLAN.md и HANDOFF.md.
+Статус: этап 0 + механические волны 2–3 готовы (смоук 47/47); существа на
+поле — живые спрайты (пока лист goblin на всех), лицевые стороны карт —
+заглушки. Подробности — в PLAN.md и HANDOFF.md.

@@ -37,6 +37,12 @@
         const delay = (s) => new Promise((r) => scheduler.after(s, r));
         let root = null, B = null;
 
+        // Лист существ поля боя: пока один (goblin) на всех. Стандарт листа —
+        // 256×256, ряды front/back/right/left по 6 кадров. Взгляд по стороне:
+        // юниты игрока идут вверх (виден затылок), врага — вниз (анфас).
+        const CREATURE = ctx.creatureSheets && ctx.creatureSheets.goblin;
+        const SPRITE_SCALE = 0.35; // кадр 256 → ~90px, фигура ~68px в клетке
+
         const T = (text, size, fill, opts = {}) => new PIXI.Text({
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
         });
@@ -135,19 +141,14 @@
         // ── Жетоны на поле: существо / строение ────────────────────────────
         function makeUnitNode(u) {
             const c = new PIXI.Container();
-            const g = new PIXI.Graphics();
+            const spr = u.def.type !== "building" && CREATURE; // спрайт-существо
             if (u.def.type === "building") {
+                const g = new PIXI.Graphics();
                 g.moveTo(-26, -8); g.lineTo(0, -26); g.lineTo(26, -8); // крыша
                 g.lineTo(26, 24); g.lineTo(-26, 24); g.closePath();
                 g.fill(u.def.color);
                 g.stroke({ width: 2.5, color: 0xffd98c });
-            } else {
-                g.roundRect(-30, -30, 60, 60, 10);
-                g.fill(u.def.color);
-                g.stroke({ width: 2.5, color: u.side === "p" ? 0x9fc4ef : 0xef9f8c });
-            }
-            c.addChild(g);
-            if (u.def.type === "building") {
+                c.addChild(g);
                 const aura = T("✦", 20, 0xffe9b0);
                 aura.anchor.set(0.5);
                 aura.position.set(0, -2);
@@ -158,26 +159,55 @@
                 hp.position.set(26, 26);
                 hp.name = "hp";
                 c.addChild(hp);
+                return finishNode(c, u);
+            }
+            if (spr) {
+                const face = u.side === "p" ? "walk_back" : "walk_front";
+                const ring = new PIXI.Graphics(); // командная тень-кольцо под ногами
+                ring.ellipse(0, 8, 30, 10);
+                ring.fill({ color: u.side === "p" ? 0x2f4f7a : 0x7a3430, alpha: 0.45 });
+                ring.stroke({ width: 1.5, color: u.side === "p" ? 0x9fc4ef : 0xef9f8c });
+                ring.eventMode = "none";
+                c.addChild(ring);
+                const body = new PIXI.AnimatedSprite(CREATURE.animations[face], false);
+                body.anchor.set(0.5, 0.85); // ноги (y≈0.93 кадра) чуть ниже центра клетки
+                body.scale.set(SPRITE_SCALE);
+                body.animationSpeed = CREATURE.animationSpeed || 0.2;
+                body.gotoAndStop(0); // стоит — статичный кадр, играет только в движении
+                body.eventMode = "none"; // клики уходят в клетки поля под существом
+                body.name = "body";
+                body.userData_face = face;
+                c.addChild(body);
             } else {
-                const atk = T(String(u.curAtk), 17, 0xffe9b0, { stroke: { color: 0x1c1207, width: 3 } });
-                atk.position.set(-26, -28);
-                atk.name = "atk";
-                const hp = T(String(u.hp), 17, 0xff9c8c, { stroke: { color: 0x1c1207, width: 3 } });
-                hp.anchor.set(1, 0);
-                hp.position.set(26, -28);
-                hp.name = "hp";
-                c.addChild(atk, hp);
-                if (u.def.speed > 1) {
-                    for (let k = 0; k < u.def.speed; k++) {
-                        const pip = new PIXI.Graphics();
-                        pip.poly([0, -4, 4, 3, -4, 3]);
-                        pip.closePath();
-                        pip.fill(0xffe9b0);
-                        pip.position.set(-4 + k * 9, 22);
-                        c.addChild(pip);
-                    }
+                const g = new PIXI.Graphics();
+                g.roundRect(-30, -30, 60, 60, 10);
+                g.fill(u.def.color);
+                g.stroke({ width: 2.5, color: u.side === "p" ? 0x9fc4ef : 0xef9f8c });
+                c.addChild(g);
+            }
+            const atk = T(String(u.curAtk), 17, 0xffe9b0, { stroke: { color: 0x1c1207, width: 3 } });
+            atk.anchor.set(0, spr ? 1 : 0);
+            atk.position.set(spr ? -31 : -26, spr ? 36 : -28);
+            atk.name = "atk";
+            const hp = T(String(u.hp), 17, 0xff9c8c, { stroke: { color: 0x1c1207, width: 3 } });
+            hp.anchor.set(1, spr ? 1 : 0);
+            hp.position.set(spr ? 31 : 26, spr ? 36 : -28);
+            hp.name = "hp";
+            c.addChild(atk, hp);
+            if (u.def.speed > 1) {
+                for (let k = 0; k < u.def.speed; k++) {
+                    const pip = new PIXI.Graphics();
+                    pip.poly([0, -4, 4, 3, -4, 3]);
+                    pip.closePath();
+                    pip.fill(0xffe9b0);
+                    pip.position.set(-4 + k * 9, spr ? 30 : 22);
+                    pip.eventMode = "none";
+                    c.addChild(pip);
                 }
             }
+            return finishNode(c, u);
+        }
+        function finishNode(c, u) {
             const p = cellXY(u.col, u.row);
             c.position.set(p.x, p.y);
             return c;
@@ -223,6 +253,7 @@
         }
 
         const floats = [], punches = [];
+        const moves = []; // плавные переходы существ между клетками
         function floatText(x, y, text, fill) {
             const tt = T(text, 24, fill, { stroke: { color: 0x1c1207, width: 5 } });
             tt.anchor.set(0.5);
@@ -231,6 +262,26 @@
             floats.push({ node: tt, life: 0.9 });
         }
         function punch(node) { punches.push({ node, life: 0.22 }); }
+
+        // Плавный переезд в центр клетки (анимация/позиция доигрываются в update)
+        function glide(u, x, y, dur = 0.16) {
+            const i = moves.findIndex((m) => m.u === u);
+            if (i >= 0) moves.splice(i, 1);
+            moves.push({ u, node: u.node, fx: u.node.x, fy: u.node.y, tx: x, ty: y, life: dur, total: dur });
+        }
+        // Походная анимация: on=true — играть цикл направления face (по умолчанию
+        // «к врагу»: игрок видит спину, враг — анфас), on=false — стоп-кадр.
+        function setWalk(u, on, face) {
+            const body = u.node && u.node.getChildByName("body");
+            if (!body || !body.textures || !CREATURE) return;
+            const name = face || (u.side === "p" ? "walk_back" : "walk_front");
+            if (!CREATURE.animations[name]) return;
+            if (body.userData_face !== name) {
+                body.textures = CREATURE.animations[name];
+                body.userData_face = name;
+            }
+            if (on) body.gotoAndPlay(0); else body.gotoAndStop(0);
+        }
 
         function removeUnit(u) {
             const i = B.units.indexOf(u);
@@ -541,9 +592,10 @@
                     }
                     u.row = ahead;
                     const p = cellXY(u.col, u.row);
-                    u.node.position.set(p.x, p.y);
+                    glide(u, p.x, p.y);
+                    setWalk(u, true);
                     punch(u.node);
-                    await delay(0.08);
+                    await delay(0.18);
                     if (B.stopped) return;
                 }
             }
@@ -821,6 +873,7 @@
             };
             G.battle = B;
             drawCards(4);
+            moves.length = 0; floats.length = 0; punches.length = 0; // хвосты прошлого боя
 
             root = new PIXI.Container();
             root.eventMode = "static";
@@ -891,6 +944,24 @@
                     punches.splice(i, 1);
                 }
             }
+            for (let i = moves.length - 1; i >= 0; i--) {
+                const m = moves[i];
+                m.life -= dt;
+                if (m.node.destroyed) { moves.splice(i, 1); continue; }
+                const k = 1 - Math.max(0, m.life / m.total);
+                m.node.x = m.fx + (m.tx - m.fx) * k;
+                m.node.y = m.fy + (m.ty - m.fy) * k;
+                if (m.life <= 0) {
+                    moves.splice(i, 1);
+                    if (!moves.some((mm) => mm.u === m.u)) setWalk(m.u, false);
+                }
+            }
+            // кадры спрайтов тикаем сами (autoUpdate=false; update ждёт ТИКЕР,
+            // не число — иначе кадр NaN и спрайт замирает)
+            for (const u of B.units) {
+                const body = u.node.getChildByName("body");
+                if (body && body.playing) body.update(ticker);
+            }
             if (bannerT > 0) {
                 bannerT -= dt;
                 const b = root.hud.userData.banner;
@@ -928,7 +999,7 @@
                     phase: B.phase, result: B.result,
                     pBase: B.playerBase, eBase: B.enemyBase,
                     mana: B.mana, hand: [...B.hand],
-                    units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type })),
+                    units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body") })),
                     traps: { p: B.traps.p.length, e: B.traps.e.length },
                 };
             },
