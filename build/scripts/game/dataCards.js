@@ -93,6 +93,18 @@
                  spell: { target: "anyUnitDmg", drainAll: true },
                  rarity: "rare", elem: "strength",
                  color: 0xb0402e, img: "strength/24" },
+        str25: { type: "spell", cost: 1,
+                 spell: { target: "none", copyLast: true },
+                 rarity: "epic", elem: "strength",
+                 color: 0xb0402e, img: "strength/25" },
+        str26: { type: "spell", cost: 3,
+                 spell: { target: "none", journey: 6 },
+                 rarity: "common", elem: "strength",
+                 color: 0xb0402e, img: "strength/26" },
+        str27: { type: "unit", cost: 3, atk: 2, hp: 1, speed: 1,
+                 creature: "goblin", spellBuffAura: 1,
+                 rarity: "rare", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/27" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -112,6 +124,7 @@
         str5: 0, str6: 0, str7: 0, str8: 0, str10: 0, str11: 0,
         str13: 0, str14: 0, str15: 0, str16: 0, str17: 0, str18: 0,
         str19: 0, str20: 0, str21: 0, str22: 0, str23: 0, str24: 0,
+        str25: 0, str26: 0, str27: 0,
     };
     const DECK_MAX = 60, DECK_MIN = 12, TRAP_SLOTS = 2;
     const DECK_COPIES = 3; // максимум одинаковых карт в колоде
@@ -123,10 +136,12 @@
         "str9", "str9", "str9", "str12", "str12", "str12",
         "str15", "str15", "str15", "str16", "str16", "str16",
         "str22", "str22", "str22", "str23", "str23", "str23",
+        "str26", "str26", "str26",
         "str5", "str5", "str7", "str7", "str11", "str11",
         "str13", "str13", "str14", "str14", "str17", "str17",
         "str19", "str19", "str20", "str20", "str24", "str24",
-        "str6", "str8", "str10", "str18", "str21",
+        "str27", "str27",
+        "str6", "str8", "str10", "str18", "str21", "str25",
     ];
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
@@ -171,11 +186,14 @@
         ["gobElite", "gobTrap", "gobFire"],   // 6+
     ];
     // Пул добора колоды врага по редкости. str11 («Жертвоприношение», цель —
-    // своё существо) врагу не даётся: ИИ за неё не играет.
+    // своё существо) врагу не даётся: ИИ за неё не играет. str25/str26
+    // («Горящие руны», «Глубокое путешествие») тоже не даются — их эффекты
+    // идут через панели выбора, которых у ИИ нет.
     const ENEMY_FILL = {
         common: ["str1", "str2", "str3", "str4", "str9", "str12", "str13",
                  "str14", "str15", "str16", "str22", "str23"],
-        rare:   ["str5", "str7", "str13", "str14", "str17", "str19", "str20", "str24"],
+        rare:   ["str5", "str7", "str13", "str14", "str17", "str19", "str20",
+                 "str24", "str27"],
         epic:   ["str6", "str8", "str10", "str18", "str21"],
     };
     // Колода врага: ядро архетипа + 3..8 карт добора; с глубиной (floor ≥ 1)

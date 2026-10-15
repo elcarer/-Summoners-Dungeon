@@ -92,6 +92,26 @@
                 + altarBonus(side);
         }
 
+        // «Заклинатель клинков» (spellBuffAura): после КАЖДОГО розыгрыша
+        // заклинания — любой стороной, включая повторы «Горящих рун» — он и
+        // все соседние СУЩЕСТВА (строения не считаются) получают +1 к урону
+        // навсегда (bonusAtk).
+        function afterSpellPlayed() {
+            for (const u of B.units.slice()) {
+                if (!u.def.spellBuffAura || !B.units.includes(u)) continue;
+                const near = B.units.filter((v) => v !== u && v.def.type === "unit"
+                    && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
+                for (const v of [u, ...near]) {
+                    v.bonusAtk = (v.bonusAtk || 0) + 1;
+                }
+                recalcAuras();
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 66, "+1⚔", 0x9fd489);
+                punch(u.node);
+                sfx("up");
+            }
+        }
+
         // ── Зона призыва: [свой последний ряд .. ряд перед самым выдвинутым
         //    своим существом/строением]. Базы — ЗА пределами сетки (ниже ряда 4
         //    игрока, выше ряда 0 врага), поэтому «ряд перед базой» = крайний
@@ -176,6 +196,14 @@
             hi.clear();
             if (B.phase !== "player" || B.selected === null) {
                 root.board.userData.baseZone.eventMode = "none";
+                if (B.phase !== "player" || !B.journeySummon) return;
+                // бесплатный призыв из «Глубокого путешествия»: свободные
+                // клетки зоны призыва подсвечены, карта не в руке
+                for (const [col, r] of freeCells(deployRows("p"))) {
+                    const rc = cellRect(col, r);
+                    hi.rect(rc.x, rc.y, rc.w, rc.h);
+                    hi.fill({ color: 0x7dc95e, alpha: 0.28 });
+                }
                 return;
             }
             if (B.spellTarget) { // прицел заклинания
@@ -1212,6 +1240,110 @@
             refreshHud();
         }
 
+        // ── Панель «Глубокое путешествие» (str26): верхние карты колоды ────
+        // (снимаются с колоды сразу при касте) — выбрать карту ПРИЗЫВА и
+        // сыграть её бесплатно. Из остальных: 1 случайная — в руку, прочие —
+        // в сброс (это происходит и без выбора, «Без призыва»/Esc). Если
+        // призыва среди верхних нет — панель не открывается вовсе.
+        // Выбранная карта ставится в режим journeySummon: игрок кликает
+        // клетку зоны призыва — существо выходит БЕЗ траты энергии (Esc или
+        // клик мимо — карта просто возвращается в руку).
+        let journeyPanel = null, journeyTop = [];
+        function closeJourneyPanel() {
+            if (!journeyPanel) return;
+            journeyPanel.destroy({ children: true });
+            journeyPanel = null;
+            journeyTop = [];
+            if (B) B.picking = false;
+        }
+        function openJourneyPanel(n) {
+            closeJourneyPanel();
+            const k = Math.min(n, B.deck.length);
+            journeyTop = k ? B.deck.splice(B.deck.length - k, k) : []; // верх колоды — конец массива
+            if (!journeyTop.some((id) => CARDS[id].type === "unit")) {
+                finishJourney(null); // призыва нет: случайная — в руку, прочие в сброс
+                return;
+            }
+            B.picking = true;
+            const node = new PIXI.Container();
+            node.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(0, 0, 1920, 1080);
+            dim.fill({ color: 0x000000, alpha: 0.6 });
+            dim.eventMode = "static";
+            node.addChild(dim);
+            const frame = new PIXI.Graphics();
+            frame.roundRect(285, 270, 1350, 540, 18);
+            frame.fill({ color: 0x171310, alpha: 0.96 });
+            frame.stroke({ width: 3, color: 0x6b5c40 });
+            node.addChild(frame);
+            const title = T(t("journey.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(960, 297);
+            title.eventMode = "none";
+            node.addChild(title);
+            const hint = T(t("journey.hint", { n: journeyTop.length }), 25, 0xd8c79d);
+            hint.anchor.set(0.5, 0);
+            hint.position.set(960, 354);
+            hint.eventMode = "none";
+            node.addChild(hint);
+            const m = journeyTop.length;
+            const spread = Math.min(210, 1260 / Math.max(1, m));
+            journeyTop.forEach((cardId, idx) => {
+                const isUnit = CARDS[cardId].type === "unit";
+                const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                if (!isUnit) c.alpha = 0.5; // не призыв — сыграть нельзя
+                else c.on("pointertap", () => pickJourney(idx));
+                node.addChild(c);
+            });
+            node.addChild(globalThis.GAME_UI.button(ctx, {
+                tex: "button_menu.png", label: t("journey.back"), x: 960, y: 762, scale: 1,
+                onTap: () => finishJourney(null),
+            }));
+            root.addChild(node);
+            journeyPanel = node;
+        }
+        function pickJourney(idx) { // idx — номер карты среди показанных верхних
+            if (!B || !B.picking || !journeyPanel) return;
+            const cardId = journeyTop[idx];
+            if (!cardId || CARDS[cardId].type !== "unit") return;
+            finishJourney(cardId);
+        }
+        // раздача остатков и запуск бесплатного призыва (chosen может быть
+        // null — игрок отказался от призыва)
+        function finishJourney(chosen) {
+            const rest = journeyTop.filter((id) => id !== chosen);
+            if (rest.length) {
+                const k = (Math.random() * rest.length) | 0;
+                B.hand.push(rest[k]); // одна случайная — в руку
+                for (let i = 0; i < rest.length; i++) if (i !== k) B.discard.push(rest[i]);
+            }
+            sfx("chpoc");
+            closeJourneyPanel();
+            if (chosen) {
+                if (freeCells(deployRows("p")).length) { // есть куда поставить
+                    B.journeySummon = chosen;
+                    layoutHand();
+                    redrawHighlight();
+                    refreshHud();
+                    return;
+                }
+                B.hand.push(chosen); // поле забито — карта хотя бы в руку
+            }
+            layoutHand();
+            refreshHud();
+        }
+        // отказ от бесплатного призыва — карта возвращается в руку
+        function cancelJourneySummon() {
+            if (!B.journeySummon) return;
+            B.hand.push(B.journeySummon);
+            B.journeySummon = null;
+            layoutHand();
+            redrawHighlight();
+            refreshHud();
+        }
+
         // ── HUD боя ────────────────────────────────────────────────────────
         function buildHud() {
             const c = new PIXI.Container();
@@ -1816,6 +1948,8 @@
                         }
                         if (def.spell.brew) B.brewCasts = (B.brewCasts || 0) + 1;
                         B.eDiscard.push(cardId);
+                        B.lastSpell.e = cardId;
+                        afterSpellPlayed(); // «Заклинатель клинков» на поле
                         hideEnemyCard();
                         refreshHud();
                         if (checkEnd()) return;
@@ -1871,6 +2005,7 @@
 
         function onCardTap(idx) {
             if (B.phase !== "player" || B.discarding || B.picking) return;
+            if (B.journeySummon) return; // сначала поставьте (или отмените) призыв
             const def = CARDS[B.hand[idx]];
             if (!def) return;
             if (ctx.sfx) ctx.sfx();
@@ -1897,7 +2032,18 @@
         }
 
         function onCellTap(col, row) {
-            if (B.phase !== "player" || B.discarding || B.picking || B.selected === null) return;
+            if (B.phase !== "player" || B.discarding || B.picking) return;
+            if (B.journeySummon) { // «Глубокое путешествие»: бесплатный призыв
+                if (!deployRows("p").includes(row) || unitAt(col, row)) return;
+                const cardId = B.journeySummon;
+                B.journeySummon = null;
+                addUnit("p", cardId, col, row); // энергия не тратится
+                layoutHand();
+                redrawHighlight();
+                refreshHud();
+                return;
+            }
+            if (B.selected === null) return;
             const def = CARDS[B.hand[B.selected]];
             if (!def) return;
             if (B.spellTarget) { // прицел: по врагу, любому существу или строению
@@ -1944,11 +2090,12 @@
             refreshHud();
         }
 
-        function castSpell(handIdx, target) {
-            if (B.phase !== "player" || B.discarding || B.picking) return false;
-            const cardId = B.hand[handIdx];
+        // Эффекты заклинаний игрока, валидация цели внутри (false — цель не
+        // годится, тогда и оплаты/сброса/панелей не будет). Отделено от
+        // оплаты карты, чтобы «Горящие руны» могли повторить эффект
+        // бесплатно. free — повтор (дренаж энергии идёт без вычета цены).
+        function applySpellP(cardId, target, free = false) {
             const def = CARDS[cardId];
-            if (!def || def.type !== "spell" || effCost(cardId) > B.energy) return false;
             if (def.spell.target === "anyUnit") { // усиление: любое существо
                 if (!target || target.col === undefined) return false;
                 const u = unitAt(target.col, target.row);
@@ -1979,8 +2126,8 @@
                 if (!u || (u.def.type !== "unit"
                     && (u.def.type !== "building" || def.spell.noBuildings))) return false;
                 if (def.spell.drainAll) { // «Огнешар»: вся энергия сверх цены — в урон
-                    damageUnit(u, Math.max(0, B.energy - effCost(cardId)) + altarBonus("p"),
-                        null, "rocket");
+                    damageUnit(u, Math.max(0, B.energy - (free ? 0 : effCost(cardId)))
+                        + altarBonus("p"), null, "rocket");
                 } else {
                     damageUnit(u, spellDmg(def), null, "rocket");
                 }
@@ -2026,9 +2173,95 @@
             }
             if (def.spell.draw) drawCards(def.spell.draw);
             if (def.spell.brew) B.brewCasts = (B.brewCasts || 0) + 1;
+            if (def.spell.search) openRunesPanel(def.spell.search); // выбор поверх боя
+            if (def.spell.journey) openJourneyPanel(def.spell.journey);
+            return true;
+        }
+
+        // Автоцель для повтора заклинания («Горящие руны») — приоритеты ИИ:
+        // добивание, сильнейший, ряд с наибольшим числом врагов.
+        function autoTargetFor(cardId) {
+            const def = CARDS[cardId];
+            const tg = def.spell.target;
+            if (tg === "anyUnit" || tg === "ownUnit") {
+                const own = B.units.filter((u) => u.side === "p" && u.def.type === "unit");
+                const best = own.slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row))[0];
+                return best ? { col: best.col, row: best.row } : null;
+            }
+            if (tg === "anyUnitDmg") {
+                const dmg = def.spell.drainAll
+                    ? Math.max(0, B.energy) + altarBonus("p") // повтор — цена не вычитается
+                    : spellDmg(def);
+                const targets = B.units.filter((u) => u.side !== "p"
+                    && (u.def.type === "unit"
+                        || (u.def.type === "building" && !def.spell.noBuildings)));
+                if (!targets.length) return null;
+                const kills = targets.filter((v) => v.hp <= dmg);
+                const best = (kills.length ? kills : targets)
+                    .slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                return { col: best.col, row: best.row };
+            }
+            if (tg === "enemyAny") {
+                const targets = B.units.filter((u) => u.side !== "p");
+                if (!targets.length) return { base: true };
+                const best = targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                return { col: best.col, row: best.row };
+            }
+            if (tg === "anyCell") { // стена костров — ряд, где больше врагов
+                const counts = [0, 0, 0, 0, 0];
+                for (const v of B.units) if (v.side !== "p") counts[v.row]++;
+                return { col: 2, row: counts.indexOf(Math.max(...counts)) };
+            }
+            return null; // без цели или целей нет — эффект повторится «вхолостую»
+        }
+
+        // «Горящие руны» (str25): эффект последнего разыгранного заклинания
+        // повторно, бесплатно; затем то заклинание СЖИГАЕТСЯ — одна копия
+        // уходит из своей текущей зоны (рука → колода → сброс) до конца боя
+        // (в колоду при перетасовке она больше не вернётся).
+        function replaySpell(cardId) {
+            const def = CARDS[cardId];
+            if (!def || def.type !== "spell") return;
+            applySpellP(cardId, autoTargetFor(cardId), true);
+            if (def.spell.drainAll) B.energy = 0; // огнешар и в повторе сжигает энергию
+            const hi = B.hand.indexOf(cardId);
+            if (hi >= 0) B.hand.splice(hi, 1);
+            else {
+                const di = B.deck.indexOf(cardId);
+                if (di >= 0) B.deck.splice(di, 1);
+                else {
+                    const si = B.discard.indexOf(cardId);
+                    if (si >= 0) B.discard.splice(si, 1);
+                }
+            }
+            floatText(960, 640, `🔥 ${GAME_LOC.t(`card.${cardId}.name`)}`, 0xffb26e);
+        }
+
+        function castSpell(handIdx, target) {
+            if (B.phase !== "player" || B.discarding || B.picking) return false;
+            const cardId = B.hand[handIdx];
+            const def = CARDS[cardId];
+            if (!def || def.type !== "spell" || effCost(cardId) > B.energy) return false;
+            if (def.spell.copyLast) { // «Горящие руны»: повтор последнего бесплатно
+                const last = B.lastSpell.p;
+                if (!last || last === "str25" || !CARDS[last]
+                    || CARDS[last].type !== "spell") return false;
+                B.energy -= effCost(cardId);
+                spendCard(handIdx);
+                B.lastSpell.p = "str25"; // повтор самой себя — бесконечная цепочка
+                replaySpell(last);
+                afterSpellPlayed();
+                layoutHand();
+                redrawHighlight();
+                refreshHud();
+                checkEnd();
+                return true;
+            }
+            if (!applySpellP(cardId, target)) return false;
             B.energy = def.spell.drainAll ? 0 : B.energy - effCost(cardId);
             spendCard(handIdx);
-            if (def.spell.search) openRunesPanel(def.spell.search); // выбор поверх боя
+            B.lastSpell.p = cardId;
+            afterSpellPlayed(); // «Заклинатель клинков» и его соседи
             layoutHand();
             redrawHighlight();
             refreshHud();
@@ -2120,6 +2353,10 @@
                 units: [], traps: { p: [], e: [] }, firewalls: [],
                 selected: null, spellTarget: false, result: null,
                 discarding: false, picking: false, brewCasts: 0,
+                // последнее разыгранное заклинание каждой стороны («Горящие
+                // руны»); journeySummon — карта призыва из «Глубокого
+                // путешествия», ждёт бесплатной постановки на клетку
+                lastSpell: { p: null, e: null }, journeySummon: null,
             };
             G.battle = B;
             drawCards(4);
@@ -2129,6 +2366,7 @@
             dragFx = null; // прошлого боя Graphics уничтожен вместе с root
             discardPanel = null;
             runesPanel = null; runesTop = [];
+            journeyPanel = null; journeyTop = [];
             unitCard = null;
             sfx("openRoom"); // начало боя
 
@@ -2163,6 +2401,9 @@
                     redrawHighlight();
                     refreshHud();
                 }
+                if (e.target === root && B.phase === "player" && B.journeySummon) {
+                    cancelJourneySummon(); // клик мимо поля — призыв в руку
+                }
             });
             ctx.ui.addChild(root);
             layoutHand();
@@ -2179,6 +2420,7 @@
             drag = null;
             closeDiscardPanel();
             closeRunesPanel();
+            closeJourneyPanel(); // узел умрёт вместе с root — снимаем ссылки
             hideEnemyCard(); // узел умер бы вместе с root — снимаем ссылку
             unitCard = null; // узел подсказки умер вместе с root
             if (root) { root.destroy({ children: true }); root = null; }
@@ -2248,7 +2490,8 @@
             if (B.phase === "player" && !B.discarding && !overlay
                 && ctx.input.wasPressed("Space")) api.endTurn();
             if (B.picking && ctx.input.wasPressed("Escape")) {
-                closeRunesPanel(); // «Поиск рун» — отмена выбора
+                if (journeyPanel) finishJourney(null); // «Глубокое путешествие» — без призыва
+                else closeRunesPanel(); // «Поиск рун» — отмена выбора
                 return;
             }
             if (overlay && B.phase !== "over" && ctx.input.wasPressed("Escape")) {
@@ -2263,6 +2506,7 @@
         const api = {
             endTurn() {
                 if (!B || B.phase !== "player" || B.discarding || B.picking) return;
+                cancelJourneySummon(); // незавершённый призыв — карта в руку
                 // шкала применяется автоматически: слева карты, справа энергия
                 const total = spheresTotal();
                 const cards = Math.max(0, Math.min(B.split, total));
@@ -2293,6 +2537,8 @@
                 B.spellTarget = false;
                 onCellTap(col, row);
             },
+            // клик по клетке как есть (бесплатный призыв «Глубокого путешествия»)
+            cellTap(col, row) { onCellTap(col, row); },
             select(handIdx) { onCardTap(handIdx); },
             castSpell,
             playTrap(handIdx, col, row) { // мина — выбрать карту и пустую клетку
@@ -2339,6 +2585,8 @@
                     hand: [...B.hand],
                     discarding: !!B.discarding,
                     picking: !!B.picking,
+                    lastSpell: B.lastSpell.p,
+                    journeySummon: B.journeySummon,
                     eDeck: B.eDeck.length,
                     units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire })),
                     traps: { p: B.traps.p.length, e: B.traps.e.length },
@@ -2353,6 +2601,11 @@
             // «Поиск рун» (тесты): состав панели и выбор карты
             runesState: () => ({ picking: !!B.picking, top: [...runesTop] }),
             runesPick(idx) { pickRune(idx); },
+            // «Глубокое путешествие» (тесты): панель, выбор призыва, режим
+            // бесплатной постановки
+            journeyState: () => ({ picking: !!journeyPanel, top: [...journeyTop] }),
+            journeyPick(idx) { pickJourney(idx); },
+            journeySummon: () => (B ? B.journeySummon : null),
             // тест-хук: урон цели с указанным «убийцей» — через damageUnit,
             // с хуками боя (очарование «Огненного дыхания» и пр.)
             _dmg(col, row, amount, killerCol, killerRow) {
