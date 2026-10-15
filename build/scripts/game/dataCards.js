@@ -185,10 +185,13 @@
         gobElite: { scene: 1, baseHp: 16,
                     core: ["str3", "str3", "str5", "str7", "str8", "str13", "str16",
                            "str16", "str19"] },
-        // «Гоблин-вождь» — главарь этажа (B на карте), сильное ядро
+        // «Гоблин-вождь» — главарь этажа (B на карте). Ядро этажа 1 — простые
+        // карты (под силу стартовой колоде героя); с глубиной добавляются
+        // редкие/эпические из grow (2 карты за этаж), добор — как у обычных.
         boss:     { scene: 2, baseHp: 20,
-                    core: ["str2", "str2", "str3", "str3", "str4", "str5", "str6",
-                           "str7", "str8", "str13", "str16", "str16", "str17",
+                    core: ["str1", "str2", "str2", "str3", "str3", "str4", "str9",
+                           "str13", "str16"],
+                    grow: ["str5", "str6", "str7", "str8", "str16", "str17",
                            "str18", "str21", "str24", "str28"] },
     };
     // Этаж → какие обычные враги на нём водятся; после конца списка — набор
@@ -218,6 +221,13 @@
         const enc = ENCOUNTERS[encId] || ENCOUNTERS.gob;
         const deck = [...enc.core];
         const f = Math.max(1, floor | 0);
+        // рост босса: с каждым этажом +2 карты из grow (без повторов внутри
+        // него) — на 1-м этаже он без них, к 6-му забирает весь список
+        if (enc.grow) {
+            const pool = [...enc.grow];
+            for (let k = 0; k < Math.min((f - 1) * 2, pool.length); k++)
+                deck.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
+        }
         const extra = Math.min(3 + (((f - 1) / 2) | 0), 8);
         const epicP = Math.min(0.45, (f - 1) * 0.09);
         const rareP = Math.min(0.85, 0.25 + f * 0.12);

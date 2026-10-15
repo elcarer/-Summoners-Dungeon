@@ -353,6 +353,7 @@
         function finishNode(c, u) {
             const p = cellXY(u.col, u.row);
             c.position.set(p.x, p.y);
+            c.zIndex = u.row; // общий z-order поля (см. unitsLayer)
             c.eventMode = "none"; // клики — всегда в клетки поля под жетоном
             return c;
         }
@@ -441,6 +442,7 @@
             const dur = 0.5 / animK();
             const i = moves.findIndex((m) => m.u === u);
             if (i >= 0) moves.splice(i, 1);
+            u.node.zIndex = u.row; // шагнул ниже по полю — поверх остальных
             moves.push({ u, node: u.node, fx: u.node.x, fy: u.node.y, tx: x, ty: y, life: dur, total: dur });
         }
         // Походная анимация: on=true — играть цикл направления face (по умолчанию
@@ -888,6 +890,25 @@
                 costT.position.set(51, -204);
                 c.addChild(costT);
             }
+            // «Колдовское варево»: бейдж с числом уже разыгранных в бою
+            // копий — урон карты растёт с каждым кастом (просил юзер)
+            if (def.spell && def.spell.brew) {
+                const badge = new PIXI.Container();
+                const disc = new PIXI.Graphics();
+                disc.circle(0, 0, 17);
+                disc.fill({ color: 0x1c1207, alpha: 0.88 });
+                disc.stroke({ width: 2.5, color: 0xf0c96a });
+                badge.addChild(disc);
+                const bt = T(`×${B.brewCasts || 0}`, 19, 0xffe9b0, { stroke: { color: 0x1c1207, width: 3 } });
+                bt.anchor.set(0.5);
+                bt.name = "bt";
+                badge.addChild(bt);
+                badge.position.set(84, -316);
+                badge.visible = (B.brewCasts || 0) > 0;
+                badge.eventMode = "none";
+                badge.name = "brewBadge";
+                c.addChild(badge);
+            }
             c.eventMode = B.selected === null ? "static" : "none";
             c.on("pointertap", () => onCardTap(idx));
             // альтернативный режим призыва (Настройки): наведение увеличивает
@@ -915,6 +936,19 @@
                 if (f) f.visible = sel;
                 root.cardsLayer.addChild(node);
             });
+        }
+        // бейджи «×N» на картах варева в руке: N = разыгранные в этом бою
+        // (растёт и от кастов врага). Рука не пересобирается посреди хода —
+        // обновляем тексты точечно
+        function refreshBrewBadges() {
+            if (!root || !B) return;
+            for (const node of root.cardsLayer.children) {
+                const b = node.getChildByName("brewBadge");
+                if (!b) continue;
+                b.visible = (B.brewCasts || 0) > 0;
+                const bt = b.getChildByName("bt");
+                if (bt) bt.text = `×${B.brewCasts || 0}`;
+            }
         }
 
         // ── Перетаскивание карт (режим «Перетаскивание» в Настройках) ────────
@@ -1217,7 +1251,7 @@
                 const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
                 c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
                 if (!isSpell) c.alpha = 0.5; // не заклинание — взять нельзя
-                else c.on("pointertap", () => pickRune(idx));
+                else { c.eventMode = "static"; c.on("pointertap", () => pickRune(idx)); }
                 node.addChild(c);
             });
             if (!top.some((id) => CARDS[id].type === "spell")) {
@@ -1301,7 +1335,7 @@
                 const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
                 c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
                 if (!isUnit) c.alpha = 0.5; // не призыв — сыграть нельзя
-                else c.on("pointertap", () => pickJourney(idx));
+                else { c.eventMode = "static"; c.on("pointertap", () => pickJourney(idx)); }
                 node.addChild(c);
             });
             node.addChild(globalThis.GAME_UI.button(ctx, {
@@ -1388,6 +1422,12 @@
             const pBar = new PIXI.Graphics();
             pBar.eventMode = "none";
             c.addChild(pBar);
+            // число жизней базы героя рядом с её полоской (просил юзер:
+            // полоска была без цифр — непонятно, сколько HP осталось)
+            const pBaseT = T("", 21, 0xb8d9a0);
+            pBaseT.position.set(417, 829);
+            pBaseT.eventMode = "none";
+            c.addChild(pBaseT);
             const pName = T("", 25, 0xf3e6c2);
             pName.position.set(255, 792);
             pName.eventMode = "none";
@@ -1510,7 +1550,7 @@
             eDeckIcon.addChild(eDeckCnt);
             c.addChild(eDeckIcon);
 
-            c.userData = { eBar, eInfo, title, pBar, pName, manaT, deckT, endBtn, banner, targetHint,
+            c.userData = { eBar, eInfo, title, pBar, pBaseT, pName, manaT, deckT, endBtn, banner, targetHint,
                 deckCnt, discardCnt, eDeckCnt,
                 slider: { wrap: slWrap, cards: slCards, energy: slEnergy, track: slTrack, thumb: slThumb } };
             return c;
@@ -1670,6 +1710,7 @@
             ud.eInfo.text = `${t("arena.baseEnemy")} ${Math.max(0, B.enemyBase)}/${B.enemyBaseMax}  ·  ${t("arena.energy")} ${B.eEnergy}  ·  ${t("arena.manaCards", { n: B.eHand.length })}`;
             globalThis.GAME_UI.fit(ud.eInfo, 430, 16.5);
             drawBar(ud.pBar, 255, 828, 150, 18, B.playerBase / B.playerBaseMax, 0x5d9c4a);
+            ud.pBaseT.text = `${t("arena.basePlayer")} ${Math.max(0, B.playerBase)}/${B.playerBaseMax}`;
             ud.pName.text = t("arena.hero");
             ud.manaT.text = `${B.energy}`;
             ud.deckT.text = `${B.deck.length}+${B.discard.length}`;
@@ -2058,7 +2099,7 @@
                     } else B.eHand.push(chosen); // поле забито — карта хотя бы в руку
                 }
             }
-            if (s.brew) B.brewCasts = (B.brewCasts || 0) + 1;
+            if (s.brew) { B.brewCasts = (B.brewCasts || 0) + 1; refreshBrewBadges(); }
         }
 
         async function aiPlay() {
@@ -2418,7 +2459,7 @@
                 } else return false;
             }
             if (def.spell.draw) drawCards(def.spell.draw);
-            if (def.spell.brew) B.brewCasts = (B.brewCasts || 0) + 1;
+            if (def.spell.brew) { B.brewCasts = (B.brewCasts || 0) + 1; refreshBrewBadges(); }
             if (def.spell.search) openRunesPanel(def.spell.search); // выбор поверх боя
             if (def.spell.journey) openJourneyPanel(def.spell.journey);
             return true;
@@ -2637,6 +2678,10 @@
             root.fireLayer = new PIXI.Container(); // «Стена костров» — огонь под жетонами
             root.addChild(root.fireLayer);
             root.unitsLayer = new PIXI.Container();
+            // общий z-order существ и строений: кто ниже по полю (больше row),
+            // тот ближе к зрителю — рисуется поверх (просил юзер: строения
+            // висели поверх существ выше их)
+            root.unitsLayer.sortableChildren = true;
             root.addChild(root.unitsLayer);
             root.trapLayer = new PIXI.Container();
             root.addChild(root.trapLayer);
@@ -2723,8 +2768,12 @@
                     p.node.scale.set(1 + Math.sin(k * Math.PI) * 0.22);
                 }
                 if (p.life <= 0) {
-                    if (p.dying) p.node.destroy({ children: true });
-                    else p.node.scale.set(1);
+                    // destroy в этой сборке Pixi не отцепляет узел от родителя —
+                    // трупы оставались в unitsLayer и копились за бой
+                    if (p.dying) {
+                        if (p.node.parent) p.node.parent.removeChild(p.node);
+                        p.node.destroy({ children: true });
+                    } else p.node.scale.set(1);
                     punches.splice(i, 1);
                 }
             }
@@ -2906,6 +2955,33 @@
                 const b = root.hud.userData.eBar.getLocalBounds();
                 return { x: Math.round(b.x), w: Math.round(b.width) };
             },
+            // бейдж «×N» на картах варева в руке + текст жизней базы героя
+            // (тесты: счётчик разыгрываний, число у полоски базы)
+            brewBadge: () => {
+                if (!root || !B) return null;
+                for (const node of root.cardsLayer.children) {
+                    const b = node.getChildByName("brewBadge");
+                    if (b) return { n: B.brewCasts || 0, visible: !!b.visible };
+                }
+                return null;
+            },
+            hudTexts: () => (root && root.hud
+                ? { pBase: root.hud.userData.pBaseT.text }
+                : null),
+            // общий z-order поля (тесты): сортировка включена, zIndex — ряды
+            zOrder: () => (root && root.unitsLayer
+                ? { sortable: !!root.unitsLayer.sortableChildren,
+                    z: root.unitsLayer.children.map((n) => n.zIndex),
+                    dbg: root.unitsLayer.children.map((n) =>
+                        ({ z: n.zIndex, dead: !!n.destroyed, x: Math.round(n.x), y: Math.round(n.y),
+                           unit: B.units.findIndex((u) => u.node === n),
+                           a: Math.round(n.alpha * 100) / 100, rot: Math.round(n.rotation * 100) / 100,
+                           sc: Math.round(n.scale.x * 100) / 100 })) }
+                : null),
+            punchesDump: () => ({ n: punches.length,
+                list: punches.map((p) => ({ dying: !!p.dying,
+                    life: Math.round(p.life * 1000) / 1000, total: p.total,
+                    dead: !!p.node.destroyed, inLayer: !!(p.node.parent && p.node.parent === root.unitsLayer) })) }),
             // лицо походки юнита на клетке (тесты: боковой шаг — walk_left/right)
             walkFace: (col, row) => {
                 const u = unitAt(col, row);
