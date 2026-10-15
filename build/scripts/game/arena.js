@@ -1417,13 +1417,13 @@
             await aiPlay();
             if (B.stopped || B.phase === "over") return;
             // шкала врага (те же правила), но копить энергию ИИ может только
-            // до порога: с запасом ≥ 6 весь доход шкалы уходит в добор карт
+            // до порога: с запасом ≥ 12 весь доход шкалы уходит в добор карт
             // (до лимита руки) — иначе энергию нечем тратить и она копится
             // десятками при почти пустом столе
             const total = spheresTotal();
             let eCards = 0;
             if (B.eHand.length < 4) eCards = 4 - B.eHand.length; // малая рука — добор до 4
-            if (B.eEnergy >= 6) eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
+            if (B.eEnergy >= 12) eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
             eCards = Math.max(0, Math.min(eCards, total));
             drawEnemy(eCards);
             B.eEnergy += total - eCards;
