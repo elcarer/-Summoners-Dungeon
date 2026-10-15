@@ -48,6 +48,9 @@
         // фоны арен с нарисованной сеткой поля
         uiTextures["scenes/1.png"] = await assets.loadTexture("./images/scenes/1.png");
         uiTextures["scenes/2.png"] = await assets.loadTexture("./images/scenes/2.png");
+        // эффект поля «Стена костров» и рубашка колоды врага (гоблины)
+        uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
+        uiTextures["card_goblin_back.png"] = await assets.loadTexture("./images/ui/card_goblin_back.png");
         // лица карт стихий: images/cards/<elem>/<№>.png (def.img в dataCards)
         say("карты…");
         await frame();

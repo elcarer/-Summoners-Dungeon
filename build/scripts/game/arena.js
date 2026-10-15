@@ -80,8 +80,16 @@
         }
         // Урон заклинания с ростом: «Колдовское варево» — +1 за каждое
         // разыгранное ранее в этом бою (счёт общий на обе стороны).
-        function spellDmg(def) {
-            return (def.spell.dmg || 0) + (def.spell.brew ? (B.brewCasts || 0) : 0);
+        // «Алтарь огня» (spellAura): +N ко ВСЕМУ урону от заклинаний и
+        // ловушек стороны (сумма по строениям на поле).
+        function altarBonus(side) {
+            return B.units.reduce((s, u) => s
+                + (u.side === side && u.def.type === "building" && u.def.spellAura
+                    ? u.def.spellAura : 0), 0);
+        }
+        function spellDmg(def, side = "p") {
+            return (def.spell.dmg || 0) + (def.spell.brew ? (B.brewCasts || 0) : 0)
+                + altarBonus(side);
         }
 
         // ── Зона призыва: [свой последний ряд .. ряд перед самым выдвинутым
@@ -173,6 +181,15 @@
             if (B.spellTarget) { // прицел заклинания
                 const def = CARDS[B.hand[B.selected]];
                 const tg = def && def.spell && def.spell.target;
+                if (tg === "anyCell") { // стена костров — годится любая клетка
+                    root.board.userData.baseZone.eventMode = "none";
+                    for (let r = 0; r < GRID; r++) for (let col = 0; col < GRID; col++) {
+                        const rc = cellRect(col, r);
+                        hi.rect(rc.x, rc.y, rc.w, rc.h);
+                        hi.fill({ color: 0xd0722c, alpha: 0.3 }); // огненная заливка
+                    }
+                    return;
+                }
                 if (tg === "anyUnit" || tg === "anyUnitDmg") {
                     // усиление — любые существа; дротик — существа и строения
                     // (варево строения не берёт — только существа)
@@ -245,8 +262,10 @@
                 g.fill(u.def.color);
                 g.stroke({ width: 3.75, color: 0xffd98c });
                 c.addChild(g);
-                // метка эффекта: лагерь даёт +1 урона соседям, прочие ауры — ✦
-                const aura = T(u.def.campAura ? `+${u.def.campAura}⚔` : "✦", 30, 0xffe9b0);
+                // метка эффекта: лагерь даёт +1 урона соседям, алтарь —
+                // +1 урона заклинаний/ловушек, прочие ауры — ✦
+                const aura = T(u.def.campAura ? `+${u.def.campAura}⚔`
+                    : (u.def.spellAura ? `+${u.def.spellAura}✦` : "✦"), 30, 0xffe9b0);
                 aura.anchor.set(0.5);
                 aura.position.set(0, -3);
                 aura.name = "auraMark";
@@ -367,8 +386,8 @@
                 else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
                 else if (def.ability === "bombling") summonBombling(u); // бомблинг
             }
-            // мина врага на клетке призыва (и существа, и строения)
-            triggerCellMines(u);
+            // ловушка врага на клетке призыва (и существа, и строения)
+            triggerCellTraps(u);
             return u;
         }
 
@@ -499,35 +518,47 @@
             redrawTraps();
             const p = cellXY(trap.col, trap.row);
             floatText(p.x, p.y - 60, "?!", 0xe08cd0);
-            damageUnit(u, trap.def.trap.dmg, null, "acid");
+            damageUnit(u, trap.def.trap.dmg + altarBonus(foe), null, "acid");
             return [trap.col, trap.row];
         }
 
-        // Перемещение завершилось: мина врага на этой клетке взрывается,
+        // Перемещение завершилось: ловушка врага на этой клетке срабатывает,
         // затем «Выстрел 1» лучника (перемещение состоялось)
         function afterMoved(u) {
             if (!B.units.includes(u) || u.def.type !== "unit") return;
-            triggerCellMines(u);
+            triggerCellTraps(u);
             archerShot(u);
         }
-        // «Гоблинская мина»: взрывается, когда вражеское юнит призван или
-        // переместился на её клетку: 3 урона этому юниту + 1 урона соседним
-        // с клеткой (верт/гориз, как у лагеря) существам и строениям.
-        // Только мины (cellDmg): приманка на той же клетке — не мина.
-        function triggerCellMines(u) {
+        // Ловушки на клетке: «Гоблинская мина» (взрыв 3+1 по соседям) и
+        // «Гоблинская засада» (выход гоблинов стороны-хозяйки). Срабатывают,
+        // когда вражеское существо призвано или переместилось на её клетку.
+        function triggerCellTraps(u) {
             if (!B.units.includes(u)) return; // умер раньше (рывок+мина на шаге)
             const foe = u.side === "p" ? "e" : "p";
             const i = B.traps[foe].findIndex((t) => t.col === u.col && t.row === u.row
-                && t.def.trap.effect === "cellDmg");
+                && (t.def.trap.effect === "cellDmg" || t.def.trap.effect === "ambush"));
             if (i < 0) return;
             const trap = B.traps[foe].splice(i, 1)[0];
             redrawTraps();
             const p = cellXY(u.col, u.row);
             floatText(p.x, p.y - 60, "?!", 0xe08cd0);
-            damageUnit(u, trap.def.trap.amount, null, "acid");
+            if (trap.def.trap.effect === "ambush") {
+                // «Гоблинская засада»: в каждой пустой соседней (верт/гориз)
+                // клетке появляется Гоблин 2/2 стороны-хозяйки ловушки
+                for (const [dc, dr] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                    const c2 = trap.col + dc, r2 = trap.row + dr;
+                    if (c2 < 0 || c2 >= GRID || r2 < 0 || r2 >= GRID) continue;
+                    if (unitAt(c2, r2)) continue;
+                    addUnit(foe, trap.def.trap.spawn, c2, r2);
+                }
+                refreshHud();
+                checkEnd();
+                return;
+            }
+            damageUnit(u, trap.def.trap.amount + altarBonus(foe), null, "acid");
             for (const v of B.units.slice()) {
                 if (v !== u && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1) {
-                    damageUnit(v, trap.def.trap.splash, null, "acid");
+                    damageUnit(v, trap.def.trap.splash + altarBonus(foe), null, "acid");
                 }
             }
             refreshHud();
@@ -581,10 +612,30 @@
             }
         }
 
+        // «Огненное дыхание»: зачарованное существо при КАЖДОМ нанесении
+        // урона кладёт владельцу в руку случайное заклинание из своей колоды
+        // (карта уходит из колоды; заклинаний в колоде нет — нет и добора).
+        function procEnchantFire(killer) {
+            if (!killer || !killer.def || killer.def.type !== "unit"
+                || !killer.enchantFire || !B.units.includes(killer)) return;
+            const deck = killer.side === "p" ? B.deck : B.eDeck;
+            const hand = killer.side === "p" ? B.hand : B.eHand;
+            const spells = deck.map((id, i) => ({ id, i }))
+                .filter((x) => CARDS[x.id].type === "spell");
+            if (!spells.length) return;
+            const pick = spells[(Math.random() * spells.length) | 0];
+            deck.splice(pick.i, 1);
+            hand.push(pick.id);
+            sfx("chpoc");
+            const p = cellXY(killer.col, killer.row);
+            floatText(p.x, p.y - 66, GAME_LOC.t(`card.${pick.id}.name`), 0xffd98c);
+        }
+
         // snd — звук удара: "sword" (атака существом), "acid" (ловушка),
         // "rocket" (заклинание), по умолчанию "dam"
         function damageUnit(target, amount, killer = null, snd = "dam") {
             target.hp -= amount;
+            procEnchantFire(killer);
             const n = target.node.getChildByName("hp");
             if (n) n.text = String(Math.max(0, target.hp));
             const p = cellXY(target.col, target.row);
@@ -603,6 +654,7 @@
 
         function baseHit(side, u) {
             sfx("crash");
+            procEnchantFire(u); // «Огненное дыхание» срабатывает и на базе
             if (side === "p") {
                 B.enemyBase -= u.curAtk;
                 const p = cellXY(u.col, 0);
@@ -644,7 +696,7 @@
             const k = cellXY(killer.col, killer.row);
             floatText(k.x, k.y - 60, "?!", 0xe08cd0);
             if (trap.def.trap.effect === "rowDmg") {
-                const amount = trap.def.trap.amount;
+                const amount = trap.def.trap.amount + altarBonus(side);
                 const victims = B.units.filter((v) => v.side !== side && v.row === killer.row);
                 for (const v of victims) {
                     if (B.units.includes(v)) damageUnit(v, amount, null, "acid");
@@ -674,6 +726,40 @@
                     layer.addChild(c);
                 });
             }
+        }
+
+        // ── «Стена костров» (str21) ────────────────────────────────────────
+        // Ряд клетки горит effects/fire.png; в конце каждого хода ВЛАДЕЛЬЦА
+        // (включая ход каста) все существа и строения ряда получают 2 урона
+        // (+ аура алтаря). У каждого каста свой счётчик ходов (left).
+        function redrawFirewalls() {
+            root.fireLayer.removeChildren().forEach((n) => n.destroy({ children: true }));
+            for (const f of B.firewalls) {
+                for (let col = 0; col < GRID; col++) {
+                    const rc = cellRect(col, f.row);
+                    const sp = new PIXI.Sprite(uiTex("effects/fire.png"));
+                    sp.anchor.set(0.5);
+                    sp.scale.set(Math.min(rc.w / sp.texture.width, rc.h / sp.texture.height));
+                    sp.position.set(rc.x + rc.w / 2, rc.y + rc.h / 2);
+                    sp.eventMode = "none"; // эффект поля не ест клики
+                    root.fireLayer.addChild(sp);
+                }
+            }
+        }
+        function firewallTick(side) {
+            if (!B.firewalls || !B.firewalls.length) return;
+            for (const f of B.firewalls) {
+                if (f.side !== side) continue;
+                for (const v of B.units.slice()) {
+                    if (v.row !== f.row || !B.units.includes(v)) continue;
+                    damageUnit(v, f.dmg + altarBonus(side), null, "rocket");
+                }
+                f.left -= 1;
+            }
+            const keep = B.firewalls.filter((f) => f.left > 0);
+            if (keep.length !== B.firewalls.length) { B.firewalls = keep; redrawFirewalls(); }
+            refreshHud();
+            checkEnd();
         }
 
         // ── Карта-подсказка на существо/строение (наведение на поле) ───────
@@ -821,7 +907,7 @@
                 && deployRows("p").includes(row) && !unitAt(col, row);
         }
         function hoverCard(idx, on) {
-            if (!G.settings.dragSummon || drag || B.phase !== "player" || overlay || B.discarding) return;
+            if (!G.settings.dragSummon || drag || B.phase !== "player" || overlay || B.discarding || B.picking) return;
             const node = root.cardsLayer.children[idx];
             if (!node) return;
             const raised = on || B.selected === idx;
@@ -830,7 +916,7 @@
             if (f) f.visible = raised;
         }
         function startCardDrag(idx, e) {
-            if (!G.settings.dragSummon || B.phase !== "player" || overlay || B.discarding) return;
+            if (!G.settings.dragSummon || B.phase !== "player" || overlay || B.discarding || B.picking) return;
             const def = CARDS[B.hand[idx]];
             if (!def || (def.type !== "unit" && def.type !== "building")) return;
             const node = root.cardsLayer.children[idx];
@@ -840,7 +926,7 @@
             window.addEventListener("pointerup", endCardDrag);
         }
         function moveCardDrag(e) {
-            if (!drag || !B || B.phase !== "player" || B.stopped || overlay) return;
+            if (!drag || !B || B.phase !== "player" || B.stopped || overlay || B.picking) return;
             const p = toDesign(e.global);
             if (!drag.moved) {
                 if (Math.hypot(p.x - drag.sx, p.y - drag.sy) < 12) return; // это клик
@@ -922,7 +1008,7 @@
             B.split = Math.max(0, Math.min(total, B.split));
             sl.cards.text = `+${B.split}`;
             sl.energy.text = `+${total - B.split}`;
-            const on = B.phase === "player" && !B.discarding;
+            const on = B.phase === "player" && !B.discarding && !B.picking;
             sl.track.eventMode = on ? "static" : "none";
             sl.thumb.eventMode = on ? "static" : "none";
             sl.wrap.alpha = on ? 1 : 0.45;
@@ -958,7 +1044,7 @@
             }
         }
         function sliderGrab(e) {
-            if (!B || B.phase !== "player" || B.discarding) return;
+            if (!B || B.phase !== "player" || B.discarding || B.picking) return;
             sliderHeld = true;
             sliderApply(e);
             window.addEventListener("pointermove", sliderMove);
@@ -1049,6 +1135,81 @@
                 layoutHand();
                 buildDiscardPanel(); // пересборка: новый состав руки и счётчик
             }
+        }
+
+        // ── Панель «Поиск рун» (str23): верхние карты колоды — выбрать ──────
+        // заклинание. Не-заклинания видны, но не кликабельны; «Оставить как
+        // было» (или Esc) отменяет — карты остаются в колоде в том же порядке.
+        let runesPanel = null, runesTop = [];
+        function closeRunesPanel() {
+            if (!runesPanel) return;
+            runesPanel.destroy({ children: true });
+            runesPanel = null;
+            runesTop = [];
+            if (B) B.picking = false;
+        }
+        function openRunesPanel(n) {
+            closeRunesPanel();
+            B.picking = true;
+            const top = B.deck.slice(-Math.min(n, B.deck.length)); // верх колоды — конец массива
+            runesTop = top;
+            const node = new PIXI.Container();
+            node.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(0, 0, 1920, 1080);
+            dim.fill({ color: 0x000000, alpha: 0.6 });
+            dim.eventMode = "static";
+            node.addChild(dim);
+            const frame = new PIXI.Graphics();
+            frame.roundRect(285, 270, 1350, 540, 18);
+            frame.fill({ color: 0x171310, alpha: 0.96 });
+            frame.stroke({ width: 3, color: 0x6b5c40 });
+            node.addChild(frame);
+            const title = T(t("runes.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(960, 297);
+            title.eventMode = "none";
+            node.addChild(title);
+            const hint = T(t("runes.hint", { n: top.length }), 25, 0xd8c79d);
+            hint.anchor.set(0.5, 0);
+            hint.position.set(960, 354);
+            hint.eventMode = "none";
+            node.addChild(hint);
+            const m = top.length;
+            const spread = Math.min(210, 1260 / Math.max(1, m));
+            top.forEach((cardId, idx) => {
+                const isSpell = CARDS[cardId].type === "spell";
+                const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                if (!isSpell) c.alpha = 0.5; // не заклинание — взять нельзя
+                else c.on("pointertap", () => pickRune(idx));
+                node.addChild(c);
+            });
+            if (!top.some((id) => CARDS[id].type === "spell")) {
+                const empty = T(t("runes.empty"), 27, 0x8a7c5e);
+                empty.anchor.set(0.5, 0);
+                empty.position.set(960, 687);
+                empty.eventMode = "none";
+                node.addChild(empty);
+            }
+            node.addChild(globalThis.GAME_UI.button(ctx, {
+                tex: "button_menu.png", label: t("runes.back"), x: 960, y: 762, scale: 1,
+                onTap: closeRunesPanel,
+            }));
+            root.addChild(node);
+            runesPanel = node;
+        }
+        function pickRune(idx) { // idx — номер карты среди показанных верхних
+            if (!B || !B.picking || !runesPanel) return;
+            const deckIdx = B.deck.length - runesTop.length + idx;
+            const cardId = B.deck[deckIdx];
+            if (cardId === undefined || CARDS[cardId].type !== "spell") return;
+            B.deck.splice(deckIdx, 1);
+            B.hand.push(cardId);
+            sfx("chpoc");
+            closeRunesPanel();
+            layoutHand();
+            refreshHud();
         }
 
         // ── HUD боя ────────────────────────────────────────────────────────
@@ -1202,9 +1363,16 @@
             const discardCnt = mkCount(60, 310);
             discardIcon.addChild(discardCnt);
             c.addChild(deckIcon, discardIcon);
+            // колода врага — рубашка гоблинов (card_goblin_back.png); клик
+            // показывает, какие карты остались у противника (просил юзер)
+            const eDeckIcon = mkIcon("card_goblin_back.png", 60, 393, 0.63,
+                () => openOverlay("edeck"));
+            const eDeckCnt = mkCount(60, 424);
+            eDeckIcon.addChild(eDeckCnt);
+            c.addChild(eDeckIcon);
 
             c.userData = { eBar, eInfo, title, pBar, pName, manaT, deckT, endBtn, banner, targetHint,
-                deckCnt, discardCnt,
+                deckCnt, discardCnt, eDeckCnt,
                 slider: { wrap: slWrap, cards: slCards, energy: slEnergy, track: slTrack, thumb: slThumb } };
             return c;
         }
@@ -1231,17 +1399,20 @@
                 const panel = globalThis.GAME_SETTINGS_SCENE.buildPanel(ctx, { onBack: closeOverlay });
                 panel.applySound();
                 node.addChild(panel.node);
-            } else { // deck / discard — только просмотр, без редактирования:
-                // колода — ОСТАТОК (B.deck), сброс — лежащие карты (B.discard)
+            } else { // deck / edeck / discard — только просмотр, без редактирования:
+                // колода — ОСТАТОК (B.deck), колода врага — его остаток (B.eDeck),
+                // сброс — лежащие карты (B.discard)
                 const { T, button, cardFace, scrollPane } = globalThis.GAME_UI;
                 const { CARDS } = globalThis.GAME_DATA;
-                const pile = name === "discard" ? B.discard : B.deck;
+                const pile = name === "discard" ? B.discard
+                    : name === "edeck" ? B.eDeck : B.deck;
                 const frame = new PIXI.Graphics();
                 frame.roundRect(285, 81, 1350, 885, 18);
                 frame.fill({ color: 0x171310, alpha: 0.95 });
                 frame.stroke({ width: 3, color: 0x6b5c40 });
                 node.addChild(frame);
-                const title = T(t(name === "discard" ? "deck.discardTitle" : "deck.viewTitle"),
+                const title = T(t(name === "discard" ? "deck.discardTitle"
+                    : name === "edeck" ? "deck.enemyTitle" : "deck.viewTitle"),
                     45, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
                 title.anchor.set(0.5, 0);
                 title.position.set(960, 105);
@@ -1311,6 +1482,7 @@
             ud.deckT.text = `${B.deck.length}+${B.discard.length}`;
             ud.deckCnt.text = String(B.deck.length); // счётчики у иконок-стопок
             ud.discardCnt.text = String(B.discard.length);
+            ud.eDeckCnt.text = String(B.eDeck.length);
             ud.endBtn.alpha = B.phase === "player" ? 1 : 0.45;
             ud.endBtn.eventMode = B.phase === "player" ? "static" : "none";
             ud.targetHint.text = B.spellTarget ? t("arena.pickTarget") : "";
@@ -1408,6 +1580,8 @@
             layoutHand();
             redrawHighlight();
             refreshHud();
+            firewallTick("p"); // стена костров игрока — конец хода игрока
+            if (B.stopped || B.phase === "over") return;
             banner(t("arena.enemyTurn"));
             await delay(0.5 / animK());
             if (B.stopped) return;
@@ -1494,28 +1668,64 @@
                     if (def.type === "spell") {
                         // добор-заклинание — тоже трата энергии; гасим только при полной руке
                         if (def.spell.draw && B.eHand.length >= HAND_MAX) continue;
-                    if (def.spell.target === "anyUnit") { // усиление — своему сильнейшему
-                        const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
+                        // огнешар при энергии 1..2 почти пуст (урон 0..1) — копим дальше
+                        if (def.spell.drainAll && B.eEnergy < 3) continue;
+                        // «Поиск рун»: в верхних картах колоды должно быть заклинание
+                        if (def.spell.search && !B.eDeck.slice(-def.spell.search)
+                            .some((id) => CARDS[id] && CARDS[id].type === "spell")) continue;
+                        // «Огненное дыхание» — только если есть своё неочарованное существо
+                        if (def.spell.enchantFire && !B.units.some((v) => v.side === "e"
+                            && v.def.type === "unit" && !v.enchantFire)) continue;
+                    if (def.spell.target === "anyUnit") { // усиление/очарование — своему сильнейшему
+                        const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
+                            && (!def.spell.enchantFire || !v.enchantFire));
                         if (!own.length) continue;
-                        const best = own.sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
-                        best.bonusAtk = (best.bonusAtk || 0) + def.spell.buffAtk;
-                        recalcAuras();
-                        const p = cellXY(best.col, best.row);
-                        floatText(p.x, p.y - 39, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                        const best = own.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                        if (def.spell.enchantFire) { // «Огненное дыхание»
+                            best.enchantFire = true;
+                            const mark = new PIXI.Graphics();
+                            mark.circle(0, 0, 10.5);
+                            mark.fill({ color: 0xff7a2e });
+                            mark.stroke({ width: 3, color: 0xffd98c });
+                            mark.position.set(36, -54);
+                            mark.name = "enchMark";
+                            mark.eventMode = "none";
+                            best.node.addChild(mark);
+                            floatText(cellXY(best.col, best.row).x, cellXY(best.col, best.row).y - 60, "✦", 0xffb26e);
+                        } else {
+                            best.bonusAtk = (best.bonusAtk || 0) + def.spell.buffAtk;
+                            recalcAuras();
+                            const p = cellXY(best.col, best.row);
+                            floatText(p.x, p.y - 39, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                        }
                         punch(best.node);
                         sfx("up");
                     }
-                    if (def.spell.target === "anyUnitDmg") { // дротик/варево — сильнейшему игроку
+                    if (def.spell.target === "anyUnitDmg") { // дротик/варево/огнешар — сильнейшему игроку
                         const targets = B.units.filter((v) => v.side === "p"
                             && (v.def.type === "unit"
                                 || (v.def.type === "building" && !def.spell.noBuildings)));
                         if (!targets.length) continue;
                         const best = targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
-                        damageUnit(best, spellDmg(def), null, "rocket");
+                        if (def.spell.drainAll) { // вся энергия сверх цены — в урон
+                            damageUnit(best, Math.max(0, B.eEnergy - effCost(pick.id, "e"))
+                                + altarBonus("e"), null, "rocket");
+                        } else {
+                            damageUnit(best, spellDmg(def, "e"), null, "rocket");
+                        }
+                    }
+                    if (def.spell.target === "anyCell") { // стена костров — ряд, где больше игроков
+                        const counts = [0, 0, 0, 0, 0];
+                        for (const v of B.units) if (v.side === "p") counts[v.row]++;
+                        const row = counts.indexOf(Math.max(...counts));
+                        B.firewalls.push({ col: 2, row, side: "e",
+                            left: def.spell.turns, dmg: def.spell.firewall });
+                        redrawFirewalls();
+                        sfx("rocket");
                     }
                     const cardId = B.eHand[pick.i];
                     B.eHand.splice(pick.i, 1);
-                    B.eEnergy -= effCost(cardId, "e");
+                    B.eEnergy = def.spell.drainAll ? 0 : B.eEnergy - effCost(cardId, "e");
                     if (def.spell.target === "enemyAny") {
                         const targets = B.units.filter((u) => u.side === "p");
                         if (targets.length) {
@@ -1528,6 +1738,12 @@
                         }
                     }
                         if (def.spell.draw) drawEnemy(def.spell.draw);
+                        if (def.spell.search) { // верхнее заклинание из верхних карт колоды — в руку
+                            const spells = B.eDeck.map((id, j) => ({ id, j }))
+                                .filter((x) => CARDS[x.id] && CARDS[x.id].type === "spell");
+                            const k = spells[spells.length - 1];
+                            if (k) { B.eDeck.splice(k.j, 1); B.eHand.push(k.id); }
+                        }
                         if (def.spell.brew) B.brewCasts = (B.brewCasts || 0) + 1;
                         B.eDiscard.push(cardId);
                         refreshHud();
@@ -1548,6 +1764,8 @@
             B.selected = null;
             B.spellTarget = false;
             refreshHud();
+            firewallTick("e"); // стена костров врага — конец хода врага
+            if (B.stopped || B.phase === "over") return;
             banner(t("arena.yourTurn"));
             await delay(0.4 / animK());
             if (B.stopped) return;
@@ -1581,7 +1799,7 @@
         }
 
         function onCardTap(idx) {
-            if (B.phase !== "player" || B.discarding) return;
+            if (B.phase !== "player" || B.discarding || B.picking) return;
             const def = CARDS[B.hand[idx]];
             if (!def) return;
             if (ctx.sfx) ctx.sfx();
@@ -1608,13 +1826,17 @@
         }
 
         function onCellTap(col, row) {
-            if (B.phase !== "player" || B.discarding || B.selected === null) return;
+            if (B.phase !== "player" || B.discarding || B.picking || B.selected === null) return;
             const def = CARDS[B.hand[B.selected]];
             if (!def) return;
             if (B.spellTarget) { // прицел: по врагу, любому существу или строению
                 const sdef = CARDS[B.hand[B.selected]];
                 const u = unitAt(col, row);
                 const tg = sdef.spell.target;
+                if (tg === "anyCell") { // стена костров — подходит любая клетка
+                    castSpell(B.selected, { col, row });
+                    return;
+                }
                 const typeOk = u && (tg === "anyUnitDmg"
                     ? (u.def.type === "unit"
                         || (u.def.type === "building" && !sdef.spell.noBuildings))
@@ -1652,7 +1874,7 @@
         }
 
         function castSpell(handIdx, target) {
-            if (B.phase !== "player" || B.discarding) return false;
+            if (B.phase !== "player" || B.discarding || B.picking) return false;
             const cardId = B.hand[handIdx];
             const def = CARDS[cardId];
             if (!def || def.type !== "spell" || effCost(cardId) > B.energy) return false;
@@ -1660,10 +1882,23 @@
                 if (!target || target.col === undefined) return false;
                 const u = unitAt(target.col, target.row);
                 if (!u || u.def.type !== "unit") return false;
-                u.bonusAtk = (u.bonusAtk || 0) + def.spell.buffAtk;
-                recalcAuras();
                 const p = cellXY(u.col, u.row);
-                floatText(p.x, p.y - 39, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                if (def.spell.enchantFire) { // «Огненное дыхание» — метка-очарование
+                    u.enchantFire = true;
+                    const mark = new PIXI.Graphics();
+                    mark.circle(0, 0, 10.5);
+                    mark.fill({ color: 0xff7a2e });
+                    mark.stroke({ width: 3, color: 0xffd98c });
+                    mark.position.set(36, -54);
+                    mark.name = "enchMark";
+                    mark.eventMode = "none";
+                    u.node.addChild(mark);
+                    floatText(p.x, p.y - 60, "✦", 0xffb26e);
+                } else {
+                    u.bonusAtk = (u.bonusAtk || 0) + def.spell.buffAtk;
+                    recalcAuras();
+                    floatText(p.x, p.y - 39, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                }
                 punch(u.node);
                 sfx("up");
             }
@@ -1672,7 +1907,19 @@
                 const u = unitAt(target.col, target.row);
                 if (!u || (u.def.type !== "unit"
                     && (u.def.type !== "building" || def.spell.noBuildings))) return false;
-                damageUnit(u, spellDmg(def), null, "rocket");
+                if (def.spell.drainAll) { // «Огнешар»: вся энергия сверх цены — в урон
+                    damageUnit(u, Math.max(0, B.energy - effCost(cardId)) + altarBonus("p"),
+                        null, "rocket");
+                } else {
+                    damageUnit(u, spellDmg(def), null, "rocket");
+                }
+            }
+            if (def.spell.target === "anyCell") { // стена костров: ряд горит N ходов владельца
+                if (!target || target.col === undefined) return false;
+                B.firewalls.push({ col: target.col, row: target.row, side: "p",
+                    left: def.spell.turns, dmg: def.spell.firewall });
+                redrawFirewalls();
+                sfx("rocket");
             }
             if (def.spell.target === "ownUnit") { // жертва: убить своё, ударить соседей
                 if (!target || target.col === undefined) return false;
@@ -1708,8 +1955,9 @@
             }
             if (def.spell.draw) drawCards(def.spell.draw);
             if (def.spell.brew) B.brewCasts = (B.brewCasts || 0) + 1;
-            B.energy -= effCost(cardId);
+            B.energy = def.spell.drainAll ? 0 : B.energy - effCost(cardId);
             spendCard(handIdx);
+            if (def.spell.search) openRunesPanel(def.spell.search); // выбор поверх боя
             layoutHand();
             redrawHighlight();
             refreshHud();
@@ -1793,9 +2041,9 @@
                 enemyBase: enc.baseHp, enemyBaseMax: enc.baseHp,
                 deck: shuffle([...G.deck]), discard: [], hand: [],
                 eDeck: shuffle([...enc.deck]), eDiscard: [], eHand: [],
-                units: [], traps: { p: [], e: [] },
+                units: [], traps: { p: [], e: [] }, firewalls: [],
                 selected: null, spellTarget: false, result: null,
-                discarding: false, brewCasts: 0,
+                discarding: false, picking: false, brewCasts: 0,
             };
             G.battle = B;
             drawCards(4);
@@ -1804,6 +2052,7 @@
             drag = null;
             dragFx = null; // прошлого боя Graphics уничтожен вместе с root
             discardPanel = null;
+            runesPanel = null; runesTop = [];
             unitCard = null;
             sfx("openRoom"); // начало боя
 
@@ -1817,6 +2066,8 @@
             root.addChild(bg);
             root.board = buildBoard();
             root.addChild(root.board);
+            root.fireLayer = new PIXI.Container(); // «Стена костров» — огонь под жетонами
+            root.addChild(root.fireLayer);
             root.unitsLayer = new PIXI.Container();
             root.addChild(root.unitsLayer);
             root.trapLayer = new PIXI.Container();
@@ -1851,6 +2102,7 @@
             sliderHeld = false;
             drag = null;
             closeDiscardPanel();
+            closeRunesPanel();
             unitCard = null; // узел подсказки умер вместе с root
             if (root) { root.destroy({ children: true }); root = null; }
             overlay = null;
@@ -1918,6 +2170,10 @@
             // «Конец хода» с клавиши: Пробел (только в свой ход, без панелей)
             if (B.phase === "player" && !B.discarding && !overlay
                 && ctx.input.wasPressed("Space")) api.endTurn();
+            if (B.picking && ctx.input.wasPressed("Escape")) {
+                closeRunesPanel(); // «Поиск рун» — отмена выбора
+                return;
+            }
             if (overlay && B.phase !== "over" && ctx.input.wasPressed("Escape")) {
                 closeOverlay();
                 return;
@@ -1929,7 +2185,7 @@
 
         const api = {
             endTurn() {
-                if (!B || B.phase !== "player" || B.discarding) return;
+                if (!B || B.phase !== "player" || B.discarding || B.picking) return;
                 // шкала применяется автоматически: слева карты, справа энергия
                 const total = spheresTotal();
                 const cards = Math.max(0, Math.min(B.split, total));
@@ -2001,9 +2257,29 @@
                     spheres: { total: spheresTotal(), split: B.split },
                     hand: [...B.hand],
                     discarding: !!B.discarding,
-                    units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body") })),
+                    picking: !!B.picking,
+                    eDeck: B.eDeck.length,
+                    units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire })),
                     traps: { p: B.traps.p.length, e: B.traps.e.length },
+                    firewalls: B.firewalls.map((f) => ({ side: f.side, row: f.row, left: f.left })),
                 };
+            },
+            // «Стена костров» (тесты): касты + сколько спрайтов огня на поле
+            firewalls: () => ({ list: B.firewalls.map((f) => ({ ...f })),
+                sprites: root.fireLayer.children.length }),
+            // тест-хук: тик стены костров (как в конце хода стороны)
+            _fwTick(side) { firewallTick(side); return B.firewalls.map((f) => ({ ...f })); },
+            // «Поиск рун» (тесты): состав панели и выбор карты
+            runesState: () => ({ picking: !!B.picking, top: [...runesTop] }),
+            runesPick(idx) { pickRune(idx); },
+            // тест-хук: урон цели с указанным «убийцей» — через damageUnit,
+            // с хуками боя (очарование «Огненного дыхания» и пр.)
+            _dmg(col, row, amount, killerCol, killerRow) {
+                const u = unitAt(col, row);
+                if (!u) return false;
+                const killer = (killerCol !== undefined && killerCol !== null) ? unitAt(killerCol, killerRow) : null;
+                damageUnit(u, amount, killer, "sword");
+                return true;
             },
             // тест-хук: убить юнита с указанным «убийцей» (для проверки ловушки)
             _kill(col, row, killerCol, killerRow) {
