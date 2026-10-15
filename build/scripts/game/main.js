@@ -1,5 +1,6 @@
 // БУТ «Подземелье призывателей»: движок → ассеты → шрифт → мета/настройки →
-// сцены → меню. UI-корень 1280×720 вписывается в окно (letterbox).
+// сцены → меню. Базовое разрешение UI — 1920×1080 (letterbox); сцены
+// работают в логических 1280×720 внутри бокса ×1.5 (подробнее у fitUi).
 // Коллекция/колода/настройки живут в localStorage (meta.js) и переживают
 // забеги; язык применяется через loc.js при старте и смене в настройках.
 (async function () {
@@ -75,14 +76,21 @@
             goblin: await assets.loadCharacter("./images/sprites/goblin_256"),
         };
 
-        // ── UI-корень 1280×720 с вписыванием в окно ────────────────────────
+        // ── UI-корень: базовое разрешение 1920×1080, вписывается в окно ────
+        // (просил юзер). Сцены при этом работают в логических 1280×720 —
+        // контейнер uiBox растягивает их ×1.5, а button_menu.png компенсирует
+        // это коэффициентом ⅔ в uiKit.button: на FullHD спрайт рисуется
+        // натуральными 274×77 экранных пикселей.
         const ui = new PIXI.Container();
         app.stage.addChild(ui);
+        const uiBox = new PIXI.Container();
+        uiBox.scale.set(1.5); // логические 1280×720 → базовые 1920×1080
+        ui.addChild(uiBox);
         function fitUi() {
-            const s = Math.min(app.screen.width / 1280, app.screen.height / 720);
+            const s = Math.min(app.screen.width / 1920, app.screen.height / 1080);
             ui.scale.set(s);
-            ui.x = (app.screen.width - 1280 * s) / 2;
-            ui.y = (app.screen.height - 720 * s) / 2;
+            ui.x = (app.screen.width - 1920 * s) / 2;
+            ui.y = (app.screen.height - 1080 * s) / 2;
         }
         fitUi();
         app.renderer.on("resize", fitUi);
@@ -210,7 +218,7 @@
         const ctx = {
             app, world, ECS, COMPONENTS, DATA, worldContainer, addSystem,
             assets, uiTex, scheduler, input, camera, characters, charInput,
-            knight, creatureSheets, G, ui, audio,
+            knight, creatureSheets, G, ui: uiBox, audio,
             sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
         };
@@ -260,9 +268,13 @@
                 const addMenuBtn = (label, x, y, onTap) => {
                     const b = menuButton("button_menu.png", label, x, y, 1, onTap);
                     const txt = b.children.find((n) => n.style);
+                    const sp = b.userData.sprite;
                     menuInfo.push({
-                        label, scale: b.userData.sprite.scale.x,
+                        label, scale: sp.scale.x,
                         fontSize: txt ? txt.style.fontSize : null,
+                        // ширина спрайта в экранных пикселях (тест базы 1920×1080)
+                        physW: Math.round(sp.texture.width * sp.scale.x
+                            * uiBox.scale.x * ui.scale.x),
                     });
                     menuRoot.addChild(b);
                     return b;
@@ -308,7 +320,7 @@
                 ver.position.set(12, 700);
                 ver.eventMode = "none";
                 menuRoot.addChild(ver);
-                ui.addChild(menuRoot);
+                uiBox.addChild(menuRoot);
                 worldContainer.visible = false;
             },
             exit() {
@@ -343,7 +355,7 @@
                 // (dungeon.exit пишет sd_run), «Продолжить» в меню его поднимет
                 fwRoot.addChild(menuButton("button_menu.png", t("floorWin.menu"), 640, 486, 1,
                     () => scenes.go("menu")));
-                ui.addChild(fwRoot);
+                uiBox.addChild(fwRoot);
             },
             exit() {
                 if (fwRoot) { fwRoot.destroy({ children: true }); fwRoot = null; }
@@ -370,7 +382,7 @@
 
         // ── Хендл для консоли и автотестов ─────────────────────────────────
         window.__GAME = {
-            scenes, G, ui, loc: GAME_LOC,
+            scenes, G, ui: uiBox, loc: GAME_LOC,
             dungeon: dungeonScene, arena: arenaScene,
             arenaApi: arenaScene.api, deckApi: deckScene.api,
             rewardApi: rewardScene.api, settingsApi: settingsScene.api,
@@ -379,7 +391,10 @@
                 status: () => audio.status(),
                 sfxCounts: () => ({ ...sfxCounts }),
             },
-            toScreen: (x, y) => ({ x: ui.x + x * ui.scale.x, y: ui.y + y * ui.scale.y }),
+            toScreen: (x, y) => ({
+                x: ui.x + x * uiBox.scale.x * ui.scale.x,
+                y: ui.y + y * uiBox.scale.y * ui.scale.y,
+            }),
             test: {
                 COMPONENTS,
                 setHeroPos(x, y) {

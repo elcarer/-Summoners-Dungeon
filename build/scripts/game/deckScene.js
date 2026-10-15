@@ -1,6 +1,7 @@
 // СЦЕНА «КОЛОДА И КОЛЛЕКЦИЯ» — редактор колоды из меню.
 // Слева — текущая колода карточками (клик по карте убирает копию),
-// справа — коллекция (клик добавляет копию). Наведение на карту плавно
+// справа — коллекция (клик добавляет копию), только карты, которые
+// есть у игрока. Наведение на карту плавно
 // увеличивает её до полного размера (копия поверх панели, маска не режет).
 // Фильтры по типу/цене/редкости; стихии — рядом из 6 лого в правой части
 // экрана (повторный клик по активному лого снимает фильтр). Оба окна —
@@ -85,10 +86,13 @@
         }
 
         // ── правое окно: сетка коллекции ───────────────────────────────────
+        // Показываются только карты, которые ЕСТЬ у игрока (просил юзер):
+        // счётчик коллекции — все добытые копии, включая вложенные в колоду.
         function buildCollection() {
             const c = new PIXI.Container();
             paneCards.right = [];
-            const ids = Object.keys(CARDS).filter(passes);
+            const ids = Object.keys(CARDS)
+                .filter((id) => (G.collection[id] || 0) > 0 && passes(id));
             ids.forEach((id, i) => {
                 const col = i % 5, rowI = (i / 5) | 0;
                 const owned = G.collection[id] || 0;
@@ -117,6 +121,12 @@
                 }
                 if (canAdd) card.on("pointertap", () => api.add(id));
             });
+            if (!ids.length) { // фильтры спрятали всё (или коллекция пуста)
+                const empty = T(t("deck.empty"), 15, 0x8a7c5e);
+                empty.position.set(62, 24);
+                empty.eventMode = "none";
+                c.addChild(empty);
+            }
             const rowsN = Math.ceil(ids.length / 5);
             c.userData = { contentH: ids.length ? (92 + (rowsN - 1) * 205 + 155) : 40 };
             return c;
@@ -303,7 +313,8 @@
             },
             setFilter(key, value) { filters[key] = value; rebuildPanes(); },
             filters: () => ({ ...filters }),
-            visibleIds: () => Object.keys(CARDS).filter(passes),
+            visibleIds: () => Object.keys(CARDS)
+                .filter((id) => (G.collection[id] || 0) > 0 && passes(id)),
             deckListIds: () => [...new Set(G.deck)].filter(passes),
             counts() { return { deck: G.deck.length, collection: { ...G.collection } }; },
             scroll(side, dy) { (side === "left" ? leftPane : rightPane).scrollBy(dy); },

@@ -21,21 +21,26 @@
     }
 
     // Кнопка: спириm + подпись (текст не ловит клики и вписан в ширину).
-    // Кнопки button_menu.png — в НАТУРАЛЬНОМ размере спрайта 274×77 (просил
-    // юзер), кегль 19 — подпись гарантированно внутри фрейма.
+    // Базовое разрешение UI — 1920×1080, сцены живут в логических 1280×720
+    // (бокс ×1.5), поэтому button_menu.png рендерится с коэффициентом ⅔:
+    // на FullHD это натуральные 274×77 экранных пикселей (просил юзер),
+    // кегль 19 — подпись гарантированно внутри фрейма.
+    const BTN_K = 2 / 3;
     function button(ctx, { tex, label, x, y, scale = 1, onTap, fontSize = 19 }) {
         const c = new PIXI.Container();
         const sp = new PIXI.Sprite(ctx.uiTex(tex));
         sp.anchor.set(0.5);
-        sp.scale.set(scale);
+        sp.scale.set(scale * BTN_K);
         c.addChild(sp);
         if (label) {
             const t = T(label, fontSize, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4 } });
             t.anchor.set(0.5);
             t.eventMode = "none";
-            c.addChild(t);
-            // подпись не шире кнопки (у широких надписей ужимается кегль)
+            // подпись не шире кнопки (у широких надписей ужимается кегль),
+            // затем вся подпись сжимается тем же коэффициентом ⅔
             fit(t, sp.texture.width * scale * 0.86, 11);
+            t.scale.set(BTN_K * t.scale.x, BTN_K);
+            c.addChild(t);
         }
         c.position.set(x, y);
         c.eventMode = "static";

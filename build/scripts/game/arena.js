@@ -762,7 +762,13 @@
         // слота в руке до центра клетки, отпускание — призыв. Спеллы и ловушки
         // ставятся кликом как раньше.
         let drag = null, dragFx = null; // drag: {idx,node,homeX,homeY,sx,sy,moved,over}
-        const toDesign = (g) => ({ x: (g.x - ctx.ui.x) / ctx.ui.scale.x, y: (g.y - ctx.ui.y) / ctx.ui.scale.y });
+        // Глобальные экранные → логические дизайн-координаты: делить нужно
+        // на ПОЛНУЮ цепочку (letterbox базовых 1920×1080 × бокс 1.5), поэтому
+        // мировая трансформация бокса, а не только его собственный масштаб.
+        const toDesign = (g) => {
+            const wt = ctx.ui.worldTransform;
+            return { x: (g.x - wt.tx) / wt.a, y: (g.y - wt.ty) / wt.d };
+        };
 
         function cellAt(x, y) {
             const g = SCENE_GRID[curScene] || SCENE_GRID[1];
@@ -1874,10 +1880,10 @@
             handGeom() {
                 if (!root || !B || !root.cardsLayer.children.length) return null;
                 const b = root.cardsLayer.children[0].getBounds();
-                const s = ctx.ui.scale.x || 1;
+                const wt = ctx.ui.worldTransform; // полная цепочка letterbox × бокс
                 return {
-                    x: (b.x - ctx.ui.x) / s, top: (b.y - ctx.ui.y) / s,
-                    w: b.width / s, h: b.height / s,
+                    x: (b.x - wt.tx) / wt.a, top: (b.y - wt.ty) / wt.d,
+                    w: b.width / wt.a, h: b.height / wt.d,
                 };
             },
             state() {
