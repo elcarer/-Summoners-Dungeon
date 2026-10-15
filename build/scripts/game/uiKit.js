@@ -20,8 +20,10 @@
         return textEl;
     }
 
-    // Кнопка: спириm + подпись (текст не ловит клики и вписан в ширину)
-    function button(ctx, { tex, label, x, y, scale = 1, onTap, fontSize = 24 }) {
+    // Кнопка: спириm + подпись (текст не ловит клики и вписан в ширину).
+    // Кнопки button_menu.png — в НАТУРАЛЬНОМ размере спрайта 274×77 (просил
+    // юзер), кегль 19 — подпись гарантированно внутри фрейма.
+    function button(ctx, { tex, label, x, y, scale = 1, onTap, fontSize = 19 }) {
         const c = new PIXI.Container();
         const sp = new PIXI.Sprite(ctx.uiTex(tex));
         sp.anchor.set(0.5);
@@ -143,9 +145,11 @@
     }
 
     // ── Скролл-панель: контент + маска + ползунок справа, колесо мыши ──────
-    // const pane = scrollPane(ctx, { x, y, w, h }); pane.setContent(node);
+    // const pane = scrollPane(ctx, { x, y, w, h, onScroll }); pane.setContent(node);
     // node кладётся с локальным (0,0) — панель сама двигает его по вертикали.
-    function scrollPane(ctx, { x, y, w, h }) {
+    // onScroll вызывается при каждом перемещении контента (ховер-эффекты
+    // вроде зума карт сбрасывают по нему своё состояние).
+    function scrollPane(ctx, { x, y, w, h, onScroll }) {
         const root = new PIXI.Container();
         root.position.set(x, y);
 
@@ -204,6 +208,7 @@
             const max = Math.max(0, contentH - h);
             inner.y = -t * max;
             handle.y = t * (h - handle.height);
+            if (onScroll) onScroll();
         }
         function scrollBy(dy) {
             const max = Math.max(0, contentH - h);

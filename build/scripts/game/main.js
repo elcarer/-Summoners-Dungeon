@@ -193,6 +193,17 @@
                 this.activeEnemy = null;
                 this.battle = null;
             },
+            // сейв забега (sd_run): этаж, герой, золото, подземелье целиком —
+            // «Продолжить» в меню поднимает его (dungeon — простые данные,
+            // переживают JSON)
+            saveRun() {
+                globalThis.GAME_META.saveRun({
+                    floor: this.run.floor,
+                    hero: { hp: this.hero.hp, maxHp: this.hero.maxHp },
+                    gold: this.gold,
+                    dungeon: this.dungeon ? JSON.parse(JSON.stringify(this.dungeon)) : null,
+                });
+            },
         };
         if (!G.deck.length) G.deck = [...DEFAULT_DECK];
 
@@ -241,18 +252,54 @@
                 sub.eventMode = "none";
                 menuRoot.addChild(sub);
 
-                menuRoot.addChild(menuButton("button_1.png", t("menu.play"), 640, 366, 1.18,
-                    () => { G.resetRun(); scenes.go("dungeon"); }));
-                menuRoot.addChild(menuButton("button_menu.png", t("menu.deck"), 640, 462, 0.92,
-                    () => scenes.go("deck")));
-                menuRoot.addChild(menuButton("button_menu.png", t("menu.settings"), 640, 542, 0.92,
-                    () => scenes.go("settings")));
-                menuRoot.addChild(menuButton("button_menu.png", t("menu.exit"), 640, 622, 0.92,
-                    () => { menuRoot.userData.bye.visible = true; }));
+                // «Войти» заменён парой «Продолжить»/«Новая игра» (просил юзер):
+                // продолжить можно сохранённый забег (sd_run, пишет G.saveRun),
+                // новая игра снимает сейв и начинает с 1-го этажа. Кнопки — в
+                // натуральном размере спрайта 274×77 (просил юзер).
+                const menuInfo = [];
+                const addMenuBtn = (label, x, y, onTap) => {
+                    const b = menuButton("button_menu.png", label, x, y, 1, onTap);
+                    const txt = b.children.find((n) => n.style);
+                    menuInfo.push({
+                        label, scale: b.userData.sprite.scale.x,
+                        fontSize: txt ? txt.style.fontSize : null,
+                    });
+                    menuRoot.addChild(b);
+                    return b;
+                };
+                const contEnabled = !!GAME_META.loadRun();
+                const bCont = addMenuBtn(t("menu.continue"), 640, 316, () => {
+                    const r = GAME_META.loadRun();
+                    if (!contEnabled || !r) return;
+                    G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp || 10 };
+                    G.gold = r.gold || 0;
+                    G.run.floor = r.floor;
+                    G.dungeon = r.dungeon || null;
+                    scenes.go("dungeon");
+                });
+                if (!contEnabled) bCont.alpha = 0.45; // забега нет — кнопка приглушена
+                const bNew = addMenuBtn(t("menu.newGame"), 640, 400, () => {
+                    GAME_META.clearRun();
+                    G.resetRun();
+                    scenes.go("dungeon");
+                    G.saveRun(); // свежий забег сразу сохранён
+                });
+                addMenuBtn(t("menu.deck"), 640, 484, () => scenes.go("deck"));
+                addMenuBtn(t("menu.settings"), 640, 568, () => scenes.go("settings"));
+                addMenuBtn(t("menu.exit"), 640, 652, () => { menuRoot.userData.bye.visible = true; });
+                // хендл для смоука: подписи/размеры кнопок, нажатие по имени
+                window.__GAME.menu = {
+                    buttons: () => menuInfo.map((b) => ({ ...b })),
+                    continueEnabled: () => contEnabled,
+                    press(name) {
+                        const b = name === "continue" ? bCont : name === "newGame" ? bNew : null;
+                        if (b) b.emit("pointertap");
+                    },
+                };
 
-                const bye = T(t("menu.bye"), 24, 0xffe2a8, { stroke: { color: 0x1c1207, width: 5 } });
+                const bye = T(t("menu.bye"), 22, 0xffe2a8, { stroke: { color: 0x1c1207, width: 5 } });
                 bye.anchor.set(0.5);
-                bye.position.set(640, 688);
+                bye.position.set(640, 706);
                 bye.visible = false;
                 bye.eventMode = "none";
                 menuRoot.addChild(bye);
@@ -265,6 +312,7 @@
                 worldContainer.visible = false;
             },
             exit() {
+                window.__GAME.menu = null; // кнопки умерли вместе с root
                 if (menuRoot) { menuRoot.destroy({ children: true }); menuRoot = null; }
             },
         });
@@ -289,10 +337,12 @@
                 ft.position.set(640, 252);
                 ft.eventMode = "none";
                 fwRoot.addChild(ft);
-                fwRoot.addChild(menuButton("button_menu.png", t("floorWin.next"), 640, 386, 0.95,
+                fwRoot.addChild(menuButton("button_menu.png", t("floorWin.next"), 640, 386, 1,
                     () => scenes.go("dungeon")));
-                fwRoot.addChild(menuButton("button_menu.png", t("floorWin.menu"), 640, 486, 0.95,
-                    () => { G.resetRun(); scenes.go("menu"); }));
+                // «В меню» больше НЕ сбрасывает забег: прогресс этажа сохранён
+                // (dungeon.exit пишет sd_run), «Продолжить» в меню его поднимет
+                fwRoot.addChild(menuButton("button_menu.png", t("floorWin.menu"), 640, 486, 1,
+                    () => scenes.go("menu")));
                 ui.addChild(fwRoot);
             },
             exit() {

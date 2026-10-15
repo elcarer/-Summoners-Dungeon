@@ -199,6 +199,67 @@
             G.dungeon.toastT = 2.2;
         }
 
+        // ── Подсказка на врага (наведение курсором): имя энкаунтера + краткое
+        // описание его колоды (состав с копиями) и HP базы. Панель живёт в
+        // ui-слое (дизайн-координаты) и каждый кадр следует за жетоном —
+        // камера может двигаться. Показывает pointermove по клик-зоне карты:
+        // жетоны врагов НЕ интерактивны, чтобы не съедать клики движения.
+        let tip = null; // { enemy, node, h }
+        function deckSummary(encId) {
+            const enc = globalThis.GAME_DATA.ENCOUNTERS[encId] || globalThis.GAME_DATA.ENCOUNTERS.gob;
+            const counts = new Map();
+            for (const id of enc.deck) counts.set(id, (counts.get(id) || 0) + 1);
+            return [...counts.entries()]
+                .map(([id, n]) => `${n}× ${GAME_LOC.t("card." + id + ".name")}`).join(", ");
+        }
+        function showTip(enemy) {
+            if (tip && tip.enemy === enemy) return;
+            hideTip();
+            const enc = globalThis.GAME_DATA.ENCOUNTERS[enemy.enc] || globalThis.GAME_DATA.ENCOUNTERS.gob;
+            const node = new PIXI.Container();
+            node.eventMode = "none";
+            const title = new PIXI.Text({
+                text: GAME_LOC.t("enc." + enemy.enc + ".title"),
+                style: { fontFamily: "Kereru", fontSize: 16, fill: 0xffe9b0 },
+            });
+            const hpLine = new PIXI.Text({
+                text: GAME_LOC.t("dungeon.tipBase", { n: enc.baseHp }),
+                style: { fontFamily: "Kereru", fontSize: 12, fill: 0xff9c8c },
+            });
+            const deck = new PIXI.Text({
+                text: GAME_LOC.t("dungeon.tipDeck") + ": " + deckSummary(enemy.enc),
+                style: { fontFamily: "Kereru", fontSize: 12, fill: 0xd8c79d,
+                    wordWrap: true, wordWrapWidth: 224, breakWords: true },
+            });
+            const w = 248, pad = 10;
+            const h = pad + title.height + 4 + hpLine.height + 6 + deck.height + pad;
+            const g = new PIXI.Graphics();
+            g.roundRect(0, 0, w, h, 8);
+            g.fill({ color: 0x171310, alpha: 0.94 });
+            g.stroke({ width: 2, color: 0x6b5c40 });
+            title.position.set(pad, pad);
+            hpLine.position.set(pad, pad + title.height + 4);
+            deck.position.set(pad, pad + title.height + 8 + hpLine.height);
+            node.addChild(g, title, hpLine, deck);
+            ctx.ui.addChild(node);
+            tip = { enemy, node, h };
+        }
+        function hideTip() {
+            if (!tip) return;
+            tip.node.destroy({ children: true });
+            tip = null;
+        }
+        function hoverCheck(p) {
+            if (!G.dungeon) { hideTip(); return; }
+            let best = null, bd = 1e9;
+            for (const e of G.dungeon.enemies) {
+                if (!e.alive) continue;
+                const d = Math.hypot(e.x - p.x, e.y - p.y);
+                if (d < (e.boss ? 34 : 26) && d < bd) { best = e; bd = d; }
+            }
+            if (best) showTip(best); else hideTip();
+        }
+
         return {
             enter() {
                 if (ctx.music) ctx.music("dungeon");
@@ -220,6 +281,9 @@
                         Math.floor(p.x / TS), Math.floor(p.y / TS));
                     if (next) path = next; // в стену/сам в себя — не идём
                 });
+                // наведение на врага — подсказка (имя + колода); ушли — скрыть
+                zone.on("pointermove", (e) => hoverCheck(zone.toLocal(e.global)));
+                zone.on("pointerout", () => hideTip());
                 layer.addChild(zone);
                 layer.addChild(buildMapGfx());
                 layer.addChild(makeExit());
@@ -259,8 +323,12 @@
                 if (st && heroId !== null) {
                     st.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
                 }
+                // забег сохраняется при каждом уходе из подземелья (бой,
+                // настройки, колода, «этаж пройден») — «Продолжить» в меню
+                if (st && G.saveRun) G.saveRun();
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
                 path = null;
+                hideTip();
                 if (layer) { layer.destroy({ children: true }); layer = null; }
                 tokens = [];
                 if (uiHud) { uiHud.destroy({ children: true }); uiHud = null; }
@@ -301,6 +369,15 @@
                     t.phase += dt * 3;
                     t.node.y = t.base + Math.sin(t.phase) * 3;
                 }
+                // тултип следует за жетоном врага (камера/покачивание живые):
+                // мировые → экранные → дизайн-координаты ui-слоя
+                if (tip && layer) {
+                    const sp = layer.toGlobal({ x: tip.enemy.x, y: tip.enemy.y });
+                    const p = ctx.ui.toLocal(sp);
+                    const tx = Math.max(8, Math.min(1280 - 256, p.x - 124));
+                    const ty = (p.y - tip.h - 18 < 8) ? p.y + 22 : p.y - tip.h - 18;
+                    tip.node.position.set(tx, ty);
+                }
                 if (st.toastT > 0) {
                     st.toastT -= dt;
                     uiHud.userData.toast.text = st.toast;
@@ -337,6 +414,18 @@
             // layer стоит в (0,0) мира — его трансформ и есть мировая матрица
             path: () => path,
             worldToScreen: (x, y) => (layer ? layer.toGlobal({ x, y }) : null),
+            // тултип врага: тест-хук «наведение в мировых координатах» + состояние
+            hoverAt(x, y) {
+                hoverCheck({ x, y });
+                return tip ? { enc: tip.enemy.enc, boss: !!tip.enemy.boss } : null;
+            },
+            tipState: () => (tip ? {
+                enc: tip.enemy.enc, boss: !!tip.enemy.boss,
+                title: GAME_LOC.t("enc." + tip.enemy.enc + ".title"),
+                deck: deckSummary(tip.enemy.enc),
+                w: 248, h: tip.h,
+            } : null),
+            tipHide: () => hideTip(),
         };
     }
 

@@ -44,6 +44,11 @@
         const t = (k, v) => GAME_LOC.t(k, v);
         const sfx = (name) => { if (ctx.sfx) ctx.sfx(name); };
         const delay = (s) => new Promise((r) => scheduler.after(s, r));
+        // Скорость анимаций и передвижений (ползунок «Анимации» в Настройках,
+        // settings.animSpeed 0..10). 5 = дефолт — в 1.5 раза медленнее
+        // исходной; все длительности (глиссады, паузы, всплывающий текст)
+        // делятся на этот коэффициент, скорость походки — умножается.
+        const animK = () => Math.max(0.25, (((G.settings && G.settings.animSpeed) ?? 5) * 2) / 15);
         // всего сфер на шкале конца хода: 3 на первом ходу, каждый ход +1
         const spheresTotal = () => B.turnNo + 2;
         let root = null, B = null;
@@ -329,7 +334,7 @@
             const node = makeUnitNode(u);
             u.node = node;
             node.scale.set(0.2);
-            punches.push({ node, life: 0.3 });
+            punches.push({ node, life: 0.3 / animK(), total: 0.3 / animK() });
             root.unitsLayer.addChild(node);
             sfx("use"); // призыв (обе стороны)
             B.units.push(u);
@@ -363,14 +368,18 @@
             tt.anchor.set(0.5);
             tt.position.set(x, y);
             root.fx.addChild(tt);
-            floats.push({ node: tt, life: 0.9 });
+            const k = animK();
+            floats.push({ node: tt, life: 0.9 / k, total: 0.9 / k, k });
         }
-        function punch(node) { punches.push({ node, life: 0.22 }); }
+        function punch(node) {
+            punches.push({ node, life: 0.22 / animK(), total: 0.22 / animK() });
+        }
 
         // Плавный переезд в центр клетки (анимация/позиция доигрываются в update).
         // 0.5с на шаг = ровно один полный цикл походки (6 кадров × 12fps):
         // клетка проходится целым шагом, анимация читается целиком.
-        function glide(u, x, y, dur = 0.5) {
+        function glide(u, x, y) {
+            const dur = 0.5 / animK();
             const i = moves.findIndex((m) => m.u === u);
             if (i >= 0) moves.splice(i, 1);
             moves.push({ u, node: u.node, fx: u.node.x, fy: u.node.y, tx: x, ty: y, life: dur, total: dur });
@@ -546,7 +555,7 @@
         function removeUnit(u) {
             const i = B.units.indexOf(u);
             if (i >= 0) B.units.splice(i, 1);
-            punches.push({ node: u.node, life: 0.25, dying: true });
+            punches.push({ node: u.node, life: 0.25 / animK(), total: 0.25 / animK(), dying: true });
         }
 
         function killUnit(u, killer) {
@@ -1191,7 +1200,7 @@
                 pane.setContent(grid, ids.length ? 110 + (rowsN - 1) * 205 + 150 : 40);
                 node.addChild(pane.node);
                 node.addChild(button(ctx, {
-                    tex: "button_menu.png", label: t("settings.back"), x: 640, y: 684, scale: 0.95,
+                    tex: "button_menu.png", label: t("settings.back"), x: 640, y: 678, scale: 1,
                     onTap: closeOverlay,
                 }));
             }
@@ -1226,13 +1235,14 @@
             refreshSlider();
         }
 
-        let bannerT = 0;
+        let bannerT = 0, bannerFade = 0.35;
         function banner(text) {
             const b = root.hud.userData.banner;
             b.text = text;
             b.scale.set(1.25);
             b.alpha = 1;
-            bannerT = 1.1;
+            bannerT = 1.1 / animK();
+            bannerFade = 0.35 / animK();
         }
 
         // ── Колода/рука ─────────────────────────────────────────────────────
@@ -1294,7 +1304,7 @@
                     glide(u, p.x, p.y);
                     setWalk(u, true);
                     sfx("step");
-                    await delay(0.52); // глиссада 0.5с + пауза: полный шаг походки
+                    await delay(0.52 / animK()); // глиссада + пауза: полный шаг походки
                     if (B.stopped) return;
                     afterMoved(u); // перемещение — ловушки врага
                     if (checkEnd()) return;
@@ -1317,7 +1327,7 @@
             redrawHighlight();
             refreshHud();
             banner(t("arena.enemyTurn"));
-            await delay(0.5);
+            await delay(0.5 / animK());
             if (B.stopped) return;
             upkeep("e"); // грибницы врага
             await marchSide("e");
@@ -1331,7 +1341,7 @@
             drawEnemy(eCards);
             B.eEnergy += total - eCards;
             refreshHud();
-            await delay(0.25);
+            await delay(0.25 / animK());
             if (B.stopped) return;
             await playerTurnStart();
         }
@@ -1424,7 +1434,7 @@
                 }
                 if (!played) return;
                 refreshHud();
-                await delay(0.4);
+                await delay(0.4 / animK());
             }
         }
 
@@ -1435,7 +1445,7 @@
             B.spellTarget = false;
             refreshHud();
             banner(t("arena.yourTurn"));
-            await delay(0.4);
+            await delay(0.4 / animK());
             if (B.stopped) return;
             upkeep("p"); // грибницы игрока
             await marchSide("p");
@@ -1632,25 +1642,28 @@
                         G.activeEnemy.alive = false;
                         if (G.activeEnemy.boss) G.dungeon.bossDead = true;
                     }
+                    if (G.saveRun) G.saveRun(); // враг побеждён — забег продолжается
                     scenes.go("reward");
                 } else {
+                    // поражение — забег закончен: сейв снимается
+                    if (globalThis.GAME_META.clearRun) globalThis.GAME_META.clearRun();
                     G.resetRun();
                     scenes.go("menu");
                 }
             };
             if (victory) {
                 // победа сама ведёт в меню трофея — кнопка не нужна
-                scheduler.after(1.4, () => {
+                scheduler.after(1.4 / animK(), () => {
                     if (B && !B.stopped && B.phase === "over" && B.result === "win") B.continueAction();
                 });
             } else {
                 const btn = new PIXI.Sprite(uiTex("button_menu.png"));
                 btn.anchor.set(0.5);
-                btn.scale.set(1.15);
+                btn.scale.set(1); // натуральный размер спрайта (просил юзер)
                 btn.position.set(640, 390);
                 btn.eventMode = "static";
                 ov.addChild(btn);
-                const bt = T(t("arena.toMenu"), 24, 0xf3e6c2);
+                const bt = T(t("arena.toMenu"), 20, 0xf3e6c2);
                 bt.anchor.set(0.5);
                 globalThis.GAME_UI.fit(bt, btn.texture.width * btn.scale.x * 0.8, 11); // не шире кнопки
                 bt.position.set(640, 390);
@@ -1744,15 +1757,17 @@
             const dt = ticker.deltaMS / 1000;
             for (let i = floats.length - 1; i >= 0; i--) {
                 const f = floats[i];
+                if (f.node.destroyed) { floats.splice(i, 1); continue; } // узел снесён вне анимации
                 f.life -= dt;
-                f.node.y -= 36 * dt;
-                f.node.alpha = Math.max(0, f.life / 0.9);
+                f.node.y -= 36 * f.k * dt; // путь тот же — дольше и медленнее
+                f.node.alpha = Math.max(0, f.life / f.total);
                 if (f.life <= 0) { f.node.destroy(); floats.splice(i, 1); }
             }
             for (let i = punches.length - 1; i >= 0; i--) {
                 const p = punches[i];
+                if (p.node.destroyed) { punches.splice(i, 1); continue; } // узел снесён вне анимации (wipe в тестах)
                 p.life -= dt;
-                const k = Math.max(0, p.life / (p.dying ? 0.25 : 0.22));
+                const k = Math.max(0, p.life / p.total);
                 if (p.dying) {
                     p.node.scale.set(k * 1.1);
                     p.node.alpha = k;
@@ -1779,17 +1794,24 @@
                 }
             }
             // кадры спрайтов тикаем сами (autoUpdate=false; update ждёт ТИКЕР,
-            // не число — иначе кадр NaN и спрайт замирает)
+            // не число — иначе кадр NaN и спрайт замирает). Скорость походки
+            // каждый кадр — ползунок «Анимации» действует и на живые юниты.
             for (const u of B.units) {
                 const body = u.node.getChildByName("body");
-                if (body && body.playing) body.update(ticker);
+                if (!body) continue;
+                const sheet = sheetOf(u);
+                body.animationSpeed = ((sheet && sheet.animationSpeed) || 0.2) * animK();
+                if (body.playing) body.update(ticker);
             }
             if (bannerT > 0) {
                 bannerT -= dt;
                 const b = root.hud.userData.banner;
-                b.alpha = Math.min(1, bannerT / 0.35);
+                b.alpha = Math.min(1, bannerT / bannerFade);
                 b.scale.set(b.scale.x + (1.0 - b.scale.x) * 0.12);
             } else root.hud.userData.banner.alpha = 0;
+            // «Конец хода» с клавиши: Пробел (только в свой ход, без панелей)
+            if (B.phase === "player" && !B.discarding && !overlay
+                && ctx.input.wasPressed("Space")) api.endTurn();
             if (overlay && B.phase !== "over" && ctx.input.wasPressed("Escape")) {
                 closeOverlay();
                 return;
@@ -1815,6 +1837,8 @@
             },
             // шкала «карты↔энергия»: total сфер (3 + ход−1), split — доля в карты
             sliderGet: () => (B ? { total: spheresTotal(), split: B.split } : null),
+            // длительности текущих глиссад (тесты скорости анимаций)
+            movesInfo: () => moves.map((m) => Math.round(m.total * 1000) / 1000),
             sliderSet(n) {
                 if (!B) return null;
                 const total = spheresTotal();

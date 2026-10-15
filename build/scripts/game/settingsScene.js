@@ -101,10 +101,13 @@
             panel.eventMode = "static"; // глотает клики мимо рядов
             outer.addChildAt(panel, 0);
 
-            outer.addChild(stepper(t("settings.sound"), "sound", 200));
-            outer.addChild(stepper(t("settings.music"), "music", 270));
+            outer.addChild(stepper(t("settings.sound"), "sound", 195));
+            outer.addChild(stepper(t("settings.music"), "music", 255));
+            // скорость анимаций/передвижений боя: 0..10, живое значение —
+            // арена читает его каждый кадр (arena.js animK)
+            outer.addChild(stepper(t("settings.anim"), "animSpeed", 315));
 
-            segmented(t("settings.lang"), 360,
+            segmented(t("settings.lang"), 380,
                 [["ru", "РУССКИЙ", 610, 144], ["en", "ENGLISH", 770, 144]],
                 (code) => GAME_LOC.lang === code,
                 (code) => {
@@ -116,7 +119,7 @@
                 });
 
             // способ призыва: клик по карте → клетка, или перетаскивание
-            segmented(t("settings.summon"), 430,
+            segmented(t("settings.summon"), 445,
                 [[false, t("settings.summonClick"), 610, 144], [true, t("settings.summonDrag"), 770, 144]],
                 (v) => !!G.settings.dragSummon === v,
                 (v) => {
@@ -128,7 +131,7 @@
 
             const note = T(t("settings.musicNote"), 13, 0x8a7c5e);
             note.anchor.set(0.5, 0);
-            note.position.set(640, 486);
+            note.position.set(640, 497);
             note.eventMode = "none";
             outer.addChild(note);
 

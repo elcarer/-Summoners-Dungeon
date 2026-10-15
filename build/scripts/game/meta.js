@@ -3,10 +3,13 @@
 (function () {
     const LS_SETTINGS = "sd_settings";
     const LS_META = "sd_meta";
+    const LS_RUN = "sd_run";
 
     // dragSummon — способ призыва на поле: false — клик по карте + клик по
-    // клетке; true — перетаскивание карты на клетку (drag&drop)
-    const DEFAULT_SETTINGS = { sound: 5, music: 5, lang: "ru", dragSummon: false };
+    // клетке; true — перетаскивание карты на клетку (drag&drop).
+    // animSpeed — скорость анимаций/передвижений боя, 0..10; 5 = дефолт
+    // (в 1.5 раза медленнее исходной), см. arena.js animK()
+    const DEFAULT_SETTINGS = { sound: 5, music: 5, lang: "ru", dragSummon: false, animSpeed: 5 };
 
     function loadSettings() {
         try {
@@ -35,5 +38,22 @@
         return deck.reduce((n, c) => n + (c === id ? 1 : 0), 0);
     }
 
-    globalThis.GAME_META = { loadSettings, saveSettings, loadMeta, saveMeta, countIn };
+    // Сейв забега (sd_run): этаж, герой, золото, подземелье (враги/выход).
+    // «Продолжить» в меню загружает, «Новая игра» снимает. Колода/коллекция
+    // живут отдельно (sd_meta) и забегом не считаются.
+    function loadRun() {
+        try {
+            const raw = JSON.parse(localStorage.getItem(LS_RUN));
+            if (raw && typeof raw === "object" && Number.isInteger(raw.floor) && raw.floor >= 1
+                && raw.hero && raw.hero.hp > 0) return raw;
+        } catch (e) { /* повреждённые — считаем, что сейва нет */ }
+        return null;
+    }
+    function saveRun(run) { localStorage.setItem(LS_RUN, JSON.stringify(run)); }
+    function clearRun() { localStorage.removeItem(LS_RUN); }
+
+    globalThis.GAME_META = {
+        loadSettings, saveSettings, loadMeta, saveMeta, countIn,
+        loadRun, saveRun, clearRun,
+    };
 })();
