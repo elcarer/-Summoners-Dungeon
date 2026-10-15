@@ -37,14 +37,14 @@
             root = new PIXI.Container();
             root.eventMode = "static";
             root.addChild(dimBg(ctx, 0.85));
-            const title = T(t("reward.title"), 40, 0xf0c96a, { stroke: { color: 0x241505, width: 7 } });
+            const title = T(t("reward.title"), 60, 0xf0c96a, { stroke: { color: 0x241505, width: 10.5 } });
             title.anchor.set(0.5, 0);
-            title.position.set(640, 44);
+            title.position.set(960, 66);
             title.eventMode = "none";
             root.addChild(title);
-            const sub = T(t("reward.pick"), 20, 0xd8c79d);
+            const sub = T(t("reward.pick"), 30, 0xd8c79d);
             sub.anchor.set(0.5, 0);
-            sub.position.set(640, 106);
+            sub.position.set(960, 159);
             sub.eventMode = "none";
             root.addChild(sub);
 
@@ -54,11 +54,11 @@
                     scale: picked === null || isPicked ? 0.92 : 0.78,
                     dim: picked !== null && !isPicked,
                 });
-                card.position.set(340 + i * 300, 330);
+                card.position.set(510 + i * 450, 495);
                 if (isPicked) {
                     const glow = new PIXI.Graphics();
-                    glow.roundRect(-112, -162, 224, 324, 10);
-                    glow.stroke({ width: 5, color: 0xf0c96a });
+                    glow.roundRect(-168, -243, 336, 486, 15);
+                    glow.stroke({ width: 7.5, color: 0xf0c96a });
                     card.addChildAt(glow, 0);
                 }
                 if (picked === null) {

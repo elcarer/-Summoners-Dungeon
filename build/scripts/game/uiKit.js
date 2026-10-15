@@ -21,25 +21,20 @@
     }
 
     // Кнопка: спириm + подпись (текст не ловит клики и вписан в ширину).
-    // Базовое разрешение UI — 1920×1080, сцены живут в логических 1280×720
-    // (бокс ×1.5), поэтому button_menu.png рендерится с коэффициентом ⅔:
-    // на FullHD это натуральные 274×77 экранных пикселей (просил юзер),
-    // кегль 19 — подпись гарантированно внутри фрейма.
-    const BTN_K = 2 / 3;
+    // Кнопки button_menu.png — натуральные 274×77 при базовом разрешении
+    // 1920×1080 (просил юзер), кегль 19 — подпись внутри фрейма.
     function button(ctx, { tex, label, x, y, scale = 1, onTap, fontSize = 19 }) {
         const c = new PIXI.Container();
         const sp = new PIXI.Sprite(ctx.uiTex(tex));
         sp.anchor.set(0.5);
-        sp.scale.set(scale * BTN_K);
+        sp.scale.set(scale);
         c.addChild(sp);
         if (label) {
             const t = T(label, fontSize, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4 } });
             t.anchor.set(0.5);
             t.eventMode = "none";
-            // подпись не шире кнопки (у широких надписей ужимается кегль),
-            // затем вся подпись сжимается тем же коэффициентом ⅔
+            // подпись не шире кнопки (у широких надписей ужимается кегль)
             fit(t, sp.texture.width * scale * 0.86, 11);
-            t.scale.set(BTN_K * t.scale.x, BTN_K);
             c.addChild(t);
         }
         c.position.set(x, y);
@@ -50,15 +45,15 @@
     }
 
     // Чип-кнопка (фильтры): маленькая прямоугольная кнопка с текстом
-    function chip(ctx, { label, x, y, active = false, onTap, w = 0, h = 26 }) {
+    function chip(ctx, { label, x, y, active = false, onTap, w = 0, h = 39 }) {
         const c = new PIXI.Container();
-        const t = T(label, 13, active ? 0x14200e : 0xd8c79d);
+        const t = T(label, 19, active ? 0x14200e : 0xd8c79d);
         t.eventMode = "none";
-        const tw = w || Math.max(30, Math.ceil(t.width) + 18);
+        const tw = w || Math.max(45, Math.ceil(t.width) + 27);
         const g = new PIXI.Graphics();
-        g.roundRect(0, 0, tw, h, 6);
+        g.roundRect(0, 0, tw, h, 9);
         g.fill(active ? 0x7dc95e : 0x2e2822);
-        g.stroke({ width: 1.5, color: active ? 0xa8e890 : 0x6b5c40 });
+        g.stroke({ width: 2.25, color: active ? 0xa8e890 : 0x6b5c40 });
         g.eventMode = "static";
         g.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onTap && onTap(); });
         c.addChild(g, t);
@@ -71,6 +66,8 @@
     // Крупная карта (колода/награда). Если у карты есть img — это готовое
     // лицо-картинка (рамка/имя/тексты нарисованы), поверх только точка
     // редкости; иначе — процедурная сборка из рубашки и подписей.
+    // Эталонная высота виджета — 495 (картинка 230×338 в масштабе ~1.46);
+    // scale у вызывающих сторон — доля от этого эталона.
     function cardFace(ctx, cardId, { scale = 1, dim = false } = {}) {
         const { CARDS, RARITY_COLORS } = globalThis.GAME_DATA;
         const def = CARDS[cardId];
@@ -78,12 +75,12 @@
         if (def.img) {
             const face = new PIXI.Sprite(ctx.uiTex(`cards/${def.img}.png`));
             face.anchor.set(0.5);
-            face.scale.set(330 / face.texture.height); // к высоте эталонной рубашки
+            face.scale.set(495 / face.texture.height); // к высоте эталонной рубашки
             c.addChild(face);
             const rDot = new PIXI.Graphics();
-            rDot.circle(84, -118, 6);
+            rDot.circle(126, -177, 9);
             rDot.fill(RARITY_COLORS[def.rarity] || 0x9a9a9a);
-            rDot.stroke({ width: 1.5, color: 0x1c1207 });
+            rDot.stroke({ width: 2.25, color: 0x1c1207 });
             rDot.eventMode = "none";
             c.addChild(rDot);
             c.scale.set(scale);
@@ -92,46 +89,47 @@
         }
         const face = new PIXI.Sprite(ctx.uiTex("card_back_min.png"));
         face.anchor.set(0.5);
+        face.scale.set(1.5);
         if (def.type !== "unit") face.tint = def.color || 0xffffff;
         c.addChild(face);
         const plate = new PIXI.Graphics();
-        plate.roundRect(-100, -140, 200, 150, 8);
+        plate.roundRect(-150, -210, 300, 225, 12);
         plate.fill({ color: 0x120d09, alpha: 0.72 });
         c.addChild(plate);
-        const name = T(GAME_LOC.t(`card.${cardId}.name`), 20, 0xf3e6c2, { align: "center", wordWrap: true, wordWrapWidth: 190 });
+        const name = T(GAME_LOC.t(`card.${cardId}.name`), 30, 0xf3e6c2, { align: "center", wordWrap: true, wordWrapWidth: 285 });
         name.anchor.set(0.5, 0);
-        name.position.set(0, -134);
+        name.position.set(0, -201);
         name.eventMode = "none";
-        fit(name, 190, 12);
+        fit(name, 285, 18);
         c.addChild(name);
-        const type = T(GAME_LOC.t(`type.${def.type}`), 14, 0xcfc4a6);
+        const type = T(GAME_LOC.t(`type.${def.type}`), 21, 0xcfc4a6);
         type.anchor.set(0.5, 0);
-        type.position.set(0, -92);
+        type.position.set(0, -138);
         type.eventMode = "none";
         c.addChild(type);
         const descText = def.type === "unit"
             ? `${def.atk} ⚔   ${def.hp} ♥   ${def.speed} →`
             : GAME_LOC.t(`card.${cardId}.desc`);
-        const desc = T(descText, 14, 0xd8c79d, { align: "center", wordWrap: true, wordWrapWidth: 186 });
+        const desc = T(descText, 21, 0xd8c79d, { align: "center", wordWrap: true, wordWrapWidth: 279 });
         desc.anchor.set(0.5, 0);
-        desc.position.set(0, -66);
+        desc.position.set(0, -99);
         desc.eventMode = "none";
         c.addChild(desc);
         const cost = new PIXI.Graphics();
-        cost.circle(84, -146, 17);
+        cost.circle(126, -219, 25.5);
         cost.fill(0x2f6fb0);
-        cost.stroke({ width: 2.5, color: 0xbfe0ff });
+        cost.stroke({ width: 3.75, color: 0xbfe0ff });
         c.addChild(cost);
-        const costT = T(String(def.cost), 20, 0xffffff);
+        const costT = T(String(def.cost), 30, 0xffffff);
         costT.anchor.set(0.5);
-        costT.position.set(84, -146);
+        costT.position.set(126, -219);
         costT.eventMode = "none";
         c.addChild(costT);
         // точка редкости под стоимостью
         const rDot = new PIXI.Graphics();
-        rDot.circle(84, -118, 6);
+        rDot.circle(126, -177, 9);
         rDot.fill(RARITY_COLORS ? (RARITY_COLORS[def.rarity] || 0x9a9a9a) : 0x9a9a9a);
-        rDot.stroke({ width: 1.5, color: 0x1c1207 });
+        rDot.stroke({ width: 2.25, color: 0x1c1207 });
         rDot.eventMode = "none";
         c.addChild(rDot);
         c.scale.set(scale);
@@ -142,9 +140,9 @@
     // Затемнённый полноэкранный фон сцены-меню
     function dimBg(ctx, alpha = 0.78) {
         const bg = new PIXI.Sprite(ctx.uiTex("bg_corridor_1.png"));
-        const s = Math.max(1280 / bg.texture.width, 720 / bg.texture.height);
+        const s = Math.max(1920 / bg.texture.width, 1080 / bg.texture.height);
         bg.scale.set(s);
-        bg.position.set((1280 - bg.texture.width * s) / 2, (720 - bg.texture.height * s) / 2);
+        bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);
         bg.alpha = alpha;
         return bg;
     }

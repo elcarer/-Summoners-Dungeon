@@ -1,6 +1,6 @@
 // БУТ «Подземелье призывателей»: движок → ассеты → шрифт → мета/настройки →
-// сцены → меню. Базовое разрешение UI — 1920×1080 (letterbox); сцены
-// работают в логических 1280×720 внутри бокса ×1.5 (подробнее у fitUi).
+// сцены → меню. Базовое разрешение UI — 1920×1080, все координаты
+// интерфейса заданы прямо в нём; вписывается в окно (letterbox).
 // Коллекция/колода/настройки живут в localStorage (meta.js) и переживают
 // забеги; язык применяется через loc.js при старте и смене в настройках.
 (async function () {
@@ -77,15 +77,11 @@
         };
 
         // ── UI-корень: базовое разрешение 1920×1080, вписывается в окно ────
-        // (просил юзер). Сцены при этом работают в логических 1280×720 —
-        // контейнер uiBox растягивает их ×1.5, а button_menu.png компенсирует
-        // это коэффициентом ⅔ в uiKit.button: на FullHD спрайт рисуется
-        // натуральными 274×77 экранных пикселей.
+        // (просил юзер). Все сцены и спрайты рассчитаны на эти координаты
+        // напрямую: button_menu.png — натуральные 274×77, карты руки —
+        // картинка 230×338 в масштабе 1 и т.д.
         const ui = new PIXI.Container();
         app.stage.addChild(ui);
-        const uiBox = new PIXI.Container();
-        uiBox.scale.set(1.5); // логические 1280×720 → базовые 1920×1080
-        ui.addChild(uiBox);
         function fitUi() {
             const s = Math.min(app.screen.width / 1920, app.screen.height / 1080);
             ui.scale.set(s);
@@ -218,7 +214,7 @@
         const ctx = {
             app, world, ECS, COMPONENTS, DATA, worldContainer, addSystem,
             assets, uiTex, scheduler, input, camera, characters, charInput,
-            knight, creatureSheets, G, ui: uiBox, audio,
+            knight, creatureSheets, G, ui, audio,
             sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
         };
@@ -241,22 +237,22 @@
                 menuRoot = new PIXI.Container();
                 menuRoot.eventMode = "static";
                 const bg = new PIXI.Sprite(uiTex("bg_corridor_1.png"));
-                const s = Math.max(1280 / bg.texture.width, 720 / bg.texture.height);
+                const s = Math.max(1920 / bg.texture.width, 1080 / bg.texture.height);
                 bg.scale.set(s);
-                bg.position.set((1280 - bg.texture.width * s) / 2, (720 - bg.texture.height * s) / 2);
+                bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);
                 menuRoot.addChild(bg);
 
-                const t1 = T(t("menu.title1"), 74, 0xf0c96a, { stroke: { color: 0x241505, width: 10 } });
+                const t1 = T(t("menu.title1"), 111, 0xf0c96a, { stroke: { color: 0x241505, width: 15 } });
                 t1.anchor.set(0.5, 1);
-                t1.position.set(640, 138);
-                const t2 = T(t("menu.title2"), 74, 0xf0c96a, { stroke: { color: 0x241505, width: 10 } });
+                t1.position.set(960, 207);
+                const t2 = T(t("menu.title2"), 111, 0xf0c96a, { stroke: { color: 0x241505, width: 15 } });
                 t2.anchor.set(0.5, 0);
-                t2.position.set(640, 146);
+                t2.position.set(960, 219);
                 t1.eventMode = "none"; t2.eventMode = "none";
                 menuRoot.addChild(t1, t2);
-                const sub = T(t("menu.subtitle"), 19, 0xd8c79d);
+                const sub = T(t("menu.subtitle"), 28, 0xd8c79d);
                 sub.anchor.set(0.5, 0);
-                sub.position.set(640, 222);
+                sub.position.set(960, 333);
                 sub.eventMode = "none";
                 menuRoot.addChild(sub);
 
@@ -273,14 +269,13 @@
                         label, scale: sp.scale.x,
                         fontSize: txt ? txt.style.fontSize : null,
                         // ширина спрайта в экранных пикселях (тест базы 1920×1080)
-                        physW: Math.round(sp.texture.width * sp.scale.x
-                            * uiBox.scale.x * ui.scale.x),
+                        physW: Math.round(sp.texture.width * sp.scale.x * ui.scale.x),
                     });
                     menuRoot.addChild(b);
                     return b;
                 };
                 const contEnabled = !!GAME_META.loadRun();
-                const bCont = addMenuBtn(t("menu.continue"), 640, 316, () => {
+                const bCont = addMenuBtn(t("menu.continue"), 960, 474, () => {
                     const r = GAME_META.loadRun();
                     if (!contEnabled || !r) return;
                     G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp || 10 };
@@ -290,15 +285,15 @@
                     scenes.go("dungeon");
                 });
                 if (!contEnabled) bCont.alpha = 0.45; // забега нет — кнопка приглушена
-                const bNew = addMenuBtn(t("menu.newGame"), 640, 400, () => {
+                const bNew = addMenuBtn(t("menu.newGame"), 960, 600, () => {
                     GAME_META.clearRun();
                     G.resetRun();
                     scenes.go("dungeon");
                     G.saveRun(); // свежий забег сразу сохранён
                 });
-                addMenuBtn(t("menu.deck"), 640, 484, () => scenes.go("deck"));
-                addMenuBtn(t("menu.settings"), 640, 568, () => scenes.go("settings"));
-                addMenuBtn(t("menu.exit"), 640, 652, () => { menuRoot.userData.bye.visible = true; });
+                addMenuBtn(t("menu.deck"), 960, 726, () => scenes.go("deck"));
+                addMenuBtn(t("menu.settings"), 960, 852, () => scenes.go("settings"));
+                addMenuBtn(t("menu.exit"), 960, 978, () => { menuRoot.userData.bye.visible = true; });
                 // хендл для смоука: подписи/размеры кнопок, нажатие по имени
                 window.__GAME.menu = {
                     buttons: () => menuInfo.map((b) => ({ ...b })),
@@ -309,18 +304,18 @@
                     },
                 };
 
-                const bye = T(t("menu.bye"), 22, 0xffe2a8, { stroke: { color: 0x1c1207, width: 5 } });
+                const bye = T(t("menu.bye"), 33, 0xffe2a8, { stroke: { color: 0x1c1207, width: 8 } });
                 bye.anchor.set(0.5);
-                bye.position.set(640, 706);
+                bye.position.set(960, 1059);
                 bye.visible = false;
                 bye.eventMode = "none";
                 menuRoot.addChild(bye);
                 menuRoot.userData = { bye };
-                const ver = T("v0.2 · zero_engine", 14, 0x8a7c5e);
-                ver.position.set(12, 700);
+                const ver = T("v0.2 · zero_engine", 21, 0x8a7c5e);
+                ver.position.set(18, 1050);
                 ver.eventMode = "none";
                 menuRoot.addChild(ver);
-                uiBox.addChild(menuRoot);
+                ui.addChild(menuRoot);
                 worldContainer.visible = false;
             },
             exit() {
@@ -336,26 +331,26 @@
                 fwRoot = new PIXI.Container();
                 fwRoot.eventMode = "static";
                 const dim = new PIXI.Graphics();
-                dim.rect(0, 0, 1280, 720);
+                dim.rect(0, 0, 1920, 1080);
                 dim.fill({ color: 0x000000, alpha: 0.65 });
                 fwRoot.addChild(dim);
                 const panel = new PIXI.Sprite(uiTex("panel_allert.png"));
                 panel.anchor.set(0.5);
-                panel.scale.set(1.5);
-                panel.position.set(640, 290);
+                panel.scale.set(2.25);
+                panel.position.set(960, 435);
                 fwRoot.addChild(panel);
-                const ft = T(t("floorWin.title", { n: G.run.floor - 1 }), 36, 0xffe9b0, { stroke: { color: 0x1c1207, width: 7 } });
+                const ft = T(t("floorWin.title", { n: G.run.floor - 1 }), 54, 0xffe9b0, { stroke: { color: 0x1c1207, width: 10 } });
                 ft.anchor.set(0.5);
-                ft.position.set(640, 252);
+                ft.position.set(960, 378);
                 ft.eventMode = "none";
                 fwRoot.addChild(ft);
-                fwRoot.addChild(menuButton("button_menu.png", t("floorWin.next"), 640, 386, 1,
+                fwRoot.addChild(menuButton("button_menu.png", t("floorWin.next"), 960, 579, 1,
                     () => scenes.go("dungeon")));
                 // «В меню» больше НЕ сбрасывает забег: прогресс этажа сохранён
                 // (dungeon.exit пишет sd_run), «Продолжить» в меню его поднимет
-                fwRoot.addChild(menuButton("button_menu.png", t("floorWin.menu"), 640, 486, 1,
+                fwRoot.addChild(menuButton("button_menu.png", t("floorWin.menu"), 960, 729, 1,
                     () => scenes.go("menu")));
-                uiBox.addChild(fwRoot);
+                ui.addChild(fwRoot);
             },
             exit() {
                 if (fwRoot) { fwRoot.destroy({ children: true }); fwRoot = null; }
@@ -382,7 +377,7 @@
 
         // ── Хендл для консоли и автотестов ─────────────────────────────────
         window.__GAME = {
-            scenes, G, ui: uiBox, loc: GAME_LOC,
+            scenes, G, ui, loc: GAME_LOC,
             dungeon: dungeonScene, arena: arenaScene,
             arenaApi: arenaScene.api, deckApi: deckScene.api,
             rewardApi: rewardScene.api, settingsApi: settingsScene.api,
@@ -391,10 +386,7 @@
                 status: () => audio.status(),
                 sfxCounts: () => ({ ...sfxCounts }),
             },
-            toScreen: (x, y) => ({
-                x: ui.x + x * uiBox.scale.x * ui.scale.x,
-                y: ui.y + y * uiBox.scale.y * ui.scale.y,
-            }),
+            toScreen: (x, y) => ({ x: ui.x + x * ui.scale.x, y: ui.y + y * ui.scale.y }),
             test: {
                 COMPONENTS,
                 setHeroPos(x, y) {

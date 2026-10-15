@@ -24,16 +24,16 @@
         // Степпер: [−] ▮▮▮▮▯▯ [+]
         function stepper(label, key, y) {
             const row = new PIXI.Container();
-            const name = T(label, 22, 0xf3e6c2);
+            const name = T(label, 33, 0xf3e6c2);
             name.anchor.set(1, 0.5);
-            name.position.set(520, y);
+            name.position.set(780, y);
             name.eventMode = "none";
             row.addChild(name);
             const mk = (dx, glyph, delta) => {
                 const b = new PIXI.Graphics();
-                b.circle(dx, y, 18);
+                b.circle(dx, y, 27);
                 b.fill(0x2e2822);
-                b.stroke({ width: 2, color: 0x6b5c40 });
+                b.stroke({ width: 3, color: 0x6b5c40 });
                 b.eventMode = "static";
                 b.on("pointertap", () => {
                     if (ctx.sfx) ctx.sfx();
@@ -43,18 +43,18 @@
                     save();
                     rebuild();
                 });
-                const g = T(glyph, 22, 0xd8c79d);
+                const g = T(glyph, 33, 0xd8c79d);
                 g.anchor.set(0.5);
                 g.position.set(dx, y);
                 g.eventMode = "none";
                 row.addChild(b, g);
             };
-            mk(570, "−", -1);
-            mk(790, "+", 1);
+            mk(855, "−", -1);
+            mk(1185, "+", 1);
             const bar = new PIXI.Graphics();
             const v = G.settings[key];
             for (let i = 0; i < 10; i++) {
-                bar.rect(606 + i * 17, y - 10, 13, 20);
+                bar.rect(909 + i * 25.5, y - 15, 19.5, 30);
                 bar.fill(i < v ? 0x9fd489 : 0x35302a);
             }
             bar.eventMode = "none";
@@ -64,20 +64,20 @@
 
         // Сегмент из двух кнопок (язык / способ призыва)
         function segmented(label, y, options, isOn, onPick) {
-            const name = T(label, 22, 0xf3e6c2);
+            const name = T(label, 33, 0xf3e6c2);
             name.anchor.set(1, 0.5);
-            name.position.set(520, y);
+            name.position.set(780, y);
             name.eventMode = "none";
             outer.addChild(name);
             for (const [code, lab, x, w] of options) {
                 const active = isOn(code);
                 const b = new PIXI.Graphics();
-                b.roundRect(x - w / 2, y - 28, w, 56, 8);
+                b.roundRect(x - w / 2, y - 42, w, 84, 12);
                 b.fill(active ? 0x3f5f2a : 0x2e2822);
-                b.stroke({ width: 2, color: active ? 0x9fd489 : 0x6b5c40 });
+                b.stroke({ width: 3, color: active ? 0x9fd489 : 0x6b5c40 });
                 b.eventMode = "static";
                 b.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onPick(code); });
-                const lt = T(lab, 17, active ? 0xe6ffd9 : 0xd8c79d);
+                const lt = T(lab, 25, active ? 0xe6ffd9 : 0xd8c79d);
                 lt.anchor.set(0.5);
                 lt.position.set(x, y);
                 lt.eventMode = "none";
@@ -88,27 +88,27 @@
         function rebuild() {
             for (const ch of outer.removeChildren()) ch.destroy({ children: true });
 
-            const title = T(t("settings.title"), 36, 0xf0c96a, { stroke: { color: 0x241505, width: 6 } });
+            const title = T(t("settings.title"), 54, 0xf0c96a, { stroke: { color: 0x241505, width: 9 } });
             title.anchor.set(0.5, 0);
-            title.position.set(640, 60);
+            title.position.set(960, 90);
             title.eventMode = "none";
             outer.addChild(title);
 
             const panel = new PIXI.Graphics();
-            panel.roundRect(340, 130, 600, 400, 12);
+            panel.roundRect(510, 195, 900, 600, 18);
             panel.fill({ color: 0x171310, alpha: 0.92 });
-            panel.stroke({ width: 2, color: 0x6b5c40 });
+            panel.stroke({ width: 3, color: 0x6b5c40 });
             panel.eventMode = "static"; // глотает клики мимо рядов
             outer.addChildAt(panel, 0);
 
-            outer.addChild(stepper(t("settings.sound"), "sound", 195));
-            outer.addChild(stepper(t("settings.music"), "music", 255));
+            outer.addChild(stepper(t("settings.sound"), "sound", 292.5));
+            outer.addChild(stepper(t("settings.music"), "music", 382.5));
             // скорость анимаций/передвижений боя: 0..10, живое значение —
             // арена читает его каждый кадр (arena.js animK)
-            outer.addChild(stepper(t("settings.anim"), "animSpeed", 315));
+            outer.addChild(stepper(t("settings.anim"), "animSpeed", 472.5));
 
-            segmented(t("settings.lang"), 380,
-                [["ru", "РУССКИЙ", 610, 144], ["en", "ENGLISH", 770, 144]],
+            segmented(t("settings.lang"), 570,
+                [["ru", "РУССКИЙ", 915, 216], ["en", "ENGLISH", 1155, 216]],
                 (code) => GAME_LOC.lang === code,
                 (code) => {
                     if (ctx.sfx) ctx.sfx();
@@ -119,8 +119,8 @@
                 });
 
             // способ призыва: клик по карте → клетка, или перетаскивание
-            segmented(t("settings.summon"), 445,
-                [[false, t("settings.summonClick"), 610, 144], [true, t("settings.summonDrag"), 770, 144]],
+            segmented(t("settings.summon"), 667.5,
+                [[false, t("settings.summonClick"), 915, 216], [true, t("settings.summonDrag"), 1155, 216]],
                 (v) => !!G.settings.dragSummon === v,
                 (v) => {
                     if (ctx.sfx) ctx.sfx();
@@ -129,14 +129,14 @@
                     rebuild();
                 });
 
-            const note = T(t("settings.musicNote"), 13, 0x8a7c5e);
+            const note = T(t("settings.musicNote"), 19, 0x8a7c5e);
             note.anchor.set(0.5, 0);
-            note.position.set(640, 497);
+            note.position.set(960, 745.5);
             note.eventMode = "none";
             outer.addChild(note);
 
             outer.addChild(button(ctx, {
-                tex: "button_menu.png", label: t("settings.back"), x: 640, y: 596, scale: 1.0,
+                tex: "button_menu.png", label: t("settings.back"), x: 960, y: 894, scale: 1.0,
                 onTap: onBack,
             }));
         }

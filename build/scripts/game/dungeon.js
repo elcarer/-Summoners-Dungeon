@@ -156,38 +156,38 @@
         function buildHud() {
             const c = new PIXI.Container();
             const panel = new PIXI.Sprite(uiTex("panel_label.png"));
-            panel.scale.set(0.7); // 341×87 → ~239×61
+            panel.scale.set(1.05); // 341×87 → ~358×91
             panel.eventMode = "static"; // панель — «хром» HUD: клики по ней не ведут героя
             c.addChild(panel);
-            const style = { fontFamily: "Kereru", fontSize: 18, fill: 0xf3e6c2 };
+            const style = { fontFamily: "Kereru", fontSize: 27, fill: 0xf3e6c2 };
             const floorT = new PIXI.Text({ text: "", style });
-            floorT.position.set(26, 10);
+            floorT.position.set(39, 15);
             const hpT = new PIXI.Text({ text: "", style });
-            hpT.position.set(126, 10);
+            hpT.position.set(189, 15);
             c.addChild(floorT, hpT);
             c.userData = { floorT, hpT, fit: true };
             // настройки и колода — доступны и из подземелья; «Назад» вернёт сюда
-            c.addChild(hudIcon("icon_setting.png", 1226, 44, () => {
+            c.addChild(hudIcon("icon_setting.png", 1839, 66, () => {
                 G.uiReturn = "dungeon";
                 scenes.go("settings");
             }));
-            c.addChild(hudIcon("card_back_small.png", 1226, 108, () => {
+            c.addChild(hudIcon("card_back_small.png", 1839, 162, () => {
                 G.uiReturn = "dungeon";
                 scenes.go("deck");
-            }, 0.45));
+            }, 0.675));
             const hint = new PIXI.Text({
                 text: GAME_LOC.t("dungeon.hint"),
-                style: { fontFamily: "Kereru", fontSize: 15, fill: 0xbfae87 },
+                style: { fontFamily: "Kereru", fontSize: 22, fill: 0xbfae87 },
             });
             hint.anchor.set(0.5, 0);
-            hint.position.set(640, 700);
+            hint.position.set(960, 1050);
             c.addChild(hint);
             const toast = new PIXI.Text({
-                text: "", style: { fontFamily: "Kereru", fontSize: 26, fill: 0xffe2a8,
-                stroke: { color: 0x1c1207, width: 5 } },
+                text: "", style: { fontFamily: "Kereru", fontSize: 39, fill: 0xffe2a8,
+                stroke: { color: 0x1c1207, width: 7.5 } },
             });
             toast.anchor.set(0.5, 0.5);
-            toast.position.set(640, 330);
+            toast.position.set(960, 495);
             toast.alpha = 0;
             c.addChild(toast);
             c.userData = { floorT, hpT, toast };
@@ -220,23 +220,23 @@
             node.eventMode = "none";
             const title = new PIXI.Text({
                 text: GAME_LOC.t("enc." + enemy.enc + ".title"),
-                style: { fontFamily: "Kereru", fontSize: 16, fill: 0xffe9b0 },
+                style: { fontFamily: "Kereru", fontSize: 24, fill: 0xffe9b0 },
             });
             const hpLine = new PIXI.Text({
                 text: GAME_LOC.t("dungeon.tipBase", { n: enc.baseHp }),
-                style: { fontFamily: "Kereru", fontSize: 12, fill: 0xff9c8c },
+                style: { fontFamily: "Kereru", fontSize: 18, fill: 0xff9c8c },
             });
             const deck = new PIXI.Text({
                 text: GAME_LOC.t("dungeon.tipDeck") + ": " + deckSummary(enemy.enc),
-                style: { fontFamily: "Kereru", fontSize: 12, fill: 0xd8c79d,
-                    wordWrap: true, wordWrapWidth: 224, breakWords: true },
+                style: { fontFamily: "Kereru", fontSize: 18, fill: 0xd8c79d,
+                    wordWrap: true, wordWrapWidth: 336, breakWords: true },
             });
-            const w = 248, pad = 10;
+            const w = 372, pad = 15;
             const h = pad + title.height + 4 + hpLine.height + 6 + deck.height + pad;
             const g = new PIXI.Graphics();
-            g.roundRect(0, 0, w, h, 8);
+            g.roundRect(0, 0, w, h, 12);
             g.fill({ color: 0x171310, alpha: 0.94 });
-            g.stroke({ width: 2, color: 0x6b5c40 });
+            g.stroke({ width: 3, color: 0x6b5c40 });
             title.position.set(pad, pad);
             hpLine.position.set(pad, pad + title.height + 4);
             deck.position.set(pad, pad + title.height + 8 + hpLine.height);
@@ -374,8 +374,8 @@
                 if (tip && layer) {
                     const sp = layer.toGlobal({ x: tip.enemy.x, y: tip.enemy.y });
                     const p = ctx.ui.toLocal(sp);
-                    const tx = Math.max(8, Math.min(1280 - 256, p.x - 124));
-                    const ty = (p.y - tip.h - 18 < 8) ? p.y + 22 : p.y - tip.h - 18;
+                    const tx = Math.max(12, Math.min(1920 - 384, p.x - 186));
+                    const ty = (p.y - tip.h - 27 < 12) ? p.y + 33 : p.y - tip.h - 27;
                     tip.node.position.set(tx, ty);
                 }
                 if (st.toastT > 0) {
@@ -423,7 +423,7 @@
                 enc: tip.enemy.enc, boss: !!tip.enemy.boss,
                 title: GAME_LOC.t("enc." + tip.enemy.enc + ".title"),
                 deck: deckSummary(tip.enemy.enc),
-                w: 248, h: tip.h,
+                w: 372, h: tip.h,
             } : null),
             tipHide: () => hideTip(),
         };

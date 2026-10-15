@@ -8,19 +8,19 @@
 (function () {
     const GRID = 5;          // 5×5
     // Геометрия поля — поверх НАРИСОВАННОЙ сетки бэкграунда арены
-    // (images/scenes/N.png). Границы клеток по колонкам/рядам в координатах
-    // дизайна 1280×720 (сетка на арте слегка неравномерная — потому массивы,
-    // а не один шаг). Измерено по градиентам краев клеток.
+    // (images/scenes/N.png). Границы клеток по колонкам/рядам в базовом
+    // разрешении 1920×1080 (сетка на арте слегка неравномерная — потому
+    // массивы, а не один шаг). Измерено по градиентам краев клеток.
     const SCENE_GRID = {
-        1: { cols: [427, 509, 594, 679, 765, 850], rows: [112, 198, 276, 353, 433, 517] },
-        2: { cols: [427, 509, 594, 679, 765, 850], rows: [119, 198, 276, 353, 433, 517] },
+        1: { cols: [640.5, 763.5, 891, 1018.5, 1147.5, 1275], rows: [168, 297, 414, 529.5, 649.5, 775.5] },
+        2: { cols: [640.5, 763.5, 891, 1018.5, 1147.5, 1275], rows: [178.5, 297, 414, 529.5, 649.5, 775.5] },
     };
     let curScene = 1;
     const cellRect = (col, row) => {
         const g = SCENE_GRID[curScene] || SCENE_GRID[1];
         return {
-            x: g.cols[col] + 2, y: g.rows[row] + 2,
-            w: g.cols[col + 1] - g.cols[col] - 4, h: g.rows[row + 1] - g.rows[row] - 4,
+            x: g.cols[col] + 3, y: g.rows[row] + 3,
+            w: g.cols[col + 1] - g.cols[col] - 6, h: g.rows[row + 1] - g.rows[row] - 6,
         };
     };
     const cellXY = (col, row) => {
@@ -57,7 +57,7 @@
         // Стандарт листа — 256×256, ряды front/back/right/left по 6 кадров.
         // Взгляд по стороне: юниты игрока идут вверх (виден затылок), врага —
         // вниз (анфас).
-        const SPRITE_SCALE = 0.35; // кадр 256 → ~90px, фигура ~68px в клетке
+        const SPRITE_SCALE = 0.525; // кадр 256 → ~134px, фигура ~102px в клетке
         const sheetOf = (u) => ctx.creatureSheets
             && ((u.def.creature && ctx.creatureSheets[u.def.creature]) || ctx.creatureSheets.goblin);
 
@@ -141,11 +141,17 @@
                 if (hit) onCellTap(hit[0], hit[1]);
                 else deselect(); // щель в разметке поля — как клик мимо клеток
             });
+            // наведение на жетон — карта-подсказка (жетоны сами не ловят курсор)
+            zone.on("pointermove", (e) => {
+                const p = zone.toLocal(e.global);
+                unitHoverAt(p.x, p.y);
+            });
+            zone.on("pointerout", () => unitCardHide());
             c.addChild(zone);
 
             // зона клика по базе врага (для заклинаний с прицелом)
             const baseZone = new PIXI.Graphics();
-            baseZone.rect(470, 28, 340, 36);
+            baseZone.rect(705, 42, 510, 54);
             baseZone.fill({ color: 0xffffff, alpha: 0.001 });
             baseZone.eventMode = "none";
             baseZone.on("pointertap", () => {
@@ -199,7 +205,7 @@
                     hi.fill({ color: 0xd05a3c, alpha: 0.4 });
                     hi.stroke({ width: 2, color: 0xef9f8c });
                 }
-                hi.rect(470, 28, 340, 36);
+                hi.rect(705, 42, 510, 54);
                 hi.fill({ color: 0xd05a3c, alpha: 0.3 });
                 hi.stroke({ width: 2, color: 0xef9f8c });
                 root.board.userData.baseZone.eventMode = "static";
@@ -224,26 +230,30 @@
         }
 
         // ── Жетоны на поле: существо / строение ────────────────────────────
+        // Жетон ПОЛНОСТЬЮ прозрачен для кликов (finishNode ставит
+        // eventMode="none" на весь контейнер): клики всегда уходят в зону
+        // поля под ним — иначе спрайт/подписи на клетке съедали pointertap
+        // и клетка «не выбиралась» (баг юзера).
         function makeUnitNode(u) {
             const c = new PIXI.Container();
             const sheet = sheetOf(u);
             const spr = u.def.type !== "building" && sheet; // спрайт-существо
             if (u.def.type === "building") {
                 const g = new PIXI.Graphics();
-                g.moveTo(-26, -8); g.lineTo(0, -26); g.lineTo(26, -8); // крыша
-                g.lineTo(26, 24); g.lineTo(-26, 24); g.closePath();
+                g.moveTo(-39, -12); g.lineTo(0, -39); g.lineTo(39, -12); // крыша
+                g.lineTo(39, 36); g.lineTo(-39, 36); g.closePath();
                 g.fill(u.def.color);
-                g.stroke({ width: 2.5, color: 0xffd98c });
+                g.stroke({ width: 3.75, color: 0xffd98c });
                 c.addChild(g);
                 // метка эффекта: лагерь даёт +1 урона соседям, прочие ауры — ✦
-                const aura = T(u.def.campAura ? `+${u.def.campAura}⚔` : "✦", 20, 0xffe9b0);
+                const aura = T(u.def.campAura ? `+${u.def.campAura}⚔` : "✦", 30, 0xffe9b0);
                 aura.anchor.set(0.5);
-                aura.position.set(0, -2);
+                aura.position.set(0, -3);
                 aura.name = "auraMark";
                 c.addChild(aura);
-                const hp = T(String(u.hp), 17, 0xff9c8c, { stroke: { color: 0x1c1207, width: 3 } });
+                const hp = T(String(u.hp), 25, 0xff9c8c, { stroke: { color: 0x1c1207, width: 4.5 } });
                 hp.anchor.set(1, 1);
-                hp.position.set(26, 26);
+                hp.position.set(39, 39);
                 hp.name = "hp";
                 c.addChild(hp);
                 return finishNode(c, u);
@@ -251,7 +261,7 @@
             if (spr) {
                 const face = u.side === "p" ? "walk_back" : "walk_front";
                 const ring = new PIXI.Graphics(); // командная тень под ногами
-                ring.ellipse(0, 8, 30, 10);
+                ring.ellipse(0, 12, 45, 15);
                 ring.fill({ color: u.side === "p" ? 0x2f4f7a : 0x7a3430, alpha: 0.45 });
                 ring.eventMode = "none";
                 c.addChild(ring);
@@ -266,27 +276,27 @@
                 c.addChild(body);
             } else {
                 const g = new PIXI.Graphics();
-                g.roundRect(-30, -30, 60, 60, 10);
+                g.roundRect(-45, -45, 90, 90, 15);
                 g.fill(u.def.color);
-                g.stroke({ width: 2.5, color: u.side === "p" ? 0x9fc4ef : 0xef9f8c });
+                g.stroke({ width: 3.75, color: u.side === "p" ? 0x9fc4ef : 0xef9f8c });
                 c.addChild(g);
             }
-            const atk = T(String(u.curAtk), 17, 0xffe9b0, { stroke: { color: 0x1c1207, width: 3 } });
+            const atk = T(String(u.curAtk), 25, 0xffe9b0, { stroke: { color: 0x1c1207, width: 4.5 } });
             atk.anchor.set(0, spr ? 1 : 0);
-            atk.position.set(spr ? -31 : -26, spr ? 36 : -28);
+            atk.position.set(spr ? -46 : -39, spr ? 54 : -42);
             atk.name = "atk";
-            const hp = T(String(u.hp), 17, 0xff9c8c, { stroke: { color: 0x1c1207, width: 3 } });
+            const hp = T(String(u.hp), 25, 0xff9c8c, { stroke: { color: 0x1c1207, width: 4.5 } });
             hp.anchor.set(1, spr ? 1 : 0);
-            hp.position.set(spr ? 31 : 26, spr ? 36 : -28);
+            hp.position.set(spr ? 46 : 39, spr ? 54 : -42);
             hp.name = "hp";
             c.addChild(atk, hp);
             if (u.def.speed > 1) {
                 for (let k = 0; k < u.def.speed; k++) {
                     const pip = new PIXI.Graphics();
-                    pip.poly([0, -4, 4, 3, -4, 3]);
+                    pip.poly([0, -6, 6, 4.5, -6, 4.5]);
                     pip.closePath();
                     pip.fill(0xffe9b0);
-                    pip.position.set(-4 + k * 9, spr ? 30 : 22);
+                    pip.position.set(-6 + k * 13.5, spr ? 45 : 33);
                     pip.eventMode = "none";
                     c.addChild(pip);
                 }
@@ -296,6 +306,7 @@
         function finishNode(c, u) {
             const p = cellXY(u.col, u.row);
             c.position.set(p.x, p.y);
+            c.eventMode = "none"; // клики — всегда в клетки поля под жетоном
             return c;
         }
 
@@ -350,7 +361,7 @@
                     u.bonusAtk += camp;
                     recalcAuras();
                     const p = cellXY(col, row);
-                    floatText(p.x, p.y - 40, `+${camp}⚔`, 0x9fd489);
+                    floatText(p.x, p.y - 60, `+${camp}⚔`, 0x9fd489);
                 }
                 if (def.ability === "dash1") summonDash(u); // «Скорость 1»
                 else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
@@ -364,9 +375,10 @@
         const floats = [], punches = [];
         const moves = []; // плавные переходы существ между клетками
         function floatText(x, y, text, fill) {
-            const tt = T(text, 24, fill, { stroke: { color: 0x1c1207, width: 5 } });
+            const tt = T(text, 36, fill, { stroke: { color: 0x1c1207, width: 7.5 } });
             tt.anchor.set(0.5);
             tt.position.set(x, y);
+            tt.eventMode = "none"; // всплывающий текст не ест клики поля
             root.fx.addChild(tt);
             const k = animK();
             floats.push({ node: tt, life: 0.9 / k, total: 0.9 / k, k });
@@ -454,7 +466,7 @@
             if (pick.def.type === "trap") armTrap(u.side, pick.id, col, row);
             else addUnit(u.side, pick.id, col, row);
             const p = cellXY(u.col, u.row);
-            floatText(p.x, p.y - 46, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
+            floatText(p.x, p.y - 69, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
         }
 
         // «Бомблинг»: после призыва находит в колоде владельца случайную
@@ -471,7 +483,7 @@
             hand.push(pick.id);
             sfx("chpoc");
             const p = cellXY(u.col, u.row);
-            floatText(p.x, p.y - 46, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
+            floatText(p.x, p.y - 69, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
         }
 
         // «Гоблинская приманка»: существо врага, шагающее С КЛЕТКИ, соседней
@@ -486,7 +498,7 @@
             const trap = B.traps[foe].splice(i, 1)[0];
             redrawTraps();
             const p = cellXY(trap.col, trap.row);
-            floatText(p.x, p.y - 40, "?!", 0xe08cd0);
+            floatText(p.x, p.y - 60, "?!", 0xe08cd0);
             damageUnit(u, trap.def.trap.dmg, null, "acid");
             return [trap.col, trap.row];
         }
@@ -511,7 +523,7 @@
             const trap = B.traps[foe].splice(i, 1)[0];
             redrawTraps();
             const p = cellXY(u.col, u.row);
-            floatText(p.x, p.y - 40, "?!", 0xe08cd0);
+            floatText(p.x, p.y - 60, "?!", 0xe08cd0);
             damageUnit(u, trap.def.trap.amount, null, "acid");
             for (const v of B.units.slice()) {
                 if (v !== u && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1) {
@@ -541,11 +553,11 @@
             if (u.side === "p") {
                 B.enemyBase -= 1;
                 const p = cellXY(u.col, 0);
-                floatText(p.x, p.y - 10, "−1", 0xff8f6e);
+                floatText(p.x, p.y - 15, "−1", 0xff8f6e);
             } else {
                 B.playerBase -= 1;
                 const p = cellXY(u.col, GRID - 1);
-                floatText(p.x, p.y + 10, "−1", 0xff5f4e);
+                floatText(p.x, p.y + 15, "−1", 0xff5f4e);
             }
             punch(root.hud);
             refreshHud();
@@ -555,6 +567,7 @@
         function removeUnit(u) {
             const i = B.units.indexOf(u);
             if (i >= 0) B.units.splice(i, 1);
+            if (unitCard && unitCard.unit === u) unitCardHide(); // жетон умер
             punches.push({ node: u.node, life: 0.25 / animK(), total: 0.25 / animK(), dying: true });
         }
 
@@ -575,7 +588,7 @@
             const n = target.node.getChildByName("hp");
             if (n) n.text = String(Math.max(0, target.hp));
             const p = cellXY(target.col, target.row);
-            floatText(p.x, p.y - 24, `−${amount}`, 0xffb26e);
+            floatText(p.x, p.y - 36, `−${amount}`, 0xffb26e);
             punch(target.node);
             sfx(snd);
             if (target.hp <= 0) { killUnit(target, killer); return; }
@@ -583,7 +596,7 @@
             // с 1 жизнью, добивается
             if (target.hp === 1 && target.def.type === "unit"
                 && killer && killer.def.ability === "assassin") {
-                floatText(p.x, p.y - 44, "☠", 0xef9f8c);
+                floatText(p.x, p.y - 66, "☠", 0xef9f8c);
                 killUnit(target, killer);
             }
         }
@@ -593,11 +606,11 @@
             if (side === "p") {
                 B.enemyBase -= u.curAtk;
                 const p = cellXY(u.col, 0);
-                floatText(p.x, p.y - 10, `−${u.curAtk}`, 0xff8f6e);
+                floatText(p.x, p.y - 15, `−${u.curAtk}`, 0xff8f6e);
             } else {
                 B.playerBase -= u.curAtk;
                 const p = cellXY(u.col, GRID - 1);
-                floatText(p.x, p.y + 10, `−${u.curAtk}`, 0xff5f4e);
+                floatText(p.x, p.y + 15, `−${u.curAtk}`, 0xff5f4e);
             }
             punch(root.hud);
         }
@@ -610,7 +623,7 @@
                 if (side === "p") B.energy += 1; else B.eEnergy += 1;
                 sfx("aqua");
                 const p = cellXY(b.col, b.row);
-                floatText(p.x, p.y - 40, "+1⚡", 0xffd98c);
+                floatText(p.x, p.y - 60, "+1⚡", 0xffd98c);
                 damageUnit(b, 1, null, "dam");
             }
             refreshHud();
@@ -629,7 +642,7 @@
             const trap = B.traps[side].shift();
             redrawTraps();
             const k = cellXY(killer.col, killer.row);
-            floatText(k.x, k.y - 40, "?!", 0xe08cd0);
+            floatText(k.x, k.y - 60, "?!", 0xe08cd0);
             if (trap.def.trap.effect === "rowDmg") {
                 const amount = trap.def.trap.amount;
                 const victims = B.units.filter((v) => v.side !== side && v.row === killer.row);
@@ -647,12 +660,13 @@
                 B.traps[side].forEach((tr) => {
                     // «?» стоит прямо на заминированной клетке
                     const c = new PIXI.Container();
+                    c.eventMode = "none"; // маркер не ест клики клетки
                     const g = new PIXI.Graphics();
-                    g.circle(0, 0, 14);
+                    g.circle(0, 0, 21);
                     g.fill({ color: side === "p" ? 0x3f5f8a : 0x7a3f3f, alpha: 0.62 });
-                    g.stroke({ width: 2, color: 0xd8c79d });
+                    g.stroke({ width: 3, color: 0xd8c79d });
                     c.addChild(g);
-                    const q = T("?", 18, 0xffe9b0);
+                    const q = T("?", 27, 0xffe9b0);
                     q.anchor.set(0.5);
                     c.addChild(q);
                     const p = cellXY(tr.col, tr.row);
@@ -662,15 +676,40 @@
             }
         }
 
+        // ── Карта-подсказка на существо/строение (наведение на поле) ───────
+        // Просили юзер: наведение на жетон (свой или врага) показывает ЕГО
+        // КАРТУ — вся информация о существе на лицевой стороне. Жетоны не
+        // ловят клики, поэтому курсор отслеживает зона поля (pointermove);
+        // карта показывается на свободном месте слева от поля.
+        let unitCard = null; // { unit, node }
+        function unitCardHide() {
+            if (!unitCard) return;
+            unitCard.node.destroy({ children: true });
+            unitCard = null;
+        }
+        function unitHoverAt(x, y) {
+            if (!root || !B) return;
+            const hit = cellAt(x, y);
+            const u = hit ? unitAt(hit[0], hit[1]) : null;
+            if (!u) { unitCardHide(); return; }
+            if (unitCard && unitCard.unit === u) return;
+            unitCardHide();
+            const node = globalThis.GAME_UI.cardFace(ctx, cardIdOf(u.def), { scale: 0.75 });
+            node.eventMode = "none";
+            node.position.set(430, 420); // свободная полоса между героем и полем
+            root.addChild(node);
+            unitCard = { unit: u, node };
+        }
+
     // ── Карты в руке ────────────────────────────────────────────────────
-    // Лицо — сама картинка карты в 2/3 размера (230×338 → ~153×225), нижний
-    // край уходит за экран: верх карты ниже поля (поле кончается на y=517) —
+    // Лицо — картинка карты 230×338 в масштабе 1, нижний
+    // край уходит за экран: верх карты ниже поля (поле кончается на y=775) —
     // клетки боя не закрываются. Выбор/наведение — лёгкое увеличение и
     // золотая рамка, БЕЗ подъёма вверх. Неразыгрываемая (не хватает энергии)
     // карта — затемнённая тинтом. Пока выбрана карта — все карты руки
     // неинтерактивны: клики уходят в поле; снять выбор — Esc, клик по фону
     // или мимо подсвеченных клеток.
-    const HAND_Y = 754, HAND_SCALE = 2 / 3;
+    const HAND_Y = 1131, HAND_SCALE = 1; // картинка 230×338 в масштабе 1
         function cardBottom(def) { // подпись нижней плашки (фолбэк без картинки)
             if (def.type === "unit") return { text: `${def.atk}⚔ ${def.hp}♥ ${def.speed}→`, small: false };
             const key = `card.${Object.keys(CARDS).find((k) => CARDS[k] === def)}.desc`;
@@ -686,8 +725,8 @@
                 c.addChild(face);
                 // рамка выбора/наведения (видна у выделенной карты)
                 const frame = new PIXI.Graphics();
-                frame.roundRect(-118, -341, 236, 344, 12);
-                frame.stroke({ width: 5, color: 0xf0c96a });
+                frame.roundRect(-124, -347, 248, 356, 18);
+                frame.stroke({ width: 7.5, color: 0xf0c96a });
                 frame.visible = false;
                 frame.name = "selframe";
                 frame.eventMode = "none";
@@ -699,33 +738,33 @@
                 if (effCost(card) > B.energy) face.tint = (face.tint & 0x9f9f9f) >>> 0;
                 c.addChild(face);
                 const plate = new PIXI.Graphics();
-                plate.roundRect(-44, def.type === "unit" ? -132 : -150, 88, def.type === "unit" ? 44 : 62, 6);
+                plate.roundRect(-66, def.type === "unit" ? -198 : -225, 132, def.type === "unit" ? 66 : 93, 9);
                 plate.fill({ color: 0x120d09, alpha: 0.66 });
                 c.addChild(plate);
-                const name = T(GAME_LOC.t(`card.${card}.name`), 13, 0xf3e6c2);
+                const name = T(GAME_LOC.t(`card.${card}.name`), 19, 0xf3e6c2);
                 name.anchor.set(0.5, 0);
-                name.position.set(0, -128);
-                globalThis.GAME_UI.fit(name, 84, 10);
+                name.position.set(0, -192);
+                globalThis.GAME_UI.fit(name, 126, 15);
                 c.addChild(name);
                 const bottom = cardBottom(def);
-                const stats = T(bottom.text, bottom.small ? 11 : 14, 0xd8c79d,
-                    bottom.small ? { wordWrap: true, wordWrapWidth: 84, breakWords: true, align: "center" } : {});
+                const stats = T(bottom.text, bottom.small ? 16 : 21, 0xd8c79d,
+                    bottom.small ? { wordWrap: true, wordWrapWidth: 126, breakWords: true, align: "center" } : {});
                 stats.anchor.set(0.5, 1);
-                stats.position.set(0, -92);
-                if (!bottom.small) globalThis.GAME_UI.fit(stats, 84, 10);
+                stats.position.set(0, -138);
+                if (!bottom.small) globalThis.GAME_UI.fit(stats, 126, 15);
                 c.addChild(stats);
-                const tag = T(GAME_LOC.t(`type.${def.type}.short`), 10, 0xcfc4a6);
+                const tag = T(GAME_LOC.t(`type.${def.type}.short`), 15, 0xcfc4a6);
                 tag.anchor.set(0, 1);
-                tag.position.set(-40, -34);
+                tag.position.set(-60, -51);
                 c.addChild(tag);
                 const cost = new PIXI.Graphics();
-                cost.circle(34, -136, 13);
+                cost.circle(51, -204, 19.5);
                 cost.fill(0x2f6fb0);
-                cost.stroke({ width: 2, color: 0xbfe0ff });
+                cost.stroke({ width: 3, color: 0xbfe0ff });
                 c.addChild(cost);
-                const costT = T(String(def.cost), 15, 0xffffff);
+                const costT = T(String(def.cost), 22, 0xffffff);
                 costT.anchor.set(0.5);
-                costT.position.set(34, -136);
+                costT.position.set(51, -204);
                 c.addChild(costT);
             }
             c.eventMode = B.selected === null ? "static" : "none";
@@ -745,8 +784,8 @@
             const n = B.hand.length;
             B.hand.forEach((card, idx) => {
                 const node = makeCardNode(card, idx);
-                const spread = Math.min(150, 1050 / Math.max(1, n));
-                node.x = 640 + (idx - (n - 1) / 2) * spread;
+                const spread = Math.min(225, 1575 / Math.max(1, n));
+                node.x = 960 + (idx - (n - 1) / 2) * spread;
                 node.y = HAND_Y;
                 node.rotation = (idx - (n - 1) / 2) * 0.035;
                 const sel = B.selected === idx;
@@ -762,9 +801,8 @@
         // слота в руке до центра клетки, отпускание — призыв. Спеллы и ловушки
         // ставятся кликом как раньше.
         let drag = null, dragFx = null; // drag: {idx,node,homeX,homeY,sx,sy,moved,over}
-        // Глобальные экранные → логические дизайн-координаты: делить нужно
-        // на ПОЛНУЮ цепочку (letterbox базовых 1920×1080 × бокс 1.5), поэтому
-        // мировая трансформация бокса, а не только его собственный масштаб.
+        // Глобальные экранные → координаты 1920×1080: мировая трансформация
+        // ui-корня (letterbox) — полная цепочка от экрана.
         const toDesign = (g) => {
             const wt = ctx.ui.worldTransform;
             return { x: (g.x - wt.tx) / wt.a, y: (g.y - wt.ty) / wt.d };
@@ -805,7 +843,7 @@
             if (!drag || !B || B.phase !== "player" || B.stopped || overlay) return;
             const p = toDesign(e.global);
             if (!drag.moved) {
-                if (Math.hypot(p.x - drag.sx, p.y - drag.sy) < 8) return; // это клик
+                if (Math.hypot(p.x - drag.sx, p.y - drag.sy) < 12) return; // это клик
                 drag.moved = true;
                 root.cardsLayer.addChild(drag.node); // карта поверх остальных
                 B.selected = drag.idx; // подсветить зону призыва
@@ -813,7 +851,7 @@
                 redrawHighlight();
             }
             drag.node.x = p.x;
-            drag.node.y = Math.min(p.y, 690);
+            drag.node.y = Math.min(p.y, 1035);
             drag.node.scale.set(1.12); // перетаскиваемая карта — полноразмерная
             drag.over = cellAt(p.x, p.y);
             drawDragFx();
@@ -834,14 +872,14 @@
             // кривая от домашнего слота карты к центру клетки (дуга набок)
             const dx = target.x - drag.homeX, dy = target.y - drag.homeY;
             const len = Math.hypot(dx, dy) || 1;
-            const bow = Math.min(140, len * 0.3);
-            dragFx.moveTo(drag.homeX, drag.homeY - 50);
+            const bow = Math.min(210, len * 0.3);
+            dragFx.moveTo(drag.homeX, drag.homeY - 75);
             dragFx.quadraticCurveTo(drag.homeX + dx / 2 - dy / len * bow, drag.homeY + dy / 2 + dx / len * bow, target.x, target.y);
-            dragFx.stroke({ width: 3, color: ok ? 0xa8e890 : 0xef9f8c, alpha: 0.9 });
-            dragFx.circle(drag.homeX, drag.homeY - 50, 5);
+            dragFx.stroke({ width: 4.5, color: ok ? 0xa8e890 : 0xef9f8c, alpha: 0.9 });
+            dragFx.circle(drag.homeX, drag.homeY - 75, 7.5);
             dragFx.fill({ color: ok ? 0xa8e890 : 0xef9f8c });
             const rc = cellRect(c2, r2);
-            dragFx.rect(rc.x + 2, rc.y + 2, rc.w - 4, rc.h - 4);
+            dragFx.rect(rc.x + 3, rc.y + 3, rc.w - 6, rc.h - 6);
             dragFx.fill({ color: ok ? 0x7dc95e : 0xd05a3c, alpha: 0.4 });
         }
         function endCardDrag(ev) {
@@ -875,7 +913,7 @@
         // менять в любой момент хода (тап/перетаскивание по треку); выбранное
         // сохраняется между ходами. По кнопке «Конец» шкала применяется
         // автоматически: слева — добор карт, справа — энергия на след. ход.
-        const SLIDER_W = 240, SLIDER_X = 1090, SLIDER_Y = 430;
+        const SLIDER_W = 360, SLIDER_X = 1635, SLIDER_Y = 645;
         let sliderHeld = false;
         function refreshSlider() {
             if (!root || !B) return;
@@ -890,21 +928,21 @@
             sl.wrap.alpha = on ? 1 : 0.45;
             const g = sl.track;
             g.clear();
-            const w = SLIDER_W, h = 14, x0 = -w / 2;
-            g.roundRect(x0, -h / 2, w, h, 7);
+            const w = SLIDER_W, h = 21, x0 = -w / 2;
+            g.roundRect(x0, -h / 2, w, h, 10.5);
             g.fill(0x1c1712);
-            g.roundRect(x0 + 3, -h / 2 + 3, Math.max(0, (B.split / total) * (w - 6)), h - 6, 4);
+            g.roundRect(x0 + 4.5, -h / 2 + 4.5, Math.max(0, (B.split / total) * (w - 9)), h - 9, 6);
             g.fill(0x3a5f8a); // доля «в карты»
-            g.roundRect(x0, -h / 2, w, h, 7);
-            g.stroke({ width: 2, color: 0x6b5c40 });
+            g.roundRect(x0, -h / 2, w, h, 10.5);
+            g.stroke({ width: 3, color: 0x6b5c40 });
             for (let i = 0; i <= total; i++) { // деления — по числу сфер
-                g.circle(x0 + (i / total) * w, h / 2 + 6, 1.5);
+                g.circle(x0 + (i / total) * w, h / 2 + 9, 2.25);
                 g.fill(0x6b5c40);
             }
             sl.thumb.clear();
-            sl.thumb.circle(x0 + (B.split / total) * w, 0, 11);
+            sl.thumb.circle(x0 + (B.split / total) * w, 0, 16.5);
             sl.thumb.fill(0xbfe0ff);
-            sl.thumb.stroke({ width: 3, color: 0x2f4f7a });
+            sl.thumb.stroke({ width: 4.5, color: 0x2f4f7a });
         }
         function sliderApply(e) {
             // Pixi-событие несёт .global; DOM-событие window (pointermove
@@ -950,46 +988,46 @@
             const node = new PIXI.Container();
             node.eventMode = "static";
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1280, 720);
+            dim.rect(0, 0, 1920, 1080);
             dim.fill({ color: 0x000000, alpha: 0.6 });
             dim.eventMode = "static";
             node.addChild(dim);
             const frame = new PIXI.Graphics();
-            frame.roundRect(150, 160, 980, 350, 12);
+            frame.roundRect(225, 240, 1470, 525, 18);
             frame.fill({ color: 0x171310, alpha: 0.96 });
-            frame.stroke({ width: 2, color: 0x6b5c40 });
+            frame.stroke({ width: 3, color: 0x6b5c40 });
             node.addChild(frame);
-            const title = T(t("discard.title"), 26, 0xf0c96a, { stroke: { color: 0x241505, width: 5 } });
+            const title = T(t("discard.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
             title.anchor.set(0.5, 0);
-            title.position.set(640, 182);
+            title.position.set(960, 273);
             title.eventMode = "none";
             node.addChild(title);
-            const hint = T(t("discard.hint", { n: B.hand.length - HAND_MAX }), 17, 0xd8c79d);
+            const hint = T(t("discard.hint", { n: B.hand.length - HAND_MAX }), 25, 0xd8c79d);
             hint.anchor.set(0.5, 0);
-            hint.position.set(640, 226);
+            hint.position.set(960, 339);
             hint.eventMode = "none";
             node.addChild(hint);
             const n = B.hand.length;
-            const spread = Math.min(100, 900 / Math.max(1, n));
+            const spread = Math.min(150, 1350 / Math.max(1, n));
             B.hand.forEach((card, idx) => {
                 const def = CARDS[card];
                 const c = new PIXI.Container();
                 if (def.img) {
                     const face = new PIXI.Sprite(uiTex(`cards/${def.img}.png`));
                     face.anchor.set(0.5, 0.5);
-                    face.scale.set(0.55);
+                    face.scale.set(0.825);
                     c.addChild(face);
                 } else { // фолбэк без картинки: рубашка + имя
                     const face = new PIXI.Sprite(uiTex("card_back_small.png"));
                     face.anchor.set(0.5, 0.5);
                     c.addChild(face);
-                    const nm = T(GAME_LOC.t(`card.${card}.name`), 12, 0xf3e6c2);
+                    const nm = T(GAME_LOC.t(`card.${card}.name`), 18, 0xf3e6c2);
                     nm.anchor.set(0.5);
-                    nm.position.set(0, 46);
+                    nm.position.set(0, 69);
                     nm.eventMode = "none";
                     c.addChild(nm);
                 }
-                c.position.set(640 + (idx - (n - 1) / 2) * spread, 400);
+                c.position.set(960 + (idx - (n - 1) / 2) * spread, 600);
                 c.eventMode = "static";
                 c.on("pointertap", () => pickDiscard(idx));
                 node.addChild(c);
@@ -1016,90 +1054,98 @@
         // ── HUD боя ────────────────────────────────────────────────────────
         function buildHud() {
             const c = new PIXI.Container();
+            // декор HUD — «хром»: клики сквозь него (к базе врага под плашкой)
             const plate = new PIXI.Sprite(uiTex("panel_label.png"));
             plate.anchor.set(0.5, 0);
-            plate.scale.set(0.92);
-            plate.position.set(640, 6);
+            plate.scale.set(1.38);
+            plate.position.set(960, 9);
+            plate.eventMode = "none";
             c.addChild(plate);
-            const title = T("", 21, 0xffe9b0);
+            const title = T("", 31, 0xffe9b0);
             title.anchor.set(0.5, 0);
-            title.position.set(640, 14);
+            title.position.set(960, 21);
             title.eventMode = "none";
             c.addChild(title);
             const eBar = new PIXI.Graphics();
+            eBar.eventMode = "none";
             c.addChild(eBar);
-            const eInfo = T("", 14, 0xd8c79d);
+            const eInfo = T("", 21, 0xd8c79d);
             eInfo.anchor.set(0.5, 0);
-            eInfo.position.set(640, 60);
+            eInfo.position.set(960, 90);
             eInfo.eventMode = "none";
             c.addChild(eInfo);
 
             const pp = new PIXI.Sprite(uiTex("panel_1.png"));
-            pp.position.set(26, 500);
-            pp.scale.set(0.78);
+            pp.position.set(39, 750);
+            pp.scale.set(1.17);
+            pp.eventMode = "none";
             c.addChild(pp);
             const portrait = new PIXI.Sprite(uiTex("portrate_hero.png"));
-            portrait.position.set(44, 522);
-            portrait.scale.set(0.78);
+            portrait.position.set(66, 783);
+            portrait.scale.set(1.17);
+            portrait.eventMode = "none";
             c.addChild(portrait);
             const pBar = new PIXI.Graphics();
+            pBar.eventMode = "none";
             c.addChild(pBar);
-            const pName = T("", 17, 0xf3e6c2);
-            pName.position.set(170, 528);
+            const pName = T("", 25, 0xf3e6c2);
+            pName.position.set(255, 792);
             pName.eventMode = "none";
             c.addChild(pName);
 
             const manaSign = new PIXI.Sprite(uiTex("sign_mana.png"));
-            manaSign.position.set(180, 560);
-            manaSign.scale.set(0.8);
+            manaSign.position.set(270, 840);
+            manaSign.scale.set(1.2);
+            manaSign.eventMode = "none";
             c.addChild(manaSign);
-            const manaT = T("", 19, 0xbfe0ff);
-            manaT.position.set(222, 566);
+            const manaT = T("", 28, 0xbfe0ff);
+            manaT.position.set(333, 849);
             manaT.eventMode = "none";
             c.addChild(manaT);
             const deckBack = new PIXI.Sprite(uiTex("card_back_small.png"));
-            deckBack.position.set(180, 606);
-            deckBack.scale.set(0.28);
+            deckBack.position.set(270, 909);
+            deckBack.scale.set(0.42);
+            deckBack.eventMode = "none";
             c.addChild(deckBack);
-            const deckT = T("", 17, 0xd8c79d);
-            deckT.position.set(222, 610);
+            const deckT = T("", 25, 0xd8c79d);
+            deckT.position.set(333, 915);
             deckT.eventMode = "none";
             c.addChild(deckT);
 
             const endBtn = new PIXI.Sprite(uiTex("button_end.png"));
             endBtn.anchor.set(0.5);
-            endBtn.scale.set(0.82);
-            endBtn.position.set(1160, 330);
+            endBtn.scale.set(1.23);
+            endBtn.position.set(1740, 495);
             endBtn.eventMode = "static";
             endBtn.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); api.endTurn(); });
             c.addChild(endBtn);
 
             // шкала конца хода «+карты ↔ +энергия» (применится по «Конец»)
             const slWrap = new PIXI.Container();
-            slWrap.position.set(1090, 430);
-            const slTitle = T(t("orb.scaleTitle"), 14, 0xcfc4a6);
+            slWrap.position.set(1635, 645);
+            const slTitle = T(t("orb.scaleTitle"), 21, 0xcfc4a6);
             slTitle.anchor.set(0.5, 1);
-            slTitle.position.set(0, -18);
+            slTitle.position.set(0, -27);
             slTitle.eventMode = "none";
             slWrap.addChild(slTitle);
-            const slCards = T("", 22, 0xbfe0ff, { stroke: { color: 0x1c1207, width: 4 } });
+            const slCards = T("", 33, 0xbfe0ff, { stroke: { color: 0x1c1207, width: 6 } });
             slCards.anchor.set(1, 0.5);
-            slCards.position.set(-146, 0);
+            slCards.position.set(-219, 0);
             slCards.eventMode = "none";
             slWrap.addChild(slCards);
-            const slCardsL = T(t("orb.cardsLabel"), 12, 0x8a7c5e);
+            const slCardsL = T(t("orb.cardsLabel"), 18, 0x8a7c5e);
             slCardsL.anchor.set(1, 0);
-            slCardsL.position.set(-146, 8);
+            slCardsL.position.set(-219, 12);
             slCardsL.eventMode = "none";
             slWrap.addChild(slCardsL);
-            const slEnergy = T("", 22, 0xffd98c, { stroke: { color: 0x1c1207, width: 4 } });
+            const slEnergy = T("", 33, 0xffd98c, { stroke: { color: 0x1c1207, width: 6 } });
             slEnergy.anchor.set(0, 0.5);
-            slEnergy.position.set(146, 0);
+            slEnergy.position.set(219, 0);
             slEnergy.eventMode = "none";
             slWrap.addChild(slEnergy);
-            const slEnergyL = T(t("orb.energyLabel"), 12, 0x8a7c5e);
+            const slEnergyL = T(t("orb.energyLabel"), 18, 0x8a7c5e);
             slEnergyL.anchor.set(0, 0);
-            slEnergyL.position.set(146, 8);
+            slEnergyL.position.set(219, 12);
             slEnergyL.eventMode = "none";
             slWrap.addChild(slEnergyL);
             const slTrack = new PIXI.Graphics();
@@ -1110,24 +1156,27 @@
             slThumb.on("pointerdown", sliderGrab);
             c.addChild(slWrap);
 
-            const targetHint = T("", 16, 0xef9f8c, { stroke: { color: 0x1c1207, width: 4 } });
+            const targetHint = T("", 24, 0xef9f8c, { stroke: { color: 0x1c1207, width: 6 } });
             targetHint.anchor.set(0.5);
-            targetHint.position.set(640, 566);
+            targetHint.position.set(960, 849);
             targetHint.eventMode = "none";
             c.addChild(targetHint);
 
-            const banner = T("", 54, 0xffe2a8, { stroke: { color: 0x1c1207, width: 8 } });
+            const banner = T("", 81, 0xffe2a8, { stroke: { color: 0x1c1207, width: 12 } });
             banner.anchor.set(0.5);
-            banner.position.set(640, 300);
+            banner.position.set(960, 450);
             banner.alpha = 0;
+            banner.eventMode = "none"; // баннер не ест клики поля под ним
             c.addChild(banner);
 
-            // настройки и колода (просмотр) — оверлеи поверх боя, битва не
-            // прерывается: сцена боя при выходе умерла бы вместе с состоянием
-            const mkIcon = (tex, x, y, sc, onTap) => {
+            // настройки, колода (остаток) и сброс (просмотр) — оверлеи поверх
+            // боя, битва не прерывается: сцена боя при выходе умерла бы вместе
+            // с состоянием. У иконок колоды/сброса — счётчики карт.
+            const mkIcon = (tex, x, y, sc, onTap, tint) => {
                 const sp = new PIXI.Sprite(uiTex(tex));
                 sp.anchor.set(0.5);
                 sp.scale.set(sc);
+                if (tint) sp.tint = tint;
                 sp.eventMode = "static";
                 sp.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onTap(); });
                 const w = new PIXI.Container();
@@ -1136,10 +1185,26 @@
                 w.name = tex;
                 return w;
             };
-            c.addChild(mkIcon("icon_setting.png", 40, 44, 0.8, () => openOverlay("settings")));
-            c.addChild(mkIcon("card_back_small.png", 40, 106, 0.42, () => openOverlay("deck")));
+            const mkCount = (x, y) => {
+                const cnt = T("", 21, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4.5 } });
+                cnt.anchor.set(0.5, 0);
+                cnt.position.set(x, y);
+                cnt.eventMode = "none";
+                return cnt;
+            };
+            c.addChild(mkIcon("icon_setting.png", 60, 66, 1.2, () => openOverlay("settings")));
+            const deckIcon = mkIcon("card_back_small.png", 60, 165, 0.63, () => openOverlay("deck"));
+            const deckCnt = mkCount(60, 196);
+            deckIcon.addChild(deckCnt);
+            // сброс — та же рубашка, серее: другой стопок карт
+            const discardIcon = mkIcon("card_back_small.png", 60, 279, 0.63,
+                () => openOverlay("discard"), 0x9a8a78);
+            const discardCnt = mkCount(60, 310);
+            discardIcon.addChild(discardCnt);
+            c.addChild(deckIcon, discardIcon);
 
             c.userData = { eBar, eInfo, title, pBar, pName, manaT, deckT, endBtn, banner, targetHint,
+                deckCnt, discardCnt,
                 slider: { wrap: slWrap, cards: slCards, energy: slEnergy, track: slTrack, thumb: slThumb } };
             return c;
         }
@@ -1166,47 +1231,56 @@
                 const panel = globalThis.GAME_SETTINGS_SCENE.buildPanel(ctx, { onBack: closeOverlay });
                 panel.applySound();
                 node.addChild(panel.node);
-            } else { // deck — только просмотр, без редактирования
+            } else { // deck / discard — только просмотр, без редактирования:
+                // колода — ОСТАТОК (B.deck), сброс — лежащие карты (B.discard)
                 const { T, button, cardFace, scrollPane } = globalThis.GAME_UI;
                 const { CARDS } = globalThis.GAME_DATA;
+                const pile = name === "discard" ? B.discard : B.deck;
                 const frame = new PIXI.Graphics();
-                frame.roundRect(190, 54, 900, 590, 12);
+                frame.roundRect(285, 81, 1350, 885, 18);
                 frame.fill({ color: 0x171310, alpha: 0.95 });
-                frame.stroke({ width: 2, color: 0x6b5c40 });
+                frame.stroke({ width: 3, color: 0x6b5c40 });
                 node.addChild(frame);
-                const title = T(t("deck.viewTitle"), 30, 0xf0c96a, { stroke: { color: 0x241505, width: 5 } });
+                const title = T(t(name === "discard" ? "deck.discardTitle" : "deck.viewTitle"),
+                    45, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
                 title.anchor.set(0.5, 0);
-                title.position.set(640, 70);
+                title.position.set(960, 105);
                 title.eventMode = "none";
                 node.addChild(title);
-                const hint = T(t("deck.viewHint"), 14, 0x8a7c5e);
+                const hint = T(t("deck.viewHint"), 21, 0x8a7c5e);
                 hint.anchor.set(0.5, 0);
-                hint.position.set(640, 108);
+                hint.position.set(960, 162);
                 hint.eventMode = "none";
                 node.addChild(hint);
-                const pane = scrollPane(ctx, { x: 210, y: 132, w: 860, h: 440 });
+                const pane = scrollPane(ctx, { x: 315, y: 198, w: 1290, h: 660 });
                 const grid = new PIXI.Container();
-                const ids = [...new Set(G.deck)].sort((a, b) =>
+                const ids = [...new Set(pile)].sort((a, b) =>
                     (CARDS[a].cost - CARDS[b].cost) || a.localeCompare(b));
                 ids.forEach((id, i) => {
                     const col = i % 4, rowI = (i / 4) | 0;
-                    const cx = 115 + col * 215, cy = 110 + rowI * 205;
-                    const card = cardFace(ctx, id, { scale: 0.5 });
+                    const cx = 172.5 + col * 322.5, cy = 165 + rowI * 307.5;
+                    const card = cardFace(ctx, id, { scale: 0.75 });
                     card.position.set(cx, cy);
                     card.eventMode = "none";
                     grid.addChild(card);
-                    const n = G.deck.reduce((s, c) => s + (c === id ? 1 : 0), 0);
-                    const cnt = T(`×${n}`, 18, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4 } });
+                    const n = pile.reduce((s, c) => s + (c === id ? 1 : 0), 0);
+                    const cnt = T(`×${n}`, 27, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 6 } });
                     cnt.anchor.set(0.5);
-                    cnt.position.set(cx + 48, cy - 64);
+                    cnt.position.set(cx + 72, cy - 96);
                     cnt.eventMode = "none";
                     grid.addChild(cnt);
                 });
+                if (!ids.length) {
+                    const empty = T(t("deck.viewEmpty"), 30, 0x8a7c5e);
+                    empty.position.set(66, 30);
+                    empty.eventMode = "none";
+                    grid.addChild(empty);
+                }
                 const rowsN = Math.ceil(ids.length / 4);
-                pane.setContent(grid, ids.length ? 110 + (rowsN - 1) * 205 + 150 : 40);
+                pane.setContent(grid, ids.length ? 165 + (rowsN - 1) * 307.5 + 225 : 60);
                 node.addChild(pane.node);
                 node.addChild(button(ctx, {
-                    tex: "button_menu.png", label: t("settings.back"), x: 640, y: 678, scale: 1,
+                    tex: "button_menu.png", label: t("settings.back"), x: 960, y: 1017, scale: 1,
                     onTap: closeOverlay,
                 }));
             }
@@ -1228,13 +1302,15 @@
             if (!root || !B) return;
             const ud = root.hud.userData;
             ud.title.text = t(`enc.${B.encId}.title`);
-            drawBar(ud.eBar, 470, 44, 340, 14, B.enemyBase / B.enemyBaseMax, 0xc0503c);
+            drawBar(ud.eBar, 705, 66, 510, 21, B.enemyBase / B.enemyBaseMax, 0xc0503c);
             ud.eInfo.text = `${t("arena.baseEnemy")} ${Math.max(0, B.enemyBase)}/${B.enemyBaseMax}  ·  ${t("arena.energy")} ${B.eEnergy}  ·  ${t("arena.manaCards", { n: B.eHand.length })}`;
-            globalThis.GAME_UI.fit(ud.eInfo, 430, 11);
-            drawBar(ud.pBar, 170, 552, 100, 12, B.playerBase / B.playerBaseMax, 0x5d9c4a);
+            globalThis.GAME_UI.fit(ud.eInfo, 645, 16.5);
+            drawBar(ud.pBar, 255, 828, 150, 18, B.playerBase / B.playerBaseMax, 0x5d9c4a);
             ud.pName.text = t("arena.hero");
             ud.manaT.text = `${B.energy}`;
             ud.deckT.text = `${B.deck.length}+${B.discard.length}`;
+            ud.deckCnt.text = String(B.deck.length); // счётчики у иконок-стопок
+            ud.discardCnt.text = String(B.discard.length);
             ud.endBtn.alpha = B.phase === "player" ? 1 : 0.45;
             ud.endBtn.eventMode = B.phase === "player" ? "static" : "none";
             ud.targetHint.text = B.spellTarget ? t("arena.pickTarget") : "";
@@ -1403,7 +1479,7 @@
                         best.bonusAtk = (best.bonusAtk || 0) + def.spell.buffAtk;
                         recalcAuras();
                         const p = cellXY(best.col, best.row);
-                        floatText(p.x, p.y - 26, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                        floatText(p.x, p.y - 39, `+${def.spell.buffAtk}⚔`, 0x9fd489);
                         punch(best.node);
                         sfx("up");
                     }
@@ -1425,7 +1501,7 @@
                             damageUnit(best, def.spell.dmg, null, "rocket");
                         } else {
                             B.playerBase -= def.spell.dmg;
-                            floatText(640, 560, `−${def.spell.dmg}`, 0xff5f4e);
+                            floatText(960, 840, `−${def.spell.dmg}`, 0xff5f4e);
                             sfx("rocket");
                         }
                     }
@@ -1565,7 +1641,7 @@
                 u.bonusAtk = (u.bonusAtk || 0) + def.spell.buffAtk;
                 recalcAuras();
                 const p = cellXY(u.col, u.row);
-                floatText(p.x, p.y - 26, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                floatText(p.x, p.y - 39, `+${def.spell.buffAtk}⚔`, 0x9fd489);
                 punch(u.node);
                 sfx("up");
             }
@@ -1582,7 +1658,7 @@
                 if (!u || u.side !== "p" || u.def.type !== "unit") return false;
                 const p = cellXY(u.col, u.row);
                 killUnit(u, null);
-                floatText(p.x, p.y - 30, "☠", 0xef9f8c);
+                floatText(p.x, p.y - 45, "☠", 0xef9f8c);
                 for (const v of B.units.slice()) {
                     if (Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1) {
                         damageUnit(v, def.spell.dmg, null, "rocket");
@@ -1591,7 +1667,7 @@
             }
             if (def.spell.target === "none" && def.spell.baseDmg) { // землетрясение
                 B.enemyBase -= def.spell.baseDmg;
-                floatText(640, 40, `−${def.spell.baseDmg}`, 0xff8f6e);
+                floatText(960, 60, `−${def.spell.baseDmg}`, 0xff8f6e);
                 punch(root.hud);
                 sfx("rocket");
             }
@@ -1599,7 +1675,7 @@
                 if (!target) return false;
                 if (target.base === true) {
                     B.enemyBase -= def.spell.dmg;
-                    floatText(640, 40, `−${def.spell.dmg}`, 0xff8f6e);
+                    floatText(960, 60, `−${def.spell.dmg}`, 0xff8f6e);
                     punch(root.hud);
                     sfx("rocket");
                 } else if (target.col !== undefined) {
@@ -1627,18 +1703,18 @@
             refreshHud();
             const ov = new PIXI.Container();
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1280, 720);
+            dim.rect(0, 0, 1920, 1080);
             dim.fill({ color: 0x000000, alpha: 0.6 });
             ov.addChild(dim);
             const panel = new PIXI.Sprite(uiTex("panel_allert.png"));
             panel.anchor.set(0.5);
-            panel.scale.set(1.35);
-            panel.position.set(640, 300);
+            panel.scale.set(2.025);
+            panel.position.set(960, 450);
             ov.addChild(panel);
-            const txt = T(victory ? t("arena.victory") : t("arena.defeat"), 44,
-                victory ? 0xffe9b0 : 0xff8f6e, { stroke: { color: 0x1c1207, width: 7 } });
+            const txt = T(victory ? t("arena.victory") : t("arena.defeat"), 66,
+                victory ? 0xffe9b0 : 0xff8f6e, { stroke: { color: 0x1c1207, width: 10.5 } });
             txt.anchor.set(0.5);
-            txt.position.set(640, 268);
+            txt.position.set(960, 402);
             txt.eventMode = "none";
             ov.addChild(txt);
             B.result = victory ? "win" : "lose";
@@ -1666,13 +1742,13 @@
                 const btn = new PIXI.Sprite(uiTex("button_menu.png"));
                 btn.anchor.set(0.5);
                 btn.scale.set(1); // натуральный размер спрайта (просил юзер)
-                btn.position.set(640, 390);
+                btn.position.set(960, 585);
                 btn.eventMode = "static";
                 ov.addChild(btn);
                 const bt = T(t("arena.toMenu"), 20, 0xf3e6c2);
                 bt.anchor.set(0.5);
                 globalThis.GAME_UI.fit(bt, btn.texture.width * btn.scale.x * 0.8, 11); // не шире кнопки
-                bt.position.set(640, 390);
+                bt.position.set(960, 585);
                 bt.eventMode = "none";
                 ov.addChild(bt);
                 btn.on("pointertap", () => { B.btnTaps = (B.btnTaps || 0) + 1; if (ctx.sfx) ctx.sfx(); B.continueAction(); });
@@ -1706,15 +1782,16 @@
             drag = null;
             dragFx = null; // прошлого боя Graphics уничтожен вместе с root
             discardPanel = null;
+            unitCard = null;
             sfx("openRoom"); // начало боя
 
             root = new PIXI.Container();
             root.eventMode = "static";
             // фон арены — нарисованная сцена с сеткой поля (по энкаунтеру)
             const bg = new PIXI.Sprite(uiTex(`scenes/${enc.scene || 1}.png`));
-            const s = Math.max(1280 / bg.texture.width, 720 / bg.texture.height);
+            const s = Math.max(1920 / bg.texture.width, 1080 / bg.texture.height);
             bg.scale.set(s);
-            bg.position.set((1280 - bg.texture.width * s) / 2, (720 - bg.texture.height * s) / 2);
+            bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);
             root.addChild(bg);
             root.board = buildBoard();
             root.addChild(root.board);
@@ -1752,6 +1829,7 @@
             sliderHeld = false;
             drag = null;
             closeDiscardPanel();
+            unitCard = null; // узел подсказки умер вместе с root
             if (root) { root.destroy({ children: true }); root = null; }
             overlay = null;
             dragFx = null; // Graphics умер вместе с root — не держим мёртвую ссылку
@@ -1868,10 +1946,17 @@
                 onCellTap(col, row);
             },
             deployRows,
-            // оверлеи боя (настройки / колода-просмотр)
+            // оверлеи боя (настройки / колода-остаток / сброс)
             openPanel(name) { if (B && root && B.phase !== "over") openOverlay(name); },
             closePanel() { closeOverlay(); },
             panel: () => (overlay && overlay.name) || null,
+            // карта-подсказка на жетон (тесты): что показано + наведение по клетке
+            unitCardState: () => (unitCard
+                ? { id: cardIdOf(unitCard.unit.def), side: unitCard.unit.side,
+                    col: unitCard.unit.col, row: unitCard.unit.row }
+                : null),
+            hoverCell(col, row) { const p = cellXY(col, row); unitHoverAt(p.x, p.y); },
+            hoverOff: () => unitCardHide(),
             // drag&drop (режим «Перетаскивание»): состояние для тестов
             dragState() {
                 return drag ? { idx: drag.idx, moved: drag.moved, over: drag.over } : null;

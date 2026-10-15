@@ -15,7 +15,9 @@
         let root = null, leftPane = null, rightPane = null;
         const filters = { type: null, cost: null, rarity: null, elem: null };
         const ELEM_KEYS = Object.keys(ELEM_LOGO);
-        const PANE_POS = { left: { x: 60, y: 148 }, right: { x: 520, y: 186 } };
+        const PANE_POS = { left: { x: 90, y: 222 }, right: { x: 780, y: 279 } };
+        // ряд лого стихий (общие константы: использует и rebuildChips, и api)
+        const ELEM_Y = 144, ELEM_X0 = 1449, STEP = 66; // лого 57px, ряд до x=1836
         const paneCards = { left: [], right: [] }; // для тестов: {id, node, cx, cy, labelY}
         const elemBtns = []; // круги-логотипы (эмитят pointertap в тестах)
         let zoom = null; // {id, node, cur, tgt} — ховер-зум карты
@@ -30,7 +32,7 @@
             const pp = PANE_POS[side];
             const st = (side === "left" ? leftPane : rightPane).state;
             const iy = -st.t * Math.max(0, st.contentH - st.viewH);
-            node.position.set(pp.x + cx, Math.max(180, Math.min(540, pp.y + cy + iy)));
+            node.position.set(pp.x + cx, Math.max(270, Math.min(810, pp.y + cy + iy)));
             root.addChild(node);
             zoom = { id, node, cur: 0.5, tgt: 1 };
         }
@@ -65,7 +67,7 @@
             const locked = G.deck.length <= DECK_MIN; // минимум — убирать нельзя
             ids.forEach((id, i) => {
                 const col = i % 3, rowI = (i / 3) | 0;
-                const cx = 62 + col * 132, cy = 92 + rowI * 205;
+                const cx = 93 + col * 198, cy = 138 + rowI * 307.5;
                 const card = cardFace(ctx, id, { scale: 0.5, dim: locked });
                 card.position.set(cx, cy);
                 card.eventMode = "static";
@@ -73,15 +75,15 @@
                 card.on("pointerover", () => showZoom(id, "left", cx, cy));
                 card.on("pointerout", () => hideZoom(false));
                 c.addChild(card);
-                const cnt = T(`×${countIn(id)}`, 13, locked ? 0x8a7c5e : 0xd8c79d);
+                const cnt = T(`×${countIn(id)}`, 19, locked ? 0x8a7c5e : 0xd8c79d);
                 cnt.anchor.set(0.5, 0);
-                cnt.position.set(cx, cy + 92); // под картой, поднято на 10px (просил юзер)
+                cnt.position.set(cx, cy + 138); // под картой (×1.5 от базы 1280)
                 cnt.eventMode = "none";
                 c.addChild(cnt);
-                paneCards.left.push({ id, node: card, cx, cy, labelY: cy + 92 });
+                paneCards.left.push({ id, node: card, cx, cy, labelY: cy + 138 });
             });
             const rowsN = Math.ceil(ids.length / 3);
-            c.userData = { contentH: ids.length ? (92 + (rowsN - 1) * 205 + 155) : 40 };
+            c.userData = { contentH: ids.length ? (138 + (rowsN - 1) * 307.5 + 232.5) : 60 };
             return c;
         }
 
@@ -99,36 +101,36 @@
                 const inDeck = countIn(id);
                 const capped = inDeck >= DECK_COPIES; // лимит одинаковых карт
                 const canAdd = owned > inDeck && !capped && G.deck.length < DECK_MAX;
-                const cx = 62 + col * 132, cy = 92 + rowI * 205;
+                const cx = 93 + col * 198, cy = 138 + rowI * 307.5;
                 const card = cardFace(ctx, id, { scale: 0.5, dim: owned <= inDeck || capped });
                 card.position.set(cx, cy);
                 card.eventMode = "static"; // ховер-зум — на любой карте
                 card.on("pointerover", () => showZoom(id, "right", cx, cy));
                 card.on("pointerout", () => hideZoom(false));
                 c.addChild(card);
-                const cnt = T(t("deck.owned", { n: owned }), 13, canAdd ? 0xd8c79d : 0x8a7c5e);
+                const cnt = T(t("deck.owned", { n: owned }), 19, canAdd ? 0xd8c79d : 0x8a7c5e);
                 cnt.anchor.set(0.5, 0);
-                cnt.position.set(cx, cy + 92); // под картой, поднято на 10px (просил юзер)
+                cnt.position.set(cx, cy + 138); // под картой (×1.5 от базы 1280)
                 cnt.eventMode = "none";
                 c.addChild(cnt);
-                paneCards.right.push({ id, node: card, cx, cy, labelY: cy + 92 });
+                paneCards.right.push({ id, node: card, cx, cy, labelY: cy + 138 });
                 if (inDeck > 0) {
-                    const mark = T(`+${inDeck}`, 15, 0x9fd489);
+                    const mark = T(`+${inDeck}`, 22, 0x9fd489);
                     mark.anchor.set(0.5);
-                    mark.position.set(cx + 46, cy - 68);
+                    mark.position.set(cx + 69, cy - 102);
                     mark.eventMode = "none";
                     c.addChild(mark);
                 }
                 if (canAdd) card.on("pointertap", () => api.add(id));
             });
             if (!ids.length) { // фильтры спрятали всё (или коллекция пуста)
-                const empty = T(t("deck.empty"), 15, 0x8a7c5e);
-                empty.position.set(62, 24);
+                const empty = T(t("deck.empty"), 22, 0x8a7c5e);
+                empty.position.set(93, 36);
                 empty.eventMode = "none";
                 c.addChild(empty);
             }
             const rowsN = Math.ceil(ids.length / 5);
-            c.userData = { contentH: ids.length ? (92 + (rowsN - 1) * 205 + 155) : 40 };
+            c.userData = { contentH: ids.length ? (138 + (rowsN - 1) * 307.5 + 232.5) : 60 };
             return c;
         }
 
@@ -162,44 +164,44 @@
             root.eventMode = "static";
             root.addChild(dimBg(ctx, 0.85));
 
-            const title = T(t("deck.title"), 34, 0xf0c96a, { stroke: { color: 0x241505, width: 6 } });
+            const title = T(t("deck.title"), 51, 0xf0c96a, { stroke: { color: 0x241505, width: 9 } });
             title.anchor.set(0.5, 0);
-            title.position.set(640, 14);
+            title.position.set(960, 21);
             title.eventMode = "none";
-            fit(title, 900, 20);
+            fit(title, 1350, 30);
             root.addChild(title);
 
             // левая рамка + заголовок + скролл-панель
             const left = new PIXI.Graphics();
-            left.roundRect(48, 86, 430, 592, 10);
+            left.roundRect(72, 129, 645, 888, 15);
             left.fill({ color: 0x171310, alpha: 0.92 });
-            left.stroke({ width: 2, color: 0x6b5c40 });
+            left.stroke({ width: 3, color: 0x6b5c40 });
             root.addChild(left);
-            const deckH = T("", 20, 0xf3e6c2);
-            deckH.position.set(66, 88); // на 10px выше (просил юзер)
+            const deckH = T("", 30, 0xf3e6c2);
+            deckH.position.set(99, 132);
             deckH.eventMode = "none";
             root.addChild(deckH);
-            const minH = T("", 13, 0x8a7c5e);
-            minH.position.set(66, 126);
+            const minH = T("", 19, 0x8a7c5e);
+            minH.position.set(99, 189);
             minH.eventMode = "none";
             root.addChild(minH);
             headerRef = { deck: deckH, min: minH };
-            leftPane = scrollPane(ctx, { x: 60, y: 148, w: 406, h: 516, onScroll: () => hideZoom(false) });
+            leftPane = scrollPane(ctx, { x: 90, y: 222, w: 609, h: 774, onScroll: () => hideZoom(false) });
             root.addChild(leftPane.node);
 
             // правая рамка + фильтры + скролл-панель
             const right = new PIXI.Graphics();
-            right.roundRect(508, 86, 724, 592, 10);
+            right.roundRect(762, 129, 1086, 888, 15);
             right.fill({ color: 0x171310, alpha: 0.92 });
-            right.stroke({ width: 2, color: 0x6b5c40 });
+            right.stroke({ width: 3, color: 0x6b5c40 });
             root.addChild(right);
 
-            const hint = T(t("deck.hint"), 13, 0x8a7c5e, { wordWrap: true, wordWrapWidth: 690 });
-            hint.position.set(524, 652);
+            const hint = T(t("deck.hint"), 19, 0x8a7c5e, { wordWrap: true, wordWrapWidth: 1035 });
+            hint.position.set(786, 978);
             hint.eventMode = "none";
             root.addChild(hint);
 
-            rightPane = scrollPane(ctx, { x: 520, y: 186, w: 700, h: 456, onScroll: () => hideZoom(false) });
+            rightPane = scrollPane(ctx, { x: 780, y: 279, w: 1050, h: 684, onScroll: () => hideZoom(false) });
             root.addChild(rightPane.node);
 
             rebuildChips();
@@ -210,7 +212,7 @@
             headerText();
 
             root.addChild(button(ctx, {
-                tex: "button_menu.png", label: t("deck.back"), x: 110, y: 52, scale: 1,
+                tex: "button_menu.png", label: t("deck.back"), x: 165, y: 78, scale: 1,
                 onTap: () => {
                     const to = G.uiReturn || "menu"; // откуда пришли (меню/подземелье)
                     G.uiReturn = null;
@@ -224,26 +226,26 @@
             elemBtns.length = 0;
             for (const n of root.children.slice()) {
                 if (n.userData && n.userData.isChip) root.removeChild(n);
-                else if (n.style && n.style.fontSize === 13 && n.y >= 92 && n.y <= 180 && n.x >= 524) {
+                else if (n.style && n.style.fontSize === 19 && n.y >= 138 && n.y <= 270 && n.x >= 786) {
                     root.removeChild(n); // подписи осей фильтров
                 }
             }
             const costs = [...new Set(Object.values(CARDS).map((d) => d.cost))].sort();
             const rows = [
-                { y: 96, label: t("filter.type"), key: "type",
+                { y: 144, label: t("filter.type"), key: "type",
                     opts: [["unit", "building", "spell", "trap"].map((v) => ({ value: v, label: t(`type.${v}.short`) }))] },
-                { y: 126, label: t("filter.cost"), key: "cost",
+                { y: 189, label: t("filter.cost"), key: "cost",
                     opts: [costs.map((v) => ({ value: v, label: String(v) }))] },
-                { y: 156, label: t("filter.rarity"), key: "rarity",
+                { y: 234, label: t("filter.rarity"), key: "rarity",
                     opts: [["common", "rare", "epic"].map((v) => ({ value: v, label: t(`rarity.${v}.short`) }))] },
             ];
             for (const r of rows) {
-                let cx = 524;
-                const label = T(r.label, 13, 0xcfc4a6);
-                label.position.set(cx, r.y + 6);
+                let cx = 786;
+                const label = T(r.label, 19, 0xcfc4a6);
+                label.position.set(cx, r.y + 9);
                 label.eventMode = "none";
                 root.addChild(label);
-                cx += label.width + 10;
+                cx += label.width + 15;
                 const opts = [{ value: null, label: t("filter.all") }, ...r.opts[0]];
                 for (const o of opts) {
                     const active = filters[r.key] === o.value;
@@ -253,21 +255,20 @@
                     });
                     ch.userData.isChip = true;
                     root.addChild(ch);
-                    cx += ch.userData.w + 6;
+                    cx += ch.userData.w + 9;
                 }
             }
             // ── фильтр стихий: ряд из 6 лого в ПРАВОЙ части экрана, на
             // свободном месте над панелью коллекции (просил юзер). Повторный
             // клик по активному лого снимает фильтр (= «Все»).
-            const ELEM_Y = 96, ELEM_X0 = 966, STEP = 44; // лого 38px, ряд до x=1224
             for (let i = 0; i < ELEM_KEYS.length; i++) {
                 const value = ELEM_KEYS[i];
                 const active = filters.elem === value;
                 const c2 = new PIXI.Container();
                 const g = new PIXI.Graphics();
-                g.circle(19, 19, 19);
+                g.circle(28.5, 28.5, 28.5);
                 g.fill(active ? 0x3a4a2e : 0x2e2822);
-                g.stroke({ width: 2, color: active ? 0xa8e890 : 0x6b5c40 });
+                g.stroke({ width: 3, color: active ? 0xa8e890 : 0x6b5c40 });
                 g.eventMode = "static";
                 g.on("pointertap", () => {
                     if (ctx.sfx) ctx.sfx();
@@ -276,7 +277,7 @@
                 });
                 const sp = new PIXI.Sprite(uiTex(ELEM_LOGO[value]));
                 sp.anchor.set(0.5);
-                sp.scale.set(30 / sp.texture.width);
+                sp.scale.set(45 / sp.texture.width);
                 sp.position.set(19, 19);
                 sp.eventMode = "none";
                 if (!active) sp.alpha = 0.6;
@@ -286,9 +287,9 @@
                 root.addChild(c2);
                 elemBtns.push(g);
             }
-            const cap = T(t("filter.elem"), 13, 0xcfc4a6);
+            const cap = T(t("filter.elem"), 19, 0xcfc4a6);
             cap.anchor.set(0.5, 0);
-            cap.position.set(ELEM_X0 + (ELEM_KEYS.length - 1) * STEP / 2 + 19, ELEM_Y + 44);
+            cap.position.set(ELEM_X0 + (ELEM_KEYS.length - 1) * STEP / 2 + 28.5, ELEM_Y + 66);
             cap.eventMode = "none";
             root.addChild(cap);
         }
@@ -329,7 +330,7 @@
             cardInfo: (side, i) => (paneCards[side] && paneCards[side][i]
                 ? { ...paneCards[side][i], node: undefined } : null),
             // ряд лого стихий (тесты): число, активный фильтр, левый край
-            elemInfo: () => ({ count: ELEM_KEYS.length, active: filters.elem, x0: 966 }),
+            elemInfo: () => ({ count: ELEM_KEYS.length, active: filters.elem, x0: ELEM_X0 }),
             elemTap(i) { const g = elemBtns[i]; if (g) g.emit("pointertap"); },
         };
 
