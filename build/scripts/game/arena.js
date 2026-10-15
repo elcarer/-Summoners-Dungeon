@@ -1416,10 +1416,15 @@
             if (B.stopped || B.phase === "over") return;
             await aiPlay();
             if (B.stopped || B.phase === "over") return;
-            // шкала врага (те же правила): рука мала — добор, остальное — энергия
+            // шкала врага (те же правила), но копить энергию ИИ может только
+            // до порога: с запасом ≥ 6 весь доход шкалы уходит в добор карт
+            // (до лимита руки) — иначе энергию нечем тратить и она копится
+            // десятками при почти пустом столе
             const total = spheresTotal();
             let eCards = 0;
-            if (B.eHand.length < 4) eCards = Math.min(4 - B.eHand.length, total);
+            if (B.eHand.length < 4) eCards = 4 - B.eHand.length; // малая рука — добор до 4
+            if (B.eEnergy >= 6) eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
+            eCards = Math.max(0, Math.min(eCards, total));
             drawEnemy(eCards);
             B.eEnergy += total - eCards;
             refreshHud();
@@ -1429,13 +1434,29 @@
         }
 
         async function aiPlay() {
+            // ИИ тратит энергию, пока есть чем. Если играть нечем (в руке всё
+            // слишком дорого или неприменимо — поле забито, целей нет), а
+            // энергии много — добирает карты и пробует снова: копить десятки
+            // энергии вместо давления ИИ не должен.
+            let refillTries = 0;
+            const tryRefill = async () => {
+                if (B.eEnergy < 5 || refillTries >= 2) return false;
+                if (!B.eDeck.length && !B.eDiscard.length) return false;
+                refillTries++;
+                const before = B.eHand.length;
+                drawEnemy(2);
+                if (B.eHand.length === before) return false; // колода и сброс пусты
+                refreshHud();
+                await delay(0.3 / animK());
+                return true;
+            };
             for (;;) {
                 if (B.stopped || B.phase === "over") return;
                 const affordable = B.eHand
                     .map((c, i) => ({ i, id: c, def: CARDS[c] }))
                     .filter((x) => effCost(x.id, "e") <= B.eEnergy)
                     .sort((a, b) => effCost(b.id, "e") - effCost(a.id, "e"));
-                if (!affordable.length) return;
+                if (!affordable.length) { if (!await tryRefill()) return; continue; }
                 let played = false;
                 for (const pick of affordable) {
                     const def = pick.def;
@@ -1471,7 +1492,8 @@
                         break;
                     }
                     if (def.type === "spell") {
-                        if (def.spell.draw && B.eHand.length > 4) continue;
+                        // добор-заклинание — тоже трата энергии; гасим только при полной руке
+                        if (def.spell.draw && B.eHand.length >= HAND_MAX) continue;
                     if (def.spell.target === "anyUnit") { // усиление — своему сильнейшему
                         const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
                         if (!own.length) continue;
@@ -1514,7 +1536,7 @@
                         break;
                     }
                 }
-                if (!played) return;
+                if (!played) { if (!await tryRefill()) return; continue; }
                 refreshHud();
                 await delay(0.4 / animK());
             }
