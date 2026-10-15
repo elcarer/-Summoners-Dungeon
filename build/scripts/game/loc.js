@@ -4,8 +4,8 @@
 (function () {
     const STRINGS = {
         ru: {
-            "menu.title1": "ПОДЗЕМЕЛЬЕ",
-            "menu.title2": "ПРИЗЫВАТЕЛЕЙ",
+            "menu.title1": "Подземелье",
+            "menu.title2": "призывателей",
             "menu.subtitle": "карточный рогалик о спуске в глубину",
             "menu.play": "ВОЙТИ",
             "menu.continue": "ПРОДОЛЖИТЬ",
@@ -160,8 +160,8 @@
             "common.units": "сущ.",
         },
         en: {
-            "menu.title1": "SUMMONERS'",
-            "menu.title2": "DUNGEON",
+            "menu.title1": "Summoners'",
+            "menu.title2": "Dungeon",
             "menu.subtitle": "a card roguelike about descending deep",
             "menu.play": "ENTER",
             "menu.continue": "CONTINUE",

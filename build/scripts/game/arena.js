@@ -1516,18 +1516,49 @@
         }
 
         // ── Оверлеи поверх боя: настройки / колода (просмотр) ────────────────
-        let overlay = null; // { name, node }
+        let overlay = null; // { name, node, grid, pane }
+        let ovZoom = null; // ховер-зум карты {id, node, cur, tgt}
+        let ovCards = []; // узлы карточек сетки (тесты: pointerover/out)
+        const OV_PANE = { x: 315, y: 198, w: 1290, h: 660 }; // окно просмотра
         function closeOverlay() {
             if (!overlay) return;
+            hideOvZoom(true); // зум-копия — ребёнок overlay.node, гасим первой
             overlay.node.destroy({ children: true });
             overlay = null;
+            ovCards = [];
             if (drag) endCardDrag(); // защита от пересечения состояний
+        }
+        // Ховер-зум карт оверлея (просил юзер — как в меню «Колоды»): копия
+        // поверх панели растёт 0.75 → 1 (оригинальный размер спрайта),
+        // уведение — уменьшается обратно и удаляется. Копия добавляется в
+        // node оверлея — маска скролла её не обрезает.
+        function showOvZoom(id, cx, cy) {
+            hideOvZoom(true);
+            if (!overlay || !overlay.pane) return;
+            const zNode = globalThis.GAME_UI.cardFace(ctx, id, { scale: 0.75 });
+            zNode.eventMode = "none"; // уведение проходит к карте под копией
+            const st = overlay.pane.state;
+            const iy = -st.t * Math.max(0, st.contentH - st.viewH);
+            // полная карта 337×495: не даём вылезти за окно панели
+            const hw = 172, hh = 250;
+            zNode.position.set(
+                Math.max(OV_PANE.x + hw, Math.min(OV_PANE.x + OV_PANE.w - hw, OV_PANE.x + cx)),
+                Math.max(OV_PANE.y + hh, Math.min(OV_PANE.y + OV_PANE.h - hh, OV_PANE.y + cy + iy)),
+            );
+            overlay.node.addChild(zNode);
+            ovZoom = { id, node: zNode, cur: 0.75, tgt: 1 };
+        }
+        function hideOvZoom(immediate) {
+            if (!ovZoom) return;
+            if (immediate) { ovZoom.node.destroy({ children: true }); ovZoom = null; }
+            else ovZoom.tgt = 0.75; // плавно уменьшится в update, затем удалится
         }
         function openOverlay(name) {
             if (overlay || (B && B.discarding)) return; // поверх сброса — ничего
             if (overlay) closeOverlay();
             const node = new PIXI.Container();
             let grid = null; // сетка карт (deck/edeck/discard) — для тестов
+            let pane = null; // скролл-панель просмотра (ховер-зум берёт сдвиг скролла)
             node.eventMode = "static"; // глотает клики — поле под ним молчит
             const dim = new PIXI.Graphics();
             dim.rect(0, 0, 1280, 720);
@@ -1562,8 +1593,12 @@
                 hint.position.set(960, 162);
                 hint.eventMode = "none";
                 node.addChild(hint);
-                const pane = scrollPane(ctx, { x: 315, y: 198, w: 1290, h: 660 });
+                pane = scrollPane(ctx, {
+                    x: OV_PANE.x, y: OV_PANE.y, w: OV_PANE.w, h: OV_PANE.h,
+                    onScroll: () => hideOvZoom(false), // прокрутка — старый зум мимо
+                });
                 grid = new PIXI.Container();
+                ovCards = [];
                 // cardFace 0.75 = карта ~253×371 (центр в position): ряды
                 // дальше высоты карты (415), первый ряд целиком в панели
                 // (просил юзер: карты обрезались сверху и налагались)
@@ -1575,8 +1610,11 @@
                     const cx = 172.5 + col * 322.5, cy = TOP + rowI * ROW_STEP;
                     const card = cardFace(ctx, id, { scale: 0.75 });
                     card.position.set(cx, cy);
-                    card.eventMode = "none";
+                    card.eventMode = "static"; // ховер-зум — на любой карте
+                    card.on("pointerover", () => showOvZoom(id, cx, cy));
+                    card.on("pointerout", () => hideOvZoom(false));
                     grid.addChild(card);
+                    ovCards.push(card);
                     const n = pile.reduce((s, c) => s + (c === id ? 1 : 0), 0);
                     const cnt = T(`×${n}`, 27, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 6 } });
                     cnt.anchor.set(0.5);
@@ -1600,7 +1638,7 @@
                 }));
             }
             root.addChild(node);
-            overlay = { name, node, grid };
+            overlay = { name, node, grid, pane };
         }
 
         function drawBar(g, x, y, w, h, ratio, color) {
@@ -2437,6 +2475,8 @@
             unitCard = null; // узел подсказки умер вместе с root
             if (root) { root.destroy({ children: true }); root = null; }
             overlay = null;
+            ovZoom = null; // узел умер вместе с root — снимаем ссылку
+            ovCards = [];
             dragFx = null; // Graphics умер вместе с root — не держим мёртвую ссылку
             G.battle = null;
         }
@@ -2444,6 +2484,16 @@
         function update(ticker) {
             if (!root || !B) return;
             const dt = ticker.deltaMS / 1000;
+            // ховер-зум карты оверлея: 0.75 ↔ 1 (плавно, как в «Колоде»)
+            if (ovZoom) {
+                const z = ovZoom;
+                z.cur += (z.tgt - z.cur) * Math.min(1, dt * 14);
+                if (Math.abs(z.tgt - z.cur) < 0.01) {
+                    z.cur = z.tgt;
+                    if (z.tgt === 0.75) { z.node.destroy({ children: true }); ovZoom = null; }
+                }
+                if (ovZoom) z.node.scale.set(z.cur);
+            }
             for (let i = floats.length - 1; i >= 0; i--) {
                 const f = floats[i];
                 if (f.node.destroyed) { floats.splice(i, 1); continue; } // узел снесён вне анимации
@@ -2635,6 +2685,12 @@
                     .filter((ch) => ch.scale && ch.scale.x === 0.75) // cardFace (не тексты ×N)
                     .map((ch) => ({ x: Math.round(ch.x), y: Math.round(ch.y) }));
             },
+            // ховер-зум карт оверлея (тесты): анимация 0.75 ↔ 1
+            ovZoomState: () => (ovZoom
+                ? { id: ovZoom.id, scale: Math.round(ovZoom.cur * 1000) / 1000, target: ovZoom.tgt }
+                : null),
+            // узел карточки сетки оверлея (тесты: эмит pointerover/out)
+            overlayCardNode: (i) => ovCards[i] || null,
             // тест-хук: урон цели с указанным «убийцей» — через damageUnit,
             // с хуками боя (очарование «Огненного дыхания» и пр.)
             _dmg(col, row, amount, killerCol, killerRow) {

@@ -20,6 +20,7 @@
         const ELEM_Y = 144, ELEM_X0 = 1449, STEP = 66; // лого 57px, ряд до x=1836
         const paneCards = { left: [], right: [] }; // для тестов: {id, node, cx, cy, labelY}
         const elemBtns = []; // круги-логотипы (эмитят pointertap в тестах)
+        const elemSprites = []; // спрайты лого (тесты: позиция = центр круга)
         let zoom = null; // {id, node, cur, tgt} — ховер-зум карты
 
         // Наведение на карту: копия поверх панели растёт 0.5 → 1 (полный
@@ -224,6 +225,7 @@
 
         function rebuildChips() {
             elemBtns.length = 0;
+            elemSprites.length = 0;
             for (const n of root.children.slice()) {
                 if (n.userData && n.userData.isChip) root.removeChild(n);
                 else if (n.style && n.style.fontSize === 19 && n.y >= 138 && n.y <= 270 && n.x >= 786) {
@@ -278,7 +280,7 @@
                 const sp = new PIXI.Sprite(uiTex(ELEM_LOGO[value]));
                 sp.anchor.set(0.5);
                 sp.scale.set(45 / sp.texture.width);
-                sp.position.set(19, 19);
+                sp.position.set(28.5, 28.5); // центр круга, не угол контейнера
                 sp.eventMode = "none";
                 if (!active) sp.alpha = 0.6;
                 c2.addChild(g, sp);
@@ -286,6 +288,7 @@
                 c2.userData = { isChip: true };
                 root.addChild(c2);
                 elemBtns.push(g);
+                elemSprites.push(sp);
             }
             const cap = T(t("filter.elem"), 19, 0xcfc4a6);
             cap.anchor.set(0.5, 0);
@@ -329,8 +332,12 @@
             cardNode: (side, i) => (paneCards[side] && paneCards[side][i] ? paneCards[side][i].node : null),
             cardInfo: (side, i) => (paneCards[side] && paneCards[side][i]
                 ? { ...paneCards[side][i], node: undefined } : null),
-            // ряд лого стихий (тесты): число, активный фильтр, левый край
-            elemInfo: () => ({ count: ELEM_KEYS.length, active: filters.elem, x0: ELEM_X0 }),
+            // ряд лого стихий (тесты): число, активный фильтр, левый край,
+            // фактическая позиция первого лого (должна совпадать с центром круга)
+            elemInfo: () => ({
+                count: ELEM_KEYS.length, active: filters.elem, x0: ELEM_X0,
+                logo: elemSprites[0] ? { x: elemSprites[0].x, y: elemSprites[0].y } : null,
+            }),
             elemTap(i) { const g = elemBtns[i]; if (g) g.emit("pointertap"); },
         };
 

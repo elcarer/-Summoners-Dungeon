@@ -192,13 +192,17 @@
             dungeon: null, activeEnemy: null, battle: null,
             uiReturn: null, // откуда открыты настройки/колода (кнопка «Назад»)
             resetRun() {
-                // забег сбрасывается, коллекция/колода/настройки — нет
+                // новая игра — забег И коллекция/колода с нуля (просил юзер:
+                // после кнопки оставалась прокачанная коллекция)
                 this.hero.hp = this.hero.maxHp;
                 this.gold = 0;
                 this.run.floor = 1;
                 this.dungeon = null;
                 this.activeEnemy = null;
                 this.battle = null;
+                this.deck = [...DEFAULT_DECK];
+                this.collection = { ...DEFAULT_COLLECTION };
+                globalThis.GAME_META.saveMeta(this.collection, this.deck);
             },
             // сейв забега (sd_run): этаж, герой, золото, подземелье целиком —
             // «Продолжить» в меню поднимает его (dungeon — простые данные,
@@ -231,8 +235,8 @@
         const T = (text, size, fill, opts = {}) => new PIXI.Text({
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
         });
-        function menuButton(texName, label, x, y, scale, onTap) {
-            return globalThis.GAME_UI.button(ctx, { tex: texName, label, x, y, scale, onTap });
+        function menuButton(texName, label, x, y, scale, onTap, fontSize = 19) {
+            return globalThis.GAME_UI.button(ctx, { tex: texName, label, x, y, scale, onTap, fontSize });
         }
         scenes.add("menu", {
             enter() {
@@ -245,19 +249,19 @@
                 bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);
                 menuRoot.addChild(bg);
 
-                const t1 = T(t("menu.title1"), 111, 0xf0c96a, { stroke: { color: 0x241505, width: 15 } });
-                t1.anchor.set(0.5, 1);
-                t1.position.set(960, 207);
-                const t2 = T(t("menu.title2"), 111, 0xf0c96a, { stroke: { color: 0x241505, width: 15 } });
-                t2.anchor.set(0.5, 0);
-                t2.position.set(960, 219);
+                // Заголовок и кнопки — по референсу юзера (референсы/
+                // start_menu.png): «Подземелье»/«призывателей» строками с
+                // центрами y≈321/471 (кегль 150 по ширинам 650/804 референса,
+                // тонкий штрих), без подзаголовка; кнопки 274×77 столбцом
+                // по центру с шагом 90 (центры 630..990), подписи кеглем 45.
+                const t1 = T(t("menu.title1"), 150, 0xf0c96a, { stroke: { color: 0x241505, width: 8 } });
+                t1.anchor.set(0.5, 0.5);
+                t1.position.set(960, 321);
+                const t2 = T(t("menu.title2"), 150, 0xf0c96a, { stroke: { color: 0x241505, width: 8 } });
+                t2.anchor.set(0.5, 0.5);
+                t2.position.set(960, 471);
                 t1.eventMode = "none"; t2.eventMode = "none";
                 menuRoot.addChild(t1, t2);
-                const sub = T(t("menu.subtitle"), 28, 0xd8c79d);
-                sub.anchor.set(0.5, 0);
-                sub.position.set(960, 333);
-                sub.eventMode = "none";
-                menuRoot.addChild(sub);
 
                 // «Войти» заменён парой «Продолжить»/«Новая игра» (просил юзер):
                 // продолжить можно сохранённый забег (sd_run, пишет G.saveRun),
@@ -265,11 +269,11 @@
                 // натуральном размере спрайта 274×77 (просил юзер).
                 const menuInfo = [];
                 const addMenuBtn = (label, x, y, onTap) => {
-                    const b = menuButton("button_menu.png", label, x, y, 1, onTap);
+                    const b = menuButton("button_menu.png", label, x, y, 1, onTap, 45);
                     const txt = b.children.find((n) => n.style);
                     const sp = b.userData.sprite;
                     menuInfo.push({
-                        label, scale: sp.scale.x,
+                        label, x, y, scale: sp.scale.x,
                         fontSize: txt ? txt.style.fontSize : null,
                         // ширина спрайта в экранных пикселях (тест базы 1920×1080)
                         physW: Math.round(sp.texture.width * sp.scale.x * ui.scale.x),
@@ -278,7 +282,7 @@
                     return b;
                 };
                 const contEnabled = !!GAME_META.loadRun();
-                const bCont = addMenuBtn(t("menu.continue"), 960, 474, () => {
+                const bCont = addMenuBtn(t("menu.continue"), 960, 630, () => {
                     const r = GAME_META.loadRun();
                     if (!contEnabled || !r) return;
                     G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp || 10 };
@@ -288,18 +292,23 @@
                     scenes.go("dungeon");
                 });
                 if (!contEnabled) bCont.alpha = 0.45; // забега нет — кнопка приглушена
-                const bNew = addMenuBtn(t("menu.newGame"), 960, 600, () => {
+                const bNew = addMenuBtn(t("menu.newGame"), 960, 720, () => {
                     GAME_META.clearRun();
                     G.resetRun();
                     scenes.go("dungeon");
                     G.saveRun(); // свежий забег сразу сохранён
                 });
-                addMenuBtn(t("menu.deck"), 960, 726, () => scenes.go("deck"));
-                addMenuBtn(t("menu.settings"), 960, 852, () => scenes.go("settings"));
-                addMenuBtn(t("menu.exit"), 960, 978, () => { menuRoot.userData.bye.visible = true; });
-                // хендл для смоука: подписи/размеры кнопок, нажатие по имени
+                addMenuBtn(t("menu.deck"), 960, 810, () => scenes.go("deck"));
+                addMenuBtn(t("menu.settings"), 960, 900, () => scenes.go("settings"));
+                addMenuBtn(t("menu.exit"), 960, 990, () => { menuRoot.userData.bye.visible = true; });
+                // хендл для смоука: подписи/размеры кнопок, заголовок, нажатие
                 window.__GAME.menu = {
                     buttons: () => menuInfo.map((b) => ({ ...b })),
+                    titles: () => [t1, t2].map((n) => ({
+                        text: n.text, x: n.x, y: n.y,
+                        fontSize: n.style.fontSize, stroke: n.style.stroke.width,
+                    })),
+                    texts: () => menuRoot.children.filter((n) => n.text).map((n) => n.text),
                     continueEnabled: () => contEnabled,
                     press(name) {
                         const b = name === "continue" ? bCont : name === "newGame" ? bNew : null;
