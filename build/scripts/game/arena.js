@@ -837,14 +837,20 @@
                 face.anchor.set(0.5, 1); // оригинальный размер спрайта
                 face.tint = effCost(card) > B.energy ? 0x9f9f9f : 0xffffff;
                 c.addChild(face);
-                // рамка выбора/наведения (видна у выделенной карты)
+                // мягкое свечение выбора/наведения (просил юзер: жёсткая
+                // обводка висела слишком далеко от края спрайта) — золотая
+                // заливка РОВНО по границе карты, размытая блюром, ПОД
+                // спрайтом: виден только мягкий ореол вокруг краёв
                 const frame = new PIXI.Graphics();
-                frame.roundRect(-124, -347, 248, 356, 18);
-                frame.stroke({ width: 7.5, color: 0xf0c96a });
+                frame.roundRect(-115, -338, 230, 338, 16);
+                frame.fill({ color: 0xf0c96a, alpha: 0.85 });
+                const blur = new PIXI.BlurFilter({ strength: 9, quality: 3 });
+                blur.padding = 18; // ореол не резать по границе фильтра
+                frame.filters = [blur];
                 frame.visible = false;
                 frame.name = "selframe";
                 frame.eventMode = "none";
-                c.addChild(frame);
+                c.addChildAt(frame, 0);
             } else { // фолбэк без картинки: рубашка + подписи
                 const face = new PIXI.Sprite(uiTex("card_back_small.png"));
                 face.anchor.set(0.5, 1);
@@ -1521,6 +1527,7 @@
             if (overlay || (B && B.discarding)) return; // поверх сброса — ничего
             if (overlay) closeOverlay();
             const node = new PIXI.Container();
+            let grid = null; // сетка карт (deck/edeck/discard) — для тестов
             node.eventMode = "static"; // глотает клики — поле под ним молчит
             const dim = new PIXI.Graphics();
             dim.rect(0, 0, 1280, 720);
@@ -1556,12 +1563,16 @@
                 hint.eventMode = "none";
                 node.addChild(hint);
                 const pane = scrollPane(ctx, { x: 315, y: 198, w: 1290, h: 660 });
-                const grid = new PIXI.Container();
+                grid = new PIXI.Container();
+                // cardFace 0.75 = карта ~253×371 (центр в position): ряды
+                // дальше высоты карты (415), первый ряд целиком в панели
+                // (просил юзер: карты обрезались сверху и налагались)
+                const CARD_H = 371, ROW_STEP = 415, TOP = 200;
                 const ids = [...new Set(pile)].sort((a, b) =>
                     (CARDS[a].cost - CARDS[b].cost) || a.localeCompare(b));
                 ids.forEach((id, i) => {
                     const col = i % 4, rowI = (i / 4) | 0;
-                    const cx = 172.5 + col * 322.5, cy = 165 + rowI * 307.5;
+                    const cx = 172.5 + col * 322.5, cy = TOP + rowI * ROW_STEP;
                     const card = cardFace(ctx, id, { scale: 0.75 });
                     card.position.set(cx, cy);
                     card.eventMode = "none";
@@ -1580,7 +1591,8 @@
                     grid.addChild(empty);
                 }
                 const rowsN = Math.ceil(ids.length / 4);
-                pane.setContent(grid, ids.length ? 165 + (rowsN - 1) * 307.5 + 225 : 60);
+                pane.setContent(grid,
+                    ids.length ? TOP + CARD_H / 2 + (rowsN - 1) * ROW_STEP : 60);
                 node.addChild(pane.node);
                 node.addChild(button(ctx, {
                     tex: "button_menu.png", label: t("settings.back"), x: 960, y: 1017, scale: 1,
@@ -1588,7 +1600,7 @@
                 }));
             }
             root.addChild(node);
-            overlay = { name, node };
+            overlay = { name, node, grid };
         }
 
         function drawBar(g, x, y, w, h, ratio, color) {
@@ -2606,6 +2618,23 @@
             journeyState: () => ({ picking: !!journeyPanel, top: [...journeyTop] }),
             journeyPick(idx) { pickJourney(idx); },
             journeySummon: () => (B ? B.journeySummon : null),
+            // тест-хуки поправок: свечение выбранной карты (п2) и сетка
+            // оверлея-просмотра (п3)
+            selGlow() {
+                if (!root || !B || B.selected === null) return null;
+                const n = root.cardsLayer.children[B.selected];
+                if (!n) return null;
+                const f = n.getChildByName("selframe");
+                if (!f) return null; // фолбэк-карта без свечения
+                return { visible: !!f.visible, blurred: !!(f.filters && f.filters.length),
+                    behind: n.getChildIndex(f) === 0 };
+            },
+            overlayCards() {
+                if (!overlay || !overlay.grid) return null;
+                return overlay.grid.children
+                    .filter((ch) => ch.scale && ch.scale.x === 0.75) // cardFace (не тексты ×N)
+                    .map((ch) => ({ x: Math.round(ch.x), y: Math.round(ch.y) }));
+            },
             // тест-хук: урон цели с указанным «убийцей» — через damageUnit,
             // с хуками боя (очарование «Огненного дыхания» и пр.)
             _dmg(col, row, amount, killerCol, killerRow) {

@@ -19,6 +19,7 @@
             "dungeon.hp": "HP {hp}/{max}",
             "dungeon.exitLabel": "ВЫХОД",
             "dungeon.exitSealed": "Выход запечатан: победите главаря!",
+            "dungeon.exitDeck": "Для спуска нужно минимум {n} карт в колоде",
             "dungeon.toastFloor": "Этаж {n} пройден!",
             "dungeon.tipDeck": "Колода",
             "dungeon.tipBase": "HP базы: {n}",

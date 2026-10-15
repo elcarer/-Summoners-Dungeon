@@ -407,7 +407,11 @@
                 }
                 if (st.exit && Math.hypot(st.exit.x - hx, st.exit.y - hy) < TS * 0.85) {
                     if (!st.bossDead) showToast(GAME_LOC.t("dungeon.exitSealed"));
-                    else {
+                    // спуск требует растущую колоду: на этаже N — минимум
+                    // 11+N карт (этаж 1 — 12, спуск на 2-й — 13, …)
+                    else if (G.deck.length < 12 + st.floor) {
+                        showToast(GAME_LOC.t("dungeon.exitDeck", { n: 12 + st.floor }));
+                    } else {
                         G.run.floor += 1;
                         G.dungeon = null; // новый этаж — новая карта (v0: тот же шаблон)
                         scenes.go("floorWin");
