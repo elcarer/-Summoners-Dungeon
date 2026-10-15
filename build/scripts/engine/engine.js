@@ -503,6 +503,11 @@ async function init() {
         // height: 600, //высота экрана в пикселях
         backgroundColor: "black",
         resizeTo: window, //растянуть на всё окно
+        // рендер в физических пикселях дисплея: при системном масштабе
+        // 125–150% канвас иначе дважды перемасштабируется (downscale
+        // letterbox + upscale браузера) и арт выглядит «пережатым»
+        resolution: Math.min(window.devicePixelRatio || 1, 2),
+        autoDensity: true, // CSS-размер канваса не меняется — вёрстка та же
         antialias: false, //отключаем сглаживание пиксельарта (???)
         preference: "webgpu" // предпочитаемый рендерер: нет WebGPU — PixiJS сам откатится на WebGL
     });

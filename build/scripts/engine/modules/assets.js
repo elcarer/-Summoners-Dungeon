@@ -24,7 +24,7 @@ function createAssets() {
             const img = new Image();
             img.onload = () => {
                 const tex = PIXI.Texture.from(img);
-                tex.source.scaleMode = "nearest";
+                tex.source.scaleMode = "linear";
                 resolve(tex);
             };
             img.onerror = () => reject(new Error("битый data-URL изображения"));
@@ -45,11 +45,14 @@ function createAssets() {
         return results;
     }
 
-    // Загрузить одну текстуру (с кэшем); пиксельарт — без сглаживания
+    // Загрузить одну текстуру (с кэшем). Арт проекта — рисованый (не
+    // пиксель-арт), поэтому фильтрация линейная: при уменьшении карт/панелей
+    // нет «пережатых» пикселей (просил юзер). Пиксель-артные загрузчики
+    // (dualgrid) ставят nearest на своих текстурах сами.
     async function loadTexture(url) {
         if (cache.has(url)) return cache.get(url);
         const texture = await PIXI.Assets.load(url);
-        texture.source.scaleMode = "nearest";
+        texture.source.scaleMode = "linear";
         cache.set(url, texture);
         return texture;
     }

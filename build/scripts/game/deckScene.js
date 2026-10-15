@@ -26,8 +26,14 @@
         // Наведение на карту: копия поверх панели растёт 0.5 → 1 (полный
         // размер), уведение — уменьшается обратно и удаляется. Копия добавляется
         // в root сцены (не в панель) — маска скролла её не обрезает.
-        function showZoom(id, side, cx, cy) {
+        function showZoom(id, side, cx, cy, base) {
             hideZoom(true);
+            // базовую карту прячем на время показа копии (просил юзер —
+            // иначе видны обе). Через alpha, не visible: невидимая карта
+            // остаётся кликабельной (клик по ней добавляет/убирает копию),
+            // а dim-карты вернут свою прозрачность
+            let baseAlpha = 1;
+            if (base && !base.destroyed) { baseAlpha = base.alpha; base.alpha = 0; }
             const node = cardFace(ctx, id, { scale: 0.5 });
             node.eventMode = "none"; // клики проходят к карте под копией
             const pp = PANE_POS[side];
@@ -35,12 +41,15 @@
             const iy = -st.t * Math.max(0, st.contentH - st.viewH);
             node.position.set(pp.x + cx, Math.max(270, Math.min(810, pp.y + cy + iy)));
             root.addChild(node);
-            zoom = { id, node, cur: 0.5, tgt: 1 };
+            zoom = { id, node, cur: 0.5, tgt: 1, base, baseAlpha };
         }
         function hideZoom(immediate) {
             if (!zoom) return;
-            if (immediate) { zoom.node.destroy({ children: true }); zoom = null; }
-            else zoom.tgt = 0.5; // плавно уменьшится в update, затем удалится
+            if (immediate) {
+                if (zoom.base && !zoom.base.destroyed) zoom.base.alpha = zoom.baseAlpha;
+                zoom.node.destroy({ children: true });
+                zoom = null;
+            } else zoom.tgt = 0.5; // плавно уменьшится в update, затем удалится
         }
 
         function countIn(id) {
@@ -73,7 +82,7 @@
                 card.position.set(cx, cy);
                 card.eventMode = "static";
                 card.on("pointertap", () => api.remove(id));
-                card.on("pointerover", () => showZoom(id, "left", cx, cy));
+                card.on("pointerover", () => showZoom(id, "left", cx, cy, card));
                 card.on("pointerout", () => hideZoom(false));
                 c.addChild(card);
                 const cnt = T(`×${countIn(id)}`, 19, locked ? 0x8a7c5e : 0xd8c79d);
@@ -106,7 +115,7 @@
                 const card = cardFace(ctx, id, { scale: 0.5, dim: owned <= inDeck || capped });
                 card.position.set(cx, cy);
                 card.eventMode = "static"; // ховер-зум — на любой карте
-                card.on("pointerover", () => showZoom(id, "right", cx, cy));
+                card.on("pointerover", () => showZoom(id, "right", cx, cy, card));
                 card.on("pointerout", () => hideZoom(false));
                 c.addChild(card);
                 const cnt = T(t("deck.owned", { n: owned }), 19, canAdd ? 0xd8c79d : 0x8a7c5e);
@@ -354,7 +363,11 @@
                     z.cur += (z.tgt - z.cur) * Math.min(1, (ticker.deltaMS / 1000) * 14);
                     if (Math.abs(z.tgt - z.cur) < 0.01) {
                         z.cur = z.tgt;
-                        if (z.tgt === 0.5) { z.node.destroy({ children: true }); zoom = null; }
+                        if (z.tgt === 0.5) {
+                            if (z.base && !z.base.destroyed) z.base.alpha = z.baseAlpha;
+                            z.node.destroy({ children: true });
+                            zoom = null;
+                        }
                     }
                     if (zoom) z.node.scale.set(z.cur);
                 }

@@ -477,11 +477,12 @@
             }
             const dest = lureRedirect(u, u.col, u.row, u.col, ahead);
             if (!B.units.includes(u)) return; // приманка убила шагнувшего
+            const ddx = dest[0] - u.col; // боковой шаг (приманка) — боковая походка
             u.col = dest[0];
             u.row = dest[1];
             const p = cellXY(u.col, u.row);
             glide(u, p.x, p.y);
-            setWalk(u, true);
+            setWalk(u, true, ddx < 0 ? "walk_left" : ddx > 0 ? "walk_right" : undefined);
             sfx("step");
             afterMoved(u); // перемещение — вражеские ловушки могут сработать
         }
@@ -1532,9 +1533,14 @@
         // поверх панели растёт 0.75 → 1 (оригинальный размер спрайта),
         // уведение — уменьшается обратно и удаляется. Копия добавляется в
         // node оверлея — маска скролла её не обрезает.
-        function showOvZoom(id, cx, cy) {
+        function showOvZoom(id, cx, cy, base) {
             hideOvZoom(true);
             if (!overlay || !overlay.pane) return;
+            // базовую карту прячем на время показа копии (просил юзер —
+            // иначе видны обе). Через alpha, не visible: невидимая карта
+            // остаётся кликабельной, а dim-карты вернут свою прозрачность
+            let baseAlpha = 1;
+            if (base && !base.destroyed) { baseAlpha = base.alpha; base.alpha = 0; }
             const zNode = globalThis.GAME_UI.cardFace(ctx, id, { scale: 0.75 });
             zNode.eventMode = "none"; // уведение проходит к карте под копией
             const st = overlay.pane.state;
@@ -1546,12 +1552,15 @@
                 Math.max(OV_PANE.y + hh, Math.min(OV_PANE.y + OV_PANE.h - hh, OV_PANE.y + cy + iy)),
             );
             overlay.node.addChild(zNode);
-            ovZoom = { id, node: zNode, cur: 0.75, tgt: 1 };
+            ovZoom = { id, node: zNode, cur: 0.75, tgt: 1, base, baseAlpha };
         }
         function hideOvZoom(immediate) {
             if (!ovZoom) return;
-            if (immediate) { ovZoom.node.destroy({ children: true }); ovZoom = null; }
-            else ovZoom.tgt = 0.75; // плавно уменьшится в update, затем удалится
+            if (immediate) {
+                if (ovZoom.base && !ovZoom.base.destroyed) ovZoom.base.alpha = ovZoom.baseAlpha;
+                ovZoom.node.destroy({ children: true });
+                ovZoom = null;
+            } else ovZoom.tgt = 0.75; // плавно уменьшится в update, затем удалится
         }
         function openOverlay(name) {
             if (overlay || (B && B.discarding)) return; // поверх сброса — ничего
@@ -1611,7 +1620,7 @@
                     const card = cardFace(ctx, id, { scale: 0.75 });
                     card.position.set(cx, cy);
                     card.eventMode = "static"; // ховер-зум — на любой карте
-                    card.on("pointerover", () => showOvZoom(id, cx, cy));
+                    card.on("pointerover", () => showOvZoom(id, cx, cy, card));
                     card.on("pointerout", () => hideOvZoom(false));
                     grid.addChild(card);
                     ovCards.push(card);
@@ -1655,9 +1664,11 @@
             if (!root || !B) return;
             const ud = root.hud.userData;
             ud.title.text = t(`enc.${B.encId}.title`);
-            drawBar(ud.eBar, 705, 66, 510, 21, B.enemyBase / B.enemyBaseMax, 0xc0503c);
+            // полоска — внутри плашки panel_label (470 px в масштабе 1.38):
+            // 735..1185, иначе вылезает за камень (просил юзер)
+            drawBar(ud.eBar, 735, 66, 450, 21, B.enemyBase / B.enemyBaseMax, 0xc0503c);
             ud.eInfo.text = `${t("arena.baseEnemy")} ${Math.max(0, B.enemyBase)}/${B.enemyBaseMax}  ·  ${t("arena.energy")} ${B.eEnergy}  ·  ${t("arena.manaCards", { n: B.eHand.length })}`;
-            globalThis.GAME_UI.fit(ud.eInfo, 645, 16.5);
+            globalThis.GAME_UI.fit(ud.eInfo, 430, 16.5);
             drawBar(ud.pBar, 255, 828, 150, 18, B.playerBase / B.playerBaseMax, 0x5d9c4a);
             ud.pName.text = t("arena.hero");
             ud.manaT.text = `${B.energy}`;
@@ -1701,6 +1712,10 @@
         function drawEnemy(count) {
             for (let k = 0; k < count; k++) {
                 if (!B.eDeck.length) { B.eDeck = shuffle(B.eDiscard); B.eDiscard = []; }
+                // «Подкрепление»: и колода, и сброс пусты — свежая тасовка
+                // базовой колоды врага (иначе в затяжном бою ИИ остаётся
+                // без карт и копит энергию — просил юзер)
+                if (!B.eDeck.length && B.eDeckBase) B.eDeck = shuffle([...B.eDeckBase]);
                 if (!B.eDeck.length) break;
                 B.eHand.push(B.eDeck.pop());
             }
@@ -1734,11 +1749,12 @@
                     }
                     const dest = lureRedirect(u, u.col, u.row, u.col, ahead);
                     if (!B.units.includes(u)) break; // приманка убила шагнувшего
+                    const ddx = dest[0] - u.col; // боковой шаг (приманка) — боковая походка
                     u.col = dest[0];
                     u.row = dest[1];
                     const p = cellXY(u.col, u.row);
                     glide(u, p.x, p.y);
-                    setWalk(u, true);
+                    setWalk(u, true, ddx < 0 ? "walk_left" : ddx > 0 ? "walk_right" : undefined);
                     sfx("step");
                     await delay(0.52 / animK()); // глиссада + пауза: полный шаг походки
                     if (B.stopped) return;
@@ -1772,15 +1788,16 @@
             if (B.stopped || B.phase === "over") return;
             await aiPlay();
             if (B.stopped || B.phase === "over") return;
-            // шкала врага (те же правила), но копить энергию ИИ может только
-            // до порога: с запасом ≥ 12 весь доход шкалы уходит в добор карт
-            // (до лимита руки) — иначе энергию нечем тратить и она копится
-            // десятками при почти пустом столе
+            // шкала врага (те же правила): доход уходит сначала в добор карт,
+            // остаток — в энергию. С 4-го хода ИИ всегда держит руку полную
+            // (просил юзер: иначе копит десятки энергии при почти пустой руке),
+            // и в добор идут уже и накопления — но энергия не уходит в минус
             const total = spheresTotal();
             let eCards = 0;
             if (B.eHand.length < 4) eCards = 4 - B.eHand.length; // малая рука — добор до 4
-            if (B.eEnergy >= 12) eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
-            eCards = Math.max(0, Math.min(eCards, total));
+            if (B.eEnergy >= 12 || B.turnNo >= 4)
+                eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
+            eCards = Math.max(0, Math.min(eCards, B.turnNo >= 4 ? total + B.eEnergy : total));
             drawEnemy(eCards);
             B.eEnergy += total - eCards;
             refreshHud();
@@ -1824,11 +1841,10 @@
             let refillTries = 0;
             const tryRefill = async () => {
                 if (B.eEnergy < 5 || refillTries >= 2) return false;
-                if (!B.eDeck.length && !B.eDiscard.length) return false;
                 refillTries++;
                 const before = B.eHand.length;
-                drawEnemy(2);
-                if (B.eHand.length === before) return false; // колода и сброс пусты
+                drawEnemy(2); // пустые колода/сброс закроет «подкрепление»
+                if (B.eHand.length === before) return false; // карт взять неоткуда
                 refreshHud();
                 await delay(0.3 / animK());
                 return true;
@@ -2387,6 +2403,13 @@
             const enc = ENCOUNTERS[encId] || ENCOUNTERS.gob;
             curScene = enc.scene || 1;
             if (ctx.music) ctx.music("battle");
+            // колода врага хранится в враге подземелья (кидается при
+            // генерации этажа по глубине); для старых сейвов — генерим.
+            // eDeckBase — эталон для «подкреплений»: в затяжном бою колода
+            // не должна вымирать (иначе ИИ копит энергию без карт в руке)
+            const eBase = G.activeEnemy && G.activeEnemy.deck
+                ? [...G.activeEnemy.deck]
+                : enemyDeck(encId, G.run ? G.run.floor : 1);
             B = {
                 encId, phase: "player", stopped: false, turnNo: 1,
                 energy: 1, eEnergy: 1,
@@ -2394,11 +2417,8 @@
                 playerBase: 15, playerBaseMax: 15,
                 enemyBase: enc.baseHp, enemyBaseMax: enc.baseHp,
                 deck: shuffle([...G.deck]), discard: [], hand: [],
-                // колода врага хранится в враге подземелья (кидается при
-                // генерации этажа по глубине); для старых сейвов — генерим
-                eDeck: shuffle(G.activeEnemy && G.activeEnemy.deck
-                    ? [...G.activeEnemy.deck]
-                    : enemyDeck(encId, G.run ? G.run.floor : 1)),
+                eDeck: shuffle([...eBase]),
+                eDeckBase: eBase,
                 eDiscard: [], eHand: [],
                 units: [], traps: { p: [], e: [] }, firewalls: [],
                 selected: null, spellTarget: false, result: null,
@@ -2490,7 +2510,11 @@
                 z.cur += (z.tgt - z.cur) * Math.min(1, dt * 14);
                 if (Math.abs(z.tgt - z.cur) < 0.01) {
                     z.cur = z.tgt;
-                    if (z.tgt === 0.75) { z.node.destroy({ children: true }); ovZoom = null; }
+                    if (z.tgt === 0.75) {
+                        if (z.base && !z.base.destroyed) z.base.alpha = z.baseAlpha;
+                        z.node.destroy({ children: true });
+                        ovZoom = null;
+                    }
                 }
                 if (ovZoom) z.node.scale.set(z.cur);
             }
@@ -2691,6 +2715,20 @@
                 : null),
             // узел карточки сетки оверлея (тесты: эмит pointerover/out)
             overlayCardNode: (i) => ovCards[i] || null,
+            // геометрия полоски базы врага (тесты: не вылезает за плашку;
+            // локальные границы = дизайн-координаты, без letterbox-масштаба)
+            eBarGeom: () => {
+                if (!root || !root.hud) return null;
+                const b = root.hud.userData.eBar.getLocalBounds();
+                return { x: Math.round(b.x), w: Math.round(b.width) };
+            },
+            // лицо походки юнита на клетке (тесты: боковой шаг — walk_left/right)
+            walkFace: (col, row) => {
+                const u = unitAt(col, row);
+                if (!u || !u.node) return null;
+                const body = u.node.getChildByName("body");
+                return body ? (body.userData_face || null) : null;
+            },
             // тест-хук: урон цели с указанным «убийцей» — через damageUnit,
             // с хуками боя (очарование «Огненного дыхания» и пр.)
             _dmg(col, row, amount, killerCol, killerRow) {
