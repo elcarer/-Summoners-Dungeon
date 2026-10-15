@@ -27,7 +27,7 @@
     const W = ROWS[0].length, H = ROWS.length;
 
     function newDungeonState(floor) {
-        const { MOB_POOL } = globalThis.GAME_DATA;
+        const { mobForFloor, enemyDeck } = globalThis.GAME_DATA;
         const st = {
             floor, heroPos: null, enemies: [], exit: null, bossDead: false,
             toast: null, toastT: 0,
@@ -36,8 +36,13 @@
             const ch = ROWS[j][i];
             const x = i * TS + TS / 2, y = j * TS + TS / 2;
             if (ch === "H") st.heroPos = { x, y };
-            else if (ch === "e") st.enemies.push({ x, y, enc: MOB_POOL[(Math.random() * MOB_POOL.length) | 0], alive: true, boss: false });
-            else if (ch === "B") st.enemies.push({ x, y, enc: "boss", alive: true, boss: true });
+            else if (ch === "e") {
+                // архетип по этажу; колода кидается один раз и хранится
+                // в враге — тултип и бой показывают один и тот же состав
+                const enc = mobForFloor(floor);
+                st.enemies.push({ x, y, enc, deck: enemyDeck(enc, floor), alive: true, boss: false });
+            }
+            else if (ch === "B") st.enemies.push({ x, y, enc: "boss", deck: enemyDeck("boss", floor), alive: true, boss: true });
             else if (ch === "X") st.exit = { x, y };
         }
         return st;
@@ -205,11 +210,14 @@
         // камера может двигаться. Показывает pointermove по клик-зоне карты:
         // жетоны врагов НЕ интерактивны, чтобы не съедать клики движения.
         let tip = null; // { enemy, node, h }
-        function deckSummary(encId) {
-            const enc = globalThis.GAME_DATA.ENCOUNTERS[encId] || globalThis.GAME_DATA.ENCOUNTERS.gob;
+        function deckSummary(enemy) {
+            // колода хранится в враге (кидается при генерации этажа); для
+            // врагов из старых сейвов — генерим от этажа подземелья
+            const deck = enemy.deck
+                || globalThis.GAME_DATA.enemyDeck(enemy.enc, G.dungeon ? G.dungeon.floor : 1);
             const counts = new Map();
-            for (const id of enc.deck) counts.set(id, (counts.get(id) || 0) + 1);
-            return [...counts.entries()]
+            for (const id of deck) counts.set(id, (counts.get(id) || 0) + 1);
+            return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
                 .map(([id, n]) => `${n}× ${GAME_LOC.t("card." + id + ".name")}`).join(", ");
         }
         function showTip(enemy) {
@@ -227,7 +235,7 @@
                 style: { fontFamily: "Kereru", fontSize: 18, fill: 0xff9c8c },
             });
             const deck = new PIXI.Text({
-                text: GAME_LOC.t("dungeon.tipDeck") + ": " + deckSummary(enemy.enc),
+                text: GAME_LOC.t("dungeon.tipDeck") + ": " + deckSummary(enemy),
                 style: { fontFamily: "Kereru", fontSize: 18, fill: 0xd8c79d,
                     wordWrap: true, wordWrapWidth: 336, breakWords: true },
             });
@@ -422,7 +430,7 @@
             tipState: () => (tip ? {
                 enc: tip.enemy.enc, boss: !!tip.enemy.boss,
                 title: GAME_LOC.t("enc." + tip.enemy.enc + ".title"),
-                deck: deckSummary(tip.enemy.enc),
+                deck: deckSummary(tip.enemy),
                 w: 372, h: tip.h,
             } : null),
             tipHide: () => hideTip(),

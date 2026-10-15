@@ -37,7 +37,7 @@
     // Лимит руки — 7 карт, проверяется ТОЛЬКО в конце хода (после добора со
     // шкалы): лишнее игрок сбрасывает по своему выбору (панель сброса).
     const HAND_MAX = 7;
-    const { CARDS, ENCOUNTERS, TRAP_SLOTS } = globalThis.GAME_DATA;
+    const { CARDS, ENCOUNTERS, TRAP_SLOTS, enemyDeck } = globalThis.GAME_DATA;
 
     function createArenaScene(ctx) {
         const { scenes, G, uiTex, scheduler } = ctx;
@@ -1607,6 +1607,33 @@
             await playerTurnStart();
         }
 
+        // ── Карта, разыгранная врагом (просил юзер): лицом на свободном
+        // месте слева от поля, с красной рамкой; между розыгрышами врага
+        // пауза ≥ 1 реальной секунды, и всё это время карта видна — игрок
+        // понимает, что делает противник.
+        let enemyCard = null; // { id, node }
+        function showEnemyCard(cardId) {
+            hideEnemyCard();
+            const node = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.75 });
+            node.eventMode = "none";
+            node.position.set(430, 420);
+            const frame = new PIXI.Graphics();
+            frame.roundRect(-131, -191, 262, 382, 18);
+            frame.stroke({ width: 6, color: 0xd05a3c });
+            frame.eventMode = "none";
+            node.addChild(frame);
+            root.addChild(node);
+            enemyCard = { id: cardId, node };
+        }
+        function hideEnemyCard() {
+            if (!enemyCard) return;
+            enemyCard.node.destroy({ children: true });
+            enemyCard = null;
+        }
+        // пауза между розыгрышами: минимум 1 секунда (реальная), при
+        // замедленных анимациях — дольше
+        const enemyPlayDelay = () => Math.max(1, 1 / animK());
+
         async function aiPlay() {
             // ИИ тратит энергию, пока есть чем. Если играть нечем (в руке всё
             // слишком дорого или неприменимо — поле забито, целей нет), а
@@ -1638,30 +1665,58 @@
                         const rows = deployRows("e");
                         const free = freeCells(rows);
                         if (!free.length) continue;
-                        const frontRow = rows[rows.length - 1];
-                        const front = free.filter(([, r]) => r === frontRow);
-                        const pool = front.length ? front : free;
+                        let pool;
+                        if (def.type === "building") {
+                            // строения — в тыл (ряд у своей базы): их маршем
+                            // не достать, аура работает из глубины
+                            const back = free.filter(([, r]) => r === rows[0]);
+                            pool = back.length ? back : free;
+                        } else {
+                            const frontRow = rows[rows.length - 1];
+                            const front = free.filter(([, r]) => r === frontRow);
+                            let cand = front.length ? front : free;
+                            // юниты — не в колонку за своим (заторы марша):
+                            // если есть свободные колонки без своих — в них
+                            const open = cand.filter(([c2]) =>
+                                !B.units.some((o) => o.side === "e" && o.col === c2));
+                            if (open.length) cand = open;
+                            pool = cand;
+                        }
+                        showEnemyCard(pick.id); // карта врага слева ≥ 1с
+                        await delay(enemyPlayDelay());
                         const [col, row] = pool[(Math.random() * pool.length) | 0];
                         const cardId = B.eHand[pick.i];
                         B.eHand.splice(pick.i, 1);
                         B.eEnergy -= effCost(cardId, "e");
                         addUnit("e", cardId, col, row);
+                        hideEnemyCard();
                         played = true;
                         break;
                     }
                     if (def.type === "trap") {
                         if (B.traps.e.length >= TRAP_SLOTS) continue;
-                        // минируем зону призыва игрока: ряд 4 (там призыв), затем 3, 2
+                        // минируем зону призыва игрока: ряд 4 (там призыв),
+                        // затем 3, 2; приманку — рядом с юзами игрока: она
+                        // манит шагающих с соседних клеток
                         const spots = [];
                         for (const r of [4, 3, 2]) for (let cc = 0; cc < GRID; cc++) {
                             if (!unitAt(cc, r) && !B.traps.e.some((t) => t.col === cc && t.row === r)) spots.push([cc, r]);
                         }
                         if (!spots.length) continue;
-                        const [col, row] = spots[(Math.random() * spots.length) | 0];
+                        let pool = spots;
+                        if (def.trap.effect === "lure") {
+                            const near = spots.filter(([c2, r2]) => B.units.some((v) =>
+                                v.side === "p" && Math.abs(v.col - c2) + Math.abs(v.row - r2) === 1));
+                            if (near.length) pool = near;
+                        }
+                        showEnemyCard(pick.id);
+                        await delay(enemyPlayDelay());
+                        const [col, row] = pool[(Math.random() * pool.length) | 0];
                         const cardId = B.eHand[pick.i];
                         B.eHand.splice(pick.i, 1);
                         B.eEnergy -= effCost(cardId, "e");
                         armTrap("e", cardId, col, row);
+                        hideEnemyCard();
                         played = true;
                         break;
                     }
@@ -1673,14 +1728,21 @@
                         // «Поиск рун»: в верхних картах колоды должно быть заклинание
                         if (def.spell.search && !B.eDeck.slice(-def.spell.search)
                             .some((id) => CARDS[id] && CARDS[id].type === "spell")) continue;
-                        // «Огненное дыхание» — только если есть своё неочарованное существо
-                        if (def.spell.enchantFire && !B.units.some((v) => v.side === "e"
-                            && v.def.type === "unit" && !v.enchantFire)) continue;
+                        // усиление/очарование — только если есть своё существо под него
+                        if (def.spell.target === "anyUnit" && !B.units.some((v) => v.side === "e"
+                            && v.def.type === "unit" && (!def.spell.enchantFire || !v.enchantFire))) continue;
+                        // дротик/варево/огнешар — только если есть цель
+                        if (def.spell.target === "anyUnitDmg" && !B.units.some((v) => v.side === "p"
+                            && (v.def.type === "unit"
+                                || (v.def.type === "building" && !def.spell.noBuildings)))) continue;
+                        // карта врага — лицом слева, пауза ≥ 1с: игрок видит,
+                        // что сейчас произойдёт (просил юзер)
+                        showEnemyCard(pick.id);
+                        await delay(enemyPlayDelay());
                     if (def.spell.target === "anyUnit") { // усиление/очарование — своему сильнейшему
                         const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
                             && (!def.spell.enchantFire || !v.enchantFire));
-                        if (!own.length) continue;
-                        const best = own.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                        const best = own.slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row))[0];
                         if (def.spell.enchantFire) { // «Огненное дыхание»
                             best.enchantFire = true;
                             const mark = new PIXI.Graphics();
@@ -1701,18 +1763,20 @@
                         punch(best.node);
                         sfx("up");
                     }
-                    if (def.spell.target === "anyUnitDmg") { // дротик/варево/огнешар — сильнейшему игроку
+                    if (def.spell.target === "anyUnitDmg") { // дротик/варево/огнешар
+                        const dmg = def.spell.drainAll // вся энергия сверх цены — в урон
+                            ? Math.max(0, B.eEnergy - effCost(pick.id, "e")) + altarBonus("e")
+                            : spellDmg(def, "e");
                         const targets = B.units.filter((v) => v.side === "p"
                             && (v.def.type === "unit"
                                 || (v.def.type === "building" && !def.spell.noBuildings)));
-                        if (!targets.length) continue;
-                        const best = targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
-                        if (def.spell.drainAll) { // вся энергия сверх цены — в урон
-                            damageUnit(best, Math.max(0, B.eEnergy - effCost(pick.id, "e"))
-                                + altarBonus("e"), null, "rocket");
-                        } else {
-                            damageUnit(best, spellDmg(def, "e"), null, "rocket");
-                        }
+                        // ИИ добивает: если есть цель под убийство (урон ≥
+                        // жизней) — бьём её (из них сильнейшую и ближе к базе),
+                        // иначе просто сильнейшего юза игрока
+                        const kills = targets.filter((v) => v.hp <= dmg);
+                        const best = (kills.length ? kills : targets)
+                            .slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                        damageUnit(best, dmg, null, "rocket");
                     }
                     if (def.spell.target === "anyCell") { // стена костров — ряд, где больше игроков
                         const counts = [0, 0, 0, 0, 0];
@@ -1737,6 +1801,12 @@
                             sfx("rocket");
                         }
                     }
+                    if (def.spell.target === "none" && def.spell.baseDmg) { // землетрясение
+                        B.playerBase -= def.spell.baseDmg;
+                        floatText(960, 840, `−${def.spell.baseDmg}`, 0xff5f4e);
+                        punch(root.hud);
+                        sfx("rocket");
+                    }
                         if (def.spell.draw) drawEnemy(def.spell.draw);
                         if (def.spell.search) { // верхнее заклинание из верхних карт колоды — в руку
                             const spells = B.eDeck.map((id, j) => ({ id, j }))
@@ -1746,6 +1816,7 @@
                         }
                         if (def.spell.brew) B.brewCasts = (B.brewCasts || 0) + 1;
                         B.eDiscard.push(cardId);
+                        hideEnemyCard();
                         refreshHud();
                         if (checkEnd()) return;
                         played = true;
@@ -2040,7 +2111,12 @@
                 playerBase: 15, playerBaseMax: 15,
                 enemyBase: enc.baseHp, enemyBaseMax: enc.baseHp,
                 deck: shuffle([...G.deck]), discard: [], hand: [],
-                eDeck: shuffle([...enc.deck]), eDiscard: [], eHand: [],
+                // колода врага хранится в враге подземелья (кидается при
+                // генерации этажа по глубине); для старых сейвов — генерим
+                eDeck: shuffle(G.activeEnemy && G.activeEnemy.deck
+                    ? [...G.activeEnemy.deck]
+                    : enemyDeck(encId, G.run ? G.run.floor : 1)),
+                eDiscard: [], eHand: [],
                 units: [], traps: { p: [], e: [] }, firewalls: [],
                 selected: null, spellTarget: false, result: null,
                 discarding: false, picking: false, brewCasts: 0,
@@ -2103,6 +2179,7 @@
             drag = null;
             closeDiscardPanel();
             closeRunesPanel();
+            hideEnemyCard(); // узел умер бы вместе с root — снимаем ссылку
             unitCard = null; // узел подсказки умер вместе с root
             if (root) { root.destroy({ children: true }); root = null; }
             overlay = null;
@@ -2232,6 +2309,10 @@
             unitCardState: () => (unitCard
                 ? { id: cardIdOf(unitCard.unit.def), side: unitCard.unit.side,
                     col: unitCard.unit.col, row: unitCard.unit.row }
+                : null),
+            // карта, разыгранная врагом (тесты): что показано слева
+            enemyCardState: () => (enemyCard
+                ? { id: enemyCard.id, x: enemyCard.node.x, y: enemyCard.node.y }
                 : null),
             hoverCell(col, row) { const p = cellXY(col, row); unitHoverAt(p.x, p.y); },
             hoverOff: () => unitCardHide(),

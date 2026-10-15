@@ -102,14 +102,14 @@
     };
     const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
 
-    // Базовая колода: 12 карт — по 3 копии обычных (ID 1-4) стихии «Сила».
+    // Базовая колода: 12 карт — по 2 копии шести основных (просил юзер).
     const DEFAULT_DECK = [
-        "str1", "str1", "str1", "str2", "str2", "str2",
-        "str3", "str3", "str3", "str4", "str4", "str4",
+        "str1", "str1", "str2", "str2", "str3", "str3",
+        "str4", "str4", "str9", "str9", "str12", "str12",
     ];
     const DEFAULT_COLLECTION = {
-        str1: 3, str2: 3, str3: 3, str4: 3,
-        str5: 0, str6: 0, str7: 0, str8: 0, str9: 0, str10: 0, str11: 0, str12: 0,
+        str1: 2, str2: 2, str3: 2, str4: 2, str9: 2, str12: 2,
+        str5: 0, str6: 0, str7: 0, str8: 0, str10: 0, str11: 0,
         str13: 0, str14: 0, str15: 0, str16: 0, str17: 0, str18: 0,
         str19: 0, str20: 0, str21: 0, str22: 0, str23: 0, str24: 0,
     };
@@ -129,19 +129,77 @@
         "str6", "str8", "str10", "str18", "str21",
     ];
 
-    // Энкаунтеры подземелья: 'e' — обычный (случайный), 'B' — главарь.
-    // Название — ключ локализации enc.<id>.title; scene — фон арены (images/scenes).
+    // ── Враги по глубине (просил юзер) ────────────────────────────────────
+    // Архетипы врагов: core — ядро колоды, всегда целиком; добор генерится
+    // по этажу (enemyDeck): чем глубже, тем больше карт и тем выше доля
+    // редких и эпических. На каждом этаже — свои архетипы (FLOOR_MOBS).
+    // Название — ключ локализации enc.<id>.title; scene — фон арены.
     const ENCOUNTERS = {
-        gob:     { scene: 1, baseHp: 10, deck: ["str1", "str1", "str1", "str1", "str2", "str2", "str15"] },
-        gobBig:  { scene: 1, baseHp: 14, deck: ["str1", "str1", "str2", "str2", "str3", "str4", "str9",
-                                                 "str16", "str13", "str22", "str24"] },
-        gobTrap: { scene: 2, baseHp: 12, deck: ["str1", "str1", "str3", "str3", "str6", "str12", "str14",
-                                                 "str20"] },
-        boss:    { scene: 2, baseHp: 20, deck: ["str1", "str1", "str2", "str2", "str3", "str3",
-                                                 "str4", "str4", "str5", "str6", "str7", "str8",
-                                                 "str13", "str17", "str18", "str21", "str23", "str24"] },
+        // «Банда гоблинов» — первый этаж: только обычные карты
+        gob:      { scene: 1, baseHp: 10,
+                    core: ["str1", "str1", "str1", "str2", "str2", "str3", "str4"] },
+        // «Гоблины-мародёры» — обычные + первые редкие (лучник, наездник)
+        gobBig:   { scene: 1, baseHp: 12,
+                    core: ["str1", "str2", "str2", "str3", "str3", "str4", "str9",
+                           "str13", "str16"] },
+        // «Засада гоблинов» — ловушечная колода (мина, приманка, засада)
+        gobTrap:  { scene: 2, baseHp: 12,
+                    core: ["str1", "str1", "str3", "str3", "str6", "str12", "str12",
+                           "str14", "str20"] },
+        // «Гоблины-поджигатели» — заклинательная колода (огонь, огнешары)
+        gobFire:  { scene: 2, baseHp: 14,
+                    core: ["str2", "str4", "str9", "str9", "str22", "str22",
+                           "str24", "str24", "str21"] },
+        // «Свита вождя» — элитные редкие (лагерь, шаман, вождь, алтарь)
+        gobElite: { scene: 1, baseHp: 16,
+                    core: ["str3", "str3", "str5", "str7", "str8", "str13", "str16",
+                           "str16", "str19"] },
+        // «Гоблин-вождь» — главарь этажа (B на карте), сильное ядро
+        boss:     { scene: 2, baseHp: 20,
+                    core: ["str2", "str2", "str3", "str3", "str4", "str5", "str6",
+                           "str7", "str8", "str13", "str16", "str16", "str17",
+                           "str18", "str21", "str24"] },
     };
-    const MOB_POOL = ["gob", "gobBig", "gobTrap"];
+    // Этаж → какие обычные враги на нём водятся; после конца списка — набор
+    // для самых глубоких этажей. Босс (B) есть на каждом этаже.
+    const FLOOR_MOBS = [
+        ["gob", "gob"],                       // 1
+        ["gob", "gobBig"],                    // 2
+        ["gobBig", "gobTrap"],                // 3
+        ["gobTrap", "gobFire"],               // 4
+        ["gobFire", "gobElite"],              // 5
+        ["gobElite", "gobTrap", "gobFire"],   // 6+
+    ];
+    // Пул добора колоды врага по редкости. str11 («Жертвоприношение», цель —
+    // своё существо) врагу не даётся: ИИ за неё не играет.
+    const ENEMY_FILL = {
+        common: ["str1", "str2", "str3", "str4", "str9", "str12", "str13",
+                 "str14", "str15", "str16", "str22", "str23"],
+        rare:   ["str5", "str7", "str13", "str14", "str17", "str19", "str20", "str24"],
+        epic:   ["str6", "str8", "str10", "str18", "str21"],
+    };
+    // Колода врага: ядро архетипа + 3..8 карт добора; с глубиной (floor ≥ 1)
+    // шанс эпических в доборе растёт от 0% (этаж 1) до 45%, редких — до ~85%.
+    function enemyDeck(encId, floor) {
+        const enc = ENCOUNTERS[encId] || ENCOUNTERS.gob;
+        const deck = [...enc.core];
+        const f = Math.max(1, floor | 0);
+        const extra = Math.min(3 + (((f - 1) / 2) | 0), 8);
+        const epicP = Math.min(0.45, (f - 1) * 0.09);
+        const rareP = Math.min(0.85, 0.25 + f * 0.12);
+        for (let k = 0; k < extra; k++) {
+            const r = Math.random();
+            const pool = r < epicP ? ENEMY_FILL.epic
+                : r < epicP + rareP ? ENEMY_FILL.rare : ENEMY_FILL.common;
+            deck.push(pool[(Math.random() * pool.length) | 0]);
+        }
+        return deck;
+    }
+    // Обычный враг для этажа: случайный архетип из таблицы этажа.
+    function mobForFloor(floor) {
+        const table = FLOOR_MOBS[Math.min(Math.max(1, floor | 0) - 1, FLOOR_MOBS.length - 1)];
+        return table[(Math.random() * table.length) | 0];
+    }
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.
@@ -156,6 +214,7 @@
 
     globalThis.GAME_DATA = {
         CARDS, RARITY_COLORS, DEFAULT_DECK, DEFAULT_COLLECTION, DECK_MAX, DECK_MIN, TRAP_SLOTS,
-        DECK_COPIES, REWARD_POOL, ENCOUNTERS, MOB_POOL, ELEM_LOGO,
+        DECK_COPIES, REWARD_POOL, ENCOUNTERS, FLOOR_MOBS, ENEMY_FILL,
+        enemyDeck, mobForFloor, ELEM_LOGO,
     };
 })();
