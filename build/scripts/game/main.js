@@ -190,6 +190,7 @@
             deck: savedDeck.length ? savedDeck : [...DEFAULT_DECK],
             collection: Object.keys(savedColl).length ? savedColl : { ...DEFAULT_COLLECTION },
             dungeon: null, activeEnemy: null, battle: null,
+            rewardDeck: null, // колода побеждённого — пул трофея «1 из 3»
             uiReturn: null, // откуда открыты настройки/колода (кнопка «Назад»)
             resetRun() {
                 // новая игра — забег И коллекция/колода с нуля (просил юзер:
@@ -200,6 +201,7 @@
                 this.dungeon = null;
                 this.activeEnemy = null;
                 this.battle = null;
+                this.rewardDeck = null;
                 this.deck = [...DEFAULT_DECK];
                 this.collection = { ...DEFAULT_COLLECTION };
                 globalThis.GAME_META.saveMeta(this.collection, this.deck);

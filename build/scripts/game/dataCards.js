@@ -105,6 +105,18 @@
                  creature: "goblin", spellBuffAura: 1,
                  rarity: "rare", elem: "strength",
                  color: 0x9c4a3a, img: "strength/27" },
+        str28: { type: "spell", cost: 6,
+                 spell: { target: "none", aoeDmg: 3 },
+                 rarity: "epic", elem: "strength",
+                 color: 0xb0402e, img: "strength/28" },
+        str29: { type: "unit", cost: 0, atk: 0, hp: 1, speed: 1,
+                 creature: "goblin", ability: "coward",
+                 rarity: "common", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/29" },
+        str30: { type: "spell", cost: 1,
+                 spell: { target: "none", buffAllAtk: 1 },
+                 rarity: "common", elem: "strength",
+                 color: 0xb0402e, img: "strength/30" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -124,24 +136,27 @@
         str5: 0, str6: 0, str7: 0, str8: 0, str10: 0, str11: 0,
         str13: 0, str14: 0, str15: 0, str16: 0, str17: 0, str18: 0,
         str19: 0, str20: 0, str21: 0, str22: 0, str23: 0, str24: 0,
-        str25: 0, str26: 0, str27: 0,
+        str25: 0, str26: 0, str27: 0, str28: 0, str29: 0, str30: 0,
     };
     const DECK_MAX = 60, DECK_MIN = 12, TRAP_SLOTS = 2;
     const DECK_COPIES = 3; // максимум одинаковых карт в колоде
 
-    // Пул наград «1 из 3»: вес повторами — обычные чаще, эпик реже.
+    // Пул наград «1 из 3» — запасной (сейчас трофеи берутся из колоды
+    // побеждённого врага; пул работает для старых сейвов/прямых заходов).
+    // Вес повторами — обычные чаще, эпик реже.
     const REWARD_POOL = [
         "str1", "str1", "str1", "str2", "str2", "str2",
         "str3", "str3", "str3", "str4", "str4", "str4",
         "str9", "str9", "str9", "str12", "str12", "str12",
         "str15", "str15", "str15", "str16", "str16", "str16",
         "str22", "str22", "str22", "str23", "str23", "str23",
-        "str26", "str26", "str26",
+        "str26", "str26", "str26", "str29", "str29", "str29",
+        "str30", "str30", "str30",
         "str5", "str5", "str7", "str7", "str11", "str11",
         "str13", "str13", "str14", "str14", "str17", "str17",
         "str19", "str19", "str20", "str20", "str24", "str24",
         "str27", "str27",
-        "str6", "str8", "str10", "str18", "str21", "str25",
+        "str6", "str8", "str10", "str18", "str21", "str25", "str28",
     ];
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
@@ -157,14 +172,15 @@
         gobBig:   { scene: 1, baseHp: 12,
                     core: ["str1", "str2", "str2", "str3", "str3", "str4", "str9",
                            "str13", "str16"] },
-        // «Засада гоблинов» — ловушечная колода (мина, приманка, засада)
+        // «Засада гоблинов» — ловушечная колода (мина, приманка, засада),
+        // трусливый гоблин — бесплатная стена в коридоре поля
         gobTrap:  { scene: 2, baseHp: 12,
                     core: ["str1", "str1", "str3", "str3", "str6", "str12", "str12",
-                           "str14", "str20"] },
+                           "str14", "str20", "str29"] },
         // «Гоблины-поджигатели» — заклинательная колода (огонь, огнешары)
         gobFire:  { scene: 2, baseHp: 14,
                     core: ["str2", "str4", "str9", "str9", "str22", "str22",
-                           "str24", "str24", "str21"] },
+                           "str24", "str24", "str21", "str30"] },
         // «Свита вождя» — элитные редкие (лагерь, шаман, вождь, алтарь)
         gobElite: { scene: 1, baseHp: 16,
                     core: ["str3", "str3", "str5", "str7", "str8", "str13", "str16",
@@ -173,7 +189,7 @@
         boss:     { scene: 2, baseHp: 20,
                     core: ["str2", "str2", "str3", "str3", "str4", "str5", "str6",
                            "str7", "str8", "str13", "str16", "str16", "str17",
-                           "str18", "str21", "str24"] },
+                           "str18", "str21", "str24", "str28"] },
     };
     // Этаж → какие обычные враги на нём водятся; после конца списка — набор
     // для самых глубоких этажей. Босс (B) есть на каждом этаже.
@@ -185,16 +201,16 @@
         ["gobFire", "gobElite"],              // 5
         ["gobElite", "gobTrap", "gobFire"],   // 6+
     ];
-    // Пул добора колоды врага по редкости. str11 («Жертвоприношение», цель —
-    // своё существо) врагу не даётся: ИИ за неё не играет. str25/str26
-    // («Горящие руны», «Глубокое путешествие») тоже не даются — их эффекты
-    // идут через панели выбора, которых у ИИ нет.
+    // Пул добора колоды врага по редкости. Панельные карты (str11 жертва,
+    // str25 руны, str26 путешествие) ИИ теперь разыгрывает сам — цель он
+    // выбирает по своим приоритетам, без экрана (просил юзер).
     const ENEMY_FILL = {
         common: ["str1", "str2", "str3", "str4", "str9", "str12", "str13",
-                 "str14", "str15", "str16", "str22", "str23"],
-        rare:   ["str5", "str7", "str13", "str14", "str17", "str19", "str20",
-                 "str24", "str27"],
-        epic:   ["str6", "str8", "str10", "str18", "str21"],
+                 "str14", "str15", "str16", "str22", "str23", "str26",
+                 "str29", "str30"],
+        rare:   ["str5", "str7", "str13", "str14", "str11", "str17", "str19",
+                 "str20", "str24", "str27"],
+        epic:   ["str6", "str8", "str10", "str18", "str21", "str25", "str28"],
     };
     // Колода врага: ядро архетипа + 3..8 карт добора; с глубиной (floor ≥ 1)
     // шанс эпических в доборе растёт от 0% (этаж 1) до 45%, редких — до ~85%.

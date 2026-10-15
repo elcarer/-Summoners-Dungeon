@@ -1728,6 +1728,7 @@
                 .sort((a, b) => (side === "p" ? a.row - b.row : b.row - a.row));
             for (const u of order) {
                 if (B.stopped || !B.units.includes(u)) continue;
+                if (u.def.ability === "coward") { fleeCoward(u, side); continue; } // «Трусливый гоблин»
                 for (let step = 0; step < u.def.speed; step++) {
                     if (B.stopped || !B.units.includes(u)) break;
                     const ahead = u.row + dir;
@@ -1771,6 +1772,52 @@
             return false;
         }
 
+        // «Трусливый гоблин» (str29): в начале хода владельца вместо марша
+        // сбегает с поля, а карта его призыва возвращается из сброса или
+        // колоды в руку (если она там есть) — бесплатную стену можно ставить
+        // снова. removeUnit, не killUnit: побег — не смерть, ловушки молчат.
+        function fleeCoward(u, side) {
+            const id = cardIdOf(u.def);
+            const hand = side === "p" ? B.hand : B.eHand;
+            const discard = side === "p" ? B.discard : B.eDiscard;
+            const deck = side === "p" ? B.deck : B.eDeck;
+            const p = cellXY(u.col, u.row);
+            removeUnit(u);
+            floatText(p.x, p.y - 60, GAME_LOC.t(`card.${id}.name`), 0xd8c79d);
+            let i = discard.indexOf(id);
+            if (i >= 0) { discard.splice(i, 1); hand.push(id); }
+            else {
+                i = deck.indexOf(id);
+                if (i >= 0) { deck.splice(i, 1); hand.push(id); }
+            }
+            sfx("chpoc");
+        }
+
+        // ── План добора ИИ по шкале конца хода (мягкое правило — просил юзер).
+        // Короткая рука добирается до 4; с 4-го хода ИИ считает по стоимостям
+        // карты руки, сколько реально разыграет на следующую ману (запас +
+        // доход) — меньше четырёх разыгрываемых, добор до четырёх. Если на
+        // следующий ход у него будет 12+ маны — рука добивается до 7; при
+        // 20+ маны вся шкала идёт только в карты. Энергия не уходит в минус,
+        // до 4-го хода накопления в добор не конвертируются.
+        function enemyDrawPlan() {
+            const total = spheresTotal();
+            const nextMana = B.eEnergy + total; // мана следующего хода
+            let eCards = 0;
+            if (B.eHand.length < 4) eCards = 4 - B.eHand.length;
+            if (B.turnNo >= 4) {
+                const costs = B.eHand.map((c) => effCost(c, "e")).sort((a, b) => a - b);
+                let mana = nextMana, playable = 0;
+                for (const c of costs) { if (c <= mana) { mana -= c; playable++; } else break; }
+                if (playable < 4) eCards = Math.max(eCards, 4 - playable);
+            }
+            if (nextMana >= 12) eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
+            if (B.eEnergy >= 20) eCards = HAND_MAX - B.eHand.length; // только карты
+            return Math.max(0, Math.min(eCards,
+                HAND_MAX - B.eHand.length,
+                B.turnNo >= 4 ? total + B.eEnergy : total));
+        }
+
         async function enemyTurn() {
             B.phase = "enemy";
             B.selected = null;
@@ -1788,18 +1835,10 @@
             if (B.stopped || B.phase === "over") return;
             await aiPlay();
             if (B.stopped || B.phase === "over") return;
-            // шкала врага (те же правила): доход уходит сначала в добор карт,
-            // остаток — в энергию. С 4-го хода ИИ всегда держит руку полную
-            // (просил юзер: иначе копит десятки энергии при почти пустой руке),
-            // и в добор идут уже и накопления — но энергия не уходит в минус
-            const total = spheresTotal();
-            let eCards = 0;
-            if (B.eHand.length < 4) eCards = 4 - B.eHand.length; // малая рука — добор до 4
-            if (B.eEnergy >= 12 || B.turnNo >= 4)
-                eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
-            eCards = Math.max(0, Math.min(eCards, B.turnNo >= 4 ? total + B.eEnergy : total));
+            // шкала врага — мягкое правило добора (просил юзер), см. enemyDrawPlan
+            const eCards = enemyDrawPlan();
             drawEnemy(eCards);
-            B.eEnergy += total - eCards;
+            B.eEnergy += spheresTotal() - eCards;
             refreshHud();
             await delay(0.25 / animK());
             if (B.stopped) return;
@@ -1832,6 +1871,195 @@
         // пауза между розыгрышами: минимум 1 секунда (реальная), при
         // замедленных анимациях — дольше
         const enemyPlayDelay = () => Math.max(1, 1 / animK());
+
+        // ── Панельные карты у ИИ (просил юзер): эффекты, которые у игрока
+        // идут через панели выбора, ИИ разыгрывает «в голове» — цель берёт
+        // теми же приоритетами, что и обычные карты.
+        // Жертва «Жертвоприношения» (str11): своё существо, чей взрыв убивает
+        // врагов и окупает потерю — слабое своё против убиваемого, либо
+        // 2+ убиваемых разом.
+        function aiSacrificePick() {
+            const dmg = CARDS.str11.spell.dmg;
+            let best = null, bestScore = 0;
+            for (const u of B.units) {
+                if (u.side !== "e" || u.def.type !== "unit") continue;
+                const kills = B.units.filter((v) => v.side === "p"
+                    && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1
+                    && v.hp <= dmg).length;
+                const score = kills * 3 - (u.hp + u.curAtk); // убитый враг ценнее слабого своего
+                if (kills >= 1 && score > bestScore) { best = u; bestScore = score; }
+            }
+            return best;
+        }
+        // Играбельность заклинания для ИИ (общие проверки цели/эффекта).
+        // forReplay — проверка ПОВТОРА «Горящими рунами»: карта уже не в руке.
+        function aiSpellPlayable(def, forReplay = false) {
+            const s = def.spell;
+            if (s.copyLast) return aiReplayOk();
+            if (s.sacrifice && !aiSacrificePick()) return false;
+            // «Раскалённые обломки» — только если есть что бить
+            if (s.aoeDmg && !B.units.some((v) => v.side === "p")) return false;
+            // «Поднять стяги!» — только если есть своё существо
+            if (s.buffAllAtk && !B.units.some((v) => v.side === "e" && v.def.type === "unit")) return false;
+            // добор-заклинание — тоже трата энергии; гасим только при полной руке
+            if (s.draw && B.eHand.length >= HAND_MAX) return false;
+            // огнешар при энергии 1..2 почти пуст (урон 0..1) — копим дальше
+            if (s.drainAll && B.eEnergy < 3) return false;
+            // «Поиск рун»: в верхних картах колоды должно быть заклинание
+            if (s.search && !B.eDeck.slice(-s.search)
+                .some((id) => CARDS[id] && CARDS[id].type === "spell")) return false;
+            // «Глубокое путешествие»: в верхних картах колоды должен быть призыв
+            if (s.journey && !B.eDeck.slice(-Math.min(s.journey, B.eDeck.length))
+                .some((id) => CARDS[id] && CARDS[id].type === "unit")) return false;
+            // усиление/очарование — только если есть своё существо под него
+            if (s.target === "anyUnit" && !B.units.some((v) => v.side === "e"
+                && v.def.type === "unit" && (!s.enchantFire || !v.enchantFire))) return false;
+            // дротик/варево/огнешар — только если есть цель
+            if (s.target === "anyUnitDmg" && !B.units.some((v) => v.side === "p"
+                && (v.def.type === "unit"
+                    || (v.def.type === "building" && !s.noBuildings)))) return false;
+            return true;
+        }
+        // Есть ли смысл повторять последнее заклинание («Горящие руны»):
+        // оно есть, это не сами руны и его эффект сейчас применим
+        function aiReplayOk() {
+            const last = B.lastSpell.e;
+            if (!last || last === "str25") return false;
+            const def = CARDS[last];
+            return !!def && def.type === "spell" && aiSpellPlayable(def, true);
+        }
+        // Эффект заклинания врага — один код для прямого розыгрыша и для
+        // повтора «Горящими рунами» (там эффект последнего заклинания,
+        // free=true — цена повтора не вычитается из урона).
+        function enemyCastSpellEffect(def, free = false) {
+            const s = def.spell;
+            if (s.target === "anyUnit") { // усиление/очарование — своему сильнейшему
+                const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
+                    && (!s.enchantFire || !v.enchantFire));
+                const best = own.slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row))[0];
+                if (s.enchantFire) { // «Огненное дыхание»
+                    best.enchantFire = true;
+                    const mark = new PIXI.Graphics();
+                    mark.circle(0, 0, 10.5);
+                    mark.fill({ color: 0xff7a2e });
+                    mark.stroke({ width: 3, color: 0xffd98c });
+                    mark.position.set(36, -54);
+                    mark.name = "enchMark";
+                    mark.eventMode = "none";
+                    best.node.addChild(mark);
+                    floatText(cellXY(best.col, best.row).x, cellXY(best.col, best.row).y - 60, "✦", 0xffb26e);
+                } else {
+                    best.bonusAtk = (best.bonusAtk || 0) + s.buffAtk;
+                    recalcAuras();
+                    const p = cellXY(best.col, best.row);
+                    floatText(p.x, p.y - 39, `+${s.buffAtk}⚔`, 0x9fd489);
+                }
+                punch(best.node);
+                sfx("up");
+            }
+            if (s.target === "anyUnitDmg") { // дротик/варево/огнешар
+                const dmg = s.drainAll // вся энергия сверх цены — в урон
+                    ? Math.max(0, B.eEnergy - (free ? 0 : effCost(cardIdOf(def), "e"))) + altarBonus("e")
+                    : spellDmg(def, "e");
+                const targets = B.units.filter((v) => v.side === "p"
+                    && (v.def.type === "unit"
+                        || (v.def.type === "building" && !s.noBuildings)));
+                // ИИ добивает: если есть цель под убийство (урон ≥
+                // жизней) — бьём её (из них сильнейшую и ближе к базе),
+                // иначе просто сильнейшего юза игрока
+                const kills = targets.filter((v) => v.hp <= dmg);
+                const best = (kills.length ? kills : targets)
+                    .slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                damageUnit(best, dmg, null, "rocket");
+            }
+            if (s.target === "anyCell") { // стена костров — ряд, где больше игроков
+                const counts = [0, 0, 0, 0, 0];
+                for (const v of B.units) if (v.side === "p") counts[v.row]++;
+                const row = counts.indexOf(Math.max(...counts));
+                B.firewalls.push({ col: 2, row, side: "e",
+                    left: s.turns, dmg: s.firewall });
+                redrawFirewalls();
+                sfx("rocket");
+            }
+            if (s.target === "enemyAny") {
+                const targets = B.units.filter((u) => u.side === "p");
+                if (targets.length) {
+                    const best = targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                    damageUnit(best, s.dmg, null, "rocket");
+                } else {
+                    B.playerBase -= s.dmg;
+                    floatText(960, 840, `−${s.dmg}`, 0xff5f4e);
+                    sfx("rocket");
+                }
+            }
+            if (s.target === "none" && s.baseDmg) { // землетрясение
+                B.playerBase -= s.baseDmg;
+                floatText(960, 840, `−${s.baseDmg}`, 0xff5f4e);
+                punch(root.hud);
+                sfx("rocket");
+            }
+            if (s.aoeDmg) { // «Раскалённые обломки»: всем существам и постройкам игрока
+                const dmg = s.aoeDmg + altarBonus("e");
+                for (const v of B.units.slice()) if (v.side !== "e") damageUnit(v, dmg, null, "rocket");
+                sfx("rocket");
+            }
+            if (s.buffAllAtk) { // «Поднять стяги!»: +1 урона всем своим существам
+                for (const v of B.units) if (v.side === "e" && v.def.type === "unit") {
+                    v.bonusAtk = (v.bonusAtk || 0) + s.buffAllAtk;
+                    punch(v.node);
+                    const p = cellXY(v.col, v.row);
+                    floatText(p.x, p.y - 39, `+${s.buffAllAtk}⚔`, 0x9fd489);
+                }
+                recalcAuras();
+                sfx("up");
+            }
+            if (s.sacrifice) { // «Жертвоприношение»: взрыв по соседям жертвы
+                const u = aiSacrificePick();
+                if (u) {
+                    const p = cellXY(u.col, u.row);
+                    killUnit(u, null);
+                    floatText(p.x, p.y - 45, "☠", 0xef9f8c);
+                    for (const v of B.units.slice())
+                        if (Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1)
+                            damageUnit(v, s.dmg, null, "rocket");
+                }
+            }
+            if (s.draw) drawEnemy(s.draw);
+            if (s.search) { // верхнее заклинание из верхних карт колоды — в руку
+                const spells = B.eDeck.map((id, j) => ({ id, j }))
+                    .filter((x) => CARDS[x.id] && CARDS[x.id].type === "spell");
+                const k = spells[spells.length - 1];
+                if (k) { B.eDeck.splice(k.j, 1); B.eHand.push(k.id); }
+            }
+            if (s.journey) { // «Глубокое путешествие»: призыв из верхних карт — бесплатно
+                const k = Math.min(s.journey, B.eDeck.length);
+                const top = k ? B.eDeck.splice(B.eDeck.length - k, k) : [];
+                const units = top.filter((id) => CARDS[id] && CARDS[id].type === "unit");
+                const chosen = units.length ? units[(Math.random() * units.length) | 0] : null;
+                const rest = top.filter((id) => id !== chosen);
+                if (rest.length) {
+                    const r = (Math.random() * rest.length) | 0;
+                    B.eHand.push(rest[r]); // одна случайная — в руку
+                    for (let i = 0; i < rest.length; i++) if (i !== r) B.eDiscard.push(rest[i]);
+                }
+                if (chosen) {
+                    const rows = deployRows("e");
+                    const free = freeCells(rows);
+                    if (free.length) {
+                        // как обычный призыв ИИ: передний ряд, колонка без своих
+                        const frontRow = rows[rows.length - 1];
+                        const front = free.filter(([, r2]) => r2 === frontRow);
+                        let cand = front.length ? front : free;
+                        const open = cand.filter(([c2]) =>
+                            !B.units.some((o) => o.side === "e" && o.col === c2));
+                        if (open.length) cand = open;
+                        const [col, row] = cand[(Math.random() * cand.length) | 0];
+                        addUnit("e", chosen, col, row);
+                    } else B.eHand.push(chosen); // поле забито — карта хотя бы в руку
+                }
+            }
+            if (s.brew) B.brewCasts = (B.brewCasts || 0) + 1;
+        }
 
         async function aiPlay() {
             // ИИ тратит энергию, пока есть чем. Если играть нечем (в руке всё
@@ -1887,6 +2115,7 @@
                         B.eHand.splice(pick.i, 1);
                         B.eEnergy -= effCost(cardId, "e");
                         addUnit("e", cardId, col, row);
+                        B.eDiscard.push(cardId); // как у игрока: карта в сброс (иначе цикл «Трусливого гоблина» не работает)
                         hideEnemyCard();
                         played = true;
                         break;
@@ -1919,100 +2148,36 @@
                         break;
                     }
                     if (def.type === "spell") {
-                        // добор-заклинание — тоже трата энергии; гасим только при полной руке
-                        if (def.spell.draw && B.eHand.length >= HAND_MAX) continue;
-                        // огнешар при энергии 1..2 почти пуст (урон 0..1) — копим дальше
-                        if (def.spell.drainAll && B.eEnergy < 3) continue;
-                        // «Поиск рун»: в верхних картах колоды должно быть заклинание
-                        if (def.spell.search && !B.eDeck.slice(-def.spell.search)
-                            .some((id) => CARDS[id] && CARDS[id].type === "spell")) continue;
-                        // усиление/очарование — только если есть своё существо под него
-                        if (def.spell.target === "anyUnit" && !B.units.some((v) => v.side === "e"
-                            && v.def.type === "unit" && (!def.spell.enchantFire || !v.enchantFire))) continue;
-                        // дротик/варево/огнешар — только если есть цель
-                        if (def.spell.target === "anyUnitDmg" && !B.units.some((v) => v.side === "p"
-                            && (v.def.type === "unit"
-                                || (v.def.type === "building" && !def.spell.noBuildings)))) continue;
+                        if (!aiSpellPlayable(def)) continue;
                         // карта врага — лицом слева, пауза ≥ 1с: игрок видит,
                         // что сейчас произойдёт (просил юзер)
                         showEnemyCard(pick.id);
                         await delay(enemyPlayDelay());
-                    if (def.spell.target === "anyUnit") { // усиление/очарование — своему сильнейшему
-                        const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
-                            && (!def.spell.enchantFire || !v.enchantFire));
-                        const best = own.slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row))[0];
-                        if (def.spell.enchantFire) { // «Огненное дыхание»
-                            best.enchantFire = true;
-                            const mark = new PIXI.Graphics();
-                            mark.circle(0, 0, 10.5);
-                            mark.fill({ color: 0xff7a2e });
-                            mark.stroke({ width: 3, color: 0xffd98c });
-                            mark.position.set(36, -54);
-                            mark.name = "enchMark";
-                            mark.eventMode = "none";
-                            best.node.addChild(mark);
-                            floatText(cellXY(best.col, best.row).x, cellXY(best.col, best.row).y - 60, "✦", 0xffb26e);
+                        const cardId = B.eHand[pick.i];
+                        if (def.spell.copyLast) {
+                            // «Горящие руны»: повтор ПОСЛЕДНЕГО заклинания тем
+                            // же кодом эффектов (бесплатно для его цены)
+                            const last = B.lastSpell.e;
+                            enemyCastSpellEffect(CARDS[last], true);
+                            if (CARDS[last].spell.drainAll) B.eEnergy = 0; // огнешар и в повторе сжигает энергию
+                            // сжигание: скопированное уходит из своей зоны
+                            // (рука → колода → сброс) до конца боя
+                            for (const zone of [B.eHand, B.eDeck, B.eDiscard]) {
+                                const i = zone.indexOf(last);
+                                if (i >= 0) { zone.splice(i, 1); break; }
+                            }
+                            floatText(960, 500, `🔥 ${GAME_LOC.t(`card.${last}.name`)}`, 0xffb26e);
                         } else {
-                            best.bonusAtk = (best.bonusAtk || 0) + def.spell.buffAtk;
-                            recalcAuras();
-                            const p = cellXY(best.col, best.row);
-                            floatText(p.x, p.y - 39, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                            enemyCastSpellEffect(def);
                         }
-                        punch(best.node);
-                        sfx("up");
-                    }
-                    if (def.spell.target === "anyUnitDmg") { // дротик/варево/огнешар
-                        const dmg = def.spell.drainAll // вся энергия сверх цены — в урон
-                            ? Math.max(0, B.eEnergy - effCost(pick.id, "e")) + altarBonus("e")
-                            : spellDmg(def, "e");
-                        const targets = B.units.filter((v) => v.side === "p"
-                            && (v.def.type === "unit"
-                                || (v.def.type === "building" && !def.spell.noBuildings)));
-                        // ИИ добивает: если есть цель под убийство (урон ≥
-                        // жизней) — бьём её (из них сильнейшую и ближе к базе),
-                        // иначе просто сильнейшего юза игрока
-                        const kills = targets.filter((v) => v.hp <= dmg);
-                        const best = (kills.length ? kills : targets)
-                            .slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
-                        damageUnit(best, dmg, null, "rocket");
-                    }
-                    if (def.spell.target === "anyCell") { // стена костров — ряд, где больше игроков
-                        const counts = [0, 0, 0, 0, 0];
-                        for (const v of B.units) if (v.side === "p") counts[v.row]++;
-                        const row = counts.indexOf(Math.max(...counts));
-                        B.firewalls.push({ col: 2, row, side: "e",
-                            left: def.spell.turns, dmg: def.spell.firewall });
-                        redrawFirewalls();
-                        sfx("rocket");
-                    }
-                    const cardId = B.eHand[pick.i];
-                    B.eHand.splice(pick.i, 1);
-                    B.eEnergy = def.spell.drainAll ? 0 : B.eEnergy - effCost(cardId, "e");
-                    if (def.spell.target === "enemyAny") {
-                        const targets = B.units.filter((u) => u.side === "p");
-                        if (targets.length) {
-                            const best = targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
-                            damageUnit(best, def.spell.dmg, null, "rocket");
-                        } else {
-                            B.playerBase -= def.spell.dmg;
-                            floatText(960, 840, `−${def.spell.dmg}`, 0xff5f4e);
-                            sfx("rocket");
-                        }
-                    }
-                    if (def.spell.target === "none" && def.spell.baseDmg) { // землетрясение
-                        B.playerBase -= def.spell.baseDmg;
-                        floatText(960, 840, `−${def.spell.baseDmg}`, 0xff5f4e);
-                        punch(root.hud);
-                        sfx("rocket");
-                    }
-                        if (def.spell.draw) drawEnemy(def.spell.draw);
-                        if (def.spell.search) { // верхнее заклинание из верхних карт колоды — в руку
-                            const spells = B.eDeck.map((id, j) => ({ id, j }))
-                                .filter((x) => CARDS[x.id] && CARDS[x.id].type === "spell");
-                            const k = spells[spells.length - 1];
-                            if (k) { B.eDeck.splice(k.j, 1); B.eHand.push(k.id); }
-                        }
-                        if (def.spell.brew) B.brewCasts = (B.brewCasts || 0) + 1;
+                        // indexOf: панельные эффекты кладут карты в руку —
+                        // индексы могли сместиться
+                        B.eHand.splice(B.eHand.indexOf(cardId), 1);
+                        B.eEnergy = def.spell.drainAll ? 0 : B.eEnergy - effCost(cardId, "e");
+                        // рука ИИ тоже не больше 7 — излишек панельных доборов
+                        // сбрасывается случайно (как панель сброса у игрока)
+                        while (B.eHand.length > HAND_MAX)
+                            B.eDiscard.push(B.eHand.splice((Math.random() * B.eHand.length) | 0, 1)[0]);
                         B.eDiscard.push(cardId);
                         B.lastSpell.e = cardId;
                         afterSpellPlayed(); // «Заклинатель клинков» на поле
@@ -2224,6 +2389,21 @@
                 punch(root.hud);
                 sfx("rocket");
             }
+            if (def.spell.aoeDmg) { // «Раскалённые обломки»: всем вражеским существам и постройкам
+                const dmg = def.spell.aoeDmg + altarBonus("p");
+                for (const v of B.units.slice()) if (v.side !== "p") damageUnit(v, dmg, null, "rocket");
+                sfx("rocket");
+            }
+            if (def.spell.buffAllAtk) { // «Поднять стяги!»: +1 урона всем своим существам
+                for (const v of B.units) if (v.side === "p" && v.def.type === "unit") {
+                    v.bonusAtk = (v.bonusAtk || 0) + def.spell.buffAllAtk;
+                    punch(v.node);
+                    const p = cellXY(v.col, v.row);
+                    floatText(p.x, p.y - 39, `+${def.spell.buffAllAtk}⚔`, 0x9fd489);
+                }
+                recalcAuras();
+                sfx("up");
+            }
             if (def.spell.target === "enemyAny") {
                 if (!target) return false;
                 if (target.base === true) {
@@ -2358,6 +2538,10 @@
             txt.eventMode = "none";
             ov.addChild(txt);
             B.result = victory ? "win" : "lose";
+            if (victory) {
+                // трофеи «1 из 3» берутся из колоды побеждённого (просил юзер)
+                G.rewardDeck = [...new Set(B.eDeckBase || [])].filter((id) => CARDS[id]);
+            }
             B.continueAction = () => {
                 if (victory) {
                     if (G.activeEnemy) {
@@ -2759,6 +2943,12 @@
                 if (unitAt(col, row)) return false;
                 return addUnit(side, cardId, col, row);
             },
+            // план добора ИИ по шкале (тесты мягкого правила): сколько карт
+            // возьмёт и какой доход всего
+            aiDrawPlan: () => (B
+                ? { cards: enemyDrawPlan(), total: spheresTotal(),
+                    nextMana: B.eEnergy + spheresTotal() }
+                : null),
         };
         function cardIdOf(def) {
             return Object.keys(CARDS).find((k) => CARDS[k] === def);

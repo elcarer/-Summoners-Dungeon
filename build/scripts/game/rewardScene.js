@@ -9,12 +9,16 @@
         let root = null, options = [], picked = null;
 
         function pickThree() {
-            const pool = [...REWARD_POOL];
-            const out = [];
-            while (out.length < 3 && pool.length) {
-                out.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
+            // Награда — из колоды ПОБЕЖДЁННОГО противника (просил юзер):
+            // 3 разные карты именно его колоды (G.rewardDeck пишет арена при
+            // победе). Нет данных (старый сейв/прямой заход) — общий пул Силы.
+            const pool = G.rewardDeck && G.rewardDeck.length
+                ? [...G.rewardDeck] : [...REWARD_POOL];
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = (Math.random() * (i + 1)) | 0;
+                [pool[i], pool[j]] = [pool[j], pool[i]];
             }
-            return out;
+            return pool.slice(0, 3);
         }
 
         function choose(index) {
