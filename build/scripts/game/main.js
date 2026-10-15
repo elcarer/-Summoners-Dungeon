@@ -35,6 +35,7 @@
             "arc_rune", "bg_corridor_1", "bg_corridor_2", "board", "button_1", "button_attack",
             "button_end", "button_menu", "card_back_min", "card_back_screen",
             "card_back_small", "icon_bag", "icon_gold", "icon_map", "icon_rune", "icon_setting",
+            "icon_shop",
             "panel_1", "panel_2", "panel_allert", "panel_buff", "panel_buff_circle",
             "panel_down", "panel_label", "panel_minimap", "panel_skill", "panel_top",
             "portrate_hero", "sign_mana", "sign_shield",
@@ -413,7 +414,7 @@
             },
             stats: () => ({
                 scene: scenes.current,
-                hero: { ...G.hero }, floor: G.run.floor,
+                hero: { ...G.hero }, floor: G.run.floor, gold: G.gold,
                 heroPos: (() => {
                     const id = dungeonScene.heroId();
                     return id !== null ? { x: COMPONENTS.positionX[id], y: COMPONENTS.positionY[id] } : null;
@@ -425,6 +426,12 @@
                 dungeon: G.dungeon ? {
                     enemies: G.dungeon.enemies.filter((e) => e.alive).length,
                     bossDead: G.dungeon.bossDead,
+                    // объекты комнат: тип/собрано + открытое окно
+                    objects: (G.dungeon.objects || []).map((o) => ({
+                        type: o.type, taken: !!o.taken,
+                    })),
+                    win: G.dungeon.win && G.dungeon.objects && G.dungeon.objects[G.dungeon.win.idx]
+                        ? G.dungeon.objects[G.dungeon.win.idx].type : null,
                 } : null,
                 battle: G.battle ? arenaScene.api.state() : null,
                 error: window.__gameError || null,

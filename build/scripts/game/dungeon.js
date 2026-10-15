@@ -2,14 +2,16 @@
 // v0: фиксированная карта-ASCII (30×17, тайл 40px), тайлы — плоские заглушки,
 // враги — жетоны-ромбы, герой — спрайт движка knight_64 (заглушка).
 // Состояние живёт в G.dungeon (переживает уход в арену и обратно).
+// В центрах комнат (кроме боссовой) — интерактивные объекты: куча золота,
+// сундук с картой и магазин (только с 2-го этажа, не больше 1 на этаж).
 (function () {
     const TS = 40;
     // #: стена, .: пол, H: старт героя, e: враг, B: главарь, X: выход.
     // Враги стоят В КОРИДОРАХ, перекрывая входы в комнаты (просил юзер),
     // а не в центрах: (3,7) — выход из стартовой комнаты, (24,6) — вход
-    // в правую верхнюю, (11,12) — дверной проход левой нижней. Центры
-    // комнат оставлены под будущие интерактивные объекты. Босс — в центре
-    // своей комнаты у спуска, как был.
+    // в правую верхнюю, (11,12) — дверной проход левой нижней. В центрах
+    // комнат — интерактивные объекты. Босс — в центре своей комнаты
+    // у спуска, как был.
     const ROWS = [
         "##############################",
         "#......#........#............#",
@@ -30,12 +32,39 @@
         "##############################",
     ];
     const W = ROWS[0].length, H = ROWS.length;
+    // центры комнат (колонка, строка): стартовая, верхняя средняя,
+    // верхняя правая, нижняя левая. Боссовая комната — без объектов.
+    const ROOM_CENTERS = [[3, 3], [11, 3], [22, 2], [5, 12]];
+
+    // Объекты этажа: по одному в каждом центре комнаты. Магазин — только
+    // со 2-го этажа и не больше 1 (занимает одну случайную комнату),
+    // остальные комнаты — куча золота или сундук 50/50. Сумма кучи и карта
+    // сундука кидаются при генерации этажа и хранятся в объекте —
+    // сейв/загрузка показывает то же самое.
+    function genObjects(floor) {
+        const { rollLootCard } = globalThis.GAME_DATA;
+        const centers = [...ROOM_CENTERS];
+        for (let i = centers.length - 1; i > 0; i--) {
+            const j = (Math.random() * (i + 1)) | 0;
+            [centers[i], centers[j]] = [centers[j], centers[i]];
+        }
+        return centers.map(([col, row], k) => {
+            const type = floor >= 2 && k === 0 ? "shop"
+                : Math.random() < 0.5 ? "gold" : "chest";
+            const obj = { type, col, row, taken: false };
+            if (type === "gold") obj.amount = 1 + ((Math.random() * 5) | 0) + (floor - 1);
+            if (type === "chest") obj.card = rollLootCard();
+            if (type === "shop") obj.stock = Array.from({ length: 6 }, () => rollLootCard());
+            if (type === "shop") obj.sold = [false, false, false, false, false, false];
+            return obj;
+        });
+    }
 
     function newDungeonState(floor) {
         const { mobForFloor, enemyDeck } = globalThis.GAME_DATA;
         const st = {
             floor, heroPos: null, enemies: [], exit: null, bossDead: false,
-            toast: null, toastT: 0,
+            toast: null, toastT: 0, objects: genObjects(floor), win: null,
         };
         for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
             const ch = ROWS[j][i];
@@ -56,6 +85,10 @@
     function createDungeonScene(ctx) {
         const { COMPONENTS, camera, characters, charInput, ECS, world, scenes, G, worldContainer, uiTex } = ctx;
         let layer = null, heroId = null, tokens = [], uiHud = null;
+        let objNodes = []; // спрайты объектов комнат (куча/сундук/магазин)
+        let winNode = null, winRefs = null, winObj = null; // открытое окно объекта
+        let sellRows = []; // строки продажи магазина (для тестов)
+        let refreshShop = null; // живое обновление окна магазина (пишет buildShopWin)
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
 
         function blocked(px, py) {
@@ -150,6 +183,39 @@
             return c;
         }
 
+        // Объект комнаты на карте: иконка юзера (куча/сундук/магазин) на
+        // тёмной подложке-тени; у магазина — золотой ободок «здание».
+        function makeObjectNode(obj) {
+            const c = new PIXI.Container();
+            const shadow = new PIXI.Graphics();
+            shadow.circle(0, 0, 19);
+            shadow.fill({ color: 0x120d09, alpha: 0.55 });
+            c.addChild(shadow);
+            if (obj.type === "shop") {
+                const ring = new PIXI.Graphics();
+                ring.circle(0, 0, 24);
+                ring.stroke({ width: 2.5, color: 0xcfa94e });
+                c.addChild(ring);
+            }
+            const tex = obj.type === "gold" ? "icon_gold.png"
+                : obj.type === "chest" ? "icon_bag.png" : "icon_shop.png";
+            const sp = new PIXI.Sprite(uiTex(tex));
+            sp.anchor.set(0.5);
+            sp.scale.set(obj.type === "shop" ? 0.62 : 0.5);
+            c.addChild(sp);
+            c.position.set(obj.col * TS + TS / 2, obj.row * TS + TS / 2);
+            c.zIndex = obj.row + 1;
+            return c;
+        }
+
+        function removeObjectNode(obj) {
+            const i = objNodes.findIndex((n) => n.obj === obj);
+            if (i >= 0) {
+                objNodes[i].node.destroy({ children: true });
+                objNodes.splice(i, 1);
+            }
+        }
+
         // Иконка-кнопка HUD (настройки/колода): спрайт-иконка без подписи
         function hudIcon(texName, x, y, onTap, scale = 0.9) {
             const sp = new PIXI.Sprite(uiTex(texName));
@@ -175,7 +241,23 @@
             const hpT = new PIXI.Text({ text: "", style });
             hpT.position.set(189, 15);
             c.addChild(floorT, hpT);
-            c.userData = { floorT, hpT, fit: true };
+            // золото — мета-ресурс забега: плашка под панелью этажа/HP
+            const goldPlate = new PIXI.Container();
+            const gpanel = new PIXI.Sprite(uiTex("panel_label.png"));
+            gpanel.scale.set(0.62); // 341×87 → ~211×54
+            gpanel.eventMode = "static";
+            goldPlate.addChild(gpanel);
+            const gicon = new PIXI.Sprite(uiTex("icon_gold.png"));
+            gicon.anchor.set(0.5);
+            gicon.scale.set(0.46);
+            gicon.position.set(27, 27);
+            goldPlate.addChild(gicon);
+            const goldT = new PIXI.Text({ text: "0", style });
+            goldT.position.set(50, 13);
+            goldPlate.addChild(goldT);
+            goldPlate.position.set(0, 96);
+            c.addChild(goldPlate);
+            c.userData = { floorT, hpT, goldT, fit: true };
             // настройки и колода — доступны и из подземелья; «Назад» вернёт сюда
             c.addChild(hudIcon("icon_setting.png", 1839, 66, () => {
                 G.uiReturn = "dungeon";
@@ -200,7 +282,7 @@
             toast.position.set(960, 495);
             toast.alpha = 0;
             c.addChild(toast);
-            c.userData = { floorT, hpT, toast };
+            c.userData = { floorT, hpT, goldT, toast };
             return c;
         }
 
@@ -273,11 +355,323 @@
             if (best) showTip(best); else hideTip();
         }
 
+        // ── Окна интерактивных объектов: куча золота, сундук, магазин ──────
+        // Модалка в ui-слое; пока окно открыто, герой стоит (update глушит
+        // оси и триггеры). Забор золота/карты и покупки сохраняются сразу.
+        function countInDeck(id) {
+            return G.deck.reduce((n, c) => n + (c === id ? 1 : 0), 0);
+        }
+
+        function closeModal() {
+            if (winNode) { winNode.destroy({ children: true }); winNode = null; }
+            winRefs = null;
+            winObj = null;
+            sellRows = [];
+            refreshShop = null;
+            if (G.dungeon) G.dungeon.win = null;
+        }
+
+        function openObject(o) {
+            path = null;
+            winObj = o;
+            G.dungeon.win = { idx: G.dungeon.objects.indexOf(o) };
+            winNode = o.type === "shop" ? buildShopWin(o) : buildLootWin(o);
+            ctx.ui.addChild(winNode);
+        }
+
+        // Куча золота и сундук: сумма и карта кинуты при генерации этажа —
+        // окно показывает заготовленное (переживает сейв/загрузку).
+        function buildLootWin(o) {
+            const t = GAME_LOC.t;
+            const { T, button, cardFace } = globalThis.GAME_UI;
+            const chest = o.type === "chest";
+            const c = new PIXI.Container();
+            c.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(0, 0, 1920, 1080);
+            dim.fill({ color: 0x000000, alpha: 0.55 });
+            c.addChild(dim);
+            const w = 640, h = chest ? 720 : 400, top = 540 - h / 2;
+            const panel = new PIXI.Graphics();
+            panel.roundRect(960 - w / 2, top, w, h, 18);
+            panel.fill({ color: 0x171310, alpha: 0.96 });
+            panel.stroke({ width: 4, color: 0x6b5c40 });
+            c.addChild(panel);
+            const title = T(t(chest ? "obj.chest" : "obj.gold"), 44, 0xf0c96a,
+                { stroke: { color: 0x241505, width: 8 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(960, top + 26);
+            title.eventMode = "none";
+            c.addChild(title);
+            if (chest) {
+                const sub = T(t("obj.chestFound"), 27, 0xd8c79d);
+                sub.anchor.set(0.5, 0);
+                sub.position.set(960, top + 102);
+                sub.eventMode = "none";
+                c.addChild(sub);
+                const card = cardFace(ctx, o.card, { scale: 0.62 });
+                card.position.set(960, top + 350);
+                c.addChild(card);
+            } else {
+                const icon = new PIXI.Sprite(uiTex("icon_gold.png"));
+                icon.anchor.set(0.5);
+                icon.scale.set(1.1);
+                icon.position.set(960, top + 170);
+                c.addChild(icon);
+                const sub = T(t("obj.goldFound", { n: o.amount }), 40, 0xffe2a8,
+                    { stroke: { color: 0x1c1207, width: 7 } });
+                sub.anchor.set(0.5, 0);
+                sub.position.set(960, top + 250);
+                sub.eventMode = "none";
+                c.addChild(sub);
+            }
+            const takeBtn = button(ctx, {
+                tex: "button_menu.png", label: t(chest ? "obj.takeCard" : "obj.take"),
+                x: 960, y: top + h - 70, scale: 1, fontSize: 27,
+                onTap: () => {
+                    if (chest) {
+                        G.collection[o.card] = (G.collection[o.card] || 0) + 1;
+                        globalThis.GAME_META.saveMeta(G.collection, G.deck);
+                    } else {
+                        G.gold += o.amount;
+                    }
+                    o.taken = true;
+                    removeObjectNode(o);
+                    if (ctx.sfx) ctx.sfx("coins");
+                    if (G.saveRun) G.saveRun();
+                    closeModal();
+                },
+            });
+            c.addChild(takeBtn);
+            winRefs = { takeBtn };
+            return c;
+        }
+
+        function shopBuy(i) {
+            const { CARDS, SHOP_BUY } = globalThis.GAME_DATA;
+            const o = winObj;
+            if (!o || o.type !== "shop" || !o.stock[i] || (o.sold && o.sold[i])) return false;
+            const price = SHOP_BUY[CARDS[o.stock[i]].rarity];
+            if (G.gold < price) return false; // не хватает золота — товар не продаётся
+            G.gold -= price;
+            G.collection[o.stock[i]] = (G.collection[o.stock[i]] || 0) + 1;
+            o.sold[i] = true;
+            globalThis.GAME_META.saveMeta(G.collection, G.deck);
+            if (G.saveRun) G.saveRun();
+            if (ctx.sfx) ctx.sfx("coins");
+            if (refreshShop) refreshShop();
+            return true;
+        }
+
+        function shopSell(id) {
+            const { CARDS, SHOP_SELL } = globalThis.GAME_DATA;
+            if (!winObj || winObj.type !== "shop") return false;
+            // продаются только свободные копии: вложенные в колоду не трогаем
+            if ((G.collection[id] || 0) - countInDeck(id) <= 0) return false;
+            G.collection[id] -= 1;
+            G.gold += SHOP_SELL[CARDS[id].rarity];
+            globalThis.GAME_META.saveMeta(G.collection, G.deck);
+            if (G.saveRun) G.saveRun();
+            if (ctx.sfx) ctx.sfx("coins");
+            if (refreshShop) refreshShop();
+            return true;
+        }
+
+        function buildShopWin(o) {
+            const t = GAME_LOC.t;
+            const { CARDS, SHOP_BUY, SHOP_SELL } = globalThis.GAME_DATA;
+            const { T, button, cardFace, scrollPane } = globalThis.GAME_UI;
+            const c = new PIXI.Container();
+            c.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(0, 0, 1920, 1080);
+            dim.fill({ color: 0x000000, alpha: 0.65 });
+            c.addChild(dim);
+            const title = T(t("obj.shop"), 51, 0xf0c96a, { stroke: { color: 0x241505, width: 9 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(960, 21);
+            title.eventMode = "none";
+            c.addChild(title);
+            // золото — живой счётчик справа сверху (обновляется при покупках)
+            const goldIcon = new PIXI.Sprite(uiTex("icon_gold.png"));
+            goldIcon.anchor.set(0.5);
+            goldIcon.scale.set(0.62);
+            goldIcon.position.set(1826, 66);
+            goldIcon.eventMode = "none";
+            c.addChild(goldIcon);
+            const goldT = T(String(G.gold), 34, 0xffe2a8, { stroke: { color: 0x1c1207, width: 6 } });
+            goldT.anchor.set(1, 0.5);
+            goldT.position.set(1798, 66);
+            goldT.eventMode = "none";
+            c.addChild(goldT);
+
+            // левая панель: товары (6 карт 3×2), клик — купить
+            const left = new PIXI.Graphics();
+            left.roundRect(72, 129, 645, 888, 15);
+            left.fill({ color: 0x171310, alpha: 0.92 });
+            left.stroke({ width: 3, color: 0x6b5c40 });
+            c.addChild(left);
+            const goodsH = T(t("shop.goods"), 30, 0xf3e6c2);
+            goodsH.position.set(99, 138);
+            goodsH.eventMode = "none";
+            c.addChild(goodsH);
+            const goodsBox = new PIXI.Container();
+            goodsBox.position.set(90, 200);
+            c.addChild(goodsBox);
+            const buyHint = T(t("shop.buyHint"), 19, 0x8a7c5e, { wordWrap: true, wordWrapWidth: 590 });
+            buyHint.position.set(99, 946);
+            buyHint.eventMode = "none";
+            c.addChild(buyHint);
+
+            // правая панель: продажа карт из коллекции (клик по карте)
+            const right = new PIXI.Graphics();
+            right.roundRect(762, 129, 1086, 888, 15);
+            right.fill({ color: 0x171310, alpha: 0.92 });
+            right.stroke({ width: 3, color: 0x6b5c40 });
+            c.addChild(right);
+            const sellH = T(t("shop.sellTitle"), 30, 0xf3e6c2);
+            sellH.position.set(789, 138);
+            sellH.eventMode = "none";
+            c.addChild(sellH);
+            const sellPane = scrollPane(ctx, { x: 780, y: 195, w: 1050, h: 768, onScroll: () => {} });
+            c.addChild(sellPane.node);
+            const sellHint = T(t("shop.sellHint"), 19, 0x8a7c5e, { wordWrap: true, wordWrapWidth: 1035 });
+            sellHint.position.set(786, 972);
+            sellHint.eventMode = "none";
+            c.addChild(sellHint);
+            const noGoldRef = { node: null };
+
+            function buildGoods() {
+                goodsBox.removeChildren().forEach((ch) => ch.destroy({ children: true }));
+                const nodes = [];
+                o.stock.forEach((id, i) => {
+                    const col = i % 3, rowI = (i / 3) | 0;
+                    const cx = 93 + col * 198, cy = 100 + rowI * 307.5;
+                    const sold = !!(o.sold && o.sold[i]);
+                    const price = SHOP_BUY[CARDS[id].rarity];
+                    const card = cardFace(ctx, id, { scale: 0.5, dim: sold });
+                    card.position.set(cx, cy);
+                    card.eventMode = "static";
+                    card.on("pointertap", () => { if (!shopBuy(i)) flashNoGold(); });
+                    goodsBox.addChild(card);
+                    const lbl = T(sold ? t("shop.soldOut") : t("shop.price", { n: price }),
+                        21, sold ? 0x8a7c5e : 0xffe2a8);
+                    lbl.anchor.set(0.5, 0);
+                    lbl.position.set(cx, cy + 138);
+                    lbl.eventMode = "none";
+                    goodsBox.addChild(lbl);
+                    nodes[i] = card;
+                });
+                return nodes;
+            }
+            function buildSellList() {
+                const c2 = new PIXI.Container();
+                const rows = [];
+                const ids = Object.keys(CARDS)
+                    .filter((id) => (G.collection[id] || 0) > 0)
+                    .sort((a, b) => (CARDS[a].cost - CARDS[b].cost) || a.localeCompare(b));
+                ids.forEach((id, i) => {
+                    const col = i % 5, rowI = (i / 5) | 0;
+                    const owned = G.collection[id] || 0;
+                    const canSell = owned - countInDeck(id) > 0;
+                    const cx = 93 + col * 198, cy = 138 + rowI * 307.5;
+                    const card = cardFace(ctx, id, { scale: 0.5, dim: !canSell });
+                    card.position.set(cx, cy);
+                    card.eventMode = "static";
+                    if (canSell) card.on("pointertap", () => { shopSell(id); });
+                    c2.addChild(card);
+                    const lbl = T(`×${owned} · ${t("shop.price", { n: SHOP_SELL[CARDS[id].rarity] })}`,
+                        19, canSell ? 0xd8c79d : 0x8a7c5e);
+                    lbl.anchor.set(0.5, 0);
+                    lbl.position.set(cx, cy + 138);
+                    lbl.eventMode = "none";
+                    c2.addChild(lbl);
+                    rows.push({ id, node: card, canSell });
+                });
+                if (!ids.length) {
+                    const empty = T(t("shop.sellEmpty"), 22, 0x8a7c5e);
+                    empty.position.set(93, 36);
+                    empty.eventMode = "none";
+                    c2.addChild(empty);
+                }
+                const rowsN = Math.ceil(ids.length / 5);
+                c2.userData = { contentH: ids.length ? (138 + (rowsN - 1) * 307.5 + 232.5) : 60, rows };
+                return c2;
+            }
+            function flashNoGold() {
+                if (noGoldRef.node) return;
+                const n = T(t("shop.noGold"), 30, 0xff8f6e, { stroke: { color: 0x1c1207, width: 6 } });
+                n.anchor.set(0.5);
+                n.position.set(394, 920); // над подсказкой левой панели
+                n.eventMode = "none";
+                c.addChild(n);
+                noGoldRef.node = n;
+                ctx.scheduler.after(1.2, () => {
+                    if (noGoldRef.node) { noGoldRef.node.destroy(); noGoldRef.node = null; }
+                });
+            }
+            // живое обновление окна при покупке/продаже (зовут shopBuy/shopSell
+            // со уровня сцены — пишем в внешнюю переменную, не локальную).
+            // goodsNodes перечитываем: карточки пересобраны, старые узлы мертвы
+            refreshShop = function () {
+                goldT.text = String(G.gold);
+                winRefs.goodsNodes = buildGoods();
+                const list = buildSellList();
+                sellPane.setContent(list, list.userData.contentH);
+                sellRows = list.userData.rows;
+            };
+
+            const goodsNodes = buildGoods();
+            const firstList = buildSellList();
+            sellPane.setContent(firstList, firstList.userData.contentH);
+            sellRows = firstList.userData.rows;
+
+            const leaveBtn = button(ctx, {
+                tex: "button_menu.png", label: t("shop.leave"), x: 165, y: 78, scale: 1,
+                onTap: () => {
+                    o.cool = true; // повторное открытие — только после отхода
+                    closeModal();
+                },
+            });
+            c.addChild(leaveBtn);
+            winRefs = { takeBtn: null, leaveBtn, goodsNodes };
+            return c;
+        }
+
         return {
             enter() {
                 if (ctx.music) ctx.music("dungeon");
                 if (!G.dungeon) G.dungeon = newDungeonState(G.run.floor);
                 const st = G.dungeon;
+                // сейвы старых волн без объектов — генерируются при заходе
+                if (!st.objects) { st.objects = genObjects(st.floor); st.win = null; }
+                for (const o of st.objects)
+                    if (o.type === "shop" && !o.sold) o.sold = [false, false, false, false, false, false];
+                // сейвы до волны «враги в коридорах»: враги стояли в центрах
+                // комнат (позиции хранятся в сейве) — пересаживаем живых
+                // обычных на коридорные клетки, босса не двигаем, побеждённые
+                // не возвращаются (просил юзер: вход в комнату открыт после
+                // победы над врагом-блокиратором в проходе)
+                {
+                    const slots = [[24, 6], [3, 7], [11, 12]];
+                    const cell = (e) => [Math.round(e.x / TS - 0.5), Math.round(e.y / TS - 0.5)];
+                    const alive = st.enemies.filter((e) => e.alive && !e.boss);
+                    const inCorridor = (e) => slots.some(([c, r]) =>
+                        cell(e)[0] === c && cell(e)[1] === r);
+                    if (alive.some((e) => !inCorridor(e))) {
+                        const busy = new Set(st.enemies.filter((e) => e.alive && e.boss)
+                            .map((e) => cell(e).join(",")));
+                        let si = 0;
+                        for (const e of alive) {
+                            while (si < slots.length && busy.has(slots[si].join(","))) si++;
+                            if (si >= slots.length) break;
+                            const [c, r] = slots[si++];
+                            e.x = c * TS + TS / 2;
+                            e.y = r * TS + TS / 2;
+                        }
+                    }
+                }
+                closeModal(); // окно объекта не переживает уход из сцены
                 layer = new PIXI.Container();
                 layer.sortableChildren = true;
                 // клик-зона на всю карту (ниже всех — рисуется прозрачной):
@@ -305,6 +699,12 @@
                     const tok = makeToken(e);
                     layer.addChild(tok);
                     tokens.push({ enemy: e, node: tok, base: tok.y, phase: Math.random() * 6.28 });
+                }
+                objNodes = [];
+                for (const o of st.objects) if (!o.taken) {
+                    const node = makeObjectNode(o);
+                    layer.addChild(node);
+                    objNodes.push({ obj: o, node, base: node.y, phase: Math.random() * 6.28 });
                 }
                 worldContainer.addChild(layer);
 
@@ -342,8 +742,10 @@
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
                 path = null;
                 hideTip();
+                closeModal();
                 if (layer) { layer.destroy({ children: true }); layer = null; }
                 tokens = [];
+                objNodes = [];
                 if (uiHud) { uiHud.destroy({ children: true }); uiHud = null; }
                 worldContainer.visible = false;
             },
@@ -382,6 +784,10 @@
                     t.phase += dt * 3;
                     t.node.y = t.base + Math.sin(t.phase) * 3;
                 }
+                for (const t of objNodes) {
+                    t.phase += dt * 3;
+                    t.node.y = t.base + Math.sin(t.phase) * 2.5;
+                }
                 // тултип следует за жетоном врага (камера/покачивание живые):
                 // мировые → экранные → дизайн-координаты ui-слоя
                 if (tip && layer) {
@@ -398,11 +804,27 @@
                 } else uiHud.userData.toast.alpha = 0;
                 uiHud.userData.floorT.text = GAME_LOC.t("dungeon.floor", { n: st.floor });
                 uiHud.userData.hpT.text = GAME_LOC.t("dungeon.hp", { hp: G.hero.hp, max: G.hero.maxHp });
+                uiHud.userData.goldT.text = String(G.gold);
                 globalThis.GAME_UI.fit(uiHud.userData.floorT, 95, 11);
                 globalThis.GAME_UI.fit(uiHud.userData.hpT, 105, 11);
 
-                // триггеры: враги и выход
-                for (const t of tokens) {
+                // ── триггеры: окно объекта, враги, выход ───────────────────
+                if (st.win) {
+                    // окно открыто: герой стоит на месте, боя/выхода нет
+                    setHeroAxes(0, 0);
+                    path = null;
+                } else {
+                    // окно объекта открываем только когда герой СТОИТ рядом:
+                    // проход по пути через центр комнаты не должен прерываться
+                    const idle = !path && !charInput.ix && !charInput.iy;
+                    if (idle) for (const o of st.objects) {
+                        if (o.taken) continue;
+                        const d = Math.hypot(o.col * TS + TS / 2 - hx, o.row * TS + TS / 2 - hy);
+                        if (o.cool) { if (d > TS * 1.25) o.cool = false; continue; }
+                        if (d < TS * 0.85) { openObject(o); break; }
+                    }
+                }
+                if (!st.win) for (const t of tokens) {
                     if (!t.enemy.alive) continue;
                     if (Math.hypot(t.enemy.x - hx, t.enemy.y - hy) < TS * 0.85) {
                         G.activeEnemy = t.enemy;
@@ -410,7 +832,7 @@
                         return;
                     }
                 }
-                if (st.exit && Math.hypot(st.exit.x - hx, st.exit.y - hy) < TS * 0.85) {
+                if (!st.win && st.exit && Math.hypot(st.exit.x - hx, st.exit.y - hy) < TS * 0.85) {
                     if (!st.bossDead) showToast(GAME_LOC.t("dungeon.exitSealed"));
                     // спуск требует растущую колоду: на этаже N — минимум
                     // 11+N карт (этаж 1 — 12, спуск на 2-й — 13, …)
@@ -443,6 +865,41 @@
                 w: 372, h: tip.h,
             } : null),
             tipHide: () => hideTip(),
+            // ── объекты комнат (тесты): состояние, активное окно, действия ─
+            objects: () => (G.dungeon && G.dungeon.objects
+                ? G.dungeon.objects.map((o) => ({
+                    type: o.type, col: o.col, row: o.row, taken: !!o.taken,
+                    amount: o.amount || null, card: o.card || null,
+                    stock: o.stock ? [...o.stock] : null,
+                    sold: o.sold ? [...o.sold] : null,
+                })) : []),
+            objWin: () => {
+                if (!winObj || !G.dungeon || !G.dungeon.win) return null;
+                const { CARDS, SHOP_BUY, SHOP_SELL } = globalThis.GAME_DATA;
+                if (winObj.type === "shop") return {
+                    kind: "shop", gold: G.gold,
+                    items: winObj.stock.map((id, i) => ({
+                        id, price: SHOP_BUY[CARDS[id].rarity],
+                        sold: !!(winObj.sold && winObj.sold[i]),
+                    })),
+                    sell: (sellRows || []).map((r) => ({
+                        id: r.id, price: SHOP_SELL[CARDS[r.id].rarity], canSell: r.canSell,
+                    })),
+                };
+                return winObj.type === "gold"
+                    ? { kind: "gold", amount: winObj.amount }
+                    : { kind: "chest", card: winObj.card };
+            },
+            objTake: () => { if (winRefs && winRefs.takeBtn) winRefs.takeBtn.emit("pointertap"); },
+            objClose: () => { if (winRefs && winRefs.leaveBtn) winRefs.leaveBtn.emit("pointertap"); },
+            shopBuy: (i) => shopBuy(i),
+            shopSell: (id) => shopSell(id),
+            shopCardNode: (i) => (winRefs && winRefs.goodsNodes ? winRefs.goodsNodes[i] || null : null),
+            shopSellNode: (id) => {
+                const r = (sellRows || []).find((x) => x.id === id);
+                return r ? r.node : null;
+            },
+            hudGold: () => (uiHud && uiHud.userData.goldT ? uiHud.userData.goldT.text : null),
         };
     }
 

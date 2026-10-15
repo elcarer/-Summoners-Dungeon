@@ -235,6 +235,18 @@
         return table[(Math.random() * table.length) | 0];
     }
 
+    // ── Золото и магазин подземелья (просил юзер) ─────────────────────────
+    // Золото — мета-валюта: кучи золота в комнатах, тратится в магазине.
+    // Цены магазина по редкости: покупка карты и продажа копии из коллекции.
+    const SHOP_BUY = { common: 10, rare: 30, epic: 100 };
+    const SHOP_SELL = { common: 2, rare: 6, epic: 20 };
+    // Случайная карта с редкостью «как у награды после боя» — веса заданы
+    // повторами REWARD_POOL (там все 30 карт игры, служебный gobA не входит):
+    // сундук и товары магазина кидаются им.
+    function rollLootCard() {
+        return REWARD_POOL[(Math.random() * REWARD_POOL.length) | 0];
+    }
+
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.
     const ELEM_LOGO = {
@@ -249,6 +261,6 @@
     globalThis.GAME_DATA = {
         CARDS, RARITY_COLORS, DEFAULT_DECK, DEFAULT_COLLECTION, DECK_MAX, DECK_MIN, TRAP_SLOTS,
         DECK_COPIES, REWARD_POOL, ENCOUNTERS, FLOOR_MOBS, ENEMY_FILL,
-        enemyDeck, mobForFloor, ELEM_LOGO,
+        enemyDeck, mobForFloor, ELEM_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,
     };
 })();
