@@ -424,6 +424,7 @@
                 if (def.ability === "dash1") summonDash(u); // «Скорость 1»
                 else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
                 else if (def.ability === "bombling") summonBombling(u); // бомблинг
+                if (def.berserkSummon) addBerserk(u, def.berserkSummon); // «Берсерк» — уже при призыве
             }
             // ловушка врага на клетке призыва (и существа, и строения)
             triggerCellTraps(u);
@@ -576,10 +577,18 @@
         function triggerCellTraps(u) {
             if (!B.units.includes(u)) return; // умер раньше (рывок+мина на шаге)
             const foe = u.side === "p" ? "e" : "p";
-            const i = B.traps[foe].findIndex((t) => t.col === u.col && t.row === u.row
+            let side = foe;
+            let i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                 && (t.def.trap.effect === "cellDmg" || t.def.trap.effect === "ambush"));
+            if (i < 0) {
+                // «Решётка с шипами» нейтральна: жалит ЛЮБОЕ существо,
+                // оказавшееся на клетке, — включая хозяина ловушки
+                side = u.side;
+                i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
+                    && t.def.trap.effect === "cellDmgAll");
+            }
             if (i < 0) return;
-            const trap = B.traps[foe].splice(i, 1)[0];
+            const trap = B.traps[side].splice(i, 1)[0];
             redrawTraps();
             const p = cellXY(u.col, u.row);
             floatText(p.x, p.y - 60, "?!", 0xe08cd0);
@@ -590,16 +599,16 @@
                     const c2 = trap.col + dc, r2 = trap.row + dr;
                     if (c2 < 0 || c2 >= GRID || r2 < 0 || r2 >= GRID) continue;
                     if (unitAt(c2, r2)) continue;
-                    addUnit(foe, trap.def.trap.spawn, c2, r2);
+                    addUnit(side, trap.def.trap.spawn, c2, r2);
                 }
                 refreshHud();
                 checkEnd();
                 return;
             }
-            damageUnit(u, trap.def.trap.amount + altarBonus(foe), null, "acid");
-            for (const v of B.units.slice()) {
+            damageUnit(u, trap.def.trap.amount + altarBonus(side), null, "acid");
+            if (trap.def.trap.splash) for (const v of B.units.slice()) { // у ловушек без splash соседей не задевает
                 if (v !== u && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1) {
-                    damageUnit(v, trap.def.trap.splash + altarBonus(foe), null, "acid");
+                    damageUnit(v, trap.def.trap.splash + altarBonus(side), null, "acid");
                 }
             }
             refreshHud();
@@ -2185,6 +2194,8 @@
             if (s.aoeDmg && !B.units.some((v) => v.side === "p")) return false;
             // «Поднять стяги!» — только если есть своё существо
             if (s.buffAllAtk && !B.units.some((v) => v.side === "e" && v.def.type === "unit")) return false;
+            // «Бросок валуна» — тоже нужна своя цель
+            if (s.baseHit && !B.units.some((v) => v.side === "e" && v.def.type === "unit")) return false;
             // добор-заклинание — тоже трата энергии; гасим только при полной руке
             if (s.draw && B.eHand.length >= HAND_MAX) return false;
             // огнешар при энергии 1..2 почти пуст (урон 0..1) — копим дальше
@@ -2318,6 +2329,11 @@
                         if (Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1)
                             damageUnit(v, s.dmg, null, "rocket");
                 }
+            }
+            if (s.baseHit) { // «Бросок валуна»: своё сильнейшее бьёт базу героя — это его атака
+                const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit")
+                    .slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row));
+                if (own[0]) { baseHit("e", own[0]); triggerAttackTraps(own[0]); }
             }
             if (s.draw) drawEnemy(s.draw);
             if (s.search) { // верхнее заклинание из верхних карт колоды — в руку
@@ -2701,7 +2717,14 @@
                 redrawFirewalls();
                 sfx("rocket");
             }
-            if (def.spell.target === "ownUnit") { // жертва: убить своё, ударить соседей
+            if (def.spell.target === "ownUnit" && def.spell.baseHit) { // «Бросок валуна»: своё существо бьёт базу врага — это его атака
+                if (!target || target.col === undefined) return false;
+                const u = unitAt(target.col, target.row);
+                if (!u || u.side !== "p" || u.def.type !== "unit") return false;
+                baseHit("p", u);
+                triggerAttackTraps(u);
+            }
+            if (def.spell.target === "ownUnit" && def.spell.sacrifice) { // жертва: убить своё, ударить соседей
                 if (!target || target.col === undefined) return false;
                 const u = unitAt(target.col, target.row);
                 if (!u || u.side !== "p" || u.def.type !== "unit") return false;

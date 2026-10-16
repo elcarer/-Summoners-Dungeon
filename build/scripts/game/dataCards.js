@@ -128,6 +128,18 @@
                  spell: { target: "anyUnit", berserk: 1 },
                  rarity: "common", elem: "strength",
                  color: 0xb0402e, img: "strength/33" },
+        str34: { type: "unit", cost: 3, atk: 1, hp: 4, speed: 1,
+                 creature: "goblin", berserkSummon: 2,
+                 rarity: "common", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/34" },
+        str35: { type: "spell", cost: 3,
+                 spell: { target: "ownUnit", baseHit: true },
+                 rarity: "common", elem: "strength",
+                 color: 0xb0402e, img: "strength/35" },
+        str36: { type: "trap", cost: 0,
+                 trap: { event: "onEnemyCell", effect: "cellDmgAll", amount: 1 },
+                 rarity: "common", elem: "strength",
+                 color: 0x6e4a2e, img: "strength/36" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -148,7 +160,7 @@
         str13: 0, str14: 0, str15: 0, str16: 0, str17: 0, str18: 0,
         str19: 0, str20: 0, str21: 0, str22: 0, str23: 0, str24: 0,
         str25: 0, str26: 0, str27: 0, str28: 0, str29: 0, str30: 0,
-        str31: 0, str32: 0, str33: 0,
+        str31: 0, str32: 0, str33: 0, str34: 0, str35: 0, str36: 0,
     };
     const DECK_MAX = 60, DECK_MIN = 12, TRAP_SLOTS = 2;
     const DECK_COPIES = 3; // максимум одинаковых карт в колоде
@@ -165,6 +177,8 @@
         "str26", "str26", "str26", "str29", "str29", "str29",
         "str30", "str30", "str30", "str31", "str31", "str31",
         "str32", "str32", "str32", "str33", "str33", "str33",
+        "str34", "str34", "str34", "str35", "str35", "str35",
+        "str36", "str36", "str36",
         "str5", "str5", "str7", "str7", "str11", "str11",
         "str13", "str13", "str14", "str14", "str17", "str17",
         "str19", "str19", "str20", "str20", "str24", "str24",
@@ -230,7 +244,8 @@
     const ENEMY_FILL = {
         common: ["str1", "str2", "str3", "str4", "str9", "str12", "str13",
                  "str14", "str15", "str16", "str22", "str23", "str26",
-                 "str29", "str30", "str31", "str32", "str33"],
+                 "str29", "str30", "str31", "str32", "str33",
+                 "str34", "str35", "str36"],
         rare:   ["str5", "str7", "str13", "str14", "str11", "str17", "str19",
                  "str20", "str24", "str27"],
         epic:   ["str6", "str8", "str10", "str18", "str21", "str25", "str28"],
