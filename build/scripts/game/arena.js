@@ -218,6 +218,16 @@
                     }
                     return;
                 }
+                if (tg === "emptyCell") { // культ кочерыжки — годится пустая клетка
+                    root.board.userData.baseZone.eventMode = "none";
+                    for (let r = 0; r < GRID; r++) for (let col = 0; col < GRID; col++) {
+                        if (unitAt(col, r)) continue;
+                        const rc = cellRect(col, r);
+                        hi.rect(rc.x, rc.y, rc.w, rc.h);
+                        hi.fill({ color: 0x7dc95e, alpha: 0.3 });
+                    }
+                    return;
+                }
                 if (tg === "anyUnit" || tg === "anyUnitDmg") {
                     // усиление — любые существа; дротик — существа и строения
                     // (варево строения не берёт — только существа)
@@ -301,9 +311,11 @@
                 g.stroke({ width: 3.75, color: 0xffd98c });
                 c.addChild(g);
                 // метка эффекта: лагерь даёт +1 урона соседям, алтарь —
-                // +1 урона заклинаний/ловушек, прочие ауры — ✦
+                // +1 урона заклинаний/ловушек, костёр лечит соседей (♥),
+                // прочие ауры — ✦
                 const aura = T(u.def.campAura ? `+${u.def.campAura}⚔`
-                    : (u.def.spellAura ? `+${u.def.spellAura}✦` : "✦"), 30, 0xffe9b0);
+                    : (u.def.campfire ? "♥"
+                        : (u.def.spellAura ? `+${u.def.spellAura}✦` : "✦")), 30, 0xffe9b0);
                 aura.anchor.set(0.5);
                 aura.position.set(0, -3);
                 aura.name = "auraMark";
@@ -423,6 +435,7 @@
                 }
                 if (def.ability === "dash1") summonDash(u); // «Скорость 1»
                 else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
+                else if (def.ability === "spiritSummoner") summonSpiritCaller(u); // призыватель духов
                 else if (def.ability === "bombling") summonBombling(u); // бомблинг
                 if (def.berserkSummon) addBerserk(u, def.berserkSummon); // «Берсерк» — уже при призыве
             }
@@ -530,6 +543,36 @@
             floatText(p.x, p.y - 69, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
         }
 
+        // «Призыватель духов»: после призыва бесплатно разыгрывает случайного
+        // Гоблина из СБРОСА своей стороны (цена ≤ 3) на пустую соседнюю
+        // (верт/гориз) клетку — энергия не тратится (просил юзер). Карта
+        // уходит из сброса прямо на поле. Ловушка-гоблин (приманка) ставится
+        // как ловушка: нужен свободный слот и клетка без своей ловушки.
+        function summonSpiritCaller(u) {
+            if (!B.units.includes(u)) return; // мог умереть от мины при призыве
+            const discard = u.side === "p" ? B.discard : B.eDiscard;
+            const traps = u.side === "p" ? B.traps.p : B.traps.e;
+            const near = [[-1, 0], [1, 0], [0, -1], [0, 1]]
+                .map(([dc, dr]) => [u.col + dc, u.row + dr]);
+            const cellOk = (def, c2, r2) => c2 >= 0 && c2 < GRID && r2 >= 0 && r2 < GRID
+                && !unitAt(c2, r2)
+                && (def.type !== "trap" || !traps.some((tr) => tr.col === c2 && tr.row === r2));
+            const goblins = discard
+                .map((id, i) => ({ id, i, def: CARDS[id] }))
+                .filter((x) => CARDS[x.id] && isGoblin(x.def) && x.def.cost <= 3
+                    && (x.def.type !== "trap" || traps.length < TRAP_SLOTS)
+                    && near.some(([c2, r2]) => cellOk(x.def, c2, r2)));
+            if (!goblins.length) return;
+            const pick = goblins[(Math.random() * goblins.length) | 0];
+            discard.splice(pick.i, 1);
+            const cells = near.filter(([c2, r2]) => cellOk(pick.def, c2, r2));
+            const [col, row] = cells[(Math.random() * cells.length) | 0];
+            if (pick.def.type === "trap") armTrap(u.side, pick.id, col, row);
+            else addUnit(u.side, pick.id, col, row);
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 69, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
+        }
+
         // «Бомблинг»: после призыва находит в колоде владельца случайную
         // карту ловушки и кладёт её в руку (карта уходит из колоды).
         function summonBombling(u) {
@@ -579,7 +622,8 @@
             const foe = u.side === "p" ? "e" : "p";
             let side = foe;
             let i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
-                && (t.def.trap.effect === "cellDmg" || t.def.trap.effect === "ambush"));
+                && (t.def.trap.effect === "cellDmg" || t.def.trap.effect === "ambush"
+                    || t.def.trap.effect === "confuse"));
             if (i < 0) {
                 // «Решётка с шипами» нейтральна: жалит ЛЮБОЕ существо,
                 // оказавшееся на клетке, — включая хозяина ловушки
@@ -601,6 +645,14 @@
                     if (unitAt(c2, r2)) continue;
                     addUnit(side, trap.def.trap.spawn, c2, r2);
                 }
+                refreshHud();
+                checkEnd();
+                return;
+            }
+            if (trap.def.trap.effect === "confuse") {
+                // «Путь грибов»: существо получает «Запутанность 2» — два
+                // своих хода вместо марша пятится к своей базе (просил юзер)
+                addConfusion(u, trap.def.trap.turns || 2);
                 refreshHud();
                 checkEnd();
                 return;
@@ -723,6 +775,19 @@
             }
         }
 
+        // Лечение (+n жизни; пределом служит сама карта — жёсткого максимума
+        // у существ нет): счётчик на жетоне и всплывающий «+n»
+        function healUnit(u, n) {
+            if (!B.units.includes(u)) return;
+            u.hp += n;
+            const node = u.node.getChildByName("hp");
+            if (node) node.text = String(u.hp);
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 36, `+${n}`, 0x9fd489);
+            punch(u.node);
+            sfx("up");
+        }
+
         function baseHit(side, u) {
             sfx("crash");
             procEnchantFire(u); // «Огненное дыхание» срабатывает и на базе
@@ -740,14 +805,27 @@
 
         // «Грибница»: в начало хода владельца даёт 1 энергию и теряет 1 жизнь
         // (энергия начисляется даже если грибница от этого урона погибает).
+        // «Походный костёр»: соседние с ним существа (обе стороны) получают
+        // 1 жизнь, а сам костёр теряет 1 — лечит раньше, так что даже
+        // погибая от собственного жара, он успевает согреть соседей.
         function upkeep(side) {
             for (const b of B.units.slice()) {
-                if (b.side !== side || b.def.type !== "building" || !b.def.mycelium) continue;
-                if (side === "p") B.energy += 1; else B.eEnergy += 1;
-                sfx("aqua");
-                const p = cellXY(b.col, b.row);
-                floatText(p.x, p.y - 60, "+1⚡", 0xffd98c);
-                damageUnit(b, 1, null, "dam");
+                if (b.side !== side || b.def.type !== "building") continue;
+                if (b.def.mycelium) {
+                    if (side === "p") B.energy += 1; else B.eEnergy += 1;
+                    sfx("aqua");
+                    const p = cellXY(b.col, b.row);
+                    floatText(p.x, p.y - 60, "+1⚡", 0xffd98c);
+                    damageUnit(b, 1, null, "dam");
+                }
+                if (b.def.campfire) {
+                    for (const v of B.units.slice()) {
+                        if (v.def.type !== "unit") continue;
+                        if (Math.abs(v.col - b.col) + Math.abs(v.row - b.row) !== 1) continue;
+                        healUnit(v, 1);
+                    }
+                    damageUnit(b, 1, null, "dam");
+                }
             }
             refreshHud();
         }
@@ -1974,6 +2052,91 @@
             }
         }
 
+        // ── «Запутанность N» (ловушка «Путь грибов», просил юзер) ─────────
+        // Запутанное существо вместо своего перемещения/атаки (всего марша,
+        // включая доб. атаки берсерка) идёт на клетку НАЗАД — к своей базе —
+        // а всех, кто преграждает путь (свои, чужие, постройки, своя база),
+        // атакует, как будто они вражеские. Счётчик — оставшиеся СВОИ ходы:
+        // сработал в марш/призыв → в начале следующих двух ходов владельца
+        // пятится, затем эффект снимается.
+        function addConfusion(u, turns) {
+            u.confused = turns;
+            let mark = u.node.getChildByName("confuseMark");
+            if (!mark) {
+                mark = new PIXI.Container();
+                mark.name = "confuseMark";
+                mark.eventMode = "none";
+                const g = new PIXI.Graphics();
+                g.circle(0, 0, 13.5);
+                g.fill({ color: 0x5a3f7a });
+                g.stroke({ width: 3, color: 0xd0b0ef });
+                mark.addChild(g);
+                const tx = T("", 17, 0xf3e6ff);
+                tx.anchor.set(0.5);
+                mark.addChild(tx);
+                mark.position.set(0, -66); // берсерк/очарование — по краям головы
+                u.node.addChild(mark);
+            }
+            mark.getChildAt(1).text = String(u.confused);
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 66, "✧", 0xb07ad5);
+            sfx("aqua");
+        }
+        function removeConfuseMark(u) {
+            const mark = u.node && u.node.getChildByName("confuseMark");
+            if (mark) mark.destroy({ children: true });
+        }
+        // Запутанное бьёт СВОЮ базу (зеркало baseHit: та же геометрия/цвета,
+        // но минус стороне владельца) — база «мешает пройти»
+        function ownBaseHit(u) {
+            sfx("crash");
+            procEnchantFire(u);
+            if (u.side === "p") {
+                B.playerBase -= u.curAtk;
+                const p = cellXY(u.col, GRID - 1);
+                floatText(p.x, p.y + 15, `−${u.curAtk}`, 0xff5f4e);
+            } else {
+                B.enemyBase -= u.curAtk;
+                const p = cellXY(u.col, 0);
+                floatText(p.x, p.y - 15, `−${u.curAtk}`, 0xff8f6e);
+            }
+            punch(root.hud);
+        }
+        // Ход запутанного существа (вместо марша): шаг назад или удар
+        // встанавшего на пути; у задней кромки позади своя база — бьёт её
+        // и уходит с поля. Асинхронно из-за паузы глиссады, как марш.
+        async function confusedAct(u) {
+            if (!B.units.includes(u)) return;
+            const back = u.row + (u.side === "p" ? 1 : -1);
+            if (back < 0 || back >= GRID) {
+                ownBaseHit(u);
+                triggerAttackTraps(u); // удар по базе — тоже атака (руна)
+                removeUnit(u);
+                refreshHud();
+                checkEnd();
+                return;
+            }
+            const occ = unitAt(u.col, back);
+            if (occ) { // любой на пути — «как будто вражеский»
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 60, "⚔", 0xb07ad5);
+                damageUnit(occ, u.curAtk, u, "sword");
+                triggerAttackTraps(u);
+                refreshHud();
+                checkEnd();
+                return;
+            }
+            u.row = back;
+            const p = cellXY(u.col, u.row);
+            glide(u, p.x, p.y);
+            setWalk(u, true, u.side === "p" ? "walk_front" : "walk_back");
+            sfx("step");
+            await delay(0.52 / animK()); // глиссада + пауза: полный шаг походки
+            if (B.stopped) return;
+            afterMoved(u); // перемещение — вражеские ловушки могут сработать
+            checkEnd();
+        }
+
         // ── Марш: юниты стороны идут вперёд (строения стоят) ────────────────
         async function marchSide(side) {
             const dir = side === "p" ? -1 : 1;
@@ -1981,6 +2144,13 @@
                 .sort((a, b) => (side === "p" ? a.row - b.row : b.row - a.row));
             for (const u of order) {
                 if (B.stopped || !B.units.includes(u)) continue;
+                if (u.confused > 0) { // «Запутанность»: марш заменён пятанием назад
+                    await confusedAct(u);
+                    if (B.stopped || B.phase === "over") return;
+                    u.confused -= 1;
+                    if (u.confused <= 0) { u.confused = 0; removeConfuseMark(u); refreshHud(); }
+                    continue; // доб. атаки берсерка пропускает — не марширует
+                }
                 if (u.def.ability === "coward") { fleeCoward(u, side); continue; } // «Трусливый гоблин»
                 for (let step = 0; step < u.def.speed; step++) {
                     if (B.stopped || !B.units.includes(u)) break;
@@ -2210,6 +2380,8 @@
             if (s.sacrifice && !aiSacrificePick()) return false;
             // «Раскалённые обломки» — только если есть что бить
             if (s.aoeDmg && !B.units.some((v) => v.side === "p")) return false;
+            // «Культ кочерыжки» — нужна хоть одна пустая клетка под гоблинов
+            if (s.cultRow && B.units.length >= GRID * GRID) return false;
             // «Поднять стяги!» — только если есть своё существо
             if (s.buffAllAtk && !B.units.some((v) => v.side === "e" && v.def.type === "unit")) return false;
             // «Бросок валуна» — тоже нужна своя цель
@@ -2302,6 +2474,16 @@
                     left: s.turns, dmg: s.firewall });
                 redrawFirewalls();
                 sfx("rocket");
+            }
+            if (s.target === "emptyCell") { // культ — ряд, где больше пустых (ничья — где больше игроков)
+                const empt = [0, 0, 0, 0, 0], pu = [0, 0, 0, 0, 0];
+                for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++)
+                    if (!unitAt(c, r)) empt[r]++;
+                for (const v of B.units) if (v.side === "p") pu[v.row]++;
+                let row = 0;
+                for (let r = 1; r < GRID; r++)
+                    if (empt[r] > empt[row] || (empt[r] === empt[row] && pu[r] > pu[row])) row = r;
+                cultRowSpawn("e", row);
             }
             if (s.target === "enemyAny") {
                 const targets = B.units.filter((u) => u.side === "p");
@@ -2635,6 +2817,11 @@
                     castSpell(B.selected, { col, row });
                     return;
                 }
+                if (tg === "emptyCell") { // культ кочерыжки — только пустая клетка
+                    if (!unitAt(col, row)) castSpell(B.selected, { col, row });
+                    else deselect();
+                    return;
+                }
                 const typeOk = u && (tg === "anyUnitDmg"
                     ? (u.def.type === "unit"
                         || (u.def.type === "building" && !sdef.spell.noBuildings))
@@ -2683,6 +2870,20 @@
             refreshHud();
         }
 
+        // «Культ кочерыжки» (str40): на всех пустых клетках горизонтального
+        // ряда (одинаковый row, колонки 0..4) появляются Гоблины 3/4 стороны
+        // кастовавшего (служебная карта gobC, на поле — как обычный призыв:
+        // ловушки клеток, ауры, бейджи). Возвращает число призванных.
+        function cultRowSpawn(side, row) {
+            let n = 0;
+            for (let col = 0; col < GRID; col++) {
+                if (unitAt(col, row)) continue;
+                addUnit(side, "gobC", col, row);
+                n++;
+            }
+            return n;
+        }
+
         // Эффекты заклинаний игрока, валидация цели внутри (false — цель не
         // годится, тогда и оплаты/сброса/панелей не будет). Отделено от
         // оплаты карты, чтобы «Горящие руны» могли повторить эффект
@@ -2727,6 +2928,11 @@
                 } else {
                     damageUnit(u, spellDmg(def), null, "rocket");
                 }
+            }
+            if (def.spell.target === "emptyCell") { // культ кочерыжки: ряд в гоблинах
+                if (!target || target.col === undefined) return false;
+                if (unitAt(target.col, target.row)) return false;
+                cultRowSpawn("p", target.row);
             }
             if (def.spell.target === "anyCell") { // стена костров: ряд горит N ходов владельца
                 if (!target || target.col === undefined) return false;
@@ -2829,6 +3035,16 @@
                 const counts = [0, 0, 0, 0, 0];
                 for (const v of B.units) if (v.side !== "p") counts[v.row]++;
                 return { col: 2, row: counts.indexOf(Math.max(...counts)) };
+            }
+            if (tg === "emptyCell") { // культ — ряд, где больше пустых (ничья — где больше врагов)
+                const empt = [0, 0, 0, 0, 0], foes = [0, 0, 0, 0, 0];
+                for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++)
+                    if (!unitAt(c, r)) empt[r]++;
+                for (const v of B.units) if (v.side !== "p") foes[v.row]++;
+                let best = 0;
+                for (let r = 1; r < GRID; r++)
+                    if (empt[r] > empt[best] || (empt[r] === empt[best] && foes[r] > foes[best])) best = r;
+                return { col: 2, row: best };
             }
             return null; // без цели или целей нет — эффект повторится «вхолостую»
         }
@@ -3284,7 +3500,7 @@
                     lastSpell: B.lastSpell.p,
                     journeySummon: B.journeySummon,
                     eDeck: B.eDeck.length,
-                    units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0 })),
+                    units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0 })),
                     traps: { p: B.traps.p.length, e: B.traps.e.length },
                     firewalls: B.firewalls.map((f) => ({ side: f.side, row: f.row, left: f.left })),
                 };
@@ -3402,6 +3618,10 @@
                 if (unitAt(col, row)) return false;
                 return addUnit(side, cardId, col, row);
             },
+            // тест-хук: взвести ловушку стороны (как розыгрыш карты ловушки)
+            _trap(side, cardId, col, row) { return armTrap(side, cardId, col, row); },
+            // тест-хук: upkeep стороны (начало её хода: грибницы, костры)
+            _upkeep(side) { upkeep(side); return true; },
             // план добора ИИ по шкале (тесты мягкого правила): сколько карт
             // возьмёт и какой доход всего
             aiDrawPlan: () => (B

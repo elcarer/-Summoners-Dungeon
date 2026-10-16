@@ -140,10 +140,30 @@
                  trap: { event: "onEnemyCell", effect: "cellDmgAll", amount: 1 },
                  rarity: "common", elem: "strength",
                  color: 0x6e4a2e, img: "strength/36" },
+        str37: { type: "unit", cost: 4, atk: 1, hp: 3, speed: 1,
+                 creature: "goblin", ability: "spiritSummoner",
+                 rarity: "rare", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/37" },
+        str38: { type: "building", cost: 2, atk: 0, hp: 3, campfire: 1,
+                 rarity: "common", elem: "strength",
+                 color: 0x8a5a3e, img: "strength/38" },
+        str39: { type: "trap", cost: 3,
+                 trap: { event: "onEnemyCell", effect: "confuse", turns: 2 },
+                 rarity: "rare", elem: "strength",
+                 color: 0x6e4a2e, img: "strength/39" },
+        str40: { type: "spell", cost: 6,
+                 spell: { target: "emptyCell", cultRow: true },
+                 rarity: "epic", elem: "strength",
+                 color: 0xb0402e, img: "strength/40" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
         gobA: { type: "unit", cost: 2, atk: 2, hp: 2, speed: 1,
+                creature: "goblin", rarity: "common", elem: "strength",
+                color: 0x9c4a3a },
+        // Гоблин из «Культа кочерыжки» (str40) — служебная карта без лица,
+        // как gobA: ряд выбранной клетки заполняется Гоблинами 3/4.
+        gobC: { type: "unit", cost: 3, atk: 3, hp: 4, speed: 1,
                 creature: "goblin", rarity: "common", elem: "strength",
                 color: 0x9c4a3a },
     };
@@ -161,6 +181,7 @@
         str19: 0, str20: 0, str21: 0, str22: 0, str23: 0, str24: 0,
         str25: 0, str26: 0, str27: 0, str28: 0, str29: 0, str30: 0,
         str31: 0, str32: 0, str33: 0, str34: 0, str35: 0, str36: 0,
+        str37: 0, str38: 0, str39: 0, str40: 0,
     };
     const DECK_MAX = 60, DECK_MIN = 12, TRAP_SLOTS = 2;
     const DECK_COPIES = 3; // максимум одинаковых карт в колоде
@@ -178,12 +199,13 @@
         "str30", "str30", "str30", "str31", "str31", "str31",
         "str32", "str32", "str32", "str33", "str33", "str33",
         "str34", "str34", "str34", "str35", "str35", "str35",
-        "str36", "str36", "str36",
+        "str36", "str36", "str36", "str38", "str38", "str38",
         "str5", "str5", "str7", "str7", "str11", "str11",
         "str13", "str13", "str14", "str14", "str17", "str17",
         "str19", "str19", "str20", "str20", "str24", "str24",
-        "str27", "str27",
+        "str27", "str27", "str37", "str37", "str39", "str39",
         "str6", "str8", "str10", "str18", "str21", "str25", "str28",
+        "str40",
     ];
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
@@ -245,10 +267,11 @@
         common: ["str1", "str2", "str3", "str4", "str9", "str12", "str13",
                  "str14", "str15", "str16", "str22", "str23", "str26",
                  "str29", "str30", "str31", "str32", "str33",
-                 "str34", "str35", "str36"],
+                 "str34", "str35", "str36", "str38"],
         rare:   ["str5", "str7", "str13", "str14", "str11", "str17", "str19",
-                 "str20", "str24", "str27"],
-        epic:   ["str6", "str8", "str10", "str18", "str21", "str25", "str28"],
+                 "str20", "str24", "str27", "str37", "str39"],
+        epic:   ["str6", "str8", "str10", "str18", "str21", "str25", "str28",
+                 "str40"],
     };
     // Колода врага: ядро архетипа + 3..8 карт добора; с глубиной (floor ≥ 1)
     // шанс эпических в доборе растёт от 0% (этаж 1) до 45%, редких — до ~85%.
