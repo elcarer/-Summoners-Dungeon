@@ -2353,12 +2353,122 @@
         // замедленных анимациях — дольше
         const enemyPlayDelay = () => Math.max(1, 1 / animK());
 
+        // ── Правила ИИ по картам и связкам (просил юзер) ───────────────────
+        // ИИ играет аккуратно: не навредит своим (стена костров, сплэш мины,
+        // взрыв жертвы), строит связки (лагерь/костёр + призыв рядом, вождь
+        // до гоблинов, алтарь до урона) и держит части комбо в руке, пока
+        // не придёт пара (руны копируют только достойное, валун ждёт
+        // сильного метателя). Ценность юнита для оценки размена:
+        const aiVal = (u) => u.curAtk + u.hp;
+        // «Стена костров» (str21): ряд горит ТРЁМИ тиками и бьёт ВСЕХ в ряду.
+        // Выгоден ряд с давлением игрока — его существа в ряду (успеют
+        // получить тик до ухода) и на подходе снизу (рядом r+1 — игрок
+        // шагнёт в огонь). Убыток — свои в ряду и на подходе сверху (r−1),
+        // а строения в ряду не уйти вовсе. Все ряды в убыток → null: карту
+        // держим (просил юзер: не ставить стену на своих).
+        function aiFirewallRow() {
+            let best = null, bestScore = 0;
+            for (let r = 0; r < GRID; r++) {
+                let score = 0;
+                for (const v of B.units) {
+                    if (v.side === "p" && (v.row === r || v.row === r + 1)) score += aiVal(v);
+                    if (v.side === "e" && (v.row === r || v.row === r - 1)) score -= aiVal(v);
+                }
+                if (score > bestScore) { bestScore = score; best = r; }
+            }
+            return best;
+        }
+        // «Гоблинская мина» (str6): сплэш 1 бьёт соседей клетки — своих
+        // убиваемых (жизней ≤ 1) рядом с миной ИИ не подставляет.
+        function aiMineSafe(col, row) {
+            return !B.units.some((v) => v.side === "e" && v.hp <= 1
+                && Math.abs(v.col - col) + Math.abs(v.row - row) === 1);
+        }
+        // Порядок розыгрыша в руке (внутри группы — дороже раньше, как было):
+        // 0 добивание базы · 1 двигатели связок (постройки, вождь, заклинатель
+        // клинков) · 2 урон и удаление · 3 существа · 4 усиления (когда есть
+        // кого усиливать) · 5 ловушки · 6 добор. Так алтарь усиливает дротики
+        // этого же хода, вождь удешевляет гоблинов до их розыгрыша, а лагерь
+        // встаёт раньше существ, что призываются рядом с ним.
+        function aiGroup(id, def) {
+            if (def.type === "spell") {
+                const s = def.spell;
+                if (s.baseDmg && B.playerBase <= s.baseDmg) return 0; // землетрясение добивает
+                if (s.baseHit && B.units.some((v) => v.side === "e"
+                    && v.def.type === "unit" && v.curAtk >= B.playerBase)) return 0;
+                if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
+                    || s.sacrifice || s.baseHit || s.copyLast) return 2;
+                if (s.buffAtk || s.berserk || s.buffAllAtk || s.enchantFire) return 4;
+                return 6; // поиск рун / глубокое путешествие
+            }
+            if (def.type === "building") return 1;
+            if (def.type === "trap") return 5;
+            if (def.leaderAura || def.spellBuffAura) return 1; // вождь / заклинатель клинков
+            return 3;
+        }
+        // Клетка призыва существа ИИ: связки с «Военным лагерем» (+урон при
+        // призыве рядом — самый ценный), «Походным костром» (лечение каждый
+        // ход) и «Заклинателем клинков» (+урон за каждое заклинание);
+        // прежние приоритеты сохранены — передний ряд и колонка без своих
+        // (заторы марша). Трусливый гоблин — стеной прямо перед существом
+        // игрока (клетка его следующего шага).
+        function aiUnitSpot(def) {
+            const rows = deployRows("e");
+            const free = freeCells(rows);
+            if (!free.length) return null;
+            const frontRow = rows[rows.length - 1];
+            let best = [], bestScore = -1;
+            for (const [c, r] of free) {
+                let score = 0;
+                if (r === frontRow) score += 2;
+                if (!B.units.some((o) => o.side === "e" && o.col === c)) score += 1.5;
+                for (const b of B.units) {
+                    if (b.side !== "e" || Math.abs(b.col - c) + Math.abs(b.row - r) !== 1) continue;
+                    if (b.def.type === "building" && b.def.campAura) score += 3;
+                    if (b.def.type === "building" && b.def.campfire) score += 2;
+                    if (b.def.spellBuffAura) score += 2;
+                }
+                if (def.ability === "coward"
+                    && B.units.some((v) => v.side === "p" && v.col === c && v.row === r + 1)) score += 2.5;
+                if (score > bestScore) { bestScore = score; best = [[c, r]]; }
+                else if (score === bestScore) best.push([c, r]);
+            }
+            return best[(Math.random() * best.length) | 0];
+        }
+        // Постройки-ауры соседства (лагерь, костёр) — к существам и будущим
+        // призывам: своё существо рядом (костёр лечит сразу) и пустая клетка
+        // зоны призыва рядом (лагерь усилит того, кто встанет). Остальные
+        // постройки — как раньше, в тыл у своей базы.
+        function aiBuildingSpot(def) {
+            const rows = deployRows("e");
+            const free = freeCells(rows);
+            if (!free.length) return null;
+            if (def.campAura || def.campfire) {
+                let best = [], bestScore = -1;
+                for (const [c, r] of free) {
+                    let score = 0;
+                    for (const v of B.units)
+                        if (v.side === "e" && v.def.type === "unit"
+                            && Math.abs(v.col - c) + Math.abs(v.row - r) === 1) score += 1.5;
+                    for (const [c2, r2] of free)
+                        if (Math.abs(c2 - c) + Math.abs(r2 - r) === 1) score += 1;
+                    if (score > bestScore) { bestScore = score; best = [[c, r]]; }
+                    else if (score === bestScore) best.push([c, r]);
+                }
+                return best[(Math.random() * best.length) | 0];
+            }
+            const back = free.filter(([, r]) => r === rows[0]);
+            const pool = back.length ? back : free;
+            return pool[(Math.random() * pool.length) | 0];
+        }
+
         // ── Панельные карты у ИИ (просил юзер): эффекты, которые у игрока
         // идут через панели выбора, ИИ разыгрывает «в голове» — цель берёт
         // теми же приоритетами, что и обычные карты.
         // Жертва «Жертвоприношения» (str11): своё существо, чей взрыв убивает
         // врагов и окупает потерю — слабое своё против убиваемого, либо
-        // 2+ убиваемых разом.
+        // 2+ убиваемых разом. Взрыв бьёт и СВОИХ рядом (аккуратно с картами,
+        // вредящими своим — просил юзер): своих под удар не подставляем.
         function aiSacrificePick() {
             const dmg = CARDS.str11.spell.dmg;
             let best = null, bestScore = 0;
@@ -2367,7 +2477,10 @@
                 const kills = B.units.filter((v) => v.side === "p"
                     && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1
                     && v.hp <= dmg).length;
-                const score = kills * 3 - (u.hp + u.curAtk); // убитый враг ценнее слабого своего
+                const ownColl = B.units.filter((v) => v.side === "e" && v !== u
+                    && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1
+                    && v.hp <= dmg).length;
+                const score = kills * 3 - ownColl * 2 - (u.hp + u.curAtk) * 0.25;
                 if (kills >= 1 && score > bestScore) { best = u; bestScore = score; }
             }
             return best;
@@ -2378,14 +2491,33 @@
             const s = def.spell;
             if (s.copyLast) return aiReplayOk();
             if (s.sacrifice && !aiSacrificePick()) return false;
-            // «Раскалённые обломки» — только если есть что бить
-            if (s.aoeDmg && !B.units.some((v) => v.side === "p")) return false;
+            // «Стена костров» — ряд должен окупаться (не на своих, просил
+            // юзер); всем рядам в убыток — карту держим до подходящего поля
+            if (s.firewall && aiFirewallRow() === null) return false;
+            // «Раскалённые обломки» — 6 энергии: нужны 2+ цели либо снос
+            // ценного (убиваемое существо с уроном 3+)
+            if (s.aoeDmg) {
+                const hits = B.units.filter((v) => v.side === "p");
+                if (hits.length < 2 && !hits.some((v) =>
+                    v.hp <= s.aoeDmg + altarBonus("e") && v.curAtk >= 3)) return false;
+            }
             // «Культ кочерыжки» — нужна хоть одна пустая клетка под гоблинов
             if (s.cultRow && B.units.length >= GRID * GRID) return false;
-            // «Поднять стяги!» — только если есть своё существо
-            if (s.buffAllAtk && !B.units.some((v) => v.side === "e" && v.def.type === "unit")) return false;
-            // «Бросок валуна» — тоже нужна своя цель
-            if (s.baseHit && !B.units.some((v) => v.side === "e" && v.def.type === "unit")) return false;
+            // «Поднять стяги!» — окупается при двух и более своих существах
+            if (s.buffAllAtk
+                && B.units.filter((v) => v.side === "e" && v.def.type === "unit").length < 2) return false;
+            // «Бросок валуна» — метатель с уроном 3+ либо добивание базы;
+            // слабым метателем карту не переводим — держим для сильного
+            // из колоды (просил юзер: часть комбы в руке ждёт пару)
+            if (s.baseHit) {
+                const throwers = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
+                if (!throwers.some((v) => v.curAtk >= 3 || v.curAtk >= B.playerBase)) return false;
+            }
+            // «Двойная атака» — берсерк платит жизнь за удар: вешаем
+            // на сильного (3+ урона) и крепкого (3+ жизней), либо на уже
+            // стоящего у базы врага (ряд 3+ — следующий марш в базу)
+            if (s.berserk && !B.units.some((v) => v.side === "e" && v.def.type === "unit"
+                && ((v.curAtk >= 3 && v.hp >= 3) || (v.row >= 3 && v.curAtk >= 2)))) return false;
             // добор-заклинание — тоже трата энергии; гасим только при полной руке
             if (s.draw && B.eHand.length >= HAND_MAX) return false;
             // огнешар при энергии 1..2 почти пуст (урон 0..1) — копим дальше
@@ -2405,13 +2537,24 @@
                     || (v.def.type === "building" && !s.noBuildings)))) return false;
             return true;
         }
+        // Повторять «Горящими рунами» стоит МОЩНОЕ: по базе, по площади,
+        // стену костров, жертву, огнешар или урон 2+. Усиление или добор
+        // повторять — перевод карты: руны держим в руке, пока не выйдет
+        // достойная пара (просил юзер).
+        function aiReplayWorth(id) {
+            const d = CARDS[id], s = d && d.spell;
+            if (!s) return false;
+            return !!(s.aoeDmg || s.baseDmg || s.firewall || s.sacrifice
+                || s.drainAll || (s.dmg || 0) + altarBonus("e") >= 2);
+        }
         // Есть ли смысл повторять последнее заклинание («Горящие руны»):
-        // оно есть, это не сами руны и его эффект сейчас применим
+        // оно есть, это не сами руны, оно достойно повтора и применимо
         function aiReplayOk() {
             const last = B.lastSpell.e;
             if (!last || last === "str25") return false;
             const def = CARDS[last];
-            return !!def && def.type === "spell" && aiSpellPlayable(def, true);
+            return !!def && def.type === "spell" && aiReplayWorth(last)
+                && aiSpellPlayable(def, true);
         }
         // Эффект заклинания врага — один код для прямого розыгрыша и для
         // повтора «Горящими рунами» (там эффект последнего заклинания,
@@ -2423,7 +2566,11 @@
             if (s.target === "anyUnit") { // усиление/очарование — своему сильнейшему
                 const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
                     && (!s.enchantFire || !v.enchantFire));
-                let best = own.slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row))[0];
+                // очарование «Огненного дыхания» вешается на крепкого атакующего
+                // (ему жить и бить, чтобы тянуть заклинания), усиление — на сильнейшего
+                let best = own.slice().sort((a, b) => s.enchantFire
+                    ? (b.curAtk + b.hp) - (a.curAtk + a.hp)
+                    : ((b.curAtk - a.curAtk) || (b.row - a.row)))[0];
                 if (focus && own.includes(focus)) best = focus;
                 if (!best) return;
                 if (s.enchantFire) { // «Огненное дыхание»
@@ -2466,10 +2613,9 @@
                 if (!best) return;
                 damageUnit(best, dmg, null, "rocket");
             }
-            if (s.target === "anyCell") { // стена костров — ряд, где больше игроков
-                const counts = [0, 0, 0, 0, 0];
-                for (const v of B.units) if (v.side === "p") counts[v.row]++;
-                const row = counts.indexOf(Math.max(...counts));
+            if (s.target === "anyCell") { // стена костров — ряд, где огонь окупается
+                const row = aiFirewallRow();
+                if (row === null) return; // невыгодного ряда нет — гейт держал карту
                 B.firewalls.push({ col: 2, row, side: "e",
                     left: s.turns, dmg: s.firewall });
                 redrawFirewalls();
@@ -2554,18 +2700,11 @@
                     for (let i = 0; i < rest.length; i++) if (i !== r) B.eDiscard.push(rest[i]);
                 }
                 if (chosen) {
-                    const rows = deployRows("e");
-                    const free = freeCells(rows);
-                    if (free.length) {
-                        // как обычный призыв ИИ: передний ряд, колонка без своих
-                        const frontRow = rows[rows.length - 1];
-                        const front = free.filter(([, r2]) => r2 === frontRow);
-                        let cand = front.length ? front : free;
-                        const open = cand.filter(([c2]) =>
-                            !B.units.some((o) => o.side === "e" && o.col === c2));
-                        if (open.length) cand = open;
-                        const [col, row] = cand[(Math.random() * cand.length) | 0];
-                        addUnit("e", chosen, col, row);
+                    // клетка призыва — теми же правилами связок, что и обычный
+                    // призыв ИИ (лагерь/костёр рядом, передний ряд, колонка без своих)
+                    const spot = aiUnitSpot(CARDS[chosen]);
+                    if (spot) {
+                        addUnit("e", chosen, spot[0], spot[1]);
                     } else B.eHand.push(chosen); // поле забито — карта хотя бы в руку
                 }
             }
@@ -2593,35 +2732,24 @@
                 const affordable = B.eHand
                     .map((c, i) => ({ i, id: c, def: CARDS[c] }))
                     .filter((x) => effCost(x.id, "e") <= B.eEnergy)
-                    .sort((a, b) => effCost(b.id, "e") - effCost(a.id, "e"));
+                    // порядок — по правилам связок (двигатели до урона и
+                    // существ, усиления после), внутри группы дороже раньше
+                    .sort((a, b) => (aiGroup(a.id, a.def) - aiGroup(b.id, b.def))
+                        || (effCost(b.id, "e") - effCost(a.id, "e")));
                 if (!affordable.length) { if (!await tryRefill()) return; continue; }
                 let played = false;
                 for (const pick of affordable) {
                     const def = pick.def;
                     if (def.type === "unit" || def.type === "building") {
-                        const rows = deployRows("e");
-                        const free = freeCells(rows);
-                        if (!free.length) continue;
-                        let pool;
-                        if (def.type === "building") {
-                            // строения — в тыл (ряд у своей базы): их маршем
-                            // не достать, аура работает из глубины
-                            const back = free.filter(([, r]) => r === rows[0]);
-                            pool = back.length ? back : free;
-                        } else {
-                            const frontRow = rows[rows.length - 1];
-                            const front = free.filter(([, r]) => r === frontRow);
-                            let cand = front.length ? front : free;
-                            // юниты — не в колонку за своим (заторы марша):
-                            // если есть свободные колонки без своих — в них
-                            const open = cand.filter(([c2]) =>
-                                !B.units.some((o) => o.side === "e" && o.col === c2));
-                            if (open.length) cand = open;
-                            pool = cand;
-                        }
+                        // клетка — по правилам связок: строения-ауры соседства
+                        // к существам и будущим призывам, прочие в тыл; существа —
+                        // рядом с лагерем/костром/заклинателем клинков
+                        const spot = def.type === "building"
+                            ? aiBuildingSpot(def) : aiUnitSpot(def);
+                        if (!spot) continue;
                         showEnemyCard(pick.id); // карта врага слева ≥ 1с
                         await delay(enemyPlayDelay());
-                        const [col, row] = pool[(Math.random() * pool.length) | 0];
+                        const [col, row] = spot;
                         const cardId = B.eHand[pick.i];
                         B.eHand.splice(pick.i, 1);
                         B.eEnergy -= effCost(cardId, "e");
@@ -2677,6 +2805,31 @@
                                 v.side === "p" && Math.abs(v.col - c2) + Math.abs(v.row - r2) === 1));
                             pool = near.length ? near : spots;
                         } else pool = spots;
+                        // «Путь грибов» (Запутанность): на клетку следующего
+                        // шага СИЛЬНЕЙШЕГО существа игрока — пусть лучший
+                        // бегун два хода пятится домой (правило юзера)
+                        if (def.trap.effect === "confuse" && front.length) {
+                            const strong = B.units.filter((v) =>
+                                v.side === "p" && v.def.type === "unit")
+                                .sort((a, b) => aiVal(b) - aiVal(a))[0];
+                            if (strong) {
+                                const f2 = front.filter(([c2, r2]) =>
+                                    c2 === strong.col && r2 === strong.row - 1);
+                                if (f2.length) pool = f2;
+                            }
+                        }
+                        // «Гоблинская мина»: сплэш задевает соседей клетки —
+                        // рядом не должно быть своих убиваемых (аккуратно
+                        // с картами, вредящими своим — просил юзер); совсем
+                        // небезопасно — мину держим
+                        if (def.trap.effect === "cellDmg" && def.trap.splash) {
+                            const safe = pool.filter(([c2, r2]) => aiMineSafe(c2, r2));
+                            if (!safe.length) continue;
+                            const clean = safe.filter(([c2, r2]) => !B.units.some((v) =>
+                                v.side === "e"
+                                && Math.abs(v.col - c2) + Math.abs(v.row - r2) === 1));
+                            pool = clean.length ? clean : safe;
+                        }
                         showEnemyBack(); // какая ловушка — загадка (просил юзер)
                         await delay(enemyPlayDelay());
                         const [col, row] = pool[(Math.random() * pool.length) | 0];
@@ -3466,9 +3619,11 @@
             // ловушки (тесты): у руны видно существо, на котором она висит
             trapList: () => ({
                 p: B.traps.p.map((tr) => ({ eff: tr.def.trap.effect,
+                    col: tr.unit ? null : tr.col, row: tr.unit ? null : tr.row,
                     unit: tr.unit ? cardIdOf(tr.unit.def) : null,
                     on: tr.unit ? B.units.includes(tr.unit) : null })),
                 e: B.traps.e.map((tr) => ({ eff: tr.def.trap.effect,
+                    col: tr.unit ? null : tr.col, row: tr.unit ? null : tr.row,
                     unit: tr.unit ? cardIdOf(tr.unit.def) : null,
                     on: tr.unit ? B.units.includes(tr.unit) : null })),
             }),
