@@ -534,11 +534,24 @@
             return true;
         }
 
+        // весь запас карт игрока: коллекция — полный реестр копий, колода
+        // вложена в него. Продажа не должна уронить запас ниже нормы
+        // спуска с текущего этажа (просил юзер)
+        function ownedTotal() {
+            let n = 0;
+            for (const k in G.collection) n += G.collection[k] || 0;
+            return n;
+        }
+        function sellLocked() {
+            return ownedTotal() - 1 < deckNeed(G.dungeon ? G.dungeon.floor : 1);
+        }
+
         function shopSell(id) {
             const { CARDS, SHOP_SELL } = globalThis.GAME_DATA;
             if (!winObj || winObj.type !== "shop") return false;
             // продаются только свободные копии: вложенные в колоду не трогаем
             if ((G.collection[id] || 0) - countInDeck(id) <= 0) return false;
+            if (sellLocked()) return false;
             G.collection[id] -= 1;
             G.gold += SHOP_SELL[CARDS[id].rarity];
             globalThis.GAME_META.saveMeta(G.collection, G.deck);
@@ -644,7 +657,7 @@
                 ids.forEach((id, i) => {
                     const col = i % 5, rowI = (i / 5) | 0;
                     const owned = G.collection[id] || 0;
-                    const canSell = owned - countInDeck(id) > 0;
+                    const canSell = owned - countInDeck(id) > 0 && !sellLocked();
                     const cx = 93 + col * 198, cy = 138 + rowI * 307.5;
                     const card = cardFace(ctx, id, { scale: 0.5, dim: !canSell });
                     card.position.set(cx, cy);
@@ -686,6 +699,12 @@
             // goodsNodes перечитываем: карточки пересобраны, старые узлы мертвы
             refreshShop = function () {
                 goldT.text = String(G.gold);
+                // нижняя подсказка правой панели объясняет блокировку продажи
+                const locked = sellLocked();
+                sellHint.text = locked
+                    ? t("shop.sellNeed", { n: deckNeed(G.dungeon ? G.dungeon.floor : 1) })
+                    : t("shop.sellHint");
+                sellHint.style.fill = locked ? 0xff8f6e : 0x8a7c5e;
                 winRefs.goodsNodes = buildGoods();
                 const list = buildSellList();
                 sellPane.setContent(list, list.userData.contentH);

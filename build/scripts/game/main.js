@@ -192,6 +192,7 @@
             collection: Object.keys(savedColl).length ? savedColl : { ...DEFAULT_COLLECTION },
             dungeon: null, activeEnemy: null, battle: null,
             rewardDeck: null, // колода побеждённого — пул трофея «1 из 3»
+            rewardDraft: false, // трофей — выбор из всей драфт-колоды (драфт)
             draft: null, // мини-игра «Карта сокровищ»: picks/ePicks/objIdx
             draftBattle: false, // текущий бой — драфт-бой (итог ведёт в подземелье)
             uiReturn: null, // откуда открыты настройки/колода (кнопка «Назад»)
@@ -205,6 +206,7 @@
                 this.activeEnemy = null;
                 this.battle = null;
                 this.rewardDeck = null;
+                this.rewardDraft = false;
                 this.draft = null;
                 this.draftBattle = false;
                 this.deck = [...DEFAULT_DECK];

@@ -1,12 +1,14 @@
 // СЦЕНА «ТРОФЕЙ» — после победы в бою: выбор 1 из 3 карт в коллекцию.
-// Клик по карте сам ведёт в подземелье (кнопки «Продолжить» нет).
+// После победы в драфте («Карта сокровищ») — выбор 1 карты из ВСЕЙ
+// драфт-колоды (сеткой). Клик по карте сам ведёт в подземелье
+// (кнопки «Продолжить» нет).
 (function () {
     function createRewardScene(ctx) {
         const { scenes, G, ui, scheduler } = ctx;
-        const { REWARD_POOL } = globalThis.GAME_DATA;
+        const { REWARD_POOL, CARDS } = globalThis.GAME_DATA;
         const { T, cardFace, dimBg, button } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
-        let root = null, options = [], picked = null;
+        let root = null, options = [], picked = null, draftMode = false;
 
         function pickThree() {
             // Награда — из колоды ПОБЕЖДЁННОГО противника (просил юзер):
@@ -52,12 +54,13 @@
                     scenes.go("deck");
                 },
             }));
-            const title = T(t("reward.title"), 60, 0xf0c96a, { stroke: { color: 0x241505, width: 10.5 } });
+            const title = T(t(draftMode ? "reward.titleDraft" : "reward.title"), 60,
+                0xf0c96a, { stroke: { color: 0x241505, width: 10.5 } });
             title.anchor.set(0.5, 0);
             title.position.set(960, 66);
             title.eventMode = "none";
             root.addChild(title);
-            const sub = T(t("reward.pick"), 30, 0xd8c79d);
+            const sub = T(t(draftMode ? "reward.pickDraft" : "reward.pick"), 30, 0xd8c79d);
             sub.anchor.set(0.5, 0);
             sub.position.set(960, 159);
             sub.eventMode = "none";
@@ -65,11 +68,26 @@
 
             options.forEach((id, i) => {
                 const isPicked = picked === i;
+                let x, y, sc;
+                if (draftMode) {
+                    // сетка до 4 карт в ряд (драфт-колода — до 12 разных);
+                    // строки центрируются, верхней хватает места под заголовком
+                    const cols = 4, rowI = (i / cols) | 0;
+                    const rows = Math.ceil(options.length / cols);
+                    const inRow = Math.min(options.length - rowI * cols, cols);
+                    x = 960 + (i % cols - (inRow - 1) / 2) * 250;
+                    y = (rows >= 3 ? [330, 610, 890] : rows === 2 ? [470, 750] : [540])[rowI];
+                    sc = picked === null || isPicked ? 0.5 : 0.42;
+                } else {
+                    x = 510 + i * 450;
+                    y = 495;
+                    sc = picked === null || isPicked ? 0.92 : 0.78;
+                }
                 const card = cardFace(ctx, id, {
-                    scale: picked === null || isPicked ? 0.92 : 0.78,
+                    scale: sc,
                     dim: picked !== null && !isPicked,
                 });
-                card.position.set(510 + i * 450, 495);
+                card.position.set(x, y);
                 if (isPicked) {
                     const glow = new PIXI.Graphics();
                     glow.roundRect(-168, -243, 336, 486, 15);
@@ -95,7 +113,16 @@
         return {
             enter() {
                 if (G.rewardKeep) G.rewardKeep = false; // возврат из колоды
-                else { options = pickThree(); picked = null; } // новая победа
+                else {
+                    // новая победа: в драфте на выбор ВСЯ драфт-колода
+                    // (просил юзер), иначе 3 карты колоды побеждённого
+                    draftMode = !!G.rewardDraft;
+                    G.rewardDraft = false;
+                    options = draftMode
+                        ? [...new Set(G.rewardDeck || [])].filter((id) => CARDS[id])
+                        : pickThree();
+                    picked = null;
+                }
                 rebuild();
             },
             exit() { if (root) { root.destroy({ children: true }); root = null; } },

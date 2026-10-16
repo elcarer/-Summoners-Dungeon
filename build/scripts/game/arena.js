@@ -2785,9 +2785,9 @@
         }
 
         // ── Итог боя → награда (победа) / меню (поражение) ─────────────────
-        // Драфт («Карта сокровищ») живёт по своим правилам: победа — вся
-        // драфт-колода в коллекцию, поражение — ничего; оба исхода ведут
-        // назад в подземелье, карта сокровищ при этом расходуется.
+        // Драфт («Карта сокровищ») живёт по своим правилам: победа — выбор
+        // ОДНОЙ карты из драфт-колоды в меню трофея, поражение — ничего;
+        // оба исхода ведут назад в подземелье, карта сокровищ расходуется.
         function finish(victory) {
             B.phase = "over";
             B.spellTarget = false;
@@ -2823,21 +2823,22 @@
                 // трофеи «1 из 3» берутся из колоды побеждённого (просил юзер)
                 G.rewardDeck = [...new Set(B.eDeckBase || [])].filter((id) => CARDS[id]);
             }
+            if (draft && victory) {
+                // награда драфта — одна ЛЮБАЯ карта драфт-колоды на выбор
+                // (просил юзер): меню трофея покажет весь её состав
+                G.rewardDeck = [...new Set(G.draft.picks)].filter((id) => CARDS[id]);
+                G.rewardDraft = true;
+            }
             B.continueAction = () => {
                 if (draft) {
-                    if (victory) {
-                        for (const id of G.draft.picks) {
-                            if (CARDS[id]) G.collection[id] = (G.collection[id] || 0) + 1;
-                        }
-                        globalThis.GAME_META.saveMeta(G.collection, G.deck);
-                    }
                     // карта сокровищ использована — объект уходит с этажа
                     if (G.dungeon && G.dungeon.objects[G.draft.objIdx])
                         G.dungeon.objects[G.draft.objIdx].taken = true;
                     G.draftBattle = false;
                     G.draft = null;
                     if (G.saveRun) G.saveRun();
-                    scenes.go("dungeon");
+                    if (victory) scenes.go("reward"); // выбор одной карты
+                    else scenes.go("dungeon");
                     return;
                 }
                 if (victory) {
@@ -2855,7 +2856,7 @@
                 }
             };
             if (victory) {
-                // победа сама ведёт в меню трофея (в драфте — в подземелье)
+                // победа сама ведёт в меню трофея (в драфте — за картой награды)
                 scheduler.after(1.4 / animK(), () => {
                     if (B && !B.stopped && B.phase === "over" && B.result === "win") B.continueAction();
                 });
