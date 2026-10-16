@@ -2785,9 +2785,13 @@
         }
 
         // ── Итог боя → награда (победа) / меню (поражение) ─────────────────
+        // Драфт («Карта сокровищ») живёт по своим правилам: победа — вся
+        // драфт-колода в коллекцию, поражение — ничего; оба исхода ведут
+        // назад в подземелье, карта сокровищ при этом расходуется.
         function finish(victory) {
             B.phase = "over";
             B.spellTarget = false;
+            const draft = !!(G.draftBattle && G.draft);
             sfx(victory ? "lvlUp" : "die");
             refreshHud();
             const ov = new PIXI.Container();
@@ -2806,12 +2810,36 @@
             txt.position.set(960, 402);
             txt.eventMode = "none";
             ov.addChild(txt);
+            if (draft && victory) {
+                const sub = T(t("draft.victorySub"), 30, 0xffe2a8,
+                    { stroke: { color: 0x1c1207, width: 7 } });
+                sub.anchor.set(0.5, 0);
+                sub.position.set(960, 462);
+                sub.eventMode = "none";
+                ov.addChild(sub);
+            }
             B.result = victory ? "win" : "lose";
-            if (victory) {
+            if (victory && !draft) {
                 // трофеи «1 из 3» берутся из колоды побеждённого (просил юзер)
                 G.rewardDeck = [...new Set(B.eDeckBase || [])].filter((id) => CARDS[id]);
             }
             B.continueAction = () => {
+                if (draft) {
+                    if (victory) {
+                        for (const id of G.draft.picks) {
+                            if (CARDS[id]) G.collection[id] = (G.collection[id] || 0) + 1;
+                        }
+                        globalThis.GAME_META.saveMeta(G.collection, G.deck);
+                    }
+                    // карта сокровищ использована — объект уходит с этажа
+                    if (G.dungeon && G.dungeon.objects[G.draft.objIdx])
+                        G.dungeon.objects[G.draft.objIdx].taken = true;
+                    G.draftBattle = false;
+                    G.draft = null;
+                    if (G.saveRun) G.saveRun();
+                    scenes.go("dungeon");
+                    return;
+                }
                 if (victory) {
                     if (G.activeEnemy) {
                         G.activeEnemy.alive = false;
@@ -2827,7 +2855,7 @@
                 }
             };
             if (victory) {
-                // победа сама ведёт в меню трофея — кнопка не нужна
+                // победа сама ведёт в меню трофея (в драфте — в подземелье)
                 scheduler.after(1.4 / animK(), () => {
                     if (B && !B.stopped && B.phase === "over" && B.result === "win") B.continueAction();
                 });
@@ -2838,7 +2866,7 @@
                 btn.position.set(960, 585);
                 btn.eventMode = "static";
                 ov.addChild(btn);
-                const bt = T(t("arena.toMenu"), 20, 0xf3e6c2);
+                const bt = T(t(draft ? "arena.toDungeon" : "arena.toMenu"), 20, 0xf3e6c2);
                 bt.anchor.set(0.5);
                 globalThis.GAME_UI.fit(bt, btn.texture.width * btn.scale.x * 0.8, 11); // не шире кнопки
                 bt.position.set(960, 585);
@@ -2863,13 +2891,16 @@
             const eBase = G.activeEnemy && G.activeEnemy.deck
                 ? [...G.activeEnemy.deck]
                 : enemyDeck(encId, G.run ? G.run.floor : 1);
+            // драфт («Карта сокровищ»): колода игрока — 12 отобранных карт,
+            // НЕ G.deck (настоящая колода в мини-игре не участвует)
+            const pDeck = G.draftBattle && G.draft ? G.draft.picks : G.deck;
             B = {
                 encId, phase: "player", stopped: false, turnNo: 1,
                 energy: 1, eEnergy: 1,
                 split: 1, // положение ползунка «карты↔энергия» (1 карта / 2 энергии)
                 playerBase: 15, playerBaseMax: 15,
                 enemyBase: enc.baseHp, enemyBaseMax: enc.baseHp,
-                deck: shuffle([...G.deck]), discard: [], hand: [],
+                deck: shuffle([...pDeck]), discard: [], hand: [],
                 eDeck: shuffle([...eBase]),
                 eDeckBase: eBase,
                 eDiscard: [], eHand: [],

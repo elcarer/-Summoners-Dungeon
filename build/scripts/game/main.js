@@ -192,6 +192,8 @@
             collection: Object.keys(savedColl).length ? savedColl : { ...DEFAULT_COLLECTION },
             dungeon: null, activeEnemy: null, battle: null,
             rewardDeck: null, // колода побеждённого — пул трофея «1 из 3»
+            draft: null, // мини-игра «Карта сокровищ»: picks/ePicks/objIdx
+            draftBattle: false, // текущий бой — драфт-бой (итог ведёт в подземелье)
             uiReturn: null, // откуда открыты настройки/колода (кнопка «Назад»)
             resetRun() {
                 // новая игра — забег И коллекция/колода с нуля (просил юзер:
@@ -203,6 +205,8 @@
                 this.activeEnemy = null;
                 this.battle = null;
                 this.rewardDeck = null;
+                this.draft = null;
+                this.draftBattle = false;
                 this.deck = [...DEFAULT_DECK];
                 this.collection = { ...DEFAULT_COLLECTION };
                 globalThis.GAME_META.saveMeta(this.collection, this.deck);
@@ -381,6 +385,8 @@
         scenes.add("deck", deckScene);
         const rewardScene = GAME_REWARD.createRewardScene(ctx);
         scenes.add("reward", rewardScene);
+        const draftScene = GAME_DRAFT.createDraftScene(ctx);
+        scenes.add("draft", draftScene);
         const settingsScene = GAME_SETTINGS_SCENE.createSettingsScene(ctx);
         scenes.add("settings", settingsScene);
 
@@ -396,6 +402,7 @@
             dungeon: dungeonScene, arena: arenaScene,
             arenaApi: arenaScene.api, deckApi: deckScene.api,
             rewardApi: rewardScene.api, settingsApi: settingsScene.api,
+            draftApi: draftScene.api,
             audio: {
                 track: () => audio.status().track,
                 status: () => audio.status(),

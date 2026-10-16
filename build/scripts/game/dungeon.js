@@ -37,11 +37,12 @@
     const ROOM_CENTERS = [[3, 3], [11, 3], [22, 2], [5, 12]];
 
     // Объекты этажа: по одному в центре каждой комнаты, кроме стартовой
-    // (просил юзер). Тип кидается из общего пула: куча золота, сундук и —
-    // со 2-го этажа — магазин (просил юзер): он может и не выпасть, а
-    // выпав, исключается из пула — не больше 1 на этаж. Сумма кучи и карта
-    // сундука кидаются при генерации этажа и хранятся в объекте —
-    // сейв/загрузка показывает то же самое.
+    // (просил юзер). Тип кидается из общего пула: куча золота, сундук,
+    // карта сокровищ (драфт) и — со 2-го этажа — магазин (просил юзер).
+    // Магазин и карта сокровищ могут и не выпасть, а выпав, исключаются
+    // из пула — не больше 1 каждого на этаж (драфт — долгое состязание).
+    // Сумма кучи и карта сундука кидаются при генерации этажа и хранятся
+    // в объекте — сейв/загрузка показывает то же самое.
     function genObjects(floor) {
         const { rollLootCard } = globalThis.GAME_DATA;
         const centers = ROOM_CENTERS.slice(1); // стартовая комната — без объектов
@@ -49,12 +50,12 @@
             const j = (Math.random() * (i + 1)) | 0;
             [centers[i], centers[j]] = [centers[j], centers[i]];
         }
-        const pool = ["gold", "chest"];
+        const pool = ["gold", "chest", "map"];
         if (floor >= 2) pool.push("shop");
         return centers.map(([col, row]) => {
             const pi = (Math.random() * pool.length) | 0;
             const type = pool[pi];
-            if (type === "shop") pool.splice(pi, 1); // ≤ 1 магазина на этаж
+            if (type === "shop" || type === "map") pool.splice(pi, 1); // ≤ 1 на этаж
             const obj = { type, col, row, taken: false };
             if (type === "gold") obj.amount = 1 + ((Math.random() * 5) | 0) + (floor - 1);
             if (type === "chest") obj.card = rollLootCard();
@@ -209,7 +210,8 @@
                 c.addChild(ring);
             }
             const tex = obj.type === "gold" ? "icon_gold.png"
-                : obj.type === "chest" ? "icon_bag.png" : "icon_shop.png";
+                : obj.type === "chest" ? "icon_bag.png"
+                : obj.type === "map" ? "icon_map.png" : "icon_shop.png";
             const sp = new PIXI.Sprite(uiTex(tex));
             sp.anchor.set(0.5);
             sp.scale.set(obj.type === "shop" ? 0.62 : 0.5);
@@ -386,8 +388,66 @@
             path = null;
             winObj = o;
             G.dungeon.win = { idx: G.dungeon.objects.indexOf(o) };
-            winNode = o.type === "shop" ? buildShopWin(o) : buildLootWin(o);
+            winNode = o.type === "shop" ? buildShopWin(o)
+                : o.type === "map" ? buildMapWin(o) : buildLootWin(o);
             ctx.ui.addChild(winNode);
+        }
+
+        // Карта сокровищ: окно-приглашение на драфт. «Начать драфт» уводит
+        // в мини-игру (G.draft хранит номер объекта — после боя он уйдёт);
+        // «Уйти» — объект остаётся, можно передумать (cool до отхода).
+        function buildMapWin(o) {
+            const t = GAME_LOC.t;
+            const { T, button } = globalThis.GAME_UI;
+            const c = new PIXI.Container();
+            c.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(0, 0, 1920, 1080);
+            dim.fill({ color: 0x000000, alpha: 0.55 });
+            c.addChild(dim);
+            const w = 760, h = 560, top = 540 - h / 2;
+            const panel = new PIXI.Graphics();
+            panel.roundRect(960 - w / 2, top, w, h, 18);
+            panel.fill({ color: 0x171310, alpha: 0.96 });
+            panel.stroke({ width: 4, color: 0x6b5c40 });
+            c.addChild(panel);
+            const title = T(t("obj.map"), 44, 0xf0c96a,
+                { stroke: { color: 0x241505, width: 8 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(960, top + 26);
+            title.eventMode = "none";
+            c.addChild(title);
+            const icon = new PIXI.Sprite(uiTex("icon_map.png"));
+            icon.anchor.set(0.5);
+            icon.scale.set(1.0);
+            icon.position.set(960, top + 160);
+            c.addChild(icon);
+            const sub = T(t("obj.mapDesc"), 26, 0xd8c79d,
+                { wordWrap: true, wordWrapWidth: w - 110, align: "center" });
+            sub.anchor.set(0.5, 0);
+            sub.position.set(960, top + 250);
+            sub.eventMode = "none";
+            c.addChild(sub);
+            const startBtn = button(ctx, {
+                tex: "button_menu.png", label: t("obj.startDraft"),
+                x: 960, y: top + h - 70, scale: 1, fontSize: 27,
+                onTap: () => startDraft(o),
+            });
+            c.addChild(startBtn);
+            const leaveBtn = button(ctx, {
+                tex: "button_menu.png", label: t("shop.leave"), x: 165, y: 78, scale: 1,
+                onTap: () => { o.cool = true; closeModal(); },
+            });
+            c.addChild(leaveBtn);
+            winRefs = { takeBtn: null, startBtn, leaveBtn };
+            return c;
+        }
+
+        function startDraft(o) {
+            closeModal();
+            G.draft = { picks: [], ePicks: [], objIdx: G.dungeon.objects.indexOf(o) };
+            if (ctx.sfx) ctx.sfx();
+            scenes.go("draft");
         }
 
         // Куча золота и сундук: сумма и карта кинуты при генерации этажа —
@@ -905,11 +965,14 @@
                         id: r.id, price: SHOP_SELL[CARDS[r.id].rarity], canSell: r.canSell,
                     })),
                 };
+                if (winObj.type === "map") return { kind: "map" };
                 return winObj.type === "gold"
                     ? { kind: "gold", amount: winObj.amount }
                     : { kind: "chest", card: winObj.card };
             },
             objTake: () => { if (winRefs && winRefs.takeBtn) winRefs.takeBtn.emit("pointertap"); },
+            // карта сокровищ: кнопка «Начать драфт» (тесты полного потока)
+            objStart: () => { if (winRefs && winRefs.startBtn) winRefs.startBtn.emit("pointertap"); },
             objClose: () => { if (winRefs && winRefs.leaveBtn) winRefs.leaveBtn.emit("pointertap"); },
             shopBuy: (i) => shopBuy(i),
             shopSell: (id) => shopSell(id),
