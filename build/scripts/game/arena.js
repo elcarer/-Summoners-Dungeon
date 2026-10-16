@@ -1088,7 +1088,10 @@
             const n = B.hand.length;
             B.hand.forEach((card, idx) => {
                 const node = makeCardNode(card, idx);
-                const spread = Math.min(225, 1575 / Math.max(1, n));
+                // у малых рук разлёт как был (225); у больших — веер с
+                // нахлёстом: крайние карты не залезают под «Конец хода»
+                // и угловые колоды (просил юзер)
+                const spread = Math.min(225, n > 1 ? 790 / (n - 1) : 225);
                 node.x = 960 + (idx - (n - 1) / 2) * spread;
                 node.y = HAND_Y;
                 node.rotation = (idx - (n - 1) / 2) * 0.035;
@@ -1230,7 +1233,7 @@
         // менять в любой момент хода (тап/перетаскивание по треку); выбранное
         // сохраняется между ходами. По кнопке «Конец» шкала применяется
         // автоматически: слева — добор карт, справа — энергия на след. ход.
-        const SLIDER_W = 360, SLIDER_X = 1635, SLIDER_Y = 645;
+        const SLIDER_W = 360, SLIDER_X = 1663, SLIDER_Y = 626;
         let sliderHeld = false;
         function refreshSlider() {
             if (!root || !B) return;
@@ -1252,14 +1255,7 @@
             g.fill(0x3a5f8a); // доля «в карты»
             g.roundRect(x0, -h / 2, w, h, 10.5);
             g.stroke({ width: 3, color: 0x6b5c40 });
-            for (let i = 0; i <= total; i++) { // деления — по числу сфер
-                g.circle(x0 + (i / total) * w, h / 2 + 9, 2.25);
-                g.fill(0x6b5c40);
-            }
-            sl.thumb.clear();
-            sl.thumb.circle(x0 + (B.split / total) * w, 0, 16.5);
-            sl.thumb.fill(0xbfe0ff);
-            sl.thumb.stroke({ width: 4.5, color: 0x2f4f7a });
+            sl.thumb.position.set(x0 + (B.split / total) * w, 0); // сфера button_1
         }
         function sliderApply(e) {
             // Pixi-событие несёт .global; DOM-событие window (pointermove
@@ -1550,113 +1546,162 @@
         // ── HUD боя ────────────────────────────────────────────────────────
         function buildHud() {
             const c = new PIXI.Container();
-            // декор HUD — «хром»: клики сквозь него (к базе врага под плашкой)
-            const plate = new PIXI.Sprite(uiTex("panel_label.png"));
-            plate.anchor.set(0.5, 0);
-            plate.scale.set(1.38);
-            plate.position.set(960, 9);
-            plate.eventMode = "none";
-            c.addChild(plate);
-            const title = T("", 31, 0xffe9b0);
-            title.anchor.set(0.5, 0);
-            title.position.set(960, 21);
-            title.eventMode = "none";
-            c.addChild(title);
+            // декор HUD — «хром»: клики сквозь него. Раскладка — по референсу
+            // юзера (for_work/референсы/new_UI_battle.png): колоды в углах,
+            // панели параметров у своих колод, сброс и «Конец хода» справа
+            // внизу, полоса базы врага — сверху по центру.
+
+            // полоса жизней базы врага + число под ней
             const eBar = new PIXI.Graphics();
             eBar.eventMode = "none";
             c.addChild(eBar);
-            const eInfo = T("", 21, 0xd8c79d);
-            eInfo.anchor.set(0.5, 0);
-            eInfo.position.set(960, 90);
-            eInfo.eventMode = "none";
-            c.addChild(eInfo);
+            const eBaseT = T("", 24, 0xffe9b0);
+            eBaseT.anchor.set(0.5, 0);
+            eBaseT.position.set(960, 55);
+            eBaseT.eventMode = "none";
+            c.addChild(eBaseT);
 
-            const pp = new PIXI.Sprite(uiTex("panel_1.png"));
-            pp.position.set(39, 750);
-            pp.scale.set(1.17);
-            pp.eventMode = "none";
-            c.addChild(pp);
-            const portrait = new PIXI.Sprite(uiTex("portrate_hero.png"));
-            portrait.position.set(66, 783);
-            portrait.scale.set(1.17);
-            portrait.eventMode = "none";
-            c.addChild(portrait);
-            const pBar = new PIXI.Graphics();
-            pBar.eventMode = "none";
-            c.addChild(pBar);
-            // число жизней базы героя рядом с её полоской (просил юзер:
-            // полоска была без цифр — непонятно, сколько HP осталось)
-            const pBaseT = T("", 21, 0xb8d9a0);
-            pBaseT.position.set(417, 829);
-            pBaseT.eventMode = "none";
-            c.addChild(pBaseT);
-            const pName = T("", 25, 0xf3e6c2);
-            pName.position.set(255, 792);
-            pName.eventMode = "none";
-            c.addChild(pName);
+            // имя противника — каменная плашка слева от его колоды
+            const namePlate = new PIXI.Sprite(uiTex("panel_label.png"));
+            namePlate.position.set(1314, 24);
+            namePlate.eventMode = "none";
+            c.addChild(namePlate);
+            const title = T("", 30, 0xf0c96a);
+            title.anchor.set(0.5, 0.5);
+            title.position.set(1484, 67);
+            title.eventMode = "none";
+            c.addChild(title);
 
-            const manaSign = new PIXI.Sprite(uiTex("sign_mana.png"));
-            manaSign.position.set(270, 840);
-            manaSign.scale.set(1.2);
-            manaSign.eventMode = "none";
-            c.addChild(manaSign);
-            const manaT = T("", 28, 0xbfe0ff);
-            manaT.position.set(333, 849);
-            manaT.eventMode = "none";
-            c.addChild(manaT);
-            const deckBack = new PIXI.Sprite(uiTex("card_back_small.png"));
-            deckBack.position.set(270, 909);
-            deckBack.scale.set(0.42);
-            deckBack.eventMode = "none";
-            c.addChild(deckBack);
-            const deckT = T("", 25, 0xd8c79d);
-            deckT.position.set(333, 915);
-            deckT.eventMode = "none";
-            c.addChild(deckT);
+            // колода врага — рубашка гоблинов в правом верхнем углу; клик
+            // показывает, какие карты у него остались (просил юзер)
+            const eDeckPile = new PIXI.Sprite(uiTex("card_goblin_back.png"));
+            eDeckPile.position.set(1725, 24);
+            eDeckPile.scale.set(0.74); // 230×338 → 170×250
+            eDeckPile.eventMode = "static";
+            eDeckPile.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("edeck"); });
+            c.addChild(eDeckPile);
+            const eDeckCnt = T("", 22, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4.5 } });
+            eDeckCnt.anchor.set(0.5, 1);
+            eDeckCnt.position.set(1810, 266);
+            eDeckCnt.eventMode = "none";
+            c.addChild(eDeckCnt);
 
+            // панель параметров врага — под его колодой (панель 216×387,
+            // у референса сжата до 170×232)
+            const ePanel = new PIXI.Sprite(uiTex("panel_parametrs.png"));
+            ePanel.position.set(1726, 308);
+            ePanel.scale.set(170 / 216, 232 / 387);
+            ePanel.eventMode = "none";
+            c.addChild(ePanel);
+            const eLines = [0, 1, 2].map((i) => {
+                const l = T("", 26, 0xd8c79d);
+                l.anchor.set(0, 0.5);
+                l.position.set(1738, 362 + i * 61.5);
+                l.eventMode = "none";
+                c.addChild(l);
+                return l;
+            });
+
+            // панель параметров игрока — левый край, над своей колодой
+            const pPanel = new PIXI.Sprite(uiTex("panel_parametrs.png"));
+            pPanel.position.set(30, 540);
+            pPanel.scale.set(170 / 216, 232 / 387);
+            pPanel.eventMode = "none";
+            c.addChild(pPanel);
+            const pLines = [0, 1, 2].map((i) => {
+                const l = T("", 26, 0xd8c79d);
+                l.anchor.set(0, 0.5);
+                l.position.set(42, 597 + i * 58.5);
+                l.eventMode = "none";
+                c.addChild(l);
+                return l;
+            });
+
+            // колода игрока — рубашка в левом нижнем углу; клик — просмотр
+            const pDeckPile = new PIXI.Sprite(uiTex("card_back_min.png"));
+            pDeckPile.position.set(25, 806);
+            pDeckPile.scale.set(0.775); // 230×330 → 178×256
+            pDeckPile.eventMode = "static";
+            pDeckPile.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("deck"); });
+            c.addChild(pDeckPile);
+            const pDeckCnt = T("", 22, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4.5 } });
+            pDeckCnt.anchor.set(0.5, 1);
+            pDeckCnt.position.set(114, 1052);
+            pDeckCnt.eventMode = "none";
+            c.addChild(pDeckCnt);
+
+            // сброс — правый нижний угол: последняя ушедшая карта приглушённым
+            // лицом (пусто — тусклая рубашка); клик — просмотр сброса
+            const discardFace = new PIXI.Sprite(uiTex("card_back_min.png"));
+            discardFace.position.set(1668, 724);
+            discardFace.scale.set(1, 338 / 330); // рубашка 230×330 → слот 230×338
+            discardFace.tint = 0x5a5a5a;
+            discardFace.alpha = 0.6;
+            discardFace.eventMode = "static";
+            discardFace.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("discard"); });
+            c.addChild(discardFace);
+            const discardCnt = T("", 22, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4.5 } });
+            discardCnt.anchor.set(0.5, 1);
+            discardCnt.position.set(1783, 1052);
+            discardCnt.eventMode = "none";
+            c.addChild(discardCnt);
+
+            // «Конец хода» — слева от сброса (кнопка-сфера без надписи)
             const endBtn = new PIXI.Sprite(uiTex("button_end.png"));
-            endBtn.anchor.set(0.5);
-            endBtn.scale.set(1.23);
-            endBtn.position.set(1740, 495);
+            endBtn.position.set(1477, 836); // 151×174 в натуральном масштабе
             endBtn.eventMode = "static";
             endBtn.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); api.endTurn(); });
             c.addChild(endBtn);
+            const endLabel = T(t("arena.endTurn"), 28, 0xffe9b0,
+                { stroke: { color: 0x1c1207, width: 5 }, wordWrap: true, wordWrapWidth: 120,
+                  breakWords: true, align: "center", lineHeight: 34 });
+            endLabel.anchor.set(0.5);
+            endLabel.position.set(1552, 919);
+            endLabel.eventMode = "none";
+            c.addChild(endLabel);
 
-            // шкала конца хода «+карты ↔ +энергия» (применится по «Конец»)
+            // шкала конца хода «+карты ↔ +энергия» (применится по «Конец»),
+            // над сбросом; бегунок — синяя сфера button_1
             const slWrap = new PIXI.Container();
-            slWrap.position.set(1635, 645);
-            const slTitle = T(t("orb.scaleTitle"), 21, 0xcfc4a6);
-            slTitle.anchor.set(0.5, 1);
-            slTitle.position.set(0, -27);
-            slTitle.eventMode = "none";
-            slWrap.addChild(slTitle);
-            const slCards = T("", 33, 0xbfe0ff, { stroke: { color: 0x1c1207, width: 6 } });
+            slWrap.position.set(1663, 626);
+            const slCards = T("", 30, 0xbfe0ff, { stroke: { color: 0x1c1207, width: 6 } });
             slCards.anchor.set(1, 0.5);
-            slCards.position.set(-219, 0);
+            slCards.position.set(-222, -12);
             slCards.eventMode = "none";
             slWrap.addChild(slCards);
-            const slCardsL = T(t("orb.cardsLabel"), 18, 0x8a7c5e);
+            const slCardsL = T(t("orb.cardsLabel"), 17, 0xcfc4a6);
             slCardsL.anchor.set(1, 0);
-            slCardsL.position.set(-219, 12);
+            slCardsL.position.set(-222, 6);
             slCardsL.eventMode = "none";
             slWrap.addChild(slCardsL);
-            const slEnergy = T("", 33, 0xffd98c, { stroke: { color: 0x1c1207, width: 6 } });
+            const slEnergy = T("", 30, 0xffd98c, { stroke: { color: 0x1c1207, width: 6 } });
             slEnergy.anchor.set(0, 0.5);
-            slEnergy.position.set(219, 0);
+            slEnergy.position.set(222, -12);
             slEnergy.eventMode = "none";
             slWrap.addChild(slEnergy);
-            const slEnergyL = T(t("orb.energyLabel"), 18, 0x8a7c5e);
+            const slEnergyL = T(t("orb.energyLabel"), 17, 0xcfc4a6);
             slEnergyL.anchor.set(0, 0);
-            slEnergyL.position.set(219, 12);
+            slEnergyL.position.set(222, 6);
             slEnergyL.eventMode = "none";
             slWrap.addChild(slEnergyL);
             const slTrack = new PIXI.Graphics();
             slWrap.addChild(slTrack);
-            const slThumb = new PIXI.Graphics();
+            const slThumb = new PIXI.Sprite(uiTex("button_1.png"));
+            slThumb.anchor.set(0.5);
+            slThumb.scale.set(0.81); // 99×128 → ~80×104
             slWrap.addChild(slThumb);
             slTrack.on("pointerdown", sliderGrab);
             slThumb.on("pointerdown", sliderGrab);
             c.addChild(slWrap);
+
+            // настройки — левый верхний угол
+            const gear = new PIXI.Sprite(uiTex("icon_setting.png"));
+            gear.anchor.set(0.5);
+            gear.scale.set(0.92);
+            gear.position.set(57, 57);
+            gear.eventMode = "static";
+            gear.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("settings"); });
+            c.addChild(gear);
 
             const targetHint = T("", 24, 0xef9f8c, { stroke: { color: 0x1c1207, width: 6 } });
             targetHint.anchor.set(0.5);
@@ -1671,49 +1716,8 @@
             banner.eventMode = "none"; // баннер не ест клики поля под ним
             c.addChild(banner);
 
-            // настройки, колода (остаток) и сброс (просмотр) — оверлеи поверх
-            // боя, битва не прерывается: сцена боя при выходе умерла бы вместе
-            // с состоянием. У иконок колоды/сброса — счётчики карт.
-            const mkIcon = (tex, x, y, sc, onTap, tint) => {
-                const sp = new PIXI.Sprite(uiTex(tex));
-                sp.anchor.set(0.5);
-                sp.scale.set(sc);
-                if (tint) sp.tint = tint;
-                sp.eventMode = "static";
-                sp.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onTap(); });
-                const w = new PIXI.Container();
-                w.position.set(x, y);
-                w.addChild(sp);
-                w.name = tex;
-                return w;
-            };
-            const mkCount = (x, y) => {
-                const cnt = T("", 21, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4.5 } });
-                cnt.anchor.set(0.5, 0);
-                cnt.position.set(x, y);
-                cnt.eventMode = "none";
-                return cnt;
-            };
-            c.addChild(mkIcon("icon_setting.png", 60, 66, 1.2, () => openOverlay("settings")));
-            const deckIcon = mkIcon("card_back_small.png", 60, 165, 0.63, () => openOverlay("deck"));
-            const deckCnt = mkCount(60, 196);
-            deckIcon.addChild(deckCnt);
-            // сброс — та же рубашка, серее: другой стопок карт
-            const discardIcon = mkIcon("card_back_small.png", 60, 279, 0.63,
-                () => openOverlay("discard"), 0x9a8a78);
-            const discardCnt = mkCount(60, 310);
-            discardIcon.addChild(discardCnt);
-            c.addChild(deckIcon, discardIcon);
-            // колода врага — рубашка гоблинов (card_goblin_back.png); клик
-            // показывает, какие карты остались у противника (просил юзер)
-            const eDeckIcon = mkIcon("card_goblin_back.png", 60, 393, 0.63,
-                () => openOverlay("edeck"));
-            const eDeckCnt = mkCount(60, 424);
-            eDeckIcon.addChild(eDeckCnt);
-            c.addChild(eDeckIcon);
-
-            c.userData = { eBar, eInfo, title, pBar, pBaseT, pName, manaT, deckT, endBtn, banner, targetHint,
-                deckCnt, discardCnt, eDeckCnt,
+            c.userData = { eBar, eBaseT, title, eLines, pLines, eDeckCnt, pDeckCnt, discardCnt,
+                discardFace, lastDiscard: undefined, endBtn, endLabel, banner, targetHint,
                 slider: { wrap: slWrap, cards: slCards, energy: slEnergy, track: slTrack, thumb: slThumb } };
             return c;
         }
@@ -1866,21 +1870,40 @@
             if (!root || !B) return;
             const ud = root.hud.userData;
             ud.title.text = t(`enc.${B.encId}.title`);
-            // полоска — внутри плашки panel_label (470 px в масштабе 1.38):
-            // 735..1185, иначе вылезает за камень (просил юзер)
-            drawBar(ud.eBar, 735, 66, 450, 21, B.enemyBase / B.enemyBaseMax, 0xc0503c);
-            ud.eInfo.text = `${t("arena.baseEnemy")} ${Math.max(0, B.enemyBase)}/${B.enemyBaseMax}  ·  ${t("arena.energy")} ${B.eEnergy}  ·  ${t("arena.manaCards", { n: B.eHand.length })}`;
-            globalThis.GAME_UI.fit(ud.eInfo, 430, 16.5);
-            drawBar(ud.pBar, 255, 828, 150, 18, B.playerBase / B.playerBaseMax, 0x5d9c4a);
-            ud.pBaseT.text = `${t("arena.basePlayer")} ${Math.max(0, B.playerBase)}/${B.playerBaseMax}`;
-            ud.pName.text = t("arena.hero");
-            ud.manaT.text = `${B.energy}`;
-            ud.deckT.text = `${B.deck.length}+${B.discard.length}`;
-            ud.deckCnt.text = String(B.deck.length); // счётчики у иконок-стопок
-            ud.discardCnt.text = String(B.discard.length);
+            globalThis.GAME_UI.fit(ud.title, 300);
+            // полоса базы врага — верх экрана по центру (734..1186)
+            drawBar(ud.eBar, 734, 30, 452, 29, B.enemyBase / B.enemyBaseMax, 0xc0503c);
+            ud.eBaseT.text = `${Math.max(0, B.enemyBase)}/${B.enemyBaseMax}`;
+            // панели параметров: жизни — базы, карты — рука
+            ud.eLines[0].text = `${t("param.lives")}: ${Math.max(0, B.enemyBase)}/${B.enemyBaseMax}`;
+            ud.eLines[1].text = `${t("param.energy")}: ${B.eEnergy}`;
+            ud.eLines[2].text = `${t("param.cards")}: ${B.eHand.length}`;
+            ud.pLines[0].text = `${t("param.lives")}: ${Math.max(0, B.playerBase)}/${B.playerBaseMax}`;
+            ud.pLines[1].text = `${t("param.energy")}: ${B.energy}`;
+            ud.pLines[2].text = `${t("param.cards")}: ${B.hand.length}`;
+            ud.pDeckCnt.text = String(B.deck.length);
             ud.eDeckCnt.text = String(B.eDeck.length);
-            ud.endBtn.alpha = B.phase === "player" ? 1 : 0.45;
-            ud.endBtn.eventMode = B.phase === "player" ? "static" : "none";
+            ud.discardCnt.text = String(B.discard.length);
+            // сброс: последняя ушедшая карта приглушённым лицом
+            const last = B.discard[B.discard.length - 1] || null;
+            if (ud.lastDiscard !== last) {
+                ud.lastDiscard = last;
+                if (last && CARDS[last] && CARDS[last].img) {
+                    ud.discardFace.texture = uiTex(`cards/${CARDS[last].img}.png`);
+                    ud.discardFace.scale.set(1); // лицо 230×338 — натуральный слот
+                    ud.discardFace.tint = 0x8a8a8a;
+                    ud.discardFace.alpha = 1;
+                } else {
+                    ud.discardFace.texture = uiTex("card_back_min.png");
+                    ud.discardFace.scale.set(1, 338 / 330);
+                    ud.discardFace.tint = 0x5a5a5a;
+                    ud.discardFace.alpha = 0.6;
+                }
+            }
+            const on = B.phase === "player";
+            ud.endBtn.alpha = on ? 1 : 0.45;
+            ud.endBtn.eventMode = on ? "static" : "none";
+            ud.endLabel.alpha = on ? 1 : 0.45;
             ud.targetHint.text = B.spellTarget ? t("arena.pickTarget") : "";
             refreshSlider();
         }
@@ -2922,7 +2945,7 @@
         function enter() {
             const encId = G.activeEnemy ? G.activeEnemy.enc : "gob";
             const enc = ENCOUNTERS[encId] || ENCOUNTERS.gob;
-            curScene = enc.scene || 1;
+            curScene = 1; // в этом подземелье один фон поля боя (просил юзер)
             if (ctx.music) ctx.music("battle");
             // колода врага хранится в враге подземелья (кидается при
             // генерации этажа по глубине); для старых сейвов — генерим.
@@ -2966,8 +2989,9 @@
 
             root = new PIXI.Container();
             root.eventMode = "static";
-            // фон арены — нарисованная сцена с сеткой поля (по энкаунтеру)
-            const bg = new PIXI.Sprite(uiTex(`scenes/${enc.scene || 1}.png`));
+            // фон арены — нарисованная сцена с сеткой поля; в этом подземелье
+            // фон всегда один — scenes/1.png (просил юзер)
+            const bg = new PIXI.Sprite(uiTex("scenes/1.png"));
             const s = Math.max(1920 / bg.texture.width, 1080 / bg.texture.height);
             bg.scale.set(s);
             bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);
@@ -3278,7 +3302,7 @@
                 return null;
             },
             hudTexts: () => (root && root.hud
-                ? { pBase: root.hud.userData.pBaseT.text }
+                ? { pBase: root.hud.userData.pLines[0].text }
                 : null),
             // общий z-order поля (тесты): сортировка включена, zIndex — ряды
             zOrder: () => (root && root.unitsLayer
