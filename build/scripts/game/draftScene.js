@@ -122,7 +122,7 @@
             if (phase === "built") {
                 root.addChild(button(ctx, {
                     tex: "button_menu.png", label: t("draft.tobattle"),
-                    x: 960, y: 760, scale: 1, fontSize: 27,
+                    x: 960, y: 760, scale: 1,
                     onTap: () => { if (root) launchBattle(); },
                 }));
             } else {

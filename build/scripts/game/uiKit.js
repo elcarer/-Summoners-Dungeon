@@ -22,8 +22,10 @@
 
     // Кнопка: спириm + подпись (текст не ловит клики и вписан в ширину).
     // Кнопки button_menu.png — натуральные 274×77 при базовом разрешении
-    // 1920×1080 (просил юзер), кегль 19 — подпись внутри фрейма.
-    function button(ctx, { tex, label, x, y, scale = 1, onTap, fontSize = 19 }) {
+    // 1920×1080 (просил юзер), кегль 45 — как в главном меню (просил юзер:
+    // все button_menu в игре одного размера и одним кеглем; слишком
+    // длинные надписи ужимает фит).
+    function button(ctx, { tex, label, x, y, scale = 1, onTap, fontSize = 45 }) {
         const c = new PIXI.Container();
         const sp = new PIXI.Sprite(ctx.uiTex(tex));
         sp.anchor.set(0.5);

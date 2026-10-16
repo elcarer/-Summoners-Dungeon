@@ -2970,7 +2970,7 @@
                 btn.position.set(960, 585);
                 btn.eventMode = "static";
                 ov.addChild(btn);
-                const bt = T(t(draft ? "arena.toDungeon" : "arena.toMenu"), 20, 0xf3e6c2);
+                const bt = T(t(draft ? "arena.toDungeon" : "arena.toMenu"), 45, 0xf3e6c2);
                 bt.anchor.set(0.5);
                 globalThis.GAME_UI.fit(bt, btn.texture.width * btn.scale.x * 0.8, 11); // не шире кнопки
                 bt.position.set(960, 585);

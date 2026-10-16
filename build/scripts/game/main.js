@@ -245,7 +245,7 @@
         const T = (text, size, fill, opts = {}) => new PIXI.Text({
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
         });
-        function menuButton(texName, label, x, y, scale, onTap, fontSize = 19) {
+        function menuButton(texName, label, x, y, scale, onTap, fontSize = 45) {
             return globalThis.GAME_UI.button(ctx, { tex: texName, label, x, y, scale, onTap, fontSize });
         }
         scenes.add("menu", {

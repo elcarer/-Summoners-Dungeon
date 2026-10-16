@@ -438,7 +438,7 @@
             c.addChild(sub);
             const startBtn = button(ctx, {
                 tex: "button_menu.png", label: t("obj.startDraft"),
-                x: 960, y: top + h - 70, scale: 1, fontSize: 27,
+                x: 960, y: top + h - 70, scale: 1,
                 onTap: () => startDraft(o),
             });
             c.addChild(startBtn);
@@ -506,7 +506,7 @@
             }
             const takeBtn = button(ctx, {
                 tex: "button_menu.png", label: t(chest ? "obj.takeCard" : "obj.take"),
-                x: 960, y: top + h - 70, scale: 1, fontSize: 27,
+                x: 960, y: top + h - 70, scale: 1,
                 onTap: () => {
                     if (chest) {
                         G.collection[o.card] = (G.collection[o.card] || 0) + 1;
