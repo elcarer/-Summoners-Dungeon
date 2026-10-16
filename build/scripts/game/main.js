@@ -50,6 +50,9 @@
         // фоны арен с нарисованной сеткой поля
         uiTextures["scenes/1.png"] = await assets.loadTexture("./images/scenes/1.png");
         uiTextures["scenes/2.png"] = await assets.loadTexture("./images/scenes/2.png");
+        // карта-арт «Гоблинских пещер» — фон этажа подземелья (dungeon.js)
+        uiTextures["stages/goblin.png"] =
+            await assets.loadTexture("./images/dungeon_stages/goblin_dungeon.png");
         // эффект поля «Стена костров» и рубашка колоды врага (гоблины)
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
         uiTextures["card_goblin_back.png"] = await assets.loadTexture("./images/ui/card_goblin_back.png");
@@ -309,15 +312,18 @@
                     G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp || 10 };
                     G.gold = r.gold || 0;
                     G.run.floor = r.floor;
-                    G.dungeon = r.dungeon || null;
-                    // этажи и мир: сейвы старых волн без архива — данный
-                    // этаж становится первым в архиве
-                    G.dungeonStates = r.dungeonStates
+                    // карта-арт v2: этажи старого формата несовместимы по
+                    // координатам — не поднимаются, а пересобираются при
+                    // заходе (dungeon.enter); прогресс такого этажа теряется
+                    G.dungeon = r.dungeon && r.dungeon.v === 2 ? r.dungeon : null;
+                    const saved = r.dungeonStates
                         || (r.dungeon ? { [r.floor]: r.dungeon } : {});
+                    G.dungeonStates = {};
+                    for (const k in saved) if (saved[k] && saved[k].v === 2) G.dungeonStates[k] = saved[k];
                     G.world = { heroPos: r.worldPos || null, out: !!r.worldOut };
                     // продолжение с середины этажа — в подземелье, иначе —
                     // в открытый мир (герой вышел из пещер или только начал)
-                    scenes.go(r.dungeon ? "dungeon" : "world");
+                    scenes.go(G.dungeon ? "dungeon" : "world");
                 });
                 if (!contEnabled) bCont.alpha = 0.45; // забега нет — кнопка приглушена
                 const bNew = addMenuBtn(t("menu.newGame"), 960, 720, () => {
