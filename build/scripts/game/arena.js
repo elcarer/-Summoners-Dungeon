@@ -1320,8 +1320,13 @@
         // менять в любой момент хода (тап/перетаскивание по треку); выбранное
         // сохраняется между ходами. По кнопке «Конец» шкала применяется
         // автоматически: слева — добор карт, справа — энергия на след. ход.
+        // Бегунок следует за курсором плавно (без рывков по засечкам), а
+        // после отпускания сам доскакивает к ближайшей засечке (просил юзер).
         const SLIDER_W = 360, SLIDER_X = 1663, SLIDER_Y = 626;
+        const SLIDER_GLIDE_MS = 150; // доскок к засечке после отпускания
         let sliderHeld = false;
+        let sliderVis = null; // плавная доля бегунка 0..1 при перетаскивании
+        let sliderGlide = null; // доскок { from, to, t0 }
         function refreshSlider() {
             if (!root || !B) return;
             const sl = root.hud.userData.slider;
@@ -1334,29 +1339,45 @@
             sl.track.eventMode = on ? "static" : "none";
             sl.thumb.eventMode = on ? "static" : "none";
             sl.wrap.alpha = on ? 1 : 0.45;
+            // drag — за курсором, отпускание — плавный доскок к засечке
+            let frac;
+            if (sliderVis !== null) frac = sliderVis;
+            else if (sliderGlide) {
+                const k = Math.min(1, (performance.now() - sliderGlide.t0) / SLIDER_GLIDE_MS);
+                frac = sliderGlide.from + (sliderGlide.to - sliderGlide.from) * (1 - Math.pow(1 - k, 3));
+            } else frac = B.split / total;
             const g = sl.track;
             g.clear();
             const w = SLIDER_W, h = 21, x0 = -w / 2;
             g.roundRect(x0, -h / 2, w, h, 10.5);
             g.fill(0x1c1712);
-            g.roundRect(x0 + 4.5, -h / 2 + 4.5, Math.max(0, (B.split / total) * (w - 9)), h - 9, 6);
+            g.roundRect(x0 + 4.5, -h / 2 + 4.5, Math.max(0, frac * (w - 9)), h - 9, 6);
             g.fill(0x3a5f8a); // доля «в карты»
+            // засечки — шаги шкалы: каждая меняет делёж «энергия ↔ карты»
+            // (просил юзер); поверх заливок, внутри трека
+            for (let k = 1; k < total; k++) {
+                g.rect(x0 + (k / total) * w - 1.5, -h / 2 + 6, 3, h - 12);
+            }
+            g.fill(0x8a7c5e);
             g.roundRect(x0, -h / 2, w, h, 10.5);
             g.stroke({ width: 3, color: 0x6b5c40 });
-            sl.thumb.position.set(x0 + (B.split / total) * w, 0); // сфера button_1
+            sl.thumb.position.set(x0 + frac * w, 0); // сфера button_1
         }
         function sliderApply(e) {
             // Pixi-событие несёт .global; DOM-событие window (pointermove
             // при перетаскивании) — только clientX/clientY
             const p = toDesign(e.global ? e.global : { x: e.clientX, y: e.clientY });
             const total = spheresTotal();
-            let v = Math.round(((p.x - SLIDER_X + SLIDER_W / 2) / SLIDER_W) * total);
-            v = Math.max(0, Math.min(total, v));
+            let fv = (p.x - SLIDER_X + SLIDER_W / 2) / SLIDER_W;
+            fv = Math.max(0, Math.min(1, fv));
+            sliderGlide = null; // новый жест отменяет доскок
+            sliderVis = fv; // бегунок — на плавной доле, без рывков
+            const v = Math.round(fv * total); // засечка — ближайшая
             if (v !== B.split) {
                 B.split = v;
                 if (ctx.sfx) ctx.sfx();
-                refreshSlider();
             }
+            refreshSlider();
         }
         function sliderGrab(e) {
             if (!B || B.phase !== "player" || B.discarding || B.picking) return;
@@ -1370,6 +1391,12 @@
             sliderHeld = false;
             window.removeEventListener("pointermove", sliderMove);
             window.removeEventListener("pointerup", sliderUp);
+            const total = spheresTotal();
+            if (sliderVis !== null && Math.abs(sliderVis - B.split / total) > 0.001) {
+                sliderGlide = { from: sliderVis, to: B.split / total, t0: performance.now() };
+            }
+            sliderVis = null;
+            refreshSlider();
         }
 
         // ── Панель сброса лишних карт (конец хода при руке > 7) ─────────────
@@ -1652,19 +1679,20 @@
             c.addChild(eBaseT);
             const digitStyle = { stroke: { color: 0x16283a, width: 6 } };
             const eEnergyIcon = new PIXI.Sprite(uiTex("UI_energy.png"));
-            eEnergyIcon.position.set(679, 10);
+            eEnergyIcon.position.set(682, 10); // +3px вправо (просил юзер)
             eEnergyIcon.eventMode = "none";
             c.addChild(eEnergyIcon);
             const eEnergyT = T("", 42, 0x9fd8e4, digitStyle);
             eEnergyT.anchor.set(0.5);
-            eEnergyT.position.set(715, 46);
+            eEnergyT.position.set(718, 46);
             eEnergyT.eventMode = "none";
             c.addChild(eEnergyT);
             const eCardsIcon = new PIXI.Sprite(uiTex("UI_cards_hand.png"));
             eCardsIcon.position.set(1164, 8);
             eCardsIcon.eventMode = "none";
             c.addChild(eCardsIcon);
-            const eCardsT = T("", 40, 0x9fd8e4, digitStyle);
+            // жёлтым — как число карт игрока (просил юзер; было голубым)
+            const eCardsT = T("", 40, 0xffcc66, { stroke: { color: 0x3a2408, width: 6 } });
             eCardsT.anchor.set(0.5);
             eCardsT.position.set(1200, 44);
             eCardsT.eventMode = "none";
@@ -1708,12 +1736,12 @@
             pBaseT.eventMode = "none";
             c.addChild(pBaseT);
             const pEnergyIcon = new PIXI.Sprite(uiTex("UI_energy.png"));
-            pEnergyIcon.position.set(1422, 588);
+            pEnergyIcon.position.set(1425, 588); // +3px вправо (просил юзер)
             pEnergyIcon.eventMode = "none";
             c.addChild(pEnergyIcon);
             const pEnergyT = T("", 42, 0x9fd8e4, digitStyle);
             pEnergyT.anchor.set(0.5);
-            pEnergyT.position.set(1458, 624);
+            pEnergyT.position.set(1461, 624);
             pEnergyT.eventMode = "none";
             c.addChild(pEnergyT);
             const pEnergyGainT = T("", 30, 0x9fd3d3, { stroke: { color: 0x0e1826, width: 6 } });
@@ -1821,6 +1849,7 @@
 
             c.userData = { eBar, eBaseT, eEnergyT, eCardsT, title, pBar, pBaseT, pEnergyT,
                 pEnergyGainT, pCardsT, eDeckCnt, pDeckCnt, discardCnt,
+                eEnergyIcon, pEnergyIcon,
                 discardFace, lastDiscard: undefined, endBtn, endLabel, banner, targetHint,
                 slider: { wrap: slWrap, track: slTrack, thumb: slThumb } };
             return c;
@@ -1885,7 +1914,13 @@
             dim.eventMode = "static";
             node.addChild(dim);
             if (name === "settings") {
-                const panel = globalThis.GAME_SETTINGS_SCENE.buildPanel(ctx, { onBack: closeOverlay });
+                // из боя в настройках есть «В главное меню» (просил юзер):
+                // забег сохранён подземельем при уходе в бой — «Продолжить»
+                // в меню вернёт к тому же врагу, бой начнётся заново
+                const panel = globalThis.GAME_SETTINGS_SCENE.buildPanel(ctx, {
+                    onBack: closeOverlay,
+                    onQuit: () => { closeOverlay(); scenes.go("menu"); },
+                });
                 panel.applySound();
                 node.addChild(panel.node);
             } else { // deck / edeck / discard — только просмотр, без редактирования:
@@ -3449,6 +3484,8 @@
             window.removeEventListener("pointermove", sliderMove); // хвост шкалы
             window.removeEventListener("pointerup", sliderUp);
             sliderHeld = false;
+            sliderVis = null;
+            sliderGlide = null;
             drag = null;
             closeDiscardPanel();
             closeRunesPanel();
@@ -3466,6 +3503,11 @@
         function update(ticker) {
             if (!root || !B) return;
             const dt = ticker.deltaMS / 1000;
+            // доскок бегунка шкалы к засечке (после отпускания мыши)
+            if (sliderGlide) {
+                if (performance.now() - sliderGlide.t0 >= SLIDER_GLIDE_MS) sliderGlide = null;
+                refreshSlider();
+            }
             // ховер-зум карты оверлея: 0.75 ↔ 1 (плавно, как в «Колоде»)
             if (ovZoom) {
                 const z = ovZoom;
@@ -3580,6 +3622,20 @@
                 B.split = Math.max(0, Math.min(total, n | 0));
                 refreshSlider();
                 return B.split;
+            },
+            // плавное состояние шкалы (тесты): бегунок на доле курсора,
+            // идёт ли доскок к засечке
+            sliderGeom: () => (root && root.hud
+                ? { thumbX: Math.round(root.hud.userData.slider.thumb.position.x * 100) / 100,
+                    vis: sliderVis !== null ? Math.round(sliderVis * 1000) / 1000 : null,
+                    gliding: !!sliderGlide }
+                : null),
+            // тексты открытого оверлея (тесты: кнопки панели настроек)
+            panelTexts: () => {
+                if (!overlay) return null;
+                const out = [];
+                (function walk(n) { if (n.text) out.push(n.text); n.children.forEach(walk); })(overlay.node);
+                return out;
             },
             // панель сброса лишних карт (конец хода, рука > 7)
             discardPick(idx) { pickDiscard(idx); },
@@ -3722,6 +3778,15 @@
                     eEnergy: root.hud.userData.eEnergyT.text,
                     eCards: root.hud.userData.eCardsT.text }
                 : null),
+            // геометрия/цвета HUD (тесты): иконки энергии, цвет карт врага
+            hudGeom: () => {
+                if (!root || !root.hud) return null;
+                const hex = (v) => { const c = v && v.color !== undefined ? v.color : v;
+                    try { return new PIXI.Color(c).toHex(); } catch (e) { return String(c); } };
+                const ud = root.hud.userData;
+                return { eEnergyX: ud.eEnergyIcon.x, pEnergyX: ud.pEnergyIcon.x,
+                    eCardsFill: hex(ud.eCardsT.style.fill), pCardsFill: hex(ud.pCardsT.style.fill) };
+            },
             // общий z-order поля (тесты): сортировка включена, zIndex — ряды
             zOrder: () => (root && root.unitsLayer
                 ? { sortable: !!root.unitsLayer.sortableChildren,

@@ -6,7 +6,9 @@
 (function () {
     // Панель настроек: стабильный корень outer, содержимое пересобирается
     // rebuild()-ом (степперы/язык/призыв). onBack — куда ведёт «Назад».
-    function buildPanel(ctx, { onBack }) {
+    // onQuit — необязательная кнопка «В главное меню» рядом с «Назад»
+    // (её передают бой и подземелье; из главного меню она ни к чему).
+    function buildPanel(ctx, { onBack, onQuit }) {
         const { G } = ctx;
         const { T, button } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
@@ -135,10 +137,21 @@
             note.eventMode = "none";
             outer.addChild(note);
 
-            outer.addChild(button(ctx, {
-                tex: "button_menu.png", label: t("settings.back"), x: 960, y: 894, scale: 1.0,
-                onTap: onBack,
-            }));
+            if (onQuit) { // выход в главное меню рядом с «Назад» (просил юзер)
+                outer.addChild(button(ctx, {
+                    tex: "button_menu.png", label: t("settings.back"), x: 735, y: 894, scale: 1.0,
+                    onTap: onBack,
+                }));
+                outer.addChild(button(ctx, {
+                    tex: "button_menu.png", label: t("settings.quit"), x: 1185, y: 894, scale: 1.0,
+                    onTap: onQuit,
+                }));
+            } else {
+                outer.addChild(button(ctx, {
+                    tex: "button_menu.png", label: t("settings.back"), x: 960, y: 894, scale: 1.0,
+                    onTap: onBack,
+                }));
+            }
         }
         rebuild();
         return { node: outer, rebuild, applySound, applyMusic };
@@ -158,7 +171,12 @@
 
         return {
             enter() {
-                panel = buildPanel(ctx, { onBack: goBack });
+                // «В главное меню» — только когда настройки открыты из
+                // подземелья (из меню строка выхода уже есть)
+                const quit = G.uiReturn === "dungeon"
+                    ? () => { G.uiReturn = null; scenes.go("menu"); }
+                    : undefined;
+                panel = buildPanel(ctx, { onBack: goBack, onQuit: quit });
                 panel.applySound();
                 root = new PIXI.Container();
                 root.eventMode = "static";
