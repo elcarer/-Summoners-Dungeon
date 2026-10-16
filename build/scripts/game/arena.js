@@ -1249,8 +1249,9 @@
             const sl = root.hud.userData.slider;
             const total = spheresTotal();
             B.split = Math.max(0, Math.min(total, B.split));
-            sl.cards.text = `+${B.split}`;
-            sl.energy.text = `+${total - B.split}`;
+            // добавки шкалы — на иконках энергии и карт игрока
+            root.hud.userData.pEnergyGainT.text = `+${total - B.split}`;
+            root.hud.userData.pCardsT.text = `${B.hand.length}+${B.split}`;
             const on = B.phase === "player" && !B.discarding && !B.picking;
             sl.track.eventMode = on ? "static" : "none";
             sl.thumb.eventMode = on ? "static" : "none";
@@ -1560,15 +1561,36 @@
             // панели параметров у своих колод, сброс и «Конец хода» справа
             // внизу, полоса базы врага — сверху по центру.
 
-            // полоса жизней базы врага + число под ней
+            // полоса жизней базы врага, число — в центре полосы; по краям —
+            // его энергия и карты (иконки юзера, раскладка по референсу
+            // for_work/референсы/new_UI_battle.png)
             const eBar = new PIXI.Graphics();
             eBar.eventMode = "none";
             c.addChild(eBar);
-            const eBaseT = T("", 24, 0xffe9b0);
-            eBaseT.anchor.set(0.5, 0);
-            eBaseT.position.set(960, 55);
+            const eBaseT = T("", 22, 0xffff99, { stroke: { color: 0x2a1c10, width: 5 } });
+            eBaseT.anchor.set(0.5, 0.5);
+            eBaseT.position.set(962, 47);
             eBaseT.eventMode = "none";
             c.addChild(eBaseT);
+            const digitStyle = { stroke: { color: 0x16283a, width: 6 } };
+            const eEnergyIcon = new PIXI.Sprite(uiTex("UI_energy.png"));
+            eEnergyIcon.position.set(679, 10);
+            eEnergyIcon.eventMode = "none";
+            c.addChild(eEnergyIcon);
+            const eEnergyT = T("", 42, 0x9fd8e4, digitStyle);
+            eEnergyT.anchor.set(0.5);
+            eEnergyT.position.set(715, 46);
+            eEnergyT.eventMode = "none";
+            c.addChild(eEnergyT);
+            const eCardsIcon = new PIXI.Sprite(uiTex("UI_cards_hand.png"));
+            eCardsIcon.position.set(1164, 8);
+            eCardsIcon.eventMode = "none";
+            c.addChild(eCardsIcon);
+            const eCardsT = T("", 40, 0x9fd8e4, digitStyle);
+            eCardsT.anchor.set(0.5);
+            eCardsT.position.set(1200, 44);
+            eCardsT.eventMode = "none";
+            c.addChild(eCardsT);
 
             // имя противника — каменная плашка слева от его колоды
             const namePlate = new PIXI.Sprite(uiTex("panel_label.png"));
@@ -1595,36 +1617,41 @@
             eDeckCnt.eventMode = "none";
             c.addChild(eDeckCnt);
 
-            // панель параметров врага — под его колодой (панель 216×387,
-            // у референса сжата до 170×232)
-            const ePanel = new PIXI.Sprite(uiTex("panel_parametrs.png"));
-            ePanel.position.set(1726, 308);
-            ePanel.scale.set(170 / 216, 232 / 387);
-            ePanel.eventMode = "none";
-            c.addChild(ePanel);
-            const eLines = [0, 1, 2].map((i) => {
-                const l = T("", 26, 0xd8c79d);
-                l.anchor.set(0, 0.5);
-                l.position.set(1738, 362 + i * 61.5);
-                l.eventMode = "none";
-                c.addChild(l);
-                return l;
-            });
-
-            // панель параметров игрока — левый край, над своей колодой
-            const pPanel = new PIXI.Sprite(uiTex("panel_parametrs.png"));
-            pPanel.position.set(30, 540);
-            pPanel.scale.set(170 / 216, 232 / 387);
-            pPanel.eventMode = "none";
-            c.addChild(pPanel);
-            const pLines = [0, 1, 2].map((i) => {
-                const l = T("", 26, 0xd8c79d);
-                l.anchor.set(0, 0.5);
-                l.position.set(42, 597 + i * 58.5);
-                l.eventMode = "none";
-                c.addChild(l);
-                return l;
-            });
+            // база игрока — зелёная полоса над треком «энергия-карты», число
+            // в её центре; по краям трека — энергия и карты игрока (иконки
+            // юзера): текущее число у энергии сопровождает «+добавка» по
+            // положению шкалы, у карт — «рука+добавка» (референс юзера)
+            const pBar = new PIXI.Graphics();
+            pBar.eventMode = "none";
+            c.addChild(pBar);
+            const pBaseT = T("", 22, 0xffff99, { stroke: { color: 0x2a1c10, width: 5 } });
+            pBaseT.anchor.set(0.5, 0.5);
+            pBaseT.position.set(1663, 535);
+            pBaseT.eventMode = "none";
+            c.addChild(pBaseT);
+            const pEnergyIcon = new PIXI.Sprite(uiTex("UI_energy.png"));
+            pEnergyIcon.position.set(1422, 588);
+            pEnergyIcon.eventMode = "none";
+            c.addChild(pEnergyIcon);
+            const pEnergyT = T("", 42, 0x9fd8e4, digitStyle);
+            pEnergyT.anchor.set(0.5);
+            pEnergyT.position.set(1458, 624);
+            pEnergyT.eventMode = "none";
+            c.addChild(pEnergyT);
+            const pEnergyGainT = T("", 30, 0x9fd3d3, { stroke: { color: 0x0e1826, width: 6 } });
+            pEnergyGainT.anchor.set(0, 0.5);
+            pEnergyGainT.position.set(1488, 624);
+            pEnergyGainT.eventMode = "none";
+            c.addChild(pEnergyGainT);
+            const pCardsIcon = new PIXI.Sprite(uiTex("UI_cards_hand.png"));
+            pCardsIcon.position.set(1822, 586);
+            pCardsIcon.eventMode = "none";
+            c.addChild(pCardsIcon);
+            const pCardsT = T("", 36, 0xffcc66, { stroke: { color: 0x3a2408, width: 6 } });
+            pCardsT.anchor.set(0.5);
+            pCardsT.position.set(1858, 622);
+            pCardsT.eventMode = "none";
+            c.addChild(pCardsT);
 
             // колода игрока — рубашка в левом нижнем углу; клик — просмотр
             const pDeckPile = new PIXI.Sprite(uiTex("card_back_min.png"));
@@ -1670,29 +1697,10 @@
             c.addChild(endLabel);
 
             // шкала конца хода «+карты ↔ +энергия» (применится по «Конец»),
-            // над сбросом; бегунок — синяя сфера button_1
+            // над сбросом; бегунок — синяя сфера button_1. Меток у трека нет:
+            // добавки теперь видны на иконках энергии и карт по краям
             const slWrap = new PIXI.Container();
             slWrap.position.set(1663, 626);
-            const slCards = T("", 30, 0xbfe0ff, { stroke: { color: 0x1c1207, width: 6 } });
-            slCards.anchor.set(1, 0.5);
-            slCards.position.set(-222, -12);
-            slCards.eventMode = "none";
-            slWrap.addChild(slCards);
-            const slCardsL = T(t("orb.cardsLabel"), 17, 0xcfc4a6);
-            slCardsL.anchor.set(1, 0);
-            slCardsL.position.set(-222, 6);
-            slCardsL.eventMode = "none";
-            slWrap.addChild(slCardsL);
-            const slEnergy = T("", 30, 0xffd98c, { stroke: { color: 0x1c1207, width: 6 } });
-            slEnergy.anchor.set(0, 0.5);
-            slEnergy.position.set(222, -12);
-            slEnergy.eventMode = "none";
-            slWrap.addChild(slEnergy);
-            const slEnergyL = T(t("orb.energyLabel"), 17, 0xcfc4a6);
-            slEnergyL.anchor.set(0, 0);
-            slEnergyL.position.set(222, 6);
-            slEnergyL.eventMode = "none";
-            slWrap.addChild(slEnergyL);
             const slTrack = new PIXI.Graphics();
             slWrap.addChild(slTrack);
             const slThumb = new PIXI.Sprite(uiTex("button_1.png"));
@@ -1702,6 +1710,14 @@
             slTrack.on("pointerdown", sliderGrab);
             slThumb.on("pointerdown", sliderGrab);
             c.addChild(slWrap);
+            // иконки и числа — ПОВЕРХ трека и бегунка (просил юзер): полоска
+            // заходит под края иконок, ползунок у краёв — под числа; клики
+            // не теряются: у иконок и чисел eventMode "none"
+            c.addChild(pEnergyIcon);
+            c.addChild(pEnergyT);
+            c.addChild(pCardsIcon);
+            c.addChild(pCardsT);
+            c.addChild(pEnergyGainT);
 
             // настройки — левый верхний угол
             const gear = new PIXI.Sprite(uiTex("icon_setting.png"));
@@ -1725,9 +1741,10 @@
             banner.eventMode = "none"; // баннер не ест клики поля под ним
             c.addChild(banner);
 
-            c.userData = { eBar, eBaseT, title, eLines, pLines, eDeckCnt, pDeckCnt, discardCnt,
+            c.userData = { eBar, eBaseT, eEnergyT, eCardsT, title, pBar, pBaseT, pEnergyT,
+                pEnergyGainT, pCardsT, eDeckCnt, pDeckCnt, discardCnt,
                 discardFace, lastDiscard: undefined, endBtn, endLabel, banner, targetHint,
-                slider: { wrap: slWrap, cards: slCards, energy: slEnergy, track: slTrack, thumb: slThumb } };
+                slider: { wrap: slWrap, track: slTrack, thumb: slThumb } };
             return c;
         }
 
@@ -1880,16 +1897,17 @@
             const ud = root.hud.userData;
             ud.title.text = t(`enc.${B.encId}.title`);
             globalThis.GAME_UI.fit(ud.title, 300);
-            // полоса базы врага — верх экрана по центру (734..1186)
-            drawBar(ud.eBar, 734, 30, 452, 29, B.enemyBase / B.enemyBaseMax, 0xc0503c);
+            // полоса базы врага — верх экрана по центру (742..1182)
+            drawBar(ud.eBar, 742, 31, 440, 33, B.enemyBase / B.enemyBaseMax, 0xc0503c);
             ud.eBaseT.text = `${Math.max(0, B.enemyBase)}/${B.enemyBaseMax}`;
-            // панели параметров: жизни — базы, карты — рука
-            ud.eLines[0].text = `${t("param.lives")}: ${Math.max(0, B.enemyBase)}/${B.enemyBaseMax}`;
-            ud.eLines[1].text = `${t("param.energy")}: ${B.eEnergy}`;
-            ud.eLines[2].text = `${t("param.cards")}: ${B.eHand.length}`;
-            ud.pLines[0].text = `${t("param.lives")}: ${Math.max(0, B.playerBase)}/${B.playerBaseMax}`;
-            ud.pLines[1].text = `${t("param.energy")}: ${B.energy}`;
-            ud.pLines[2].text = `${t("param.cards")}: ${B.hand.length}`;
+            // энергия и карты врага — числа на иконках по краям его полосы
+            ud.eEnergyT.text = String(B.eEnergy);
+            ud.eCardsT.text = String(B.eHand.length);
+            // база игрока — зелёная полоса над треком (1449..1877); энергия
+            // и карты — на иконках, добавку шкалы дорисует refreshSlider
+            drawBar(ud.pBar, 1449, 520, 428, 31, B.playerBase / B.playerBaseMax, 0x579e52);
+            ud.pBaseT.text = `${Math.max(0, B.playerBase)}/${B.playerBaseMax}`;
+            ud.pEnergyT.text = String(B.energy);
             ud.pDeckCnt.text = String(B.deck.length);
             ud.eDeckCnt.text = String(B.eDeck.length);
             ud.discardCnt.text = String(B.discard.length);
@@ -3325,7 +3343,13 @@
                 return null;
             },
             hudTexts: () => (root && root.hud
-                ? { pBase: root.hud.userData.pLines[0].text }
+                ? { pBase: root.hud.userData.pBaseT.text,
+                    eBase: root.hud.userData.eBaseT.text,
+                    pEnergy: root.hud.userData.pEnergyT.text,
+                    pEnergyGain: root.hud.userData.pEnergyGainT.text,
+                    pCards: root.hud.userData.pCardsT.text,
+                    eEnergy: root.hud.userData.eEnergyT.text,
+                    eCards: root.hud.userData.eCardsT.text }
                 : null),
             // общий z-order поля (тесты): сортировка включена, zIndex — ряды
             zOrder: () => (root && root.unitsLayer

@@ -64,12 +64,12 @@
     }
 
     // Крупная карта (колода/награда). Если у карты есть img — это готовое
-    // лицо-картинка (рамка/имя/тексты нарисованы), поверх только точка
-    // редкости; иначе — процедурная сборка из рубашки и подписей.
+    // лицо-картинка (рамка/имя/тексты/редкость нарисованы); иначе —
+    // процедурная сборка из рубашки и подписей.
     // Эталонная высота виджета — 495 (картинка 230×338 в масштабе ~1.46);
     // scale у вызывающих сторон — доля от этого эталона.
     function cardFace(ctx, cardId, { scale = 1, dim = false } = {}) {
-        const { CARDS, RARITY_COLORS } = globalThis.GAME_DATA;
+        const { CARDS } = globalThis.GAME_DATA;
         const def = CARDS[cardId];
         const c = new PIXI.Container();
         if (def.img) {
@@ -77,12 +77,6 @@
             face.anchor.set(0.5);
             face.scale.set(495 / face.texture.height); // к высоте эталонной рубашки
             c.addChild(face);
-            const rDot = new PIXI.Graphics();
-            rDot.circle(126, -177, 9);
-            rDot.fill(RARITY_COLORS[def.rarity] || 0x9a9a9a);
-            rDot.stroke({ width: 2.25, color: 0x1c1207 });
-            rDot.eventMode = "none";
-            c.addChild(rDot);
             c.scale.set(scale);
             if (dim) c.alpha = 0.45;
             return c;
@@ -125,13 +119,6 @@
         costT.position.set(126, -219);
         costT.eventMode = "none";
         c.addChild(costT);
-        // точка редкости под стоимостью
-        const rDot = new PIXI.Graphics();
-        rDot.circle(126, -177, 9);
-        rDot.fill(RARITY_COLORS ? (RARITY_COLORS[def.rarity] || 0x9a9a9a) : 0x9a9a9a);
-        rDot.stroke({ width: 2.25, color: 0x1c1207 });
-        rDot.eventMode = "none";
-        c.addChild(rDot);
         c.scale.set(scale);
         if (dim) c.alpha = 0.45;
         return c;
