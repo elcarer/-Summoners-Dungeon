@@ -258,7 +258,17 @@
             }
             root.board.userData.baseZone.eventMode = "none";
             const selDef = CARDS[B.hand[B.selected]];
-            if (selDef && selDef.type === "trap") { // ловушка: любая пустая клетка
+            if (selDef && selDef.type === "trap") {
+                if (selDef.trap.effect === "castRandom") { // руна: подсветка существ
+                    for (const u of B.units) {
+                        if (u.def.type !== "unit") continue;
+                        const rc = cellRect(u.col, u.row);
+                        hi.rect(rc.x, rc.y, rc.w, rc.h);
+                        hi.fill({ color: 0xb07ad5, alpha: 0.3 });
+                    }
+                    return;
+                }
+                // мина: любая пустая клетка
                 for (let r = 0; r < GRID; r++) for (let col = 0; col < GRID; col++) {
                     if (unitAt(col, r)) continue;
                     const rc = cellRect(col, r);
@@ -630,6 +640,13 @@
             const i = B.units.indexOf(u);
             if (i >= 0) B.units.splice(i, 1);
             if (unitCard && unitCard.unit === u) unitCardHide(); // жетон умер
+            // руна («Наскальная рунопись») живёт на существе: существо ушло
+            // с поля (смерть, побег, удар по базе) — ловушка рассыпалась
+            for (const s of ["p", "e"]) {
+                const n = B.traps[s].length;
+                B.traps[s] = B.traps[s].filter((tr) => tr.unit !== u);
+                if (B.traps[s].length !== n) redrawTraps();
+            }
             punches.push({ node: u.node, life: 0.25 / animK(), total: 0.25 / animK(), dying: true });
         }
 
@@ -637,6 +654,20 @@
             removeUnit(u);
             sfx("die");
             if (u.def.type === "building") recalcAuras();
+            // «Рунный монолит»: на смерть существа постройка теряет 1 жизнь,
+            // а владелец берёт карту (просил юзер). Добор до урона — как у
+            // «Грибницы»: эффект срабатывает, даже если монолит гибнет сам;
+            // смерть монолита — смерть постройки, каскад не повторяется.
+            if (u.def.type === "unit") for (const b of B.units.slice()) {
+                if (!b.def.runeMonolith) continue;
+                if (b.side === "p") drawCards(1); else drawEnemy(1);
+                const hand = b.side === "p" ? B.hand : B.eHand;
+                const drawn = hand[hand.length - 1];
+                const p = cellXY(b.col, b.row);
+                floatText(p.x, p.y - 66,
+                    drawn ? GAME_LOC.t(`card.${drawn}.name`) : "…", 0xffd98c);
+                damageUnit(b, 1, null, "dam");
+            }
             // ловушки стороны погибшего: триггер «при гибели своего существа»
             if (killer && killer.def && killer.def.type === "unit" && killer.side !== u.side) {
                 triggerTraps(u.side, killer);
@@ -713,9 +744,11 @@
         }
 
         // ── Ловушки ─────────────────────────────────────────────────────────
-        function armTrap(side, cardId, col, row) {
+        // Мины хранят клетку (col/row); руна («Наскальная рунопись») —
+        // само существо (unit) и ездит с ним.
+        function armTrap(side, cardId, col, row, unit = null) {
             if (B.traps[side].length >= TRAP_SLOTS) return false;
-            B.traps[side].push({ def: CARDS[cardId], col, row });
+            B.traps[side].push({ def: CARDS[cardId], col, row, unit });
             redrawTraps();
             sfx("mine");
             return true;
@@ -736,27 +769,156 @@
                 checkEnd();
             }
         }
+
+        // «Наскальная рунопись»: руна висит на существе — когда ОНО атакует
+        // (удар в марш или по базе), владелец руны разыгрывает случайное
+        // заклинание из своей колоды без траты энергии (просил юзер). Если
+        // заклинание может быть нацелено на атакующего — целит именно в него.
+        function triggerAttackTraps(attacker) {
+            if (!attacker || !B.units.includes(attacker)) return;
+            for (const side of ["p", "e"]) {
+                const i = B.traps[side].findIndex((tr) =>
+                    tr.unit === attacker && tr.def.trap.effect === "castRandom");
+                if (i < 0) continue;
+                B.traps[side].splice(i, 1);
+                redrawTraps();
+                const p = cellXY(attacker.col, attacker.row);
+                floatText(p.x, p.y - 60, "?!", 0xe08cd0);
+                sfx("mine");
+                castRandomSpell(side, attacker);
+                refreshHud();
+                checkEnd();
+            }
+        }
+
+        // Свободный каст случайного заклинания владельца side; focus —
+        // атакующее существо (приоритетная цель, если заклинание умеет в него).
+        function castRandomSpell(side, focus) {
+            const deck = side === "p" ? B.deck : B.eDeck;
+            const spells = deck.map((id, i) => ({ id, i }))
+                .filter((x) => CARDS[x.id] && CARDS[x.id].type === "spell");
+            if (!spells.length) return; // заклинаний в колоде нет — руна впустую
+            const pick = spells[(Math.random() * spells.length) | 0];
+            deck.splice(pick.i, 1);
+            const def = CARDS[pick.id];
+            const hand = side === "p" ? B.hand : B.eHand;
+            const discard = side === "p" ? B.discard : B.eDiscard;
+            const fp = cellXY(focus.col, focus.row);
+            floatText(fp.x, fp.y - 90, GAME_LOC.t(`card.${pick.id}.name`), 0xffd98c);
+            // панельные заклинания (выбор из карт / призыв) авто-розыгрыша
+            // не имеют — уходят в руку владельца, разыграет сам за энергию
+            if (def.spell.search || def.spell.journey) {
+                hand.push(pick.id);
+                return;
+            }
+            if (def.spell.copyLast) { // «Горящие руны»: повтор последнего
+                const last = side === "p" ? B.lastSpell.p : B.lastSpell.e;
+                const ok = last && last !== "str25" && CARDS[last]
+                    && CARDS[last].type === "spell";
+                if (!ok) { discard.push(pick.id); return; } // повтора нет — впустую
+                if (side === "p") { B.lastSpell.p = "str25"; replaySpell(last); }
+                else { B.lastSpell.e = "str25"; enemyReplayLast(); }
+                afterSpellPlayed();
+                discard.push(pick.id);
+                return;
+            }
+            if (side === "p") {
+                applySpellP(pick.id, runeTargetP(pick.id, focus), true);
+                if (def.spell.drainAll) B.energy = 0; // огнешар и бесплатно его сжигает
+                B.lastSpell.p = pick.id;
+            } else {
+                enemyCastSpellEffect(def, true, focus);
+                if (def.spell.drainAll) B.eEnergy = 0;
+                B.lastSpell.e = pick.id;
+            }
+            afterSpellPlayed(); // «Заклинатель клинков» реагирует и на это
+            discard.push(pick.id);
+        }
+
+        // Цель свободного каста у игрока: атакующий (focus), если заклинание
+        // может на него целиться, иначе автоцель как у «Горящих рун».
+        function runeTargetP(cardId, focus) {
+            const s = CARDS[cardId].spell;
+            if (s.target === "anyCell" || s.target === "none")
+                return autoTargetFor(cardId);
+            if (!focus || !B.units.includes(focus)) return autoTargetFor(cardId);
+            const ok = s.target === "anyUnit" ? focus.side === "p" && focus.def.type === "unit"
+                : s.target === "ownUnit" ? focus.side === "p" && focus.def.type === "unit"
+                : s.target === "anyUnitDmg" ? focus.def.type === "unit"
+                    || (focus.def.type === "building" && !s.noBuildings)
+                : s.target === "enemyAny" ? focus.side !== "p"
+                : false;
+            return ok ? { col: focus.col, row: focus.row } : autoTargetFor(cardId);
+        }
+
+        // Повтор последнего заклинания врага (общий код для «Горящих рун»
+        // в aiPlay и руны-ловушки): эффект бесплатно, затем сжигание.
+        function enemyReplayLast() {
+            const last = B.lastSpell.e;
+            if (!last || last === "str25" || !CARDS[last]
+                || CARDS[last].type !== "spell") return false;
+            enemyCastSpellEffect(CARDS[last], true);
+            if (CARDS[last].spell.drainAll) B.eEnergy = 0;
+            for (const zone of [B.eHand, B.eDeck, B.eDiscard]) {
+                const i = zone.indexOf(last);
+                if (i >= 0) { zone.splice(i, 1); break; }
+            }
+            floatText(960, 500, `🔥 ${GAME_LOC.t(`card.${last}.name`)}`, 0xffb26e);
+            return true;
+        }
+        // «Берсерк N» («Двойная атака»): бейдж «×(N+1)» на жетоне зеркально
+        // метке «Огненного дыхания»; в марш своего хода существо атакует
+        // N дополнительных раз и платит за каждую 1 жизнью (см. marchSide)
+        function addBerserk(u, n) {
+            u.berserk = (u.berserk || 0) + n;
+            let mark = u.node.getChildByName("berserkMark");
+            if (!mark) {
+                mark = new PIXI.Container();
+                mark.name = "berserkMark";
+                mark.eventMode = "none";
+                const g = new PIXI.Graphics();
+                g.circle(0, 0, 13.5);
+                g.fill({ color: 0x8a2f1e });
+                g.stroke({ width: 3, color: 0xffd98c });
+                mark.addChild(g);
+                const tx = T("", 17, 0xffe9b0);
+                tx.anchor.set(0.5);
+                mark.addChild(tx);
+                mark.position.set(-36, -54);
+                u.node.addChild(mark);
+            }
+            mark.getChildAt(1).text = `×${u.berserk + 1}`;
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 66, `⚔×${u.berserk + 1}`, 0xffb26e);
+        }
+
         function redrawTraps() {
             const layer = root.trapLayer;
             layer.removeChildren().forEach((n) => n.destroy({ children: true }));
-            for (const side of ["p", "e"]) {
-                B.traps[side].forEach((tr) => {
-                    // «?» стоит прямо на заминированной клетке
-                    const c = new PIXI.Container();
-                    c.eventMode = "none"; // маркер не ест клики клетки
-                    const g = new PIXI.Graphics();
-                    g.circle(0, 0, 21);
-                    g.fill({ color: side === "p" ? 0x3f5f8a : 0x7a3f3f, alpha: 0.62 });
-                    g.stroke({ width: 3, color: 0xd8c79d });
-                    c.addChild(g);
-                    const q = T("?", 27, 0xffe9b0);
-                    q.anchor.set(0.5);
-                    c.addChild(q);
-                    const p = cellXY(tr.col, tr.row);
-                    c.position.set(p.x, p.y);
-                    layer.addChild(c);
-                });
-            }
+                for (const side of ["p", "e"]) {
+                    B.traps[side].forEach((tr) => {
+                        // мина — «?» прямо на заминированной клетке; руна —
+                        // над существом, на котором висит
+                        let p = null;
+                        if (tr.unit) {
+                            if (!B.units.includes(tr.unit)) return; // снимут в removeUnit
+                            p = cellXY(tr.unit.col, tr.unit.row);
+                            p.y -= 44;
+                        } else p = cellXY(tr.col, tr.row);
+                        const c = new PIXI.Container();
+                        c.eventMode = "none"; // маркер не ест клики клетки
+                        const g = new PIXI.Graphics();
+                        g.circle(0, 0, 21);
+                        g.fill({ color: side === "p" ? 0x3f5f8a : 0x7a3f3f, alpha: 0.62 });
+                        g.stroke({ width: 3, color: 0xd8c79d });
+                        c.addChild(g);
+                        const q = T("?", 27, 0xffe9b0);
+                        q.anchor.set(0.5);
+                        c.addChild(q);
+                        c.position.set(p.x, p.y);
+                        layer.addChild(c);
+                    });
+                }
         }
 
         // ── «Стена костров» (str21) ────────────────────────────────────────
@@ -1775,6 +1937,7 @@
                     const ahead = u.row + dir;
                     if (ahead < 0 || ahead >= GRID) {
                         baseHit(side, u);
+                        triggerAttackTraps(u); // удар по базе — тоже атака (руна)
                         removeUnit(u);
                         refreshHud();
                         if (checkEnd()) return;
@@ -1784,6 +1947,7 @@
                     if (occ) {
                         if (occ.side !== u.side) {
                             damageUnit(occ, u.curAtk, u, "sword");
+                            triggerAttackTraps(u); // руна: существо атаковало
                             refreshHud();
                             if (checkEnd()) return;
                         }
@@ -1801,6 +1965,30 @@
                     await delay(0.52 / animK()); // глиссада + пауза: полный шаг походки
                     if (B.stopped) return;
                     afterMoved(u); // перемещение — ловушки врага
+                    if (checkEnd()) return;
+                }
+                // «Берсерк» («Двойная атака»): в начале хода владельца —
+                // дополнительные атаки, каждая ценой 1 жизни (просил юзер).
+                // Атаки нет (впереди пусто или своё) — жизни не теряет.
+                for (let k = 0; k < (u.berserk || 0); k++) {
+                    if (B.stopped || !B.units.includes(u)) break;
+                    const ahead = u.row + dir;
+                    if (ahead < 0 || ahead >= GRID) {
+                        baseHit(side, u);
+                        triggerAttackTraps(u);
+                    } else {
+                        const occ = unitAt(u.col, ahead);
+                        if (!occ || occ.side === u.side) break;
+                        const p = cellXY(u.col, u.row);
+                        floatText(p.x, p.y - 60, "⚔", 0xffb26e);
+                        damageUnit(occ, u.curAtk, u, "sword");
+                        triggerAttackTraps(u);
+                    }
+                    refreshHud();
+                    if (checkEnd()) return;
+                    if (!B.units.includes(u)) break;
+                    damageUnit(u, 1, null, "dam"); // цена берсерка
+                    refreshHud();
                     if (checkEnd()) return;
                 }
             }
@@ -1887,7 +2075,7 @@
         }
 
         // ── Карта, разыгранная врагом (просил юзер): лицом на свободном
-        // месте слева от поля, с красной рамкой; между розыгрышами врага
+        // месте слева от поля, со свечением по краю; между розыгрышами врага
         // пауза ≥ 1 реальной секунды, и всё это время карта видна — игрок
         // понимает, что делает противник.
         let enemyCard = null; // { id, node }
@@ -1896,9 +2084,15 @@
             const node = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.75 });
             node.eventMode = "none";
             node.position.set(430, 420);
+            // свечение по ФАКТИЧЕСКОЙ кромке карты (просил юзер): жёсткая
+            // рамка с чужими размерами сидела криво — слои от широкого
+            // тусклого к узкому яркому поверх bounds лица карты
+            const b = node.getLocalBounds();
             const frame = new PIXI.Graphics();
-            frame.roundRect(-131, -191, 262, 382, 18);
-            frame.stroke({ width: 6, color: 0xd05a3c });
+            for (const [w, a] of [[30, 0.08], [18, 0.16], [10, 0.3], [4.5, 0.95]])
+                frame.roundRect(b.x, b.y, b.width, b.height, 16)
+                    .stroke({ width: w, color: 0xff5a36, alpha: a });
+            frame.name = "glowFrame";
             frame.eventMode = "none";
             node.addChild(frame);
             root.addChild(node);
@@ -1971,13 +2165,17 @@
         }
         // Эффект заклинания врага — один код для прямого розыгрыша и для
         // повтора «Горящими рунами» (там эффект последнего заклинания,
-        // free=true — цена повтора не вычитается из урона).
-        function enemyCastSpellEffect(def, free = false) {
+        // free=true — цена повтора не вычитается из урона). focus —
+        // приоритетная цель руны-ловушки: если заклинание умеет целиться
+        // в это существо, бьёт именно его (просил юзер).
+        function enemyCastSpellEffect(def, free = false, focus = null) {
             const s = def.spell;
             if (s.target === "anyUnit") { // усиление/очарование — своему сильнейшему
                 const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
                     && (!s.enchantFire || !v.enchantFire));
-                const best = own.slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row))[0];
+                let best = own.slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row))[0];
+                if (focus && own.includes(focus)) best = focus;
+                if (!best) return;
                 if (s.enchantFire) { // «Огненное дыхание»
                     best.enchantFire = true;
                     const mark = new PIXI.Graphics();
@@ -1990,10 +2188,13 @@
                     best.node.addChild(mark);
                     floatText(cellXY(best.col, best.row).x, cellXY(best.col, best.row).y - 60, "✦", 0xffb26e);
                 } else {
-                    best.bonusAtk = (best.bonusAtk || 0) + s.buffAtk;
-                    recalcAuras();
-                    const p = cellXY(best.col, best.row);
-                    floatText(p.x, p.y - 39, `+${s.buffAtk}⚔`, 0x9fd489);
+                    if (s.buffAtk) {
+                        best.bonusAtk = (best.bonusAtk || 0) + s.buffAtk;
+                        recalcAuras();
+                        const p = cellXY(best.col, best.row);
+                        floatText(p.x, p.y - 39, `+${s.buffAtk}⚔`, 0x9fd489);
+                    }
+                    if (s.berserk) addBerserk(best, s.berserk);
                 }
                 punch(best.node);
                 sfx("up");
@@ -2009,8 +2210,10 @@
                 // жизней) — бьём её (из них сильнейшую и ближе к базе),
                 // иначе просто сильнейшего юза игрока
                 const kills = targets.filter((v) => v.hp <= dmg);
-                const best = (kills.length ? kills : targets)
+                let best = (kills.length ? kills : targets)
                     .slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                if (focus && targets.includes(focus)) best = focus; // руна
+                if (!best) return;
                 damageUnit(best, dmg, null, "rocket");
             }
             if (s.target === "anyCell") { // стена костров — ряд, где больше игроков
@@ -2025,7 +2228,9 @@
             if (s.target === "enemyAny") {
                 const targets = B.units.filter((u) => u.side === "p");
                 if (targets.length) {
-                    const best = targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                    const best = focus && targets.includes(focus)
+                        ? focus // руна: именно атакующий
+                        : targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
                     damageUnit(best, s.dmg, null, "rocket");
                 } else {
                     B.playerBase -= s.dmg;
@@ -2163,6 +2368,23 @@
                     }
                     if (def.type === "trap") {
                         if (B.traps.e.length >= TRAP_SLOTS) continue;
+                        // руна («Наскальная рунопись») — на существо игрока:
+                        // сильнейшее (при его атаке ИИ бесплатно разыграет
+                        // случайное заклинание своей колоды)
+                        if (def.trap.effect === "castRandom") {
+                            const pu = B.units.filter((v) => v.side === "p" && v.def.type === "unit")
+                                .sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                            if (!pu) continue;
+                            showEnemyCard(pick.id);
+                            await delay(enemyPlayDelay());
+                            const cardId = B.eHand[pick.i];
+                            B.eHand.splice(pick.i, 1);
+                            B.eEnergy -= effCost(cardId, "e");
+                            armTrap("e", cardId, 0, 0, pu);
+                            hideEnemyCard();
+                            played = true;
+                            break;
+                        }
                         // минируем зону призыва игрока: ряд 4 (там призыв),
                         // затем 3, 2; приманку — рядом с юзами игрока: она
                         // манит шагающих с соседних клеток
@@ -2198,16 +2420,7 @@
                         if (def.spell.copyLast) {
                             // «Горящие руны»: повтор ПОСЛЕДНЕГО заклинания тем
                             // же кодом эффектов (бесплатно для его цены)
-                            const last = B.lastSpell.e;
-                            enemyCastSpellEffect(CARDS[last], true);
-                            if (CARDS[last].spell.drainAll) B.eEnergy = 0; // огнешар и в повторе сжигает энергию
-                            // сжигание: скопированное уходит из своей зоны
-                            // (рука → колода → сброс) до конца боя
-                            for (const zone of [B.eHand, B.eDeck, B.eDiscard]) {
-                                const i = zone.indexOf(last);
-                                if (i >= 0) { zone.splice(i, 1); break; }
-                            }
-                            floatText(960, 500, `🔥 ${GAME_LOC.t(`card.${last}.name`)}`, 0xffb26e);
+                            if (enemyReplayLast()) B.lastSpell.e = "str25"; // повтор самой себя — цепочка
                         } else {
                             enemyCastSpellEffect(def);
                         }
@@ -2336,8 +2549,20 @@
                 else deselect(); // мимо цели — снять выбор
                 return;
             }
-            if (def.type === "trap") { // мина — только пустая клетка
-                if (unitAt(col, row)) { deselect(); return; }
+            if (def.type === "trap") {
+                // руна («Наскальная рунопись») — наоборот, на существо
+                if (def.trap.effect === "castRandom") {
+                    const u = unitAt(col, row);
+                    if (!u || u.def.type !== "unit") { deselect(); return; }
+                    const cardId = spendCard(B.selected);
+                    armTrap("p", cardId, 0, 0, u);
+                    deselect();
+                    layoutHand();
+                    redrawHighlight();
+                    refreshHud();
+                    return;
+                }
+                if (unitAt(col, row)) { deselect(); return; } // мина — пустая клетка
                 const cardId = spendCard(B.selected);
                 armTrap("p", cardId, col, row);
                 deselect();
@@ -2385,9 +2610,12 @@
                     u.node.addChild(mark);
                     floatText(p.x, p.y - 60, "✦", 0xffb26e);
                 } else {
-                    u.bonusAtk = (u.bonusAtk || 0) + def.spell.buffAtk;
-                    recalcAuras();
-                    floatText(p.x, p.y - 39, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                    if (def.spell.buffAtk) {
+                        u.bonusAtk = (u.bonusAtk || 0) + def.spell.buffAtk;
+                        recalcAuras();
+                        floatText(p.x, p.y - 39, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                    }
+                    if (def.spell.berserk) addBerserk(u, def.spell.berserk);
                 }
                 punch(u.node);
                 sfx("up");
@@ -2875,10 +3103,23 @@
                 ? { id: cardIdOf(unitCard.unit.def), side: unitCard.unit.side,
                     col: unitCard.unit.col, row: unitCard.unit.row }
                 : null),
-            // карта, разыгранная врагом (тесты): что показано слева
+            // карта, разыгранная врагом (тесты): что показано слева + свечение
             enemyCardState: () => (enemyCard
-                ? { id: enemyCard.id, x: enemyCard.node.x, y: enemyCard.node.y }
+                ? (() => {
+                    const f = enemyCard.node.getChildByName("glowFrame");
+                    return { id: enemyCard.id, x: enemyCard.node.x, y: enemyCard.node.y,
+                        glow: f ? { w: Math.round(f.width), h: Math.round(f.height) } : null };
+                })()
                 : null),
+            // ловушки (тесты): у руны видно существо, на котором она висит
+            trapList: () => ({
+                p: B.traps.p.map((tr) => ({ eff: tr.def.trap.effect,
+                    unit: tr.unit ? cardIdOf(tr.unit.def) : null,
+                    on: tr.unit ? B.units.includes(tr.unit) : null })),
+                e: B.traps.e.map((tr) => ({ eff: tr.def.trap.effect,
+                    unit: tr.unit ? cardIdOf(tr.unit.def) : null,
+                    on: tr.unit ? B.units.includes(tr.unit) : null })),
+            }),
             hoverCell(col, row) { const p = cellXY(col, row); unitHoverAt(p.x, p.y); },
             hoverOff: () => unitCardHide(),
             // drag&drop (режим «Перетаскивание»): состояние для тестов
@@ -2907,7 +3148,7 @@
                     lastSpell: B.lastSpell.p,
                     journeySummon: B.journeySummon,
                     eDeck: B.eDeck.length,
-                    units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire })),
+                    units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0 })),
                     traps: { p: B.traps.p.length, e: B.traps.e.length },
                     firewalls: B.firewalls.map((f) => ({ side: f.side, row: f.row, left: f.left })),
                 };

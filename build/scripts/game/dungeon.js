@@ -37,10 +37,11 @@
     const ROOM_CENTERS = [[3, 3], [11, 3], [22, 2], [5, 12]];
 
     // Объекты этажа: по одному в центре каждой комнаты, кроме стартовой
-    // (просил юзер). Магазин — только со 2-го этажа и не больше 1 (занимает
-    // одну случайную комнату), остальные комнаты — куча золота или сундук
-    // 50/50. Сумма кучи и карта сундука кидаются при генерации этажа и
-    // хранятся в объекте — сейв/загрузка показывает то же самое.
+    // (просил юзер). Тип кидается из общего пула: куча золота, сундук и —
+    // со 2-го этажа — магазин (просил юзер): он может и не выпасть, а
+    // выпав, исключается из пула — не больше 1 на этаж. Сумма кучи и карта
+    // сундука кидаются при генерации этажа и хранятся в объекте —
+    // сейв/загрузка показывает то же самое.
     function genObjects(floor) {
         const { rollLootCard } = globalThis.GAME_DATA;
         const centers = ROOM_CENTERS.slice(1); // стартовая комната — без объектов
@@ -48,9 +49,12 @@
             const j = (Math.random() * (i + 1)) | 0;
             [centers[i], centers[j]] = [centers[j], centers[i]];
         }
-        return centers.map(([col, row], k) => {
-            const type = floor >= 2 && k === 0 ? "shop"
-                : Math.random() < 0.5 ? "gold" : "chest";
+        const pool = ["gold", "chest"];
+        if (floor >= 2) pool.push("shop");
+        return centers.map(([col, row]) => {
+            const pi = (Math.random() * pool.length) | 0;
+            const type = pool[pi];
+            if (type === "shop") pool.splice(pi, 1); // ≤ 1 магазина на этаж
             const obj = { type, col, row, taken: false };
             if (type === "gold") obj.amount = 1 + ((Math.random() * 5) | 0) + (floor - 1);
             if (type === "chest") obj.card = rollLootCard();
@@ -58,6 +62,13 @@
             if (type === "shop") obj.sold = [false, false, false, false, false, false];
             return obj;
         });
+    }
+
+    // Минимальный размер колоды для спуска: на этаже N нужно 11+N карт
+    // (этаж 1 — 12, спуск на 2-й — 13, …), рост +1 за этаж до капа 60
+    // (просил юзер).
+    function deckNeed(floor) {
+        return Math.min(globalThis.GAME_DATA.DECK_MAX, 12 + floor);
     }
 
     function newDungeonState(floor) {
@@ -843,9 +854,9 @@
                 if (!st.win && st.exit && Math.hypot(st.exit.x - hx, st.exit.y - hy) < TS * 0.85) {
                     if (!st.bossDead) showToast(GAME_LOC.t("dungeon.exitSealed"));
                     // спуск требует растущую колоду: на этаже N — минимум
-                    // 11+N карт (этаж 1 — 12, спуск на 2-й — 13, …)
-                    else if (G.deck.length < 12 + st.floor) {
-                        showToast(GAME_LOC.t("dungeon.exitDeck", { n: 12 + st.floor }));
+                    // 11+N карт (этаж 1 — 12, спуск на 2-й — 13, …) до капа 60
+                    else if (G.deck.length < deckNeed(st.floor)) {
+                        showToast(GAME_LOC.t("dungeon.exitDeck", { n: deckNeed(st.floor) }));
                     } else {
                         G.run.floor += 1;
                         G.dungeon = null; // новый этаж — новая карта (v0: тот же шаблон)
@@ -908,8 +919,10 @@
                 return r ? r.node : null;
             },
             hudGold: () => (uiHud && uiHud.userData.goldT ? uiHud.userData.goldT.text : null),
+            // формула минимума колоды для спуска (тесты + единый источник)
+            deckNeed: (f) => deckNeed(f),
         };
     }
 
-    globalThis.GAME_DUNGEON = { createDungeonScene, newDungeonState, ROWS };
+    globalThis.GAME_DUNGEON = { createDungeonScene, newDungeonState, deckNeed, ROWS };
 })();

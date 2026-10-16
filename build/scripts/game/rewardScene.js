@@ -4,7 +4,7 @@
     function createRewardScene(ctx) {
         const { scenes, G, ui, scheduler } = ctx;
         const { REWARD_POOL } = globalThis.GAME_DATA;
-        const { T, cardFace, dimBg } = globalThis.GAME_UI;
+        const { T, cardFace, dimBg, button } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
         let root = null, options = [], picked = null;
 
@@ -41,6 +41,17 @@
             root = new PIXI.Container();
             root.eventMode = "static";
             root.addChild(dimBg(ctx, 0.85));
+            // «Колоды» доступна и здесь (просил юзер): перед выбором трофея
+            // можно посмотреть колоду и коллекцию. Кнопка запоминает, откуда
+            // вышли — тройка карт при возврате НЕ перекидывается заново.
+            root.addChild(button(ctx, {
+                tex: "button_menu.png", label: t("menu.deck"), x: 165, y: 78, scale: 1,
+                onTap: () => {
+                    G.rewardKeep = true; // enter() сохранит текущую тройку
+                    G.uiReturn = "reward";
+                    scenes.go("deck");
+                },
+            }));
             const title = T(t("reward.title"), 60, 0xf0c96a, { stroke: { color: 0x241505, width: 10.5 } });
             title.anchor.set(0.5, 0);
             title.position.set(960, 66);
@@ -82,7 +93,11 @@
         };
 
         return {
-            enter() { options = pickThree(); picked = null; rebuild(); },
+            enter() {
+                if (G.rewardKeep) G.rewardKeep = false; // возврат из колоды
+                else { options = pickThree(); picked = null; } // новая победа
+                rebuild();
+            },
             exit() { if (root) { root.destroy({ children: true }); root = null; } },
             api,
         };
