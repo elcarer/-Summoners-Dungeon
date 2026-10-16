@@ -1970,7 +1970,11 @@
                 // «Берсерк» («Двойная атака»): в начале хода владельца —
                 // дополнительные атаки, каждая ценой 1 жизни (просил юзер).
                 // Атаки нет (впереди пусто или своё) — жизни не теряет.
+                // Паузы разведены нарочно: сначала видно, как доб. атака
+                // ПРОШЛА, и только потом существо платит жизнью.
                 for (let k = 0; k < (u.berserk || 0); k++) {
+                    if (B.stopped || !B.units.includes(u)) break;
+                    await delay(0.3 / animK()); // отделяем доб. атаку от маршевой
                     if (B.stopped || !B.units.includes(u)) break;
                     const ahead = u.row + dir;
                     if (ahead < 0 || ahead >= GRID) {
@@ -1987,6 +1991,8 @@
                     refreshHud();
                     if (checkEnd()) return;
                     if (!B.units.includes(u)) break;
+                    await delay(0.35 / animK()); // цена — после видимой атаки
+                    if (B.stopped || !B.units.includes(u)) break;
                     damageUnit(u, 1, null, "dam"); // цена берсерка
                     refreshHud();
                     if (checkEnd()) return;
@@ -2102,6 +2108,26 @@
             if (!enemyCard) return;
             enemyCard.node.destroy({ children: true });
             enemyCard = null;
+        }
+        // Ловушка врага — РУБАШКОЙ (просил юзер): игрок видит, что противник
+        // сыграл карту, но какая именно ловушка — неизвестно; на поле встанет
+        // безликий «?» (гоблинская рубашка колоды — та же, что у колоды врага)
+        function showEnemyBack() {
+            hideEnemyCard();
+            const node = new PIXI.Sprite(uiTex("card_goblin_back.png"));
+            node.scale.set(0.75);
+            node.eventMode = "none";
+            node.position.set(430, 420);
+            const b = node.getLocalBounds();
+            const frame = new PIXI.Graphics();
+            for (const [w, a] of [[30, 0.08], [18, 0.16], [10, 0.3], [4.5, 0.95]])
+                frame.roundRect(b.x, b.y, b.width, b.height, 16)
+                    .stroke({ width: w, color: 0xff5a36, alpha: a });
+            frame.name = "glowFrame";
+            frame.eventMode = "none";
+            node.addChild(frame);
+            root.addChild(node);
+            enemyCard = { id: null, node };
         }
         // пауза между розыгрышами: минимум 1 секунда (реальная), при
         // замедленных анимациях — дольше
@@ -2375,7 +2401,7 @@
                             const pu = B.units.filter((v) => v.side === "p" && v.def.type === "unit")
                                 .sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
                             if (!pu) continue;
-                            showEnemyCard(pick.id);
+                            showEnemyBack(); // какую руну повесил — загадка (просил юзер)
                             await delay(enemyPlayDelay());
                             const cardId = B.eHand[pick.i];
                             B.eHand.splice(pick.i, 1);
@@ -2385,21 +2411,34 @@
                             played = true;
                             break;
                         }
-                        // минируем зону призыва игрока: ряд 4 (там призыв),
-                        // затем 3, 2; приманку — рядом с юзами игрока: она
-                        // манит шагающих с соседних клеток
-                        const spots = [];
-                        for (const r of [4, 3, 2]) for (let cc = 0; cc < GRID; cc++) {
-                            if (!unitAt(cc, r) && !B.traps.e.some((t) => t.col === cc && t.row === r)) spots.push([cc, r]);
+                        // ловушки — прежде всего на путь марша игрока: пустая
+                        // клетка прямо ПЕРЕД его существом (шагнёт в начале
+                        // своего хода и наступит — просил юзер); таких нет —
+                        // старое правило: зона призыва (ряд 4, затем 3, 2);
+                        // приманка без «передних» манит с соседних клеток
+                        const freeAt = (cc, r2) => !unitAt(cc, r2)
+                            && !B.traps.e.some((t) => t.col === cc && t.row === r2);
+                        const front = [], spots = [];
+                        const seenF = new Set();
+                        for (const v of B.units) {
+                            if (v.side !== "p" || v.row - 1 < 0) continue;
+                            const key = `${v.col}:${v.row - 1}`;
+                            if (seenF.has(key) || !freeAt(v.col, v.row - 1)) continue;
+                            seenF.add(key);
+                            front.push([v.col, v.row - 1]);
                         }
-                        if (!spots.length) continue;
-                        let pool = spots;
-                        if (def.trap.effect === "lure") {
+                        for (const r of [4, 3, 2]) for (let cc = 0; cc < GRID; cc++) {
+                            if (freeAt(cc, r)) spots.push([cc, r]);
+                        }
+                        if (!front.length && !spots.length) continue;
+                        let pool;
+                        if (front.length) pool = front;
+                        else if (def.trap.effect === "lure") {
                             const near = spots.filter(([c2, r2]) => B.units.some((v) =>
                                 v.side === "p" && Math.abs(v.col - c2) + Math.abs(v.row - r2) === 1));
-                            if (near.length) pool = near;
-                        }
-                        showEnemyCard(pick.id);
+                            pool = near.length ? near : spots;
+                        } else pool = spots;
+                        showEnemyBack(); // какая ловушка — загадка (просил юзер)
                         await delay(enemyPlayDelay());
                         const [col, row] = pool[(Math.random() * pool.length) | 0];
                         const cardId = B.eHand[pick.i];
