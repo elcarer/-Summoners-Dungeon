@@ -162,7 +162,7 @@
         const { dimBg } = globalThis.GAME_UI;
         let root = null, panel = null;
 
-        // «Назад» возвращает туда, откуда открыли (меню/подземелье)
+        // «Назад» возвращает туда, откуда открыли (меню/мир/подземелье)
         function goBack() {
             const to = G.uiReturn || "menu";
             G.uiReturn = null;
@@ -172,8 +172,8 @@
         return {
             enter() {
                 // «В главное меню» — только когда настройки открыты из
-                // подземелья (из меню строка выхода уже есть)
-                const quit = G.uiReturn === "dungeon"
+                // мира или подземелья (из меню строка выхода уже есть)
+                const quit = (G.uiReturn === "dungeon" || G.uiReturn === "world")
                     ? () => { G.uiReturn = null; scenes.go("menu"); }
                     : undefined;
                 panel = buildPanel(ctx, { onBack: goBack, onQuit: quit });

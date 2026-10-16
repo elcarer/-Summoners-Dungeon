@@ -163,12 +163,15 @@
         const input = createInput();
         const camera = createCamera({ app, container: worldContainer, addSystem });
 
-        const DROWS = GAME_DUNGEON.ROWS, DTS = 40;
-        const DW = DROWS[0].length, DH = DROWS.length;
+        // Коллизии героя (character-система) — по карте АКТИВНОЙ сцены:
+        // подземелье и открытый мир подменяют collide.rows при входе
+        const collide = { rows: GAME_DUNGEON.ROWS };
         function blocked(px, py) {
-            const gx = Math.floor(px / DTS), gy = Math.floor(py / DTS);
-            if (gx < 0 || gy < 0 || gx >= DW || gy >= DH) return true;
-            return DROWS[gy][gx] === "#";
+            const gx = Math.floor(px / 40), gy = Math.floor(py / 40);
+            const rows = collide.rows;
+            if (gy < 0 || gy >= rows.length || gx < 0 || gx >= rows[0].length) return true;
+            const ch = rows[gy][gx];
+            return ch === "#" || ch === "~"; // стены и вода непроходимы
         }
         // Инстанс ввода героя наружу: подземелье читает оси (клик-перемещение
         // отдаёт герою виртуальные оси, а без пути просто повторяет эти)
@@ -192,6 +195,9 @@
             deck: savedDeck.length ? savedDeck : [...DEFAULT_DECK],
             collection: Object.keys(savedColl).length ? savedColl : { ...DEFAULT_COLLECTION },
             dungeon: null, activeEnemy: null, battle: null,
+            world: { heroPos: null, out: false }, // открытый мир: где герой
+            dungeonStates: {}, // этажи подземелья по номеру — подъём наверх
+            // (враги/объекты этажа остаются как их оставили),
             rewardDeck: null, // колода побеждённого — пул трофея «1 из 3»
             rewardDraft: false, // трофей — выбор из всей драфт-колоды (драфт)
             draft: null, // мини-игра «Карта сокровищ»: picks/ePicks/objIdx
@@ -204,6 +210,8 @@
                 this.gold = 0;
                 this.run.floor = 1;
                 this.dungeon = null;
+                this.world = { heroPos: null, out: false };
+                this.dungeonStates = {};
                 this.activeEnemy = null;
                 this.battle = null;
                 this.rewardDeck = null;
@@ -223,6 +231,9 @@
                     hero: { hp: this.hero.hp, maxHp: this.hero.maxHp },
                     gold: this.gold,
                     dungeon: this.dungeon ? JSON.parse(JSON.stringify(this.dungeon)) : null,
+                    dungeonStates: JSON.parse(JSON.stringify(this.dungeonStates || {})),
+                    worldPos: this.world.heroPos,
+                    worldOut: this.world.out,
                 });
             },
         };
@@ -231,7 +242,7 @@
         const ctx = {
             app, world, ECS, COMPONENTS, DATA, worldContainer, addSystem,
             assets, uiTex, scheduler, input, camera, characters, charInput,
-            knight, creatureSheets, G, ui, audio,
+            knight, creatureSheets, G, ui, audio, collide,
             sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
         };
@@ -299,13 +310,20 @@
                     G.gold = r.gold || 0;
                     G.run.floor = r.floor;
                     G.dungeon = r.dungeon || null;
-                    scenes.go("dungeon");
+                    // этажи и мир: сейвы старых волн без архива — данный
+                    // этаж становится первым в архиве
+                    G.dungeonStates = r.dungeonStates
+                        || (r.dungeon ? { [r.floor]: r.dungeon } : {});
+                    G.world = { heroPos: r.worldPos || null, out: !!r.worldOut };
+                    // продолжение с середины этажа — в подземелье, иначе —
+                    // в открытый мир (герой вышел из пещер или только начал)
+                    scenes.go(r.dungeon ? "dungeon" : "world");
                 });
                 if (!contEnabled) bCont.alpha = 0.45; // забега нет — кнопка приглушена
                 const bNew = addMenuBtn(t("menu.newGame"), 960, 720, () => {
                     GAME_META.clearRun();
                     G.resetRun();
-                    scenes.go("dungeon");
+                    scenes.go("world"); // новый забег начинается в открытом мире
                     G.saveRun(); // свежий забег сразу сохранён
                 });
                 addMenuBtn(t("menu.deck"), 960, 810, () => scenes.go("deck"));
@@ -379,7 +397,13 @@
             },
         });
 
-        // ── Подземелье, арена, колода, награда, настройки ──────────────────
+        // ── Открытый мир, подземелье, арена, колода, награда, настройки ──
+        const worldScene = GAME_WORLD.createWorldScene(ctx);
+        scenes.add("world", worldScene);
+        // транзит между этажами: сцены не умеют перезаходить в себя
+        // (createScenes игнорирует go() в текущую), лестница наверх ходит
+        // этажами через этот ретранслятор
+        scenes.add("floorSwap", { enter() { scenes.go("dungeon"); } });
         const dungeonScene = GAME_DUNGEON.createDungeonScene(ctx);
         scenes.add("dungeon", dungeonScene);
         const arenaScene = GAME_ARENA.createArenaScene(ctx);
@@ -402,10 +426,10 @@
         // ── Хендл для консоли и автотестов ─────────────────────────────────
         window.__GAME = {
             scenes, G, ui, loc: GAME_LOC,
-            dungeon: dungeonScene, arena: arenaScene,
+            dungeon: dungeonScene, arena: arenaScene, world: worldScene,
             arenaApi: arenaScene.api, deckApi: deckScene.api,
             rewardApi: rewardScene.api, settingsApi: settingsScene.api,
-            draftApi: draftScene.api,
+            draftApi: draftScene.api, worldApi: worldScene.api,
             audio: {
                 track: () => audio.status().track,
                 status: () => audio.status(),
@@ -426,8 +450,11 @@
                 scene: scenes.current,
                 hero: { ...G.hero }, floor: G.run.floor, gold: G.gold,
                 heroPos: (() => {
-                    const id = dungeonScene.heroId();
-                    return id !== null ? { x: COMPONENTS.positionX[id], y: COMPONENTS.positionY[id] } : null;
+                    // герой живёт в подземелье или открытом мире (сцена)
+                    const ids = [dungeonScene.heroId(), worldScene.heroId()];
+                    const id = ids.find((v) => v !== null && v !== undefined);
+                    return id !== undefined && id !== null
+                        ? { x: COMPONENTS.positionX[id], y: COMPONENTS.positionY[id] } : null;
                 })(),
                 lang: GAME_LOC.lang,
                 deck: { size: G.deck.length, cards: [...G.deck] },
@@ -436,6 +463,7 @@
                 dungeon: G.dungeon ? {
                     enemies: G.dungeon.enemies.filter((e) => e.alive).length,
                     bossDead: G.dungeon.bossDead,
+                    floors: Object.keys(G.dungeonStates || {}).map(Number), // посещённые этажи
                     // объекты комнат: тип/собрано + открытое окно
                     objects: (G.dungeon.objects || []).map((o) => ({
                         type: o.type, taken: !!o.taken,
@@ -443,6 +471,7 @@
                     win: G.dungeon.win && G.dungeon.objects && G.dungeon.objects[G.dungeon.win.idx]
                         ? G.dungeon.objects[G.dungeon.win.idx].type : null,
                 } : null,
+                world: { heroPos: G.world.heroPos ? { ...G.world.heroPos } : null, out: !!G.world.out },
                 battle: G.battle ? arenaScene.api.state() : null,
                 error: window.__gameError || null,
             }),

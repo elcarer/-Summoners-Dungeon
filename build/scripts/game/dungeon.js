@@ -1,11 +1,16 @@
 // СЦЕНА «ПОДЗЕМЕЛЬЕ» — top-down перемещение героя, энкаунтеры-враги, выход.
 // v0: фиксированная карта-ASCII (30×17, тайл 40px), тайлы — плоские заглушки,
 // враги — жетоны-ромбы, герой — спрайт движка knight_64 (заглушка).
-// Состояние живёт в G.dungeon (переживает уход в арену и обратно).
+// Состояние живёт в G.dungeon (переживает уход в арену и обратно);
+// состояния пройденных этажей — в G.dungeonStates: по лестнице у старта
+// герой поднимается на этаж выше (на 1-м — выходит в открытый мир),
+// а повторный спуск попадает на этаж в том виде, в каком его оставили.
+// Подземелье ограничено глубиной: MAX_FLOOR этажей, дальше спуска нет.
 // В центрах комнат (кроме боссовой) — интерактивные объекты: куча золота,
-// сундук с картой и магазин (только с 2-го этажа, не больше 1 на этаж).
+// сундук с картой и магазин (только со 2-го этажа, не больше 1 на этаж).
 (function () {
     const TS = 40;
+    const MAX_FLOOR = 6; // глубина «Гоблинских пещер» (стихия «Сила»)
     // #: стена, .: пол, H: старт героя, e: враг, B: главарь, X: выход.
     // Враги стоят В КОРИДОРАХ, перекрывая входы в комнаты (просил юзер),
     // а не в центрах: (3,7) — выход из стартовой комнаты, (24,6) — вход
@@ -75,13 +80,14 @@
     function newDungeonState(floor) {
         const { mobForFloor, enemyDeck } = globalThis.GAME_DATA;
         const st = {
-            floor, heroPos: null, enemies: [], exit: null, bossDead: false,
+            floor, heroPos: null, spawn: null, ladder: null, enemies: [],
+            exit: null, exitCool: false, bossDead: false,
             toast: null, toastT: 0, objects: genObjects(floor), win: null,
         };
         for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
             const ch = ROWS[j][i];
             const x = i * TS + TS / 2, y = j * TS + TS / 2;
-            if (ch === "H") st.heroPos = { x, y };
+            if (ch === "H") { st.heroPos = { x, y }; st.spawn = { x, y }; }
             else if (ch === "e") {
                 // архетип по этажу; колода кидается один раз и хранится
                 // в враге — тултип и бой показывают один и тот же состав
@@ -91,12 +97,19 @@
             else if (ch === "B") st.enemies.push({ x, y, enc: "boss", deck: enemyDeck("boss", floor), alive: true, boss: true });
             else if (ch === "X") st.exit = { x, y };
         }
+        // лестница наверх — в стартовой комнате, клеткой выше героя:
+        // рядом (40px — чуть больше радиуса касания), но не на пути
+        // первого шага вправо и не срабатывает сама при спауне
+        if (st.spawn) st.ladder = { x: st.spawn.x, y: st.spawn.y - TS };
         return st;
     }
 
     function createDungeonScene(ctx) {
         const { COMPONENTS, camera, characters, charInput, ECS, world, scenes, G, worldContainer, uiTex } = ctx;
         let layer = null, heroId = null, tokens = [], uiHud = null;
+        let myState = null; // состояние, которым живёт этот инстанс сцены:
+        // подъём/спуск меняет G.dungeon ДО переключения сцены — тогда
+        // heroPos в exit() пишет уже не этому состоянию
         let objNodes = []; // спрайты объектов комнат (куча/сундук/магазин)
         let winNode = null, winRefs = null, winObj = null; // открытое окно объекта
         let sellRows = []; // строки продажи магазина (для тестов)
@@ -200,6 +213,37 @@
             c.addChild(t);
             c.position.set(G.dungeon.exit.x, G.dungeon.exit.y);
             c.zIndex = G.dungeon.exit.y + 1;
+            return c;
+        }
+
+        // Лестница наверх у старта этажа: на 1-м этаже это выход из
+        // подземелья в открытый мир, глубже — подъём на предыдущий этаж.
+        // Триггер — касание героем (как у спуска).
+        function makeLadder(st) {
+            const c = new PIXI.Container();
+            const pad = new PIXI.Graphics();
+            pad.roundRect(-17, -17, 34, 34, 6);
+            pad.fill(0x4a4136);
+            pad.stroke({ width: 2, color: 0x2b2620 });
+            c.addChild(pad);
+            const g = new PIXI.Graphics(); // тетивы + перекладины
+            g.rect(-12, -13, 4, 26);
+            g.rect(8, -13, 4, 26);
+            g.fill(0x8a6a3f);
+            g.rect(-10, -9, 20, 3.5);
+            g.rect(-10, -1, 20, 3.5);
+            g.rect(-10, 7, 20, 3.5);
+            g.fill(0xa07c4c);
+            c.addChild(g);
+            const t = new PIXI.Text({
+                text: GAME_LOC.t(st.floor <= 1 ? "dungeon.ladderExit" : "dungeon.ladder"),
+                style: { fontFamily: "Kereru", fontSize: 12, fill: 0xffe9b0 },
+            });
+            t.anchor.set(0.5, 1);
+            t.position.set(0, -20);
+            c.addChild(t);
+            c.position.set(st.ladder.x, st.ladder.y);
+            c.zIndex = st.ladder.y + 1;
             return c;
         }
 
@@ -741,6 +785,13 @@
                 if (ctx.music) ctx.music("dungeon");
                 if (!G.dungeon) G.dungeon = newDungeonState(G.run.floor);
                 const st = G.dungeon;
+                myState = st;
+                ctx.collide.rows = ROWS; // коллизии героя — по карте этажа
+                // сейв стоя на лестнице не должен мгновенно поднимать героя
+                if (st.ladder && st.heroPos
+                    && Math.hypot(st.ladder.x - st.heroPos.x, st.ladder.y - st.heroPos.y) < TS * 0.9) {
+                    st.heroPos = { ...st.spawn };
+                }
                 // сейвы старых волн без объектов — генерируются при заходе
                 if (!st.objects) { st.objects = genObjects(st.floor); st.win = null; }
                 for (const o of st.objects)
@@ -777,6 +828,15 @@
                         }
                     }
                 }
+                // сейвы до волны «лестница наверх»: старт и лестница
+                // восстанавливаются из карты этажа
+                if (!st.spawn) {
+                    for (let j = 0; j < H; j++) {
+                        const i = ROWS[j].indexOf("H");
+                        if (i >= 0) st.spawn = { x: i * TS + TS / 2, y: j * TS + TS / 2 };
+                    }
+                }
+                if (!st.ladder && st.spawn) st.ladder = { x: st.spawn.x, y: st.spawn.y - TS };
                 closeModal(); // окно объекта не переживает уход из сцены
                 layer = new PIXI.Container();
                 layer.sortableChildren = true;
@@ -800,6 +860,7 @@
                 layer.addChild(zone);
                 layer.addChild(buildMapGfx());
                 layer.addChild(makeExit());
+                if (st.ladder) layer.addChild(makeLadder(st));
                 tokens = [];
                 for (const e of st.enemies) if (e.alive) {
                     const tok = makeToken(e);
@@ -838,8 +899,10 @@
                 ctx.ui.addChild(uiHud);
             },
             exit() {
-                const st = G.dungeon;
-                if (st && heroId !== null) {
+                const st = myState;
+                // heroPos пишем только пока G.dungeon — всё ещё состояние
+                // этой сцены: подъём/спуск свапнули его до переключения
+                if (st && heroId !== null && G.dungeon === st) {
                     st.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
                 }
                 // забег сохраняется при каждом уходе из подземелья (бой,
@@ -938,15 +1001,57 @@
                         return;
                     }
                 }
+                // ── лестница у старта: наверх; на 1-м этаже — в открытый мир ──
+                if (!st.win && st.ladder
+                    && Math.hypot(st.ladder.x - hx, st.ladder.y - hy) < TS * 0.85) {
+                    const from = st.floor;
+                    st.heroPos = { x: hx, y: hy };
+                    G.dungeonStates[from] = st; // этаж остаётся в том виде, как оставили
+                    if (from <= 1) {
+                        G.dungeon = null;
+                        G.world.heroPos = null;
+                        G.world.out = true; // из пещеры — к самому входу
+                        scenes.go("world");
+                    } else {
+                        G.run.floor = from - 1;
+                        const prev = G.dungeonStates[from - 1] || newDungeonState(from - 1);
+                        prev.heroPos = { x: prev.exit.x, y: prev.exit.y }; // у спуска
+                        prev.exitCool = true; // не провалиться сразу обратно
+                        G.dungeon = prev;
+                        scenes.go("floorSwap"); // перезаход в ту же сцену
+                    }
+                    return;
+                }
+                // «остывание» спуска после подъёма: считаем ДО проверки
+                // близости — герой уже ушёл, ветка касания не выполняется
+                if (st.exit && st.exitCool
+                    && Math.hypot(st.exit.x - hx, st.exit.y - hy) > TS * 1.25) {
+                    st.exitCool = false;
+                }
                 if (!st.win && st.exit && Math.hypot(st.exit.x - hx, st.exit.y - hy) < TS * 0.85) {
-                    if (!st.bossDead) showToast(GAME_LOC.t("dungeon.exitSealed"));
+                    if (st.exitCool) {
+                        // поднялись и стоим на спуске: уйдём на клетку-другую —
+                        // выход «остынет» и снова заработает
+                    } else if (!st.bossDead) showToast(GAME_LOC.t("dungeon.exitSealed"));
+                    // дно подземелья: глубже MAX_FLOOR спуска нет (просил юзер)
+                    else if (st.floor >= MAX_FLOOR) {
+                        showToast(GAME_LOC.t("dungeon.exitBottom"));
+                    }
                     // спуск требует растущую колоду: на этаже N — минимум
                     // 11+N карт (этаж 1 — 12, спуск на 2-й — 13, …) до капа 60
                     else if (G.deck.length < deckNeed(st.floor)) {
                         showToast(GAME_LOC.t("dungeon.exitDeck", { n: deckNeed(st.floor) }));
                     } else {
-                        G.run.floor += 1;
-                        G.dungeon = null; // новый этаж — новая карта (v0: тот же шаблон)
+                        st.heroPos = { x: hx, y: hy };
+                        G.dungeonStates[st.floor] = st;
+                        G.run.floor = st.floor + 1;
+                        // посещённый этаж восстанавливается из архива, новый
+                        // генерируется; герой прибывает к старту (у лестницы)
+                        const next = G.dungeonStates[G.run.floor]
+                            || newDungeonState(G.run.floor);
+                        next.heroPos = { ...next.spawn };
+                        next.exitCool = false;
+                        G.dungeon = next;
                         scenes.go("floorWin");
                         return;
                     }
@@ -1011,8 +1116,11 @@
             hudGold: () => (uiHud && uiHud.userData.goldT ? uiHud.userData.goldT.text : null),
             // формула минимума колоды для спуска (тесты + единый источник)
             deckNeed: (f) => deckNeed(f),
+            // лестница наверх у старта этажа и предел глубины (тесты)
+            ladderAt: () => (G.dungeon && G.dungeon.ladder ? { ...G.dungeon.ladder } : null),
+            maxFloor: () => MAX_FLOOR,
         };
     }
 
-    globalThis.GAME_DUNGEON = { createDungeonScene, newDungeonState, deckNeed, ROWS };
+    globalThis.GAME_DUNGEON = { createDungeonScene, newDungeonState, deckNeed, ROWS, MAX_FLOOR };
 })();
