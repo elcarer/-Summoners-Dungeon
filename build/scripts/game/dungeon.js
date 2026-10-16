@@ -159,36 +159,44 @@
         }
 
         function makeToken(enemy) {
+            // иконки юзера (просил юзер): обычные — глаза с кинжалами,
+            // босс — огненный череп с золотым ободком (как «здание» магазина)
             const c = new PIXI.Container();
-            const size = enemy.boss ? 30 : 22;
-            const g = new PIXI.Graphics();
-            g.poly([0, -size, size * 0.8, size * 0.7, 0, size * 0.45, -size * 0.8, size * 0.7]);
-            g.closePath();
-            g.fill(enemy.boss ? 0x8a2f2f : 0x9c4a3a);
-            g.stroke({ width: 2, color: enemy.boss ? 0xffd27a : 0x2c1512 });
-            c.addChild(g);
-            if (enemy.boss) {
-                const label = new PIXI.Text({ text: "!", style: { fontFamily: "Kereru", fontSize: 22, fill: 0xffe9b0 } });
-                label.anchor.set(0.5, 0.5);
-                c.addChild(label);
+            const boss = !!enemy.boss;
+            const shadow = new PIXI.Graphics();
+            shadow.circle(0, 0, boss ? 21 : 17);
+            shadow.fill({ color: 0x120d09, alpha: 0.55 });
+            c.addChild(shadow);
+            if (boss) {
+                const ring = new PIXI.Graphics();
+                ring.circle(0, 0, 25);
+                ring.stroke({ width: 2.5, color: 0xcfa94e });
+                c.addChild(ring);
             }
-            c.pivot.set(0, size * 0.7);
+            const sp = new PIXI.Sprite(uiTex(boss ? "icon_boss.png" : "icon_enemy.png"));
+            sp.anchor.set(0.5);
+            sp.scale.set(boss ? 0.62 : 0.5);
+            c.addChild(sp);
+            c.pivot.set(0, 12); // якорь чуть ниже центра — иконка «стоит» на клетке
             c.position.set(enemy.x, enemy.y + 6);
             c.zIndex = enemy.y + 1;
             return c;
         }
 
         function makeExit() {
+            // спуск — иконка-арка юзера (просил юзер) + прежняя подпись сверху
             const c = new PIXI.Container();
-            const g = new PIXI.Graphics();
-            g.rect(-16, -14, 32, 28);
-            g.fill(0x6a5a35);
-            g.stroke({ width: 2, color: 0xcfa94e });
-            for (let k = 0; k < 4; k++) { g.rect(-12, -10 + k * 7, 24, 4); g.fill(k % 2 ? 0x8a7548 : 0x584a2a); }
-            c.addChild(g);
+            const shadow = new PIXI.Graphics();
+            shadow.circle(0, 0, 21);
+            shadow.fill({ color: 0x120d09, alpha: 0.55 });
+            c.addChild(shadow);
+            const sp = new PIXI.Sprite(uiTex("icon_down.png"));
+            sp.anchor.set(0.5);
+            sp.scale.set(0.6);
+            c.addChild(sp);
             const t = new PIXI.Text({ text: GAME_LOC.t("dungeon.exitLabel"), style: { fontFamily: "Kereru", fontSize: 12, fill: 0xffe9b0 } });
             t.anchor.set(0.5, 1);
-            t.position.set(0, -18);
+            t.position.set(0, -24);
             c.addChild(t);
             c.position.set(G.dungeon.exit.x, G.dungeon.exit.y);
             c.zIndex = G.dungeon.exit.y + 1;

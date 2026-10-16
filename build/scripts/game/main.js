@@ -34,8 +34,8 @@
         const UI_FILES = [
             "arc_rune", "bg_corridor_1", "bg_corridor_2", "board", "button_1", "button_attack",
             "button_end", "button_menu", "card_back_min", "card_back_screen",
-            "card_back_small", "icon_bag", "icon_gold", "icon_map", "icon_rune", "icon_setting",
-            "icon_shop",
+            "card_back_small", "icon_bag", "icon_boss", "icon_down", "icon_enemy",
+            "icon_gold", "icon_map", "icon_rune", "icon_setting", "icon_shop",
             "panel_1", "panel_2", "panel_allert", "panel_buff", "panel_buff_circle",
             "panel_down", "panel_label", "panel_minimap", "panel_parametrs", "panel_skill", "panel_top",
             "portrate_hero", "sign_mana", "sign_shield",
