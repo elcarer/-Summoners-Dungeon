@@ -27,7 +27,12 @@
         }
 
         function pickThree() {
-            const pool = draftPool();
+            // правило юзера «не больше 3 одинаковых в колоде»: не предлагаем
+            // карту, которую кто-то из двоих уже забрал в трёх экземплярах —
+            // иначе она может уйти четвёртой в его драфт-колоду
+            const pool = draftPool().filter((id) =>
+                G.draft.picks.filter((c) => c === id).length < 3
+                && G.draft.ePicks.filter((c) => c === id).length < 3);
             const out = [];
             while (out.length < 3) {
                 const id = pool[(Math.random() * pool.length) | 0];

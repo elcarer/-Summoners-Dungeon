@@ -266,10 +266,15 @@
         const extra = Math.min(3 + (((f - 1) / 2) | 0), 8);
         const epicP = Math.min(0.45, (f - 1) * 0.09);
         const rareP = Math.min(0.85, 0.25 + f * 0.12);
+        // правило юзера: в колоде не больше 3 одинаковых карт — добор
+        // пропускает карты, которые ядро/grow/предыдущий добор довели до трёх
         for (let k = 0; k < extra; k++) {
             const r = Math.random();
-            const pool = r < epicP ? ENEMY_FILL.epic
+            const base = r < epicP ? ENEMY_FILL.epic
                 : r < epicP + rareP ? ENEMY_FILL.rare : ENEMY_FILL.common;
+            const free = base.filter((id) =>
+                deck.filter((c) => c === id).length < 3);
+            const pool = free.length ? free : base;
             deck.push(pool[(Math.random() * pool.length) | 0]);
         }
         return deck;
