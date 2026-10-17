@@ -202,7 +202,8 @@
             if (heroId !== null) {
                 G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
             }
-            const st = globalThis.GAME_DUNGEON.stateFor(G.dungeonStates, G.run.floor);
+            const st = G.dungeonStates[G.run.floor]
+                || globalThis.GAME_DUNGEON.newDungeonState(G.run.floor);
             if (st.spawn) st.heroPos = { ...st.spawn }; // прибытие к лестнице
             st.exitCool = false;
             G.dungeon = st;
