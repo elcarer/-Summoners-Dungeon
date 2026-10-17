@@ -180,12 +180,56 @@
         grw6: { type: "building", cost: 1, atk: 0, hp: 1, sprout: 1,
                 rarity: "common", elem: "growth",
                 color: 0x2e5a3e, img: "growth/46" },
+        // ── Рост, вторая партия (глаза юзера): 47–56 ────────────────────────
+        grw7: { type: "spell", cost: 1,
+                spell: { target: "anyUnit", buffAtkByHp: true },
+                rarity: "common", elem: "growth",
+                color: 0x4a8a3e, img: "growth/47" },
+        grw8: { type: "unit", cost: 4, atk: 4, hp: 6, speed: 1,
+                creature: "goblin",
+                rarity: "common", elem: "growth",
+                color: 0x3f6d3a, img: "growth/48" },
+        grw9: { type: "unit", cost: 2, atk: 1, hp: 1, speed: 1,
+                creature: "goblin", ability: "druidEnergy",
+                rarity: "rare", elem: "growth",
+                color: 0x3f6d3a, img: "growth/49" },
+        grw10: { type: "building", cost: 2, atk: 0, hp: 1, groveAura: 1,
+                 rarity: "common", elem: "growth",
+                 color: 0x2e5a3e, img: "growth/50" },
+        grw11: { type: "building", cost: 1, atk: 0, hp: 3, riteStump: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x2e5a3e, img: "growth/51" },
+        grw12: { type: "trap", cost: 1,
+                 trap: { event: "onEnemyCell", effect: "ancestor", spawn: "ancBear" },
+                 rarity: "rare", elem: "growth",
+                 color: 0x2e5a2e, img: "growth/52" },
+        grw13: { type: "unit", cost: 2, atk: 2, hp: 2, speed: 1,
+                 creature: "goblin", ability: "pushBack",
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/53" },
+        grw14: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
+                 creature: "goblin", ability: "flyOver",
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/54" },
+        grw15: { type: "trap", cost: 2,
+                 trap: { event: "onUnitDamage", effect: "sporeCurse" },
+                 rarity: "epic", elem: "growth",
+                 color: 0x2e5a2e, img: "growth/55" },
+        grw16: { type: "spell", cost: 1,
+                 spell: { target: "none", searchUnit: 6 },
+                 rarity: "common", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/56" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
         gobA: { type: "unit", cost: 2, atk: 2, hp: 2, speed: 1,
                 creature: "goblin", rarity: "common", elem: "strength",
                 color: 0x9c4a3a },
+        // Медведь из «Духа предка» (grw12) — служебная карта без лица,
+        // как gobA/gobC: спавнится только ловушкой.
+        ancBear: { type: "unit", cost: 3, atk: 3, hp: 5, speed: 1,
+                   creature: "goblin", rarity: "common", elem: "growth",
+                   color: 0x2e5a2e },
         // Гоблин из «Культа кочерыжки» (str40) — служебная карта без лица,
         // как gobA: ряд выбранной клетки заполняется Гоблинами 3/4.
         gobC: { type: "unit", cost: 3, atk: 3, hp: 4, speed: 1,
@@ -248,7 +292,12 @@
         strength: REWARD_POOL,
         growth: ["grw1", "grw1", "grw1", "grw2", "grw2", "grw2",
                  "grw3", "grw3", "grw3", "grw4", "grw4", "grw4",
-                 "grw5", "grw5", "grw5", "grw6", "grw6", "grw6"],
+                 "grw5", "grw5", "grw5", "grw6", "grw6", "grw6",
+                 "grw7", "grw7", "grw7", "grw8", "grw8", "grw8",
+                 "grw10", "grw10", "grw10", "grw16", "grw16", "grw16",
+                 "grw9", "grw9", "grw11", "grw11", "grw12", "grw12",
+                 "grw13", "grw13", "grw14", "grw14",
+                 "grw15"],
     };
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
@@ -294,16 +343,18 @@
         draft:    { scene: 1, baseHp: 15, core: [] },
 
         // ── «Роща Роста» (второе подземелье, стихия «Рост») ───────────────
-        // Контент будет расти вместе с каталогом Роста (пока 6 карт):
-        // «Лесные звери» — существа и усиления, «Роща лоз» — ловушки
-        // и постройки; босс собирает всё.
+        // Каталог Роста — 16 карт (глаза юзера 41–56): «Лесные звери» —
+        // существа и усиления, «Роща лоз» — ловушки и постройки; босс
+        // собирает всё.
         grwBeasts: { scene: 1, baseHp: 10, elem: "growth",
-                     core: ["grw2", "grw2", "grw3", "grw3", "grw5", "grw5", "grw1"] },
+                     core: ["grw2", "grw2", "grw3", "grw3", "grw8", "grw8",
+                            "grw13", "grw14", "grw5", "grw1"] },
         grwGrove:  { scene: 1, baseHp: 12, elem: "growth",
-                     core: ["grw1", "grw1", "grw4", "grw4", "grw6", "grw6", "grw5", "grw2"] },
+                     core: ["grw4", "grw4", "grw10", "grw10", "grw11", "grw12",
+                            "grw15", "grw6", "grw5", "grw2"] },
         grwBoss:   { scene: 1, baseHp: 18, elem: "growth",
-                     core: ["grw1", "grw1", "grw2", "grw2", "grw3", "grw3",
-                            "grw4", "grw4", "grw5"] },
+                     core: ["grw3", "grw3", "grw8", "grw8", "grw13", "grw12",
+                            "grw11", "grw15", "grw9", "grw5"] },
     };
     // Подземелья открытого мира: стихия (пул наград/драфта) и кап глубины
     const CAVES = {
@@ -344,12 +395,13 @@
                  "str40"],
     };
     // Пулы добора по стихии архетипа: враги Роста добирают только зелёное
-    // (редких/эпических в стихии пока нет — добор берёт обычные)
     const ENEMY_FILLS = {
         strength: ENEMY_FILL,
         growth: {
-            common: ["grw1", "grw2", "grw3", "grw4", "grw5", "grw6"],
-            rare: [], epic: [],
+            common: ["grw1", "grw2", "grw3", "grw4", "grw5", "grw6",
+                     "grw7", "grw8", "grw10", "grw16"],
+            rare:   ["grw9", "grw11", "grw12", "grw13", "grw14"],
+            epic:   ["grw15"],
         },
     };
     // Колода врага: ядро архетипа + 3..8 карт добора; с глубиной (floor ≥ 1)

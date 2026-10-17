@@ -434,6 +434,33 @@
                     const p = cellXY(col, row);
                     floatText(p.x, p.y - 60, `+${camp}⚔`, 0x9fd489);
                 }
+                // «Лесной монолит»: существо, призванное рядом (верт/гориз)
+                // с этой постройкой, получает +1 к жизням за монолит —
+                // перманентно (зеркало военного лагеря)
+                let grove = 0;
+                for (const o of B.units) if (o !== u && o.side === side
+                    && o.def.type === "building" && o.def.groveAura
+                    && Math.abs(o.col - col) + Math.abs(o.row - row) === 1) grove += o.def.groveAura;
+                if (grove) {
+                    u.hp += grove;
+                    recalcAuras();
+                    const hn = u.node.getChildByName("hp");
+                    if (hn) hn.text = String(u.hp);
+                    const p = cellXY(col, row);
+                    floatText(p.x, p.y - 75, `+${grove}♥`, 0x9fd489);
+                }
+                // «Эльфийский друид»: каждый призыв СУЩЕСТВА (не постройки)
+                // даёт владельцу каждого друида на поле +1 энергии — будит
+                // и призыв друида («другое существо» — не он сам)
+                for (const o of B.units) {
+                    if (o === u || o.side !== side || o.def.ability !== "druidEnergy"
+                        || !B.units.includes(o)) continue;
+                    if (side === "p") B.energy += 1; else B.eEnergy += 1;
+                    const p = cellXY(o.col, o.row);
+                    floatText(p.x, p.y - 66, "+1⚡", 0xffd98c);
+                    punch(o.node);
+                    sfx("aqua");
+                }
                 if (def.ability === "dash1") summonDash(u); // «Скорость 1»
                 else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
                 else if (def.ability === "spiritSummoner") summonSpiritCaller(u); // призыватель духов
@@ -497,6 +524,7 @@
             if (occ) {
                 if (occ.side !== u.side) {
                     damageUnit(occ, u.curAtk, u, "sword");
+                    afterAttackPush(u, occ); // «Проросший кабан»
                     refreshHud();
                     checkEnd();
                 }
@@ -512,6 +540,24 @@
             setWalk(u, true, ddx < 0 ? "walk_left" : ddx > 0 ? "walk_right" : undefined);
             sfx("step");
             afterMoved(u); // перемещение — вражеские ловушки могут сработать
+        }
+
+        // «Проросший кабан» (grw13): после атаки по существу отталкивает
+        // его на клетку дальше от себя, если та свободна (постройки не
+        // оттолкнуть, умирающая цель не толкается). Втолкнули на чужую
+        // ловушку — она срабатывает, как от шага.
+        function afterAttackPush(u, occ) {
+            if (!u || !u.def || u.def.ability !== "pushBack") return;
+            if (!B.units.includes(u) || !B.units.includes(occ)) return;
+            if (occ.def.type !== "unit") return;
+            const dir = u.side === "p" ? -1 : 1;
+            const r2 = u.row + 2 * dir; // клетка за целью — дальше от кабана
+            if (r2 < 0 || r2 >= GRID || unitAt(occ.col, r2)) return;
+            occ.row = r2;
+            const p = cellXY(occ.col, occ.row);
+            glide(occ, p.x, p.y);
+            sfx("step");
+            triggerCellTraps(occ);
         }
 
         // «Шаман гоблинов»: после призыва бесплатно разыгрывает случайного
@@ -615,16 +661,18 @@
             triggerCellTraps(u);
             archerShot(u);
         }
-        // Ловушки на клетке: «Гоблинская мина» (взрыв 3+1 по соседям) и
-        // «Гоблинская засада» (выход гоблинов стороны-хозяйки). Срабатывают,
-        // когда вражеское существо призвано или переместилось на её клетку.
+        // Ловушки на клетке: «Гоблинская мина» (взрыв 3+1 по соседям),
+        // «Гоблинская засада» (выход гоблинов стороны-хозяйки), «Дух
+        // предка» (явление Медведя перед ловушкой). Срабатывают, когда
+        // вражеское существо призвано или переместилось на её клетку.
         function triggerCellTraps(u) {
             if (!B.units.includes(u)) return; // умер раньше (рывок+мина на шаге)
             const foe = u.side === "p" ? "e" : "p";
             let side = foe;
             let i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                 && (t.def.trap.effect === "cellDmg" || t.def.trap.effect === "ambush"
-                    || t.def.trap.effect === "confuse" || t.def.trap.effect === "cellDebuff"));
+                    || t.def.trap.effect === "confuse" || t.def.trap.effect === "cellDebuff"
+                    || t.def.trap.effect === "ancestor"));
             if (i < 0) {
                 // «Решётка с шипами» и «Шипастые лозы» нейтральны: жалит ЛЮБОЕ
                 // существо, оказавшееся на клетке, — включая хозяина ловушки
@@ -668,6 +716,25 @@
                 // «Путь грибов»: существо получает «Запутанность 2» — два
                 // своих хода вместо марша пятится к своей базе (просил юзер)
                 addConfusion(u, trap.def.trap.turns || 2);
+                refreshHud();
+                checkEnd();
+                return;
+            }
+            if (trap.def.trap.effect === "ancestor") {
+                // «Дух предка» (grw12): в пустой клетке перед ловушкой
+                // (ближе к базе хозяина) является Медведь 3/5. Сначала
+                // колонка ловушки, не хватило — соседние; всё занято —
+                // предок не явился
+                const dr = side === "p" ? 1 : -1;
+                let spot = null;
+                for (const c2 of [trap.col, trap.col - 1, trap.col + 1]) {
+                    if (c2 < 0 || c2 >= GRID) continue;
+                    for (let r2 = trap.row + dr; r2 >= 0 && r2 < GRID; r2 += dr) {
+                        if (!unitAt(c2, r2)) { spot = [c2, r2]; break; }
+                    }
+                    if (spot) break;
+                }
+                if (spot) addUnit(side, trap.def.trap.spawn, spot[0], spot[1]);
                 refreshHud();
                 checkEnd();
                 return;
@@ -783,11 +850,45 @@
             floatText(p.x, p.y - 66, GAME_LOC.t(`card.${pick.id}.name`), 0xffd98c);
         }
 
+        // «Призрачные споры» (grw15): проклятие вешается на существо врага —
+        // когда оно наносит урон (существу, постройке, базе), СВОЯ база
+        // получает столько же. Живёт на самом существе: смерть/побег
+        // снимают проклятие вместе с ним (в слоты ловушек не попадает).
+        function addSpores(u) {
+            u.spores = true;
+            const mark = new PIXI.Graphics();
+            mark.circle(0, 0, 10.5);
+            mark.fill({ color: 0x7a9a4e });
+            mark.stroke({ width: 3, color: 0xd8e8a0 });
+            mark.position.set(-36, -54); // очарование — справа, споры — слева
+            mark.name = "sporeMark";
+            mark.eventMode = "none";
+            u.node.addChild(mark);
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 60, "☣", 0xb7d178);
+            sfx("acid");
+        }
+        // Отклик спор на урон: база стороны проклятого существа получает
+        // столько же, сколько оно нанесло (checkEnd зовут вызывающие)
+        function procSpores(u, amount) {
+            if (!u || !u.spores || !B.units.includes(u) || !(amount > 0)) return;
+            if (u.side === "p") {
+                B.playerBase -= amount;
+                floatText(960, 840, `−${amount}`, 0xff5f4e);
+            } else {
+                B.enemyBase -= amount;
+                floatText(960, 60, `−${amount}`, 0xff8f6e);
+            }
+            punch(root.hud);
+            sfx("acid");
+        }
+
         // snd — звук удара: "sword" (атака существом), "acid" (ловушка),
         // "rocket" (заклинание), по умолчанию "dam"
         function damageUnit(target, amount, killer = null, snd = "dam") {
             target.hp -= amount;
             procEnchantFire(killer);
+            procSpores(killer, amount); // «Призрачные споры» отражают урон по базе
             const n = target.node.getChildByName("hp");
             if (n) n.text = String(Math.max(0, target.hp));
             const p = cellXY(target.col, target.row);
@@ -820,6 +921,7 @@
         function baseHit(side, u) {
             sfx("crash");
             procEnchantFire(u); // «Огненное дыхание» срабатывает и на базе
+            procSpores(u, u.curAtk); // споры: удар по чужой базе бьёт и свою
             if (side === "p") {
                 B.enemyBase -= u.curAtk;
                 const p = cellXY(u.col, 0);
@@ -873,6 +975,37 @@
                 }
             }
             refreshHud();
+        }
+
+        // «Пень обряда» (grw11), начало хода ИИ: подсматривает верхнюю карту
+        // чужой или своей колоды — сильную карту игрока (цена 4+ или
+        // эпическая) сбрасывает, свою слабую (цена ≤ 1 и мелкое существо)
+        // тоже; иную карту оставляет наверху, как было
+        function riteStumpTick(side) {
+            const stump = B.units.find((b) => b.side === side
+                && b.def.type === "building" && b.def.riteStump);
+            if (!stump) return;
+            const foeDeck = side === "p" ? B.eDeck : B.deck;
+            const foeDisc = side === "p" ? B.eDiscard : B.discard;
+            const ownDeck = side === "p" ? B.deck : B.eDeck;
+            const ownDisc = side === "p" ? B.discard : B.eDiscard;
+            const fp = cellXY(stump.col, stump.row);
+            const fDef = foeDeck.length ? CARDS[foeDeck[foeDeck.length - 1]] : null;
+            if (fDef && (fDef.cost >= 4 || fDef.rarity === "epic")) {
+                const id = foeDeck.pop();
+                foeDisc.push(id);
+                floatText(fp.x, fp.y - 66, GAME_LOC.t(`card.${id}.name`), 0xffd98c);
+                sfx("chpoc");
+                return;
+            }
+            const oDef = ownDeck.length ? CARDS[ownDeck[ownDeck.length - 1]] : null;
+            if (oDef && oDef.cost <= 1
+                && (oDef.type !== "unit" || oDef.atk + oDef.hp <= 3)) {
+                const id = ownDeck.pop();
+                ownDisc.push(id);
+                floatText(fp.x, fp.y - 66, GAME_LOC.t(`card.${id}.name`), 0xffd98c);
+                sfx("chpoc");
+            }
         }
 
         // «Росток» (grw6), конец хода владельца: постройка получает +1 жизнь
@@ -954,7 +1087,7 @@
             floatText(fp.x, fp.y - 90, GAME_LOC.t(`card.${pick.id}.name`), 0xffd98c);
             // панельные заклинания (выбор из карт / призыв) авто-розыгрыша
             // не имеют — уходят в руку владельца, разыграет сам за энергию
-            if (def.spell.search || def.spell.journey) {
+            if (def.spell.search || def.spell.journey || def.spell.searchUnit) {
                 hand.push(pick.id);
                 return;
             }
@@ -1539,22 +1672,26 @@
             }
         }
 
-        // ── Панель «Поиск рун» (str23): верхние карты колоды — выбрать ──────
-        // заклинание. Не-заклинания видны, но не кликабельны; «Оставить как
+        // ── Панель «Поиск рун» (str23) / «Рунное гадание» (grw16): верхние
+        // карты колоды — выбрать заклинание (руны) или карту призыва
+        // (гадание). Неподходящие видны, но не кликабельны; «Оставить как
         // было» (или Esc) отменяет — карты остаются в колоде в том же порядке.
-        let runesPanel = null, runesTop = [];
+        let runesPanel = null, runesTop = [], runesWant = "spell";
         function closeRunesPanel() {
             if (!runesPanel) return;
             runesPanel.destroy({ children: true });
             runesPanel = null;
             runesTop = [];
+            runesWant = "spell";
             if (B) B.picking = false;
         }
-        function openRunesPanel(n) {
+        function openRunesPanel(n, want = "spell") {
             closeRunesPanel();
             B.picking = true;
+            runesWant = want;
             const top = B.deck.slice(-Math.min(n, B.deck.length)); // верх колоды — конец массива
             runesTop = top;
+            const L = want === "unit" ? "gadanie" : "runes";
             const node = new PIXI.Container();
             node.eventMode = "static";
             const dim = new PIXI.Graphics();
@@ -1567,12 +1704,12 @@
             frame.fill({ color: 0x171310, alpha: 0.96 });
             frame.stroke({ width: 3, color: 0x6b5c40 });
             node.addChild(frame);
-            const title = T(t("runes.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+            const title = T(t(`${L}.title`), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
             title.anchor.set(0.5, 0);
             title.position.set(960, 297);
             title.eventMode = "none";
             node.addChild(title);
-            const hint = T(t("runes.hint", { n: top.length }), 25, 0xd8c79d);
+            const hint = T(t(`${L}.hint`, { n: top.length }), 25, 0xd8c79d);
             hint.anchor.set(0.5, 0);
             hint.position.set(960, 354);
             hint.eventMode = "none";
@@ -1580,15 +1717,15 @@
             const m = top.length;
             const spread = Math.min(210, 1260 / Math.max(1, m));
             top.forEach((cardId, idx) => {
-                const isSpell = CARDS[cardId].type === "spell";
+                const ok = CARDS[cardId].type === want;
                 const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
                 c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
-                if (!isSpell) c.alpha = 0.5; // не заклинание — взять нельзя
-                else { c.eventMode = "static"; c.on("pointertap", () => pickRune(idx)); }
+                if (!ok) c.alpha = 0.5; // не то — взять нельзя
+                else { c.eventMode = "static"; c.on("pointertap", () => pickRune(idx, want)); }
                 node.addChild(c);
             });
-            if (!top.some((id) => CARDS[id].type === "spell")) {
-                const empty = T(t("runes.empty"), 27, 0x8a7c5e);
+            if (!top.some((id) => CARDS[id].type === want)) {
+                const empty = T(t(`${L}.empty`), 27, 0x8a7c5e);
                 empty.anchor.set(0.5, 0);
                 empty.position.set(960, 687);
                 empty.eventMode = "none";
@@ -1601,17 +1738,110 @@
             root.addChild(node);
             runesPanel = node;
         }
-        function pickRune(idx) { // idx — номер карты среди показанных верхних
+        function pickRune(idx, want = runesWant) { // idx — номер карты среди показанных верхних
             if (!B || !B.picking || !runesPanel) return;
             const deckIdx = B.deck.length - runesTop.length + idx;
             const cardId = B.deck[deckIdx];
-            if (cardId === undefined || CARDS[cardId].type !== "spell") return;
+            if (cardId === undefined || CARDS[cardId].type !== want) return;
             B.deck.splice(deckIdx, 1);
             B.hand.push(cardId);
             sfx("chpoc");
             closeRunesPanel();
             layoutHand();
             refreshHud();
+        }
+
+        // ── Панель «Пень обряда» (grw11): в начале хода владельца — взгляд
+        // на верхнюю карту своей или вражеской колоды; «Оставить наверху»
+        // закрывает, «Сбросить» отправляет карту в сброс. Esc = оставить.
+        let stumpPanel = null, stumpSide = null, stumpTop = null;
+        function closeStumpPanel() {
+            if (!stumpPanel) return;
+            stumpPanel.destroy({ children: true });
+            stumpPanel = null;
+            stumpSide = null;
+            stumpTop = null;
+            if (B) B.picking = false;
+        }
+        function stumpShow(side) { // выбор колоды → верхняя карта и решения
+            if (!stumpPanel) return;
+            const deck = side === "p" ? B.deck : B.eDeck;
+            if (!deck.length) return; // колода пуста — смотреть нечего
+            stumpSide = side;
+            stumpTop = deck[deck.length - 1];
+            const body = stumpPanel.getChildByName("body");
+            body.destroy({ children: true });
+            const fresh = new PIXI.Container();
+            fresh.name = "body";
+            const face = globalThis.GAME_UI.cardFace(ctx, stumpTop, { scale: 0.72 });
+            face.position.set(960, 545);
+            fresh.addChild(face);
+            fresh.addChild(globalThis.GAME_UI.button(ctx, {
+                tex: "button_menu.png", label: t("stump.keep"), x: 710, y: 762, scale: 1,
+                onTap: closeStumpPanel, // оставить наверху — панели конец
+            }));
+            fresh.addChild(globalThis.GAME_UI.button(ctx, {
+                tex: "button_menu.png", label: t("stump.burn"), x: 1210, y: 762, scale: 1,
+                onTap: () => stumpBurn(),
+            }));
+            stumpPanel.addChild(fresh);
+        }
+        function stumpBurn() { // «Сбросить»: верхняя карта показанной колоды — в сброс
+            if (!stumpPanel || !stumpSide) return;
+            const deck = stumpSide === "p" ? B.deck : B.eDeck;
+            const disc = stumpSide === "p" ? B.discard : B.eDiscard;
+            if (!deck.length) return;
+            const id = deck.pop();
+            disc.push(id);
+            sfx("chpoc");
+            closeStumpPanel();
+            refreshHud();
+        }
+        function openStumpPanel() {
+            closeStumpPanel();
+            if (!B.deck.length && !B.eDeck.length) return; // смотреть нечего
+            B.picking = true;
+            const node = new PIXI.Container();
+            node.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(0, 0, 1920, 1080);
+            dim.fill({ color: 0x000000, alpha: 0.6 });
+            dim.eventMode = "static";
+            node.addChild(dim);
+            node.addChild(stumpFrame());
+            const title = T(t("stump.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(960, 297);
+            title.eventMode = "none";
+            node.addChild(title);
+            const hint = T(t("stump.hint"), 25, 0xd8c79d);
+            hint.anchor.set(0.5, 0);
+            hint.position.set(960, 354);
+            hint.eventMode = "none";
+            node.addChild(hint);
+            const body = new PIXI.Container(); // перезаполняется выбором колоды
+            body.name = "body";
+            node.addChild(body);
+            const deckBtn = (key, side, x) => {
+                const deck = side === "p" ? B.deck : B.eDeck;
+                const btn = globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t(key), x, y: 560, scale: 1,
+                    onTap: () => stumpShow(side),
+                });
+                btn.alpha = deck.length ? 1 : 0.45; // пустая колода — не смотреть
+                return btn;
+            };
+            body.addChild(deckBtn("stump.own", "p", 660));
+            body.addChild(deckBtn("stump.foe", "e", 1260));
+            root.addChild(node);
+            stumpPanel = node;
+        }
+        function stumpFrame() { // рамка панели — как у «Поиска рун»
+            const frame = new PIXI.Graphics();
+            frame.roundRect(285, 270, 1350, 540, 18);
+            frame.fill({ color: 0x171310, alpha: 0.96 });
+            frame.stroke({ width: 3, color: 0x6b5c40 });
+            return frame;
         }
 
         // ── Панель «Глубокое путешествие» (str26): верхние карты колоды ────
@@ -2186,6 +2416,7 @@
         function ownBaseHit(u) {
             sfx("crash");
             procEnchantFire(u);
+            procSpores(u, u.curAtk); // споры: удар по базе — тоже нанесение урона
             if (u.side === "p") {
                 B.playerBase -= u.curAtk;
                 const p = cellXY(u.col, GRID - 1);
@@ -2261,7 +2492,25 @@
                     const occ = unitAt(u.col, ahead);
                     if (occ) {
                         if (occ.side !== u.side) {
+                            // «Мини-фея» (grw14): полёт — за атакуемым
+                            // существом есть пустая клетка, перелетает на
+                            // неё вместо атаки (постройки не облетает)
+                            const over = ahead + dir;
+                            if (u.def.ability === "flyOver" && occ.def.type === "unit"
+                                && over >= 0 && over < GRID && !unitAt(u.col, over)) {
+                                u.row = over;
+                                const p = cellXY(u.col, u.row);
+                                glide(u, p.x, p.y);
+                                setWalk(u, true);
+                                sfx("step");
+                                await delay(0.52 / animK()); // глиссада: полный шаг
+                                if (B.stopped) return;
+                                afterMoved(u); // перемещение — ловушки врага
+                                if (checkEnd()) return;
+                                break;
+                            }
                             damageUnit(occ, u.curAtk, u, "sword");
+                            afterAttackPush(u, occ); // «Проросший кабан»
                             triggerAttackTraps(u); // руна: существо атаковало
                             refreshHud();
                             if (checkEnd()) return;
@@ -2301,6 +2550,7 @@
                         const p = cellXY(u.col, u.row);
                         floatText(p.x, p.y - 60, "⚔", 0xffb26e);
                         damageUnit(occ, u.curAtk, u, "sword");
+                        afterAttackPush(u, occ); // «Проросший кабан»
                         triggerAttackTraps(u);
                     }
                     refreshHud();
@@ -2382,6 +2632,7 @@
             await delay(0.5 / animK());
             if (B.stopped) return;
             upkeep("e"); // грибницы врага
+            riteStumpTick("e"); // пень обряда врага подсмотрел и решил
             await marchSide("e");
             if (B.stopped || B.phase === "over") return;
             await aiPlay();
@@ -2502,8 +2753,8 @@
                     && v.def.type === "unit" && v.curAtk >= B.playerBase)) return 0;
                 if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
                     || s.sacrifice || s.baseHit || s.copyLast) return 2;
-                if (s.buffAtk || s.berserk || s.buffAllAtk || s.enchantFire) return 4;
-                return 6; // поиск рун / глубокое путешествие
+                if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk || s.enchantFire) return 4;
+                return 6; // поиск рун / гадание / глубокое путешествие
             }
             if (def.type === "building") return 1;
             if (def.type === "trap") return 5;
@@ -2539,16 +2790,17 @@
             }
             return best[(Math.random() * best.length) | 0];
         }
-        // Постройки-ауры соседства (лагерь, костёр, росток) — к существам и
-        // будущим призывам: своё существо рядом (костёр лечит сразу, росток
-        // вернётся в руку с +3 жизни соседу) и пустая клетка зоны призыва
-        // рядом (лагерь усилит того, кто встанет). Остальные постройки —
-        // как раньше, в тыл у своей базы.
+        // Постройки-ауры соседства (лагерь, костёр, росток, монолит) — к
+        // существам и будущим призывам: своё существо рядом (костёр лечит
+        // сразу, росток вернётся в руку с +3 жизни соседу, монолит даст
+        // +1 жизни при призыве) и пустая клетка зоны призыва рядом (лагерь
+        // усилит того, кто встанет). Остальные постройки — как раньше,
+        // в тыл у своей базы.
         function aiBuildingSpot(def) {
             const rows = deployRows("e");
             const free = freeCells(rows);
             if (!free.length) return null;
-            if (def.campAura || def.campfire || def.sprout) {
+            if (def.campAura || def.campfire || def.sprout || def.groveAura) {
                 let best = [], bestScore = -1;
                 for (const [c, r] of free) {
                     let score = 0;
@@ -2630,6 +2882,13 @@
             // «Поиск рун»: в верхних картах колоды должно быть заклинание
             if (s.search && !B.eDeck.slice(-s.search)
                 .some((id) => CARDS[id] && CARDS[id].type === "spell")) return false;
+            // «Рунное гадание»: в верхних картах колоды должен быть призыв
+            if (s.searchUnit && !B.eDeck.slice(-s.searchUnit)
+                .some((id) => CARDS[id] && CARDS[id].type === "unit")) return false;
+            // «Природная мощь»: есть свой крепыш (3+ жизни) — иначе +1 урона
+            // за энергию и карту не окупается
+            if (s.buffAtkByHp && !B.units.some((v) => v.side === "e"
+                && v.def.type === "unit" && v.hp >= 3)) return false;
             // «Глубокое путешествие»: в верхних картах колоды должен быть призыв
             if (s.journey && !B.eDeck.slice(-Math.min(s.journey, B.eDeck.length))
                 .some((id) => CARDS[id] && CARDS[id].type === "unit")) return false;
@@ -2672,9 +2931,11 @@
                 const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
                     && (!s.enchantFire || !v.enchantFire));
                 // очарование «Огненного дыхания» вешается на крепкого атакующего
-                // (ему жить и бить, чтобы тянуть заклинания), усиление — на сильнейшего
+                // (ему жить и бить, чтобы тянуть заклинания), «Природная мощь» —
+                // на самого живучего (+урона = жизням), усиление — на сильнейшего
                 let best = own.slice().sort((a, b) => s.enchantFire
                     ? (b.curAtk + b.hp) - (a.curAtk + a.hp)
+                    : s.buffAtkByHp ? ((b.hp - a.hp) || (b.curAtk - a.curAtk))
                     : ((b.curAtk - a.curAtk) || (b.row - a.row)))[0];
                 if (focus && own.includes(focus)) best = focus;
                 if (!best) return;
@@ -2702,6 +2963,12 @@
                         if (hn) hn.text = String(best.hp);
                         const p = cellXY(best.col, best.row);
                         floatText(p.x, p.y - 75, `+${s.buffHp}♥`, 0x9fd489);
+                    }
+                    if (s.buffAtkByHp) { // «Природная мощь»: +урона = жизням
+                        best.bonusAtk = (best.bonusAtk || 0) + best.hp;
+                        recalcAuras();
+                        const p = cellXY(best.col, best.row);
+                        floatText(p.x, p.y - 39, `+${best.hp}⚔`, 0x9fd489);
                     }
                     if (s.berserk) addBerserk(best, s.berserk);
                 }
@@ -2800,6 +3067,12 @@
                 const k = spells[spells.length - 1];
                 if (k) { B.eDeck.splice(k.j, 1); B.eHand.push(k.id); }
             }
+            if (s.searchUnit) { // «Рунное гадание»: призыв из верхних карт — в руку
+                const units = B.eDeck.map((id, j) => ({ id, j }))
+                    .filter((x) => CARDS[x.id] && CARDS[x.id].type === "unit");
+                const k = units[units.length - 1]; // ближайший к верху
+                if (k) { B.eDeck.splice(k.j, 1); B.eHand.push(k.id); }
+            }
             if (s.journey) { // «Глубокое путешествие»: призыв из верхних карт — бесплатно
                 const k = Math.min(s.journey, B.eDeck.length);
                 const top = k ? B.eDeck.splice(B.eDeck.length - k, k) : [];
@@ -2872,11 +3145,14 @@
                         break;
                     }
                     if (def.type === "trap") {
-                        if (B.traps.e.length >= TRAP_SLOTS) continue;
-                        // руна («Наскальная рунопись») — на существо игрока:
-                        // сильнейшее (при его атаке ИИ бесплатно разыграет
-                        // случайное заклинание своей колоды)
-                        if (def.trap.effect === "castRandom") {
+                        if (def.trap.effect !== "sporeCurse"
+                            && B.traps.e.length >= TRAP_SLOTS) continue;
+                        // руна («Наскальная рунопись») и споры («Призрачные
+                        // споры») — на существо игрока: руна на сильнейшего
+                        // (при его атаке ИИ бесплатно разыграет случайное
+                        // заклинание своей колоды), споры тоже — чем больше
+                        // урона наносит проклятый, тем больше летит в базу
+                        if (def.trap.effect === "castRandom" || def.trap.effect === "sporeCurse") {
                             const pu = B.units.filter((v) => v.side === "p" && v.def.type === "unit")
                                 .sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
                             if (!pu) continue;
@@ -2885,7 +3161,8 @@
                             const cardId = B.eHand[pick.i];
                             B.eHand.splice(pick.i, 1);
                             B.eEnergy -= effCost(cardId, "e");
-                            armTrap("e", cardId, 0, 0, pu);
+                            if (def.trap.effect === "sporeCurse") addSpores(pu);
+                            else armTrap("e", cardId, 0, 0, pu);
                             hideEnemyCard();
                             played = true;
                             break;
@@ -3010,6 +3287,9 @@
             layoutHand();
             redrawHighlight();
             refreshHud();
+            // «Пень обряда»: в начале хода — взгляд на верхнюю карту колоды
+            if (B.units.some((b) => b.side === "p" && b.def.type === "building"
+                && b.def.riteStump)) openStumpPanel();
         }
 
         // ── Действия игрока ────────────────────────────────────────────────
@@ -3043,7 +3323,11 @@
                 return;
             }
             if (def.type === "trap") {
-                if (effCost(B.hand[idx]) > B.energy || B.traps.p.length >= TRAP_SLOTS) return;
+                // руна и споры вешаются на существо — слоты ловушек не занимают
+                const unitTrap = def.trap.effect === "castRandom"
+                    || def.trap.effect === "sporeCurse";
+                if (effCost(B.hand[idx]) > B.energy
+                    || (!unitTrap && B.traps.p.length >= TRAP_SLOTS)) return;
                 // мина ставится на выбранную пустую клетку — выбор как у юнитов
                 B.selected = B.selected === idx ? null : idx;
                 B.spellTarget = false;
@@ -3099,12 +3383,19 @@
                 return;
             }
             if (def.type === "trap") {
-                // руна («Наскальная рунопись») — наоборот, на существо
-                if (def.trap.effect === "castRandom") {
+                // руна («Наскальная рунопись») и споры («Призрачные споры») —
+                // наоборот, на существо; споры — только на существо ВРАГА
+                if (def.trap.effect === "castRandom" || def.trap.effect === "sporeCurse") {
                     const u = unitAt(col, row);
-                    if (!u || u.def.type !== "unit") { deselect(); return; }
+                    if (!u || u.def.type !== "unit"
+                        || (def.trap.effect === "sporeCurse" && u.side === "p")) {
+                        deselect();
+                        return;
+                    }
+                    B.energy -= effCost(B.hand[B.selected]); // цена ловушки
                     const cardId = spendCard(B.selected);
-                    armTrap("p", cardId, 0, 0, u);
+                    if (def.trap.effect === "sporeCurse") addSpores(u);
+                    else armTrap("p", cardId, 0, 0, u);
                     deselect();
                     layoutHand();
                     redrawHighlight();
@@ -3112,6 +3403,7 @@
                     return;
                 }
                 if (unitAt(col, row)) { deselect(); return; } // мина — пустая клетка
+                B.energy -= effCost(B.hand[B.selected]); // цена ловушки
                 const cardId = spendCard(B.selected);
                 armTrap("p", cardId, col, row);
                 deselect();
@@ -3183,6 +3475,11 @@
                         const hn = u.node.getChildByName("hp");
                         if (hn) hn.text = String(u.hp);
                         floatText(p.x, p.y - 75, `+${def.spell.buffHp}♥`, 0x9fd489);
+                    }
+                    if (def.spell.buffAtkByHp) { // «Природная мощь»: +урона = жизням
+                        u.bonusAtk = (u.bonusAtk || 0) + u.hp;
+                        recalcAuras();
+                        floatText(p.x, p.y - 39, `+${u.hp}⚔`, 0x9fd489);
                     }
                     if (def.spell.berserk) addBerserk(u, def.spell.berserk);
                 }
@@ -3270,6 +3567,7 @@
             if (def.spell.draw) drawCards(def.spell.draw);
             if (def.spell.brew) { B.brewCasts = (B.brewCasts || 0) + 1; refreshBrewBadges(); }
             if (def.spell.search) openRunesPanel(def.spell.search); // выбор поверх боя
+            if (def.spell.searchUnit) openRunesPanel(def.spell.searchUnit, "unit"); // «Рунное гадание»
             if (def.spell.journey) openJourneyPanel(def.spell.journey);
             return true;
         }
@@ -3612,6 +3910,7 @@
             drag = null;
             closeDiscardPanel();
             closeRunesPanel();
+            closeStumpPanel();
             closeJourneyPanel(); // узел умрёт вместе с root — снимаем ссылки
             hideEnemyCard(); // узел умер бы вместе с root — снимаем ссылку
             unitCard = null; // узел подсказки умер вместе с root
@@ -3708,6 +4007,7 @@
                 && ctx.input.wasPressed("Space")) api.endTurn();
             if (B.picking && ctx.input.wasPressed("Escape")) {
                 if (journeyPanel) finishJourney(null); // «Глубокое путешествие» — без призыва
+                else if (stumpPanel) closeStumpPanel(); // «Пень обряда» — оставить как было
                 else closeRunesPanel(); // «Поиск рун» — отмена выбора
                 return;
             }
@@ -3847,8 +4147,14 @@
             // тест-хук: тик ростков — конец хода стороны (+1 жизни постройкам)
             _sproutTick(side) { sproutTick(side); return true; },
             // «Поиск рун» (тесты): состав панели и выбор карты
-            runesState: () => ({ picking: !!B.picking, top: [...runesTop] }),
+            runesState: () => ({ picking: !!B.picking, top: [...runesTop], want: runesWant }),
             runesPick(idx) { pickRune(idx); },
+            // «Пень обряда» (тесты): панель и нажатия её кнопок
+            stumpState: () => ({ open: !!stumpPanel, picking: !!(B && B.picking),
+                side: stumpSide, top: stumpTop }),
+            stumpChoose(side) { stumpShow(side); },
+            stumpKeep() { closeStumpPanel(); },
+            stumpBurn() { stumpBurn(); },
             // «Глубокое путешествие» (тесты): панель, выбор призыва, режим
             // бесплатной постановки
             journeyState: () => ({ picking: !!journeyPanel, top: [...journeyTop] }),
