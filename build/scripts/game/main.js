@@ -55,15 +55,21 @@
         uiTextures["card_goblin_back.png"] = await assets.loadTexture("./images/ui/card_goblin_back.png");
         uiTextures["card_nature_back.png"] = await assets.loadTexture("./images/ui/card_nature_back.png");
         // тайлы подземелья юзера: images/dungeon_tiles/<…>.png — полы,
-        // стены (кап/лицо), тень, декор (факелы/окошки/щебёнка/лестницы)
+        // стены-«сочленения» walln_* (лица/капы/топы/боковины по маске
+        // соседей), тень, декор (щебёнка/лестницы)
         say("тайлы подземелья…");
         await frame();
         for (const f of ["floor_0", "floor_1", "floor_2", "floor_3", "floor_4",
-            "floor_5", "floor_6", "floor_7", "floor_8", "wall_top_0", "wall_top_1",
-            "wall_top_2", "wall_top_3", "wall_face_0", "wall_face_1", "wall_face_2",
-            "wall_face_3", "shadow", "door_gate", "wall_torch", "wall_window_a",
-            "wall_window_b", "stair_a", "stair_b", "stair_c", "rubble_0", "rubble_1",
-            "rubble_2", "rubble_3", "prop_barrel", "prop_crates", "prop_crate"]) {
+            "floor_5", "floor_6", "floor_7", "floor_8", "shadow", "door_gate",
+            "stair_a", "stair_b", "stair_c", "rubble_0", "rubble_1",
+            "rubble_2", "rubble_3", "prop_barrel", "prop_crates", "prop_crate",
+            "walln_h_0", "walln_h_1", "walln_h_2", "walln_h_3",
+            "walln_h_el", "walln_h_er", "walln_h_eb",
+            "walln_cap_0", "walln_cap_1", "walln_cap_2", "walln_cap_3",
+            "walln_t_0", "walln_t_1", "walln_t_2", "walln_t_3",
+            "walln_v_l", "walln_v_l_f", "walln_v_l2", "walln_v_l2_f",
+            "walln_v_r", "walln_v_r_f", "walln_v_r2", "walln_v_r2_f",
+            "walln_v_b", "walln_v_b_f"]) {
             uiTextures[`dungeon_tiles/${f}.png`] =
                 await assets.loadTexture(`./images/dungeon_tiles/${f}.png`);
         }
