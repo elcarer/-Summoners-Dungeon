@@ -225,7 +225,7 @@
                  rarity: "common", elem: "growth",
                  color: 0x4a8a3e, img: "growth/57" },
         grw18: { type: "spell", cost: 1,
-                 spell: { target: "none", stealEnergy: true },
+                 spell: { target: "none", stealEnergy: 2 },
                  rarity: "epic", elem: "growth",
                  color: 0x4a8a3e, img: "growth/58" },
         grw19: { type: "spell", cost: 1,
@@ -250,6 +250,19 @@
                  creature: "animal", keeperScale: true,
                  rarity: "epic", elem: "growth",
                  color: 0x3f6d3a, img: "growth/62" },
+        // ── Рост, пятая партия (глаза юзера): 63–64 ─────────────────────────
+        // «Варка зелий»: заклинание из любого сброса — в руку, с «Сожжением»
+        // (после розыгрыша карта удаляется из боя, в сброс не попадает)
+        grw23: { type: "spell", cost: 1,
+                 spell: { target: "none", discardPick: true },
+                 rarity: "epic", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/63" },
+        // «Друид глубокой чащи»: пережив урон (выжил), призывает Волка 2/4
+        // (grw2) на пустую соседнюю клетку; тип существа — Эльф
+        grw24: { type: "unit", cost: 5, atk: 1, hp: 5, speed: 1,
+                 creature: "elf", wolfSummon: true,
+                 rarity: "epic", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/64" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -329,7 +342,7 @@
                  "grw17", "grw17", "grw17", "grw19", "grw19", "grw19",
                  "grw9", "grw9", "grw11", "grw11", "grw12", "grw12",
                  "grw13", "grw13", "grw14", "grw14", "grw20", "grw20",
-                 "grw21", "grw22", "grw15", "grw18"],
+                 "grw21", "grw22", "grw23", "grw24", "grw15", "grw18"],
     };
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
@@ -375,15 +388,16 @@
         draft:    { scene: 1, baseHp: 15, core: [] },
 
         // ── «Роща Роста» (второе подземелье, стихия «Рост») ───────────────
-        // Каталог Роста — 22 карты (глаза юзера 41–62): «Лесные звери» —
-        // существа и усиления, «Роща лоз» — ловушки, постройки и контроль;
-        // босс собирает всё.
+        // Каталог Роста — 24 карты (глаза юзера 41–64): «Лесные звери» —
+        // существа и усиления (друид-эльф кормит связку волками), «Роща
+        // лоз» — ловушки, постройки, контроль и добор заклинаний; босс
+        // собирает всё.
         grwBeasts: { scene: 1, baseHp: 10, elem: "growth",
                      core: ["grw2", "grw2", "grw3", "grw3", "grw8", "grw8",
-                            "grw13", "grw14", "grw20", "grw22"] },
+                            "grw13", "grw14", "grw20", "grw22", "grw24"] },
         grwGrove:  { scene: 1, baseHp: 12, elem: "growth",
                      core: ["grw4", "grw4", "grw10", "grw10", "grw11", "grw12",
-                            "grw19", "grw19", "grw17", "grw21"] },
+                            "grw19", "grw19", "grw17", "grw21", "grw23"] },
         grwBoss:   { scene: 1, baseHp: 18, elem: "growth",
                      core: ["grw3", "grw3", "grw8", "grw8", "grw13", "grw12",
                             "grw11", "grw15", "grw18", "grw9", "grw22"] },
@@ -433,7 +447,7 @@
             common: ["grw1", "grw2", "grw3", "grw4", "grw5", "grw6",
                      "grw7", "grw8", "grw10", "grw16", "grw17", "grw19"],
             rare:   ["grw9", "grw11", "grw12", "grw13", "grw14", "grw20"],
-            epic:   ["grw15", "grw18", "grw21", "grw22"],
+            epic:   ["grw15", "grw18", "grw21", "grw22", "grw23", "grw24"],
         },
     };
     // Колода врага: ядро архетипа + 3..8 карт добора; с глубиной (floor ≥ 1)

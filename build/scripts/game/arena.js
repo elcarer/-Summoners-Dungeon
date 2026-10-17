@@ -1013,7 +1013,28 @@
                 && killer && killer.def.ability === "assassin") {
                 floatText(p.x, p.y - 66, "☠", 0xef9f8c);
                 killUnit(target, killer);
+                return;
             }
+            // «Друид глубокой чащи» (grw24): пережив ФАКТИЧЕСКИЙ урон
+            // (защита, съевшая всё, уроном не считается), призывает Волка
+            summonDruidWolf(target, amt);
+        }
+
+        // Призыв Волка 2/4 (grw2) на пустую соседнюю клетку друида; нет
+        // свободной — волка нет. Вызывается из damageUnit, когда друид выжил
+        function summonDruidWolf(u, amt) {
+            if (!u.def.wolfSummon || amt <= 0 || !B.units.includes(u)) return;
+            const near = [];
+            for (const [dc, dr] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                const c = u.col + dc, r = u.row + dr;
+                if (c < 0 || c >= GRID || r < 0 || r >= GRID) continue;
+                if (!unitAt(c, r)) near.push([c, r]);
+            }
+            if (!near.length) return; // кругом свои — волку нет места
+            const [col, row] = near[(Math.random() * near.length) | 0];
+            addUnit(u.side, "grw2", col, row);
+            const p = cellXY(col, row);
+            floatText(p.x, p.y - 75, GAME_LOC.t("card.grw2.name"), 0x9fd489);
         }
 
         // Лечение (+n жизни; пределом служит сама карта — жёсткого максимума
@@ -1462,6 +1483,16 @@
                 badge.name = "brewBadge";
                 c.addChild(badge);
             }
+            // «Сожжение» (Варка зелий): карта после розыгрыша удалится из
+            // боя — пламя-метка в левом верхнем углу лица
+            if (B.scorch.p.has(card)) {
+                const fl = T("🔥", 26, 0xffffff, { stroke: { color: 0x1c1207, width: 4 } });
+                fl.anchor.set(0.5);
+                fl.position.set(-84, -316);
+                fl.eventMode = "none";
+                fl.name = "scorchMark";
+                c.addChild(fl);
+            }
             c.eventMode = B.selected === null ? "static" : "none";
             c.on("pointertap", () => onCardTap(idx));
             // альтернативный режим призыва (Настройки): наведение увеличивает
@@ -1793,7 +1824,10 @@
         function pickDiscard(idx) {
             if (!B || !B.discarding || !discardPanel) return;
             const cardId = B.hand.splice(idx, 1)[0];
-            if (cardId) B.discard.push(cardId);
+            if (cardId) {
+                B.discard.push(cardId);
+                B.scorch.p.delete(cardId); // метка ушла вместе с этой картой
+            }
             sfx("chpoc");
             if (B.hand.length <= HAND_MAX) {
                 closeDiscardPanel();
@@ -2079,6 +2113,101 @@
             B.journeySummon = null;
             layoutHand();
             redrawHighlight();
+            refreshHud();
+        }
+
+        // ── Панель «Варки зелий» (grw23): заклинание из СВОЕГО сброса или
+        // сброса противника — себе в руку, карта получает «Сожжение»
+        // (после розыгрыша удаляется из боя, в сброс не попадает).
+        // Два шага, как у «Пня обряда»: выбор сброса → выбор заклинания;
+        // «Назад»/Esc закрывает (само заклинание уже потрачено — как у
+        // «Поиска рун»). Заклинаний ни в одном сбросе — панель не открывается.
+        let brewPanel = null, brewPile = null;
+        function closeBrewPanel() {
+            if (!brewPanel) return;
+            brewPanel.destroy({ children: true });
+            brewPanel = null;
+            brewPile = null;
+            if (B) B.picking = false;
+        }
+        function spellsInDiscard(side) {
+            const disc = side === "p" ? B.discard : B.eDiscard;
+            return disc.filter((id) => CARDS[id] && CARDS[id].type === "spell");
+        }
+        function openBrewPanel() {
+            closeBrewPanel();
+            B.picking = true;
+            const node = new PIXI.Container();
+            node.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(0, 0, 1920, 1080);
+            dim.fill({ color: 0x000000, alpha: 0.6 });
+            dim.eventMode = "static";
+            node.addChild(dim);
+            node.addChild(stumpFrame());
+            const title = T(t("brew.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(960, 297);
+            title.eventMode = "none";
+            node.addChild(title);
+            const hint = T(t("brew.hint"), 25, 0xd8c79d);
+            hint.anchor.set(0.5, 0);
+            hint.position.set(960, 354);
+            hint.eventMode = "none";
+            node.addChild(hint);
+            const body = new PIXI.Container(); // перезаполняется выбором сброса
+            body.name = "body";
+            node.addChild(body);
+            const pileBtn = (key, side, x) => {
+                const n = spellsInDiscard(side).length;
+                const btn = globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t(key), x, y: 560, scale: 1,
+                    onTap: () => brewShow(side),
+                });
+                btn.alpha = n ? 1 : 0.45; // пустой сброс — не смотреть
+                return btn;
+            };
+            body.addChild(pileBtn("brew.own", "p", 660));
+            body.addChild(pileBtn("brew.foe", "e", 1260));
+            root.addChild(node);
+            brewPanel = node;
+        }
+        function brewShow(side) { // заклинания выбранного сброса
+            if (!brewPanel) return;
+            const spells = spellsInDiscard(side);
+            if (!spells.length) return;
+            brewPile = side;
+            const body = brewPanel.getChildByName("body");
+            body.destroy({ children: true });
+            const fresh = new PIXI.Container();
+            fresh.name = "body";
+            const m = spells.length;
+            const spread = Math.min(210, 1260 / Math.max(1, m));
+            spells.forEach((cardId, idx) => {
+                const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                c.eventMode = "static";
+                c.on("pointertap", () => pickBrew(idx));
+                fresh.addChild(c);
+            });
+            fresh.addChild(globalThis.GAME_UI.button(ctx, {
+                tex: "button_menu.png", label: t("brew.back"), x: 960, y: 762, scale: 1,
+                onTap: closeBrewPanel,
+            }));
+            brewPanel.addChild(fresh);
+        }
+        function pickBrew(idx) { // idx — номер карты среди заклинаний сброса
+            if (!B || !B.picking || !brewPanel || !brewPile) return;
+            const disc = brewPile === "p" ? B.discard : B.eDiscard;
+            const spells = disc.filter((id) => CARDS[id] && CARDS[id].type === "spell");
+            const cardId = spells[idx];
+            if (!cardId) return;
+            disc.splice(disc.indexOf(cardId), 1);
+            B.hand.push(cardId);
+            B.scorch.p.add(cardId); // «Сожжение»: после розыгрыша — из боя
+            sfx("chpoc");
+            closeBrewPanel();
+            layoutHand();
             refreshHud();
         }
 
@@ -3070,8 +3199,12 @@
                 && v.def.type === "unit" && v.hp >= 3)) return false;
             // «Извлечение духа» — окупается, когда у цели 2+ свойств
             if (s.purge && !B.units.some((v) => v.side === "p" && countProps(v) >= 2)) return false;
-            // «Похищение энергии» — крадём только осмысленное (3+⚡)
-            if (s.stealEnergy && B.energy < 3) return false;
+            // «Похищение энергии» — крадём 2⚡, окупается при 2+⚡ у игрока
+            if (s.stealEnergy && B.energy < s.stealEnergy) return false;
+            // «Варка зелий» — в сбросах (своём или чужом) должно быть
+            // заклинание, которое стоит тащить (саму Варку ИИ не берёт)
+            if (s.discardPick && !spellsInDiscard("e").concat(spellsInDiscard("p"))
+                .some((id) => id !== "grw23")) return false;
             // «Защитный кокон» — есть кому защищать и есть от кого
             if (s.cocoon && !B.units.some((v) => v.side === "e")
                 && !B.units.some((v) => v.side === "p" && v.def.type === "unit"
@@ -3237,9 +3370,9 @@
                 punch(root.hud);
                 sfx("rocket");
             }
-            if (s.stealEnergy) { // «Похищение энергии»: вся энергия игрока — нам
-                const got = B.energy;
-                B.energy = 0;
+            if (s.stealEnergy) { // «Похищение энергии»: 2⚡ игрока — нам
+                const got = Math.min(s.stealEnergy, B.energy);
+                B.energy -= got;
                 B.eEnergy += got;
                 floatText(960, 840, `−${got}⚡`, 0xff5f4e);
                 floatText(960, 60, `+${got}⚡`, 0xffd98c);
@@ -3289,6 +3422,19 @@
                     .filter((x) => CARDS[x.id] && CARDS[x.id].type === "unit");
                 const k = units[units.length - 1]; // ближайший к верху
                 if (k) { B.eDeck.splice(k.j, 1); B.eHand.push(k.id); }
+            }
+            if (s.discardPick) { // «Варка зелий»: лучшее заклинание сбросов — в руку
+                const pick = (disc) => disc
+                    .filter((id) => CARDS[id] && CARDS[id].type === "spell" && id !== "grw23")
+                    .sort((a, b) => (CARDS[b].cost - CARDS[a].cost)
+                        || ((CARDS[b].rarity === "epic") - (CARDS[a].rarity === "epic")))[0];
+                const id = pick(B.eDiscard) || pick(B.discard); // своё ближе
+                if (id) {
+                    const disc = B.eDiscard.includes(id) ? B.eDiscard : B.discard;
+                    disc.splice(disc.indexOf(id), 1);
+                    B.eHand.push(id);
+                    B.scorch.e.add(id); // сожжётся после розыгрыша
+                }
             }
             if (s.journey) { // «Глубокое путешествие»: призыв из верхних карт — бесплатно
                 const k = Math.min(s.journey, B.eDeck.length);
@@ -3467,9 +3613,16 @@
                         B.eEnergy = def.spell.drainAll ? 0 : B.eEnergy - effCost(cardId, "e");
                         // рука ИИ тоже не больше 7 — излишек панельных доборов
                         // сбрасывается случайно (как панель сброса у игрока)
-                        while (B.eHand.length > HAND_MAX)
-                            B.eDiscard.push(B.eHand.splice((Math.random() * B.eHand.length) | 0, 1)[0]);
-                        B.eDiscard.push(cardId);
+                        while (B.eHand.length > HAND_MAX) {
+                            const sp = B.eHand.splice((Math.random() * B.eHand.length) | 0, 1)[0];
+                            B.eDiscard.push(sp);
+                            B.scorch.e.delete(sp); // метка ушла вместе с картой
+                        }
+                        if (B.scorch.e.has(cardId)) { // «Сожжение»: карта удалена из боя
+                            B.scorch.e.delete(cardId);
+                            floatText(960, 640, `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
+                            sfx("rocket");
+                        } else B.eDiscard.push(cardId);
                         B.lastSpell.e = cardId;
                         afterSpellPlayed(); // «Заклинатель клинков» на поле
                         hideEnemyCard();
@@ -3512,7 +3665,13 @@
         // ── Действия игрока ────────────────────────────────────────────────
         function spendCard(handIdx) { // вынимает карту из руки в сброс
             const cardId = B.hand[handIdx];
-            B.discard.push(cardId);
+            if (B.scorch.p.has(cardId)) { // «Сожжение»: карта удаляется из боя
+                B.scorch.p.delete(cardId);
+                floatText(960, 640, `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
+                sfx("rocket");
+            } else {
+                B.discard.push(cardId);
+            }
             B.hand.splice(handIdx, 1);
             B.selected = null;
             B.spellTarget = false;
@@ -3761,9 +3920,9 @@
                 punch(root.hud);
                 sfx("rocket");
             }
-            if (def.spell.target === "none" && def.spell.stealEnergy) { // «Похищение энергии»
-                const got = B.eEnergy;
-                B.eEnergy = 0;
+            if (def.spell.target === "none" && def.spell.stealEnergy) { // «Похищение энергии»: 2⚡
+                const got = Math.min(def.spell.stealEnergy, B.eEnergy);
+                B.eEnergy -= got;
                 B.energy += got;
                 floatText(960, 60, `−${got}⚡`, 0xff8f6e);
                 floatText(960, 840, `+${got}⚡`, 0xffd98c);
@@ -3803,6 +3962,7 @@
             if (def.spell.search) openRunesPanel(def.spell.search); // выбор поверх боя
             if (def.spell.searchUnit) openRunesPanel(def.spell.searchUnit, "unit"); // «Рунное гадание»
             if (def.spell.journey) openJourneyPanel(def.spell.journey);
+            if (def.spell.discardPick) openBrewPanel(); // «Варка зелий»: выбор из сбросов
             return true;
         }
 
@@ -4086,8 +4246,11 @@
                 discarding: false, picking: false, brewCasts: 0,
                 // последнее разыгранное заклинание каждой стороны («Горящие
                 // руны»); journeySummon — карта призыва из «Глубокого
-                // путешествия», ждёт бесплатной постановки на клетку
+                // путешествия», ждёт бесплатной постановки на клетку;
+                // scorch — «Сожжение» (Варка зелий): id карт в руке стороны,
+                // которые после розыгрыша удаляются из боя, а не в сброс
                 lastSpell: { p: null, e: null }, journeySummon: null,
+                scorch: { p: new Set(), e: new Set() },
             };
             G.battle = B;
             drawCards(4);
@@ -4098,6 +4261,7 @@
             discardPanel = null;
             runesPanel = null; runesTop = [];
             journeyPanel = null; journeyTop = [];
+            brewPanel = null; brewPile = null;
             unitCard = null;
             sfx("openRoom"); // начало боя
 
@@ -4256,6 +4420,7 @@
             if (B.picking && ctx.input.wasPressed("Escape")) {
                 if (journeyPanel) finishJourney(null); // «Глубокое путешествие» — без призыва
                 else if (stumpPanel) closeStumpPanel(); // «Пень обряда» — оставить как было
+                else if (brewPanel) closeBrewPanel(); // «Варка зелий» — без выбора
                 else closeRunesPanel(); // «Поиск рун» — отмена выбора
                 return;
             }
@@ -4408,6 +4573,13 @@
             journeyState: () => ({ picking: !!journeyPanel, top: [...journeyTop] }),
             journeyPick(idx) { pickJourney(idx); },
             journeySummon: () => (B ? B.journeySummon : null),
+            // «Варка зелий» (тесты): панель, заклинания сбросов, «Сожжение»
+            brewState: () => ({ open: !!brewPanel, picking: !!(B && B.picking),
+                pile: brewPile,
+                own: spellsInDiscard("p"), foe: spellsInDiscard("e") }),
+            brewChoose(side) { brewShow(side); },
+            brewPick(idx) { pickBrew(idx); },
+            scorch: () => ({ p: [...B.scorch.p], e: [...B.scorch.e] }),
             // тест-хуки поправок: свечение выбранной карты (п2) и сетка
             // оверлея-просмотра (п3)
             selGlow() {
