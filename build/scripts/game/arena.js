@@ -422,6 +422,25 @@
             B.units.push(u);
             recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда
             if (def.type === "unit") {
+                // «Хранитель леса» (grw22): при призыве урон и жизни = числу
+                // СВОИХ Животных на поле (включая его самого — он уже в
+                // B.units). База карты 1/1, масштаб уходит в bonusAtk — его
+                // снимает «Извлечение духа», как остальные эффекты
+                if (def.keeperScale) {
+                    let n = 0;
+                    for (const o of B.units) if (o.side === side
+                        && o.def.type === "unit" && o.def.creature === "animal") n += 1;
+                    if (n > (def.atk || 0)) u.bonusAtk += n - (def.atk || 0);
+                    if (n !== u.hp) u.hp = n;
+                    recalcAuras();
+                    const an = u.node.getChildByName("atk");
+                    if (an) an.text = String(u.curAtk);
+                    const hn = u.node.getChildByName("hp");
+                    if (hn) hn.text = String(u.hp);
+                    const p = cellXY(col, row);
+                    floatText(p.x, p.y - 75, `${n}⚔/${n}♥`, 0x9fd489);
+                    sfx("up");
+                }
                 // военный лагерь: существо, призванное рядом (верт/гориз),
                 // получает +1 к урону за каждый лагерь — перманентно
                 let camp = 0;
@@ -928,7 +947,7 @@
         // ауры, особости построек); активные состояния считаются отдельно
         const PURGE_DEF_KEYS = ["ability", "aura", "campAura", "campfire", "groveAura",
             "leaderAura", "mycelium", "riteStump", "spellBuffAura", "sprout",
-            "sisterDraw", "berserkSummon"];
+            "sisterDraw", "berserkSummon", "portalLeap"];
         function countProps(u) {
             let n = PURGE_DEF_KEYS.filter((k) => u.def[k] !== undefined).length;
             if (u.bonusAtk) n++; // перманентные бонусы (лагерь, «Природная мощь»)
@@ -1447,8 +1466,11 @@
             c.on("pointertap", () => onCardTap(idx));
             // альтернативный режим призыва (Настройки): наведение увеличивает
             // карту, перетаскивание на клетку поля — призыв
-            c.on("pointerover", () => hoverCard(idx, true));
-            c.on("pointerout", () => hoverCard(idx, false));
+            c.on("pointerover", () => { hoverIdx = idx; updateEnergyHint(); hoverCard(idx, true); });
+            c.on("pointerout", () => {
+                if (hoverIdx === idx) { hoverIdx = null; updateEnergyHint(); }
+                hoverCard(idx, false);
+            });
             c.on("pointerdown", (e) => startCardDrag(idx, e));
             c.on("globalpointermove", (e) => moveCardDrag(e));
             return c;
@@ -1457,6 +1479,8 @@
         function layoutHand() {
             for (const n of root.cardsLayer.children) n.destroy({ children: true });
             root.cardsLayer.removeChildren();
+            hoverIdx = null; // карта под курсором уничтожена — подсказку погасить
+            updateEnergyHint();
             const n = B.hand.length;
             B.hand.forEach((card, idx) => {
                 const node = makeCardNode(card, idx);
@@ -1512,6 +1536,24 @@
                 && effCost(B.hand[handIdx]) <= B.energy
                 && deployRows("p").includes(row) && !unitAt(col, row);
         }
+        // Подсказка «−X» у шкалы энергии (просил юзер): курсор на карте
+        // руки — рядом с текущей энергией видно, сколько уйдёт на розыгрыш.
+        // Живёт на hud, поэтому переживает пересборку руки; краснеет,
+        // когда энергии не хватает.
+        let hoverIdx = null;
+        function updateEnergyHint() {
+            if (!root || !root.hud) return;
+            const ht = root.hud.userData.pEnergyCostT;
+            const id = hoverIdx !== null && B && B.phase === "player" && !overlay
+                ? B.hand[hoverIdx] : null;
+            if (hoverIdx !== null && !root.cardsLayer.children[hoverIdx]) hoverIdx = null;
+            if (!id || !CARDS[id]) { ht.visible = false; return; }
+            const c = effCost(id);
+            ht.text = "-" + c;
+            ht.style.fill = c > B.energy ? 0xff7c6a : 0xffd98c;
+            ht.visible = true;
+        }
+
         function hoverCard(idx, on) {
             if (!G.settings.dragSummon || drag || B.phase !== "player" || overlay || B.discarding || B.picking) return;
             const node = root.cardsLayer.children[idx];
@@ -2126,6 +2168,13 @@
             pEnergyT.position.set(1461, 624);
             pEnergyT.eventMode = "none";
             c.addChild(pEnergyT);
+            // «−X» при наведении на карту руки (просил юзер): сколько
+            // энергии уйдёт на розыгрыш; краснеет, если энергии не хватает
+            const pEnergyCostT = T("", 30, 0xffd98c, { stroke: { color: 0x0e1826, width: 6 } });
+            pEnergyCostT.anchor.set(1, 0.5);
+            pEnergyCostT.position.set(1417, 624);
+            pEnergyCostT.eventMode = "none";
+            c.addChild(pEnergyCostT);
             const pEnergyGainT = T("", 30, 0x9fd3d3, { stroke: { color: 0x0e1826, width: 6 } });
             pEnergyGainT.anchor.set(0, 0.5);
             pEnergyGainT.position.set(1488, 624);
@@ -2230,7 +2279,7 @@
             c.addChild(banner);
 
             c.userData = { eBar, eBaseT, eEnergyT, eCardsT, title, pBar, pBaseT, pEnergyT,
-                pEnergyGainT, pCardsT, eDeckCnt, pDeckCnt, discardCnt,
+                pEnergyGainT, pEnergyCostT, pCardsT, eDeckCnt, pDeckCnt, discardCnt,
                 eEnergyIcon, pEnergyIcon,
                 discardFace, lastDiscard: undefined, endBtn, endLabel, banner, targetHint,
                 slider: { wrap: slWrap, track: slTrack, thumb: slThumb } };
@@ -2403,6 +2452,7 @@
             drawBar(ud.pBar, 1449, 520, 428, 31, B.playerBase / B.playerBaseMax, 0x579e52);
             ud.pBaseT.text = `${Math.max(0, B.playerBase)}/${B.playerBaseMax}`;
             ud.pEnergyT.text = String(B.energy);
+            updateEnergyHint(); // «−X» у энергии — стоимость карты под курсором
             ud.pDeckCnt.text = String(B.deck.length);
             ud.eDeckCnt.text = String(B.eDeck.length);
             ud.discardCnt.text = String(B.discard.length);
@@ -2556,6 +2606,34 @@
         }
 
         // ── Марш: юниты стороны идут вперёд (строения стоят) ────────────────
+        // Прыжок через «Зелёный портал» (grw21): существо, которое должно
+        // пройти на клетку портала или атаковать его, перепрыгивает на
+        // свободную клетку с противоположной стороны (как существа с
+        // полётом) и получает +1 к урону и +1 к жизням — любой стороны
+        // (просил юзер). Возвращает true, если перепрыгнул.
+        async function portalLeapAct(u, occ, dir) {
+            const over = occ.row + dir;
+            if (over < 0 || over >= GRID || unitAt(occ.col, over)) return false;
+            u.col = occ.col;
+            u.row = over;
+            u.bonusAtk += 1; // перманентный бонус — снимается «Извлечением духа»
+            u.hp += 1;
+            recalcAuras();
+            const an = u.node.getChildByName("atk");
+            if (an) an.text = String(u.curAtk);
+            const hn = u.node.getChildByName("hp");
+            if (hn) hn.text = String(u.hp);
+            const p = cellXY(u.col, u.row);
+            glide(u, p.x, p.y);
+            setWalk(u, true);
+            floatText(p.x, p.y - 72, "+1⚔ +1♥", 0x9fd489);
+            punch(u.node);
+            sfx("up");
+            await delay(0.52 / animK()); // глиссада: полный шаг
+            if (B.stopped) return true;
+            afterMoved(u); // перемещение — ловушки врага
+            return true;
+        }
         async function marchSide(side) {
             const dir = side === "p" ? -1 : 1;
             const order = B.units.filter((u) => u.side === side && u.def.type === "unit")
@@ -2583,6 +2661,13 @@
                     }
                     const occ = unitAt(u.col, ahead);
                     if (occ) {
+                        // «Зелёный портал»: прыжок вместо прохода/атаки
+                        // (до проверки стороны — перепрыгивают свои и чужие)
+                        if (occ.def.portalLeap && await portalLeapAct(u, occ, dir)) {
+                            if (B.stopped) return;
+                            if (checkEnd()) return;
+                            break;
+                        }
                         if (occ.side !== u.side) {
                             // «Мини-фея» (grw14): полёт — за атакуемым
                             // существом есть пустая клетка, перелетает на
@@ -4368,10 +4453,16 @@
                     eBase: root.hud.userData.eBaseT.text,
                     pEnergy: root.hud.userData.pEnergyT.text,
                     pEnergyGain: root.hud.userData.pEnergyGainT.text,
+                    pEnergyCost: root.hud.userData.pEnergyCostT.text,
+                    pEnergyCostVisible: !!root.hud.userData.pEnergyCostT.visible,
                     pCards: root.hud.userData.pCardsT.text,
                     eEnergy: root.hud.userData.eEnergyT.text,
                     eCards: root.hud.userData.eCardsT.text }
                 : null),
+            // узел карты руки (тесты: подсказка «−X» у энергии)
+            handCardNode: (idx) => (root && root.cardsLayer.children[idx]) || null,
+            // пересборка руки (тесты: свежие узлы после подмены B.hand)
+            relayoutHand: () => { if (root) { layoutHand(); return true; } return false; },
             // геометрия/цвета HUD (тесты): иконки энергии, цвет карт врага
             hudGeom: () => {
                 if (!root || !root.hud) return null;

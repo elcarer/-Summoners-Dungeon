@@ -60,11 +60,12 @@
 
     // Объекты этажа: по одному в центре каждой комнаты, кроме стартовой
     // (просил юзер). Тип кидается из общего пула: куча золота, сундук,
-    // карта сокровищ (драфт) и — со 2-го этажа — магазин (просил юзер).
-    // Магазин и карта сокровищ могут и не выпасть, а выпав, исключаются
-    // из пула — не больше 1 каждого на этаж (драфт — долгое состязание).
-    // Сумма кучи и карта сундука кидаются при генерации этажа и хранятся
-    // в объекте — сейв/загрузка показывает то же самое.
+    // карта сокровищ (драфт, только с 3-го этажа — просил юзер) и —
+    // со 2-го этажа — магазин (просил юзер). Магазин и карта сокровищ
+    // могут и не выпасть, а выпав, исключаются из пула — не больше 1
+    // каждого на этаж (драфт — долгое состязание). Сумма кучи и карта
+    // сундука кидаются при генерации этажа и хранятся в объекте —
+    // сейв/загрузка показывает то же самое.
     function genObjects(floor, cave = "gob") {
         const { rollLootCard } = globalThis.GAME_DATA;
         const elem = caveOf(cave).elem; // карты сундуков/магазина — стихии данжа
@@ -73,8 +74,9 @@
             const j = (Math.random() * (i + 1)) | 0;
             [centers[i], centers[j]] = [centers[j], centers[i]];
         }
-        const pool = ["gold", "chest", "map"];
+        const pool = ["gold", "chest"];
         if (floor >= 2) pool.push("shop");
+        if (floor >= 3) pool.push("map");
         return centers.map(([col, row]) => {
             const pi = (Math.random() * pool.length) | 0;
             const type = pool[pi];
@@ -1219,5 +1221,5 @@
         };
     }
 
-    globalThis.GAME_DUNGEON = { createDungeonScene, newDungeonState, stateFor, deckNeed, retreatCell, ROWS, MAX_FLOOR };
+    globalThis.GAME_DUNGEON = { createDungeonScene, newDungeonState, stateFor, deckNeed, retreatCell, genObjects, ROWS, MAX_FLOOR };
 })();
