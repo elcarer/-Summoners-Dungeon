@@ -966,7 +966,9 @@
                 }
                 worldContainer.addChild(layer);
 
-                // герой — лист гоблина 256px, рисуем в 0.25 (рост как у рыцаря)
+                // герой — лист по стихии забега (Рост — эльф, Сила — гоблин),
+                // рисуем в 0.25 (рост как у рыцаря)
+                ctx.heroSheet = ctx.heroSheets[G.elem] || ctx.heroSheets.strength;
                 const sprite = new PIXI.AnimatedSprite(ctx.heroSheet.animations.walk_front, false);
                 sprite.anchor.set(0.5, 1);
                 sprite.scale.set(0.25);

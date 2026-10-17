@@ -86,17 +86,23 @@
         };
         say("спрайты…");
         await frame();
-        // Герой — лист гоблина (рыцарь ушёл): сетка 256×256, 4 строки ходьбы
-        // по 6 кадров. wait/attack в листе нет — контроллер персонажа в покое
+        // Герой — лист по стихии забега (выбор при «Новой игре»): Рост —
+        // эльф, Сила — гоблин. Сетка у обоих 256×256, 4 строки ходьбы по
+        // 6 кадров. wait/attack в листах нет — контроллер персонажа в покое
         // замирает в стоп-кадре ходьбы (штатный сценарий play() без строки).
-        // Спрайт рисуется в 0.25: арт гоблина ~195px в кадре — те же ~49px
-        // роста, что было у рыцаря, и честный пиксельный даунскейл 4→1.
-        const heroSheet = await assets.loadCharacter("./images/sprites/goblin_256");
+        // Спрайт рисуется в 0.25: фигура ~195px в кадре — те же ~49px роста,
+        // что было у рыцаря, и честный пиксельный даунскейл 4→1.
+        const heroSheets = {
+            strength: await assets.loadCharacter("./images/sprites/goblin_256"),
+            growth: await assets.loadCharacter("./images/sprites/elf_256"),
+        };
         // Листы существ поля боя. Стандарт: <имя>_256.png — сетка 256×256,
         // 4 ряда анимаций (спереди/сзади/справа/слева) по 6 кадров + json-манифест.
-        // Пока один лист на всех существ; новые добавлять сюда записью.
+        // Пока лист на стихию (Рост — эльф, остальное — гоблин); позже у
+        // каждого типа существ будет свой — новые добавлять сюда записью.
         const creatureSheets = {
-            goblin: await assets.loadCharacter("./images/sprites/goblin_256"),
+            goblin: heroSheets.strength,
+            elf: heroSheets.growth,
         };
 
         // ── UI-корень: базовое разрешение 1920×1080, вписывается в окно ────
@@ -279,7 +285,7 @@
         const ctx = {
             app, world, ECS, COMPONENTS, DATA, worldContainer, addSystem,
             assets, uiTex, scheduler, input, camera, characters, charInput,
-            heroSheet, creatureSheets, G, ui, audio, collide,
+            heroSheet: heroSheets.strength, heroSheets, creatureSheets, G, ui, audio, collide,
             sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
         };

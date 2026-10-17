@@ -274,9 +274,11 @@
                 layer.addChild(makeCave("G", "world.caveGrowth"));
                 worldContainer.addChild(layer);
 
+                // герой — лист по стихии забега (Рост — эльф, Сила — гоблин)
+                ctx.heroSheet = ctx.heroSheets[G.elem] || ctx.heroSheets.strength;
                 const sprite = new PIXI.AnimatedSprite(ctx.heroSheet.animations.walk_front, false);
                 sprite.anchor.set(0.5, 1);
-                sprite.scale.set(0.25); // лист гоблина 256px — рост как у рыцаря 64px
+                sprite.scale.set(0.25); // лист 256px — рост как у рыцаря 64px
                 heroId = characters.spawn({
                     x: hp.x, y: hp.y, sprite, anims: ctx.heroSheet.animations,
                     speed: 170, fps: ctx.heroSheet.fps, halfW: 7, halfH: 5,

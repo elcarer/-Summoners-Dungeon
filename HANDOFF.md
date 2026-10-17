@@ -47,7 +47,8 @@ bash for_work/smoke.sh                    # полный смоук: 455 про�
 Ассеты: `images/ui/` (кит из for_work/finish), `images/scenes/{1,2}.png`
 (фоны арен с нарисованной сеткой), `images/cards/<elem>/<№>.png` (лица
 карт), `images/ui/logo/` (логотипы стихий — кнопки фильтров),
-`images/sprites/goblin_256` (лист героя карты и существ, см. ниже),
+`images/sprites/goblin_256` (лист героя/существ стихии Сила) и
+`images/sprites/elf_256` (лист героя/существ стихии Рост, см. ниже),
 `images/dungeon_tiles/goblins_lair` (тайлы подземелья 64px: floor/ и
 walls/), `font/Kereru.otf`.
 
@@ -56,9 +57,12 @@ walls/), `font/Kereru.otf`.
 `images/sprites/<имя>_256.png` — сетка кадров **256×256**: 4 ряда анимаций
 `front / back / right / left` (сверху вниз) по 6 кадров + json-манифест
 (size/columns/fps/animations — формат loadCharacter движка, нейминг как у
-knight_64: `walk_front` и т.д.). Загрузка: `creatureSheets` в main.js,
-оттуда — `ctx.creatureSheets`. Пока один лист `goblin` на ВСЕ существа;
-новые листы — записью в `creatureSheets` и выбором по карте.
+knight_64: `walk_front` и т.д.). Загрузка: в main.js — `heroSheets`
+(strength→goblin, growth→elf; герой карты выбирается по стихии забега
+`G.elem` в enter() сцен dungeon/world: `ctx.heroSheet = ctx.heroSheets[G.elem] || strength`) и
+`creatureSheets` (goblin/elf) → `ctx.creatureSheets`. Пока лист на
+СТИХИЮ; позже у каждого типа существ будет свой — новые добавлять
+записью в `creatureSheets`.
 
 Отрисовка (arena.js `makeUnitNode`): `PIXI.AnimatedSprite(…, false)` —
 autoUpdate=false, кадры тикает update() сцены (`body.update(ticker)` —
@@ -72,8 +76,9 @@ autoUpdate=false, кадры тикает update() сцены (`body.update(tick
 Спрайт `eventMode="none"` — клики уходят в клетки поля под существом.
 Строения — по-прежнему домик-графика (это не существа; лагерь помечен
 `+1⚔`). В `state()` у юнитов поле `spr` (есть ли спрайт-боди). Выбор листа —
-по карте: `def.creature` → `ctx.creatureSheets[def.creature]` (fallback
-`goblin`), новые листы — записью в `creatureSheets` в main.js.
+по стихии карты: `elem === "growth"` → `elf`, остальное → `goblin`
+(`sheetOf` в arena.js); позже переедет на `def.creature` (имя листа),
+когда у типов существ появятся свои листы.
 
 Тест-хендлы: `window.__GAME` — `stats()` (сцена/колода/бой/ошибка),
 `menu` (buttons — подписи/масштаб/кегль, continueEnabled, press("continue"|
@@ -1741,3 +1746,40 @@ rubble, shadow, prop/stair/door/wall_top/wall_face) удалены из репо
   (клетки cross без пола вокруг) даёт ритм «кладка+колонны» — буквальное
   следствие набора из 7 спрайтов; глухой массив потребовал бы отдельного
   спрайта-заливки (показано юзеру на скринах, решения не требовало).
+
+## Волна «Спрайтшит эльфа: герой и существа Роста» (2026-10-18, проба elf 17/17, смоук 684/684)
+
+Просил юзер: elf_256.png — герой забега Роста в мире/подземелье + все
+существа стихии Роста на поле боя (по аналогии с гоблином у Силы).
+- **main.js**: оба листа грузятся в `heroSheets` (strength→goblin_256,
+  growth→elf_256), `ctx.heroSheet` = умолчание (Сила) + `ctx.heroSheets`;
+  `creatureSheets = { goblin, elf }` (гоблин раньше грузился дважды —
+  теперь один loadCharacter переиспользуется).
+- **dungeon.js / world.js**: в enter() перед спавном героя
+  `ctx.heroSheet = ctx.heroSheets[G.elem] || ctx.heroSheets.strength` —
+  лист живёт в ctx, сцены перезапоминают его при каждом входе
+  («Продолжить», реванш, возврат из боя — всё накрывается).
+- **arena.js `sheetOf`**: по СТИХИИ карты — `elem === "growth"` → elf,
+  иначе goblin. `def.creature` больше НЕ участвует в выборе листа
+  (это плейсхолдеры-«goblin» на ростовских картах и дисциплинарное поле
+  для гоблинского дискаунта Вождя — трогать их нельзя); когда у типов
+  существ появятся свои листы, выбор переедет на `def.creature`.
+- **Масштабы не трогали**: эльфийский лист той же сетки (1536×1024,
+  фигура ~195px в кадре) — герой 0.25, юниты 0.525, ряды манифеста те же
+  front/back/right/left (проверено по картинке листа).
+- **Проба** for_work/probe_elf (сервер 8155, одноразовый профиль): лист
+  различается по texture source (кадры листа делят один source; имя — из
+  resource.src, фолбэк — identity с PIXI.Assets.cache.get("./images/
+  sprites/elf_256.png")). Рост: герой эльф в мире и в Роще Роста, в сцене
+  данжа ровно один AnimatedSprite (эльф), в бою 3 своих + вражеский — все
+  эльфы; Сила: гоблин везде, эльфа нет. Скрины elf_world/elf_dungeon/
+  elf_arena/goblin_arena в for_work/shots.
+- **Ловушки волны**: (1) `spriteMap` — AoS-компонент: хранится в
+  `DATA.spriteMap` (globalThis.DATA), в `COMPONENTS.spriteMap` его НЕТ
+  (addComponent кладёт объекты в DATA, SoA-числа — в COMPONENTS); спрайт
+  героя из консоли — `DATA.spriteMap[heroId()]`; (2) слой карты
+  подземелья/мира — `worldContainer` на app.stage НАД ui, обход сцены для
+  поиска спрайтов начинать с `__GAME.ui.parent`; (3) у world-сцены
+  `heroId()` есть (world.js:360), но он НЕ в api — обращаться
+  `__GAME.world.heroId()`; (4) после crash-выхода node профиль Chrome
+  может остаться занятым — перед повторным rm -rf профиля делать паузу.

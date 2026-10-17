@@ -53,13 +53,14 @@
         const spheresTotal = () => B.turnNo + 2;
         let root = null, B = null;
 
-        // Листы существ поля боя — по карте (def.creature), пока все гоблины.
-        // Стандарт листа — 256×256, ряды front/back/right/left по 6 кадров.
-        // Взгляд по стороне: юниты игрока идут вверх (виден затылок), врага —
-        // вниз (анфас).
+        // Листы существ поля боя — по стихии карты: Рост — эльф, Сила (и
+        // прочие) — гоблин. Стандарт листа — 256×256, ряды front/back/right/
+        // left по 6 кадров. Взгляд по стороне: юниты игрока идут вверх
+        // (виден затылок), врага — вниз (анфас). Позже у каждого типа
+        // существ будет свой лист — тогда выбор переедет на def.creature.
         const SPRITE_SCALE = 0.525; // кадр 256 → ~134px, фигура ~102px в клетке
         const sheetOf = (u) => ctx.creatureSheets
-            && ((u.def.creature && ctx.creatureSheets[u.def.creature]) || ctx.creatureSheets.goblin);
+            && ctx.creatureSheets[u.def.elem === "growth" ? "elf" : "goblin"];
 
         const T = (text, size, fill, opts = {}) => new PIXI.Text({
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
