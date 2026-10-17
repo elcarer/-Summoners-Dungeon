@@ -126,6 +126,24 @@
         return st;
     }
 
+    // Поражение в бою (просил юзер): герой отступает на свободную
+    // соседнюю клетку врага — враг остаётся на месте, реванш по касанию.
+    // Клетка врага всегда проходима, соседи по карте; если кругом стены —
+    // возвращаем на место (бой перезапустится касанием, не падаем).
+    function retreatCell(enemy) {
+        const cx = Math.round(enemy.x / TS - 0.5), cy = Math.round(enemy.y / TS - 0.5);
+        const open = (gx, gy) => gx >= 0 && gy >= 0 && gx < W && gy < H && ROWS[gy][gx] !== "#";
+        const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+        for (let i = dirs.length - 1; i > 0; i--) {
+            const j = (Math.random() * (i + 1)) | 0;
+            [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+        }
+        for (const [dx, dy] of dirs)
+            if (open(cx + dx, cy + dy))
+                return { x: (cx + dx) * TS + TS / 2, y: (cy + dy) * TS + TS / 2 };
+        return { x: enemy.x, y: enemy.y };
+    }
+
     function createDungeonScene(ctx) {
         const { COMPONENTS, camera, characters, charInput, ECS, world, scenes, G, worldContainer, uiTex } = ctx;
         let layer = null, heroId = null, tokens = [], uiHud = null;
@@ -1187,5 +1205,5 @@
         };
     }
 
-    globalThis.GAME_DUNGEON = { createDungeonScene, newDungeonState, stateFor, deckNeed, ROWS, MAX_FLOOR };
+    globalThis.GAME_DUNGEON = { createDungeonScene, newDungeonState, stateFor, deckNeed, retreatCell, ROWS, MAX_FLOOR };
 })();

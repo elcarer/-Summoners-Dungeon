@@ -258,6 +258,17 @@
                     worldOut: this.world.out,
                 });
             },
+            // поражение в бою: случайная карта колоды теряется НАВСЕГДА
+            // (просил юзер — вместо сброса забега). Списывается и из
+            // коллекции, иначе редактор колоды вернул бы её бесплатно.
+            // Возвращает id потерянной карты или null, если колода пуста.
+            loseCard() {
+                if (!this.deck.length) return null;
+                const id = this.deck.splice((Math.random() * this.deck.length) | 0, 1)[0];
+                if (this.collection[id]) this.collection[id] = Math.max(0, this.collection[id] - 1);
+                globalThis.GAME_META.saveMeta(this.collection, this.deck);
+                return id;
+            },
         };
         if (!G.deck.length) G.deck = [...DEFAULT_DECK];
 

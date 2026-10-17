@@ -3420,6 +3420,35 @@
                 G.rewardDeck = [...new Set(G.draft.picks)].filter((id) => CARDS[id]);
                 G.rewardDraft = true;
             }
+            if (!victory && !draft) {
+                // поражение — забег продолжается (просил юзер): случайная
+                // карта колоды теряется НАВСЕГДА (списывается и из
+                // коллекции — иначе редактор колоды вернул бы её даром).
+                // Списываем сразу: оверлей показывает потерю ещё до кнопки.
+                // Колода опустела — потеря нечему, забег кончается по-старому.
+                B.lossCard = G.loseCard ? G.loseCard() : null;
+                if (B.lossCard) {
+                    const lossLbl = T(t("arena.lossCard"), 22, 0xf3e6c2,
+                        { stroke: { color: 0x1c1207, width: 6 } });
+                    lossLbl.anchor.set(1, 0.5);
+                    lossLbl.position.set(906, 494);
+                    lossLbl.eventMode = "none";
+                    ov.addChild(lossLbl);
+                    const face = new PIXI.Sprite(uiTex(`cards/${CARDS[B.lossCard].img}.png`));
+                    face.anchor.set(0.5);
+                    face.scale.set(0.3); // 230×338 → 69×101 — пояс панели
+                    face.position.set(960, 494);
+                    face.eventMode = "none";
+                    ov.addChild(face);
+                    const lossName = T(t("card." + B.lossCard + ".name"), 24, 0xffe2a8,
+                        { stroke: { color: 0x1c1207, width: 6 } });
+                    lossName.anchor.set(0, 0.5);
+                    globalThis.GAME_UI.fit(lossName, 178, 8); // не наехало на край панели
+                    lossName.position.set(1014, 494);
+                    lossName.eventMode = "none";
+                    ov.addChild(lossName);
+                }
+            }
             B.continueAction = () => {
                 if (draft) {
                     // карта сокровищ использована — объект уходит с этажа
@@ -3439,9 +3468,18 @@
                     }
                     if (G.saveRun) G.saveRun(); // враг побеждён — забег продолжается
                     scenes.go("reward");
+                } else if (B.lossCard) {
+                    // реванш (просил юзер): враг жив на месте, герой
+                    // отступает на соседнюю клетку — бой не перезапускается
+                    // сам, но касание врага начинает его заново
+                    if (G.dungeon && G.activeEnemy && globalThis.GAME_DUNGEON.retreatCell)
+                        G.dungeon.heroPos = globalThis.GAME_DUNGEON.retreatCell(G.activeEnemy);
+                    G.activeEnemy = null;
+                    if (G.saveRun) G.saveRun(); // забег жив: этаж и колода (−1 карта)
+                    scenes.go("dungeon");
                 } else {
-                    // поражение — забег закончен: сейв снимается; стартер
-                    // той же стихии (забег был её)
+                    // колода опустела — забег закончен: сейв снимается;
+                    // стартер той же стихии (забег был её)
                     if (globalThis.GAME_META.clearRun) globalThis.GAME_META.clearRun();
                     G.resetRun(G.elem);
                     scenes.go("menu");
@@ -3459,7 +3497,7 @@
                 btn.position.set(960, 585);
                 btn.eventMode = "static";
                 ov.addChild(btn);
-                const bt = T(t(draft ? "arena.toDungeon" : "arena.toMenu"), 45, 0xf3e6c2);
+                const bt = T(t(draft || B.lossCard ? "arena.toDungeon" : "arena.toMenu"), 45, 0xf3e6c2);
                 bt.anchor.set(0.5);
                 globalThis.GAME_UI.fit(bt, btn.texture.width * btn.scale.x * 0.8, 11); // не шире кнопки
                 bt.position.set(960, 585);
