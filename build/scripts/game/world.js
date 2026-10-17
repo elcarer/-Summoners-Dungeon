@@ -310,6 +310,11 @@
                 if (heroId === null || !uiHud) return;
                 const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
 
+                // скорость анимаций из настроек (0..10; 5 = скорость листа) —
+                // живая, как в бою и подземелье (просил юзер)
+                COMPONENTS.animationSpeed[heroId] = (ctx.heroSheet.animationSpeed || 0.2)
+                    * Math.max(0.25, ((G.settings && G.settings.animSpeed) ?? 5) / 5);
+
                 // ведение по пути (как в подземелье: клавиши главнее)
                 if (path && (charInput.ix || charInput.iy)) path = null;
                 if (path && !path.length) path = null;

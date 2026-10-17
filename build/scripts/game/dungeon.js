@@ -1022,6 +1022,11 @@
                 const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
                 const dt = ticker.deltaMS / 1000;
 
+                // скорость анимаций из настроек (0..10; 5 = скорость листа,
+                // ниже 2 — ползунок в минимум) — живая, как в бою (просил юзер)
+                COMPONENTS.animationSpeed[heroId] = (ctx.heroSheet.animationSpeed || 0.2)
+                    * Math.max(0.25, ((G.settings && G.settings.animSpeed) ?? 5) / 5);
+
                 // ── ведение по пути (клик-перемещение) ─────────────────────
                 if (path && (charInput.ix || charInput.iy)) path = null; // клавиши главнее
                 if (path && !path.length) path = null;
@@ -1094,6 +1099,11 @@
                 if (!st.win) for (const t of tokens) {
                     if (!t.enemy.alive) continue;
                     if (Math.hypot(t.enemy.x - hx, t.enemy.y - hy) < TS * 0.85) {
+                        // мгновенный стоп у энкаунтера (просил юзер): гасим
+                        // оси и путь, точка касания — позиция возврата из боя
+                        setHeroAxes(0, 0);
+                        path = null;
+                        st.heroPos = { x: hx, y: hy };
                         G.activeEnemy = t.enemy;
                         scenes.go("arena");
                         return;
