@@ -467,6 +467,19 @@
                 else if (def.ability === "bombling") summonBombling(u); // бомблинг
                 if (def.berserkSummon) addBerserk(u, def.berserkSummon); // «Берсерк» — уже при призыве
             }
+            // «Сестра леса»: каждый призыв Растения (метка plant — существо
+            // или постройка) даёт владельцу каждой Сестры на поле 1 карту
+            if (def.plant) {
+                for (const o of B.units) {
+                    if (o === u || o.side !== side || !o.def.sisterDraw
+                        || !B.units.includes(o)) continue;
+                    if (side === "p") drawCards(1); else drawEnemy(1);
+                    const p = cellXY(o.col, o.row);
+                    floatText(p.x, p.y - 66, "+1 " + GAME_LOC.t("card.grw20.draw"), 0x9fd489);
+                    punch(o.node);
+                    sfx("chpoc");
+                }
+            }
             // ловушка врага на клетке призыва (и существа, и строения)
             triggerCellTraps(u);
             return u;
@@ -883,16 +896,95 @@
             sfx("acid");
         }
 
+        // «Защитный кокон» (grw19): цель получает «Защита 1» — любой урон
+        // по ней уменьшается на 1 (режется в damageUnit). Коконы складываются,
+        // бейдж показывает сумму; «Извлечение духа» снимает защиту целиком.
+        function addProtect(u) {
+            u.protect = (u.protect || 0) + 1;
+            let mark = u.node.getChildByName("protectMark");
+            if (!mark) {
+                mark = new PIXI.Container();
+                mark.name = "protectMark";
+                mark.eventMode = "none";
+                const g = new PIXI.Graphics();
+                g.circle(0, 0, 13.5);
+                g.fill({ color: 0x2e5f8a });
+                g.stroke({ width: 3, color: 0xa0d8ef });
+                mark.addChild(g);
+                const tx = T("", 17, 0xd0effa);
+                tx.anchor.set(0.5);
+                mark.addChild(tx);
+                mark.position.set(36, -54); // зеркально меткам берсерка/спор
+                u.node.addChild(mark);
+            }
+            mark.getChildAt(1).text = String(u.protect);
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 60, GAME_LOC.t("card.grw19.name"), 0x8cd0ef);
+            punch(u.node);
+            sfx("up");
+        }
+
+        // «Извлечение духа» (grw17): снимаемые свойства КАРТЫ (способности,
+        // ауры, особости построек); активные состояния считаются отдельно
+        const PURGE_DEF_KEYS = ["ability", "aura", "campAura", "campfire", "groveAura",
+            "leaderAura", "mycelium", "riteStump", "spellBuffAura", "sprout",
+            "sisterDraw", "berserkSummon"];
+        function countProps(u) {
+            let n = PURGE_DEF_KEYS.filter((k) => u.def[k] !== undefined).length;
+            if (u.bonusAtk) n++; // перманентные бонусы (лагерь, «Природная мощь»)
+            if (u.spores) n++;
+            if (u.enchantFire) n++;
+            if (u.protect) n++;
+            if (u.berserk) n++;
+            if (u.confused) n++;
+            return n;
+        }
+        // Снять ВСЕ свойства/эффекты цели; возвращает, сколько снято, —
+        // база кастовавшего лечится за каждое. Метка plant и базовые статы
+        // остаются (это тип существа, а не эффект).
+        function purgeUnit(u) {
+            const def = Object.assign({}, u.def);
+            let n = 0;
+            for (const k of PURGE_DEF_KEYS) if (def[k] !== undefined) { delete def[k]; n++; }
+            def.__base = u.def.__base || u.def; // cardIdOf должен узнавать карту
+            u.def = def;
+            if (u.bonusAtk) { u.bonusAtk = 0; n++; }
+            if (u.spores) { u.spores = false; n++; }
+            if (u.enchantFire) { u.enchantFire = false; n++; }
+            if (u.protect) { u.protect = 0; n++; }
+            if (u.berserk) { u.berserk = 0; n++; }
+            if (u.confused) { u.confused = 0; n++; }
+            for (const m of ["sporeMark", "enchMark", "protectMark", "berserkMark", "confuseMark"]) {
+                const node = u.node.getChildByName(m);
+                if (node) node.destroy({ children: true });
+            }
+            recalcAuras(); // снесённая аура больше не действует соседям
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 60, GAME_LOC.t("card.grw17.name"), 0xd0b0ef);
+            punch(u.node);
+            sfx("chpoc");
+            return n;
+        }
+
         // snd — звук удара: "sword" (атака существом), "acid" (ловушка),
         // "rocket" (заклинание), по умолчанию "dam"
         function damageUnit(target, amount, killer = null, snd = "dam") {
-            target.hp -= amount;
+            // «Защита N» («Защитный кокон») режет входящий урон до нуля;
+            // споры/огненное дыхание реагируют на ФАКТИЧЕСКИ прошедший урон
+            let amt = amount;
+            if (target.protect && amt > 0) {
+                const blocked = Math.min(target.protect, amt);
+                amt -= blocked;
+                const bp = cellXY(target.col, target.row);
+                floatText(bp.x, bp.y - 72, `Защита −${blocked}`, 0x8cd0ef);
+            }
+            target.hp -= amt;
             procEnchantFire(killer);
-            procSpores(killer, amount); // «Призрачные споры» отражают урон по базе
+            procSpores(killer, amt); // «Призрачные споры» отражают урон по базе
             const n = target.node.getChildByName("hp");
             if (n) n.text = String(Math.max(0, target.hp));
             const p = cellXY(target.col, target.row);
-            floatText(p.x, p.y - 36, `−${amount}`, 0xffb26e);
+            floatText(p.x, p.y - 36, `−${amt}`, 0xffb26e);
             punch(target.node);
             sfx(snd);
             if (target.hp <= 0) { killUnit(target, killer); return; }
@@ -2752,8 +2844,10 @@
                 if (s.baseHit && B.units.some((v) => v.side === "e"
                     && v.def.type === "unit" && v.curAtk >= B.playerBase)) return 0;
                 if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
-                    || s.sacrifice || s.baseHit || s.copyLast) return 2;
-                if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk || s.enchantFire) return 4;
+                    || s.sacrifice || s.baseHit || s.copyLast
+                    || s.purge || s.stealEnergy) return 2;
+                if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk
+                    || s.enchantFire || s.cocoon) return 4;
                 return 6; // поиск рун / гадание / глубокое путешествие
             }
             if (def.type === "building") return 1;
@@ -2889,6 +2983,14 @@
             // за энергию и карту не окупается
             if (s.buffAtkByHp && !B.units.some((v) => v.side === "e"
                 && v.def.type === "unit" && v.hp >= 3)) return false;
+            // «Извлечение духа» — окупается, когда у цели 2+ свойств
+            if (s.purge && !B.units.some((v) => v.side === "p" && countProps(v) >= 2)) return false;
+            // «Похищение энергии» — крадём только осмысленное (3+⚡)
+            if (s.stealEnergy && B.energy < 3) return false;
+            // «Защитный кокон» — есть кому защищать и есть от кого
+            if (s.cocoon && !B.units.some((v) => v.side === "e")
+                && !B.units.some((v) => v.side === "p" && v.def.type === "unit"
+                    && v.curAtk >= 2)) return false;
             // «Глубокое путешествие»: в верхних картах колоды должен быть призыв
             if (s.journey && !B.eDeck.slice(-Math.min(s.journey, B.eDeck.length))
                 .some((id) => CARDS[id] && CARDS[id].type === "unit")) return false;
@@ -2975,22 +3077,43 @@
                 punch(best.node);
                 sfx("up");
             }
-            if (s.target === "anyUnitDmg") { // дротик/варево/огнешар
-                const dmg = s.drainAll // вся энергия сверх цены — в урон
-                    ? Math.max(0, B.eEnergy - (free ? 0 : effCost(cardIdOf(def), "e"))) + altarBonus("e")
-                    : spellDmg(def, "e");
+            if (s.target === "anyUnitDmg") {
                 const targets = B.units.filter((v) => v.side === "p"
                     && (v.def.type === "unit"
                         || (v.def.type === "building" && !s.noBuildings)));
-                // ИИ добивает: если есть цель под убийство (урон ≥
-                // жизней) — бьём её (из них сильнейшую и ближе к базе),
-                // иначе просто сильнейшего юза игрока
-                const kills = targets.filter((v) => v.hp <= dmg);
-                let best = (kills.length ? kills : targets)
-                    .slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
-                if (focus && targets.includes(focus)) best = focus; // руна
-                if (!best) return;
-                damageUnit(best, dmg, null, "rocket");
+                if (s.purge) { // «Извлечение духа»: чистим самую «заряженную» цель
+                    let best = null, bestN = 0;
+                    for (const v of targets) {
+                        const n = countProps(v);
+                        if (n > bestN) { bestN = n; best = v; }
+                    }
+                    if (focus && targets.includes(focus)) best = focus; // руна
+                    if (best && bestN > 0) {
+                        const n = purgeUnit(best);
+                        B.enemyBase = Math.min(B.enemyBaseMax, B.enemyBase + n);
+                        floatText(960, 60, `+${n}`, 0x9fd489);
+                        punch(root.hud);
+                        sfx("up");
+                    }
+                } else if (s.cocoon) { // «Защитный кокон» — своему крепышу
+                    const own = B.units.filter((v) => v.side === "e");
+                    let best = own.slice().sort((a, b) => (b.hp - a.hp) || (b.curAtk - a.curAtk))[0];
+                    if (focus && own.includes(focus)) best = focus;
+                    if (best) addProtect(best);
+                } else { // дротик/варево/огнешар
+                    const dmg = s.drainAll // вся энергия сверх цены — в урон
+                        ? Math.max(0, B.eEnergy - (free ? 0 : effCost(cardIdOf(def), "e"))) + altarBonus("e")
+                        : spellDmg(def, "e");
+                    // ИИ добивает: если есть цель под убийство (урон ≥
+                    // жизней) — бьём её (из них сильнейшую и ближе к базе),
+                    // иначе просто сильнейшего юза игрока
+                    const kills = targets.filter((v) => v.hp <= dmg);
+                    let best = (kills.length ? kills : targets)
+                        .slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                    if (focus && targets.includes(focus)) best = focus; // руна
+                    if (!best) return;
+                    damageUnit(best, dmg, null, "rocket");
+                }
             }
             if (s.target === "anyCell") { // стена костров — ряд, где огонь окупается
                 const row = aiFirewallRow();
@@ -3028,6 +3151,15 @@
                 floatText(960, 840, `−${s.baseDmg}`, 0xff5f4e);
                 punch(root.hud);
                 sfx("rocket");
+            }
+            if (s.stealEnergy) { // «Похищение энергии»: вся энергия игрока — нам
+                const got = B.energy;
+                B.energy = 0;
+                B.eEnergy += got;
+                floatText(960, 840, `−${got}⚡`, 0xff5f4e);
+                floatText(960, 60, `+${got}⚡`, 0xffd98c);
+                punch(root.hud);
+                sfx("aqua");
             }
             if (s.aoeDmg) { // «Раскалённые обломки»: всем существам и постройкам игрока
                 const dmg = s.aoeDmg + altarBonus("e");
@@ -3491,7 +3623,15 @@
                 const u = unitAt(target.col, target.row);
                 if (!u || (u.def.type !== "unit"
                     && (u.def.type !== "building" || def.spell.noBuildings))) return false;
-                if (def.spell.drainAll) { // «Огнешар»: вся энергия сверх цены — в урон
+                if (def.spell.purge) { // «Извлечение духа»: снять все свойства, база лечится за каждое
+                    const n = purgeUnit(u);
+                    B.playerBase = Math.min(B.playerBaseMax, B.playerBase + n);
+                    floatText(960, 840, `+${n}`, 0x9fd489);
+                    punch(root.hud);
+                    sfx("up");
+                } else if (def.spell.cocoon) { // «Защитный кокон»: «Защита 1» цели
+                    addProtect(u);
+                } else if (def.spell.drainAll) { // «Огнешар»: вся энергия сверх цены — в урон
                     damageUnit(u, Math.max(0, B.energy - (free ? 0 : effCost(cardId)))
                         + altarBonus("p"), null, "rocket");
                 } else {
@@ -3535,6 +3675,15 @@
                 floatText(960, 60, `−${def.spell.baseDmg}`, 0xff8f6e);
                 punch(root.hud);
                 sfx("rocket");
+            }
+            if (def.spell.target === "none" && def.spell.stealEnergy) { // «Похищение энергии»
+                const got = B.eEnergy;
+                B.eEnergy = 0;
+                B.energy += got;
+                floatText(960, 60, `−${got}⚡`, 0xff8f6e);
+                floatText(960, 840, `+${got}⚡`, 0xffd98c);
+                punch(root.hud);
+                sfx("aqua");
             }
             if (def.spell.aoeDmg) { // «Раскалённые обломки»: всем вражеским существам и постройкам
                 const dmg = def.spell.aoeDmg + altarBonus("p");
@@ -3583,6 +3732,20 @@
                 return best ? { col: best.col, row: best.row } : null;
             }
             if (tg === "anyUnitDmg") {
+                if (def.spell.cocoon) { // кокон — своему крепышу
+                    const own = B.units.filter((u) => u.side === "p");
+                    const best = own.slice().sort((a, b) => (b.hp - a.hp) || (b.curAtk - a.curAtk))[0];
+                    return best ? { col: best.col, row: best.row } : null;
+                }
+                if (def.spell.purge) { // дух — чужой самый «заряженный» объект
+                    let best = null, bestN = 0;
+                    for (const u of B.units) {
+                        if (u.side === "p") continue;
+                        const n = countProps(u);
+                        if (n > bestN) { bestN = n; best = u; }
+                    }
+                    return best ? { col: best.col, row: best.row } : null;
+                }
                 const dmg = def.spell.drainAll
                     ? Math.max(0, B.energy) + altarBonus("p") // повтор — цена не вычитается
                     : spellDmg(def);
@@ -4283,7 +4446,10 @@
             aiSpellPlayable: (id) => !!CARDS[id] && aiSpellPlayable(CARDS[id]),
         };
         function cardIdOf(def) {
-            return Object.keys(CARDS).find((k) => CARDS[k] === def);
+            // «Извлечение духа» подменяет def существа «очищенной» копией —
+            // в копии остаётся ссылка __base на исходную карту каталога
+            return Object.keys(CARDS).find((k) => CARDS[k] === def
+                || (def && def.__base && CARDS[k] === def.__base));
         }
 
         return { enter, exit, update, api };
