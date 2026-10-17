@@ -972,12 +972,13 @@
                 }
                 worldContainer.addChild(layer);
 
-                // герой (заглушка — рыцарь движка)
-                const sprite = new PIXI.AnimatedSprite(ctx.knight.animations.wait, false);
+                // герой — лист гоблина 256px, рисуем в 0.25 (рост как у рыцаря)
+                const sprite = new PIXI.AnimatedSprite(ctx.heroSheet.animations.walk_front, false);
                 sprite.anchor.set(0.5, 1);
+                sprite.scale.set(0.25);
                 heroId = characters.spawn({
-                    x: st.heroPos.x, y: st.heroPos.y, sprite, anims: ctx.knight.animations,
-                    speed: 238, fps: ctx.knight.fps, halfW: 10, halfH: 7,
+                    x: st.heroPos.x, y: st.heroPos.y, sprite, anims: ctx.heroSheet.animations,
+                    speed: 238, fps: ctx.heroSheet.fps, halfW: 10, halfH: 7,
                 });
                 // виртуальные оси: их пишет и путь (клик-перемещение), и
                 // зеркало клавиш/джойстика в update — герой всегда на них

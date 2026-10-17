@@ -93,7 +93,12 @@
         };
         say("спрайты…");
         await frame();
-        const knight = await assets.loadCharacter("./images/sprites/knight_64");
+        // Герой — лист гоблина (рыцарь ушёл): сетка 256×256, 4 строки ходьбы
+        // по 6 кадров. wait/attack в листе нет — контроллер персонажа в покое
+        // замирает в стоп-кадре ходьбы (штатный сценарий play() без строки).
+        // Спрайт рисуется в 0.25: арт гоблина ~195px в кадре — те же ~49px
+        // роста, что было у рыцаря, и честный пиксельный даунскейл 4→1.
+        const heroSheet = await assets.loadCharacter("./images/sprites/goblin_256");
         // Листы существ поля боя. Стандарт: <имя>_256.png — сетка 256×256,
         // 4 ряда анимаций (спереди/сзади/справа/слева) по 6 кадров + json-манифест.
         // Пока один лист на всех существ; новые добавлять сюда записью.
@@ -281,7 +286,7 @@
         const ctx = {
             app, world, ECS, COMPONENTS, DATA, worldContainer, addSystem,
             assets, uiTex, scheduler, input, camera, characters, charInput,
-            knight, creatureSheets, G, ui, audio, collide,
+            heroSheet, creatureSheets, G, ui, audio, collide,
             sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
         };
