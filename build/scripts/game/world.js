@@ -210,14 +210,15 @@
             }
             // уходим в ДРУГОЙ данж — текущий этаж архивируется, чтобы
             // прогресс (враги/объекты/позиция) не потерялся
-            if (G.dungeon && G.dungeon.v === 3 && G.dungeon.cave !== caveId) {
+            if (G.dungeon && G.dungeon.v === globalThis.GAME_DUNGEON.MAP_V
+                && G.dungeon.cave !== caveId) {
                 G.dungeonStates[(G.dungeon.cave || "gob") + ":" + G.dungeon.floor] = G.dungeon;
             }
             if (G.run.cave !== caveId) {
                 G.run.cave = caveId;
                 G.run.floor = (G.run.floors || (G.run.floors = {}))[caveId] || 1;
             }
-            // архив этажей другой геометрии (v≠3) не поднимается —
+            // архив этажей другой геометрии (v≠MAP_V) не поднимается —
             // stateFor отдаст свежий этаж текущей сетки
             const st = globalThis.GAME_DUNGEON.stateFor(G.dungeonStates, caveId, G.run.floor);
             st.cave = caveId;
@@ -232,7 +233,7 @@
             enter() {
                 if (ctx.music) ctx.music("menu"); // трек мира (пока общий с меню)
                 ctx.collide.rows = ROWS; // коллизии героя — по карте мира
-                ctx.collide.ts = 40; // после подземелья (клетка 56) — вернуть шаг мира
+                ctx.collide.ts = 40; // после подземелья (клетка 64) — вернуть шаг мира
                 const cave = findCh("C"), spawn = findCh("W"), grove = findCh("G");
                 // точка появления: вышедший из подземелья герой стоит у входа
                 // ТОГО данжа; сохранившаяся позиция у самого входа не должна

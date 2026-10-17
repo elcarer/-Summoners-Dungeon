@@ -54,24 +54,17 @@
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
         uiTextures["card_goblin_back.png"] = await assets.loadTexture("./images/ui/card_goblin_back.png");
         uiTextures["card_nature_back.png"] = await assets.loadTexture("./images/ui/card_nature_back.png");
-        // тайлы подземелья юзера: images/dungeon_tiles/<…>.png — полы,
-        // стены-«сочленения» walln_* (лица/капы/топы/боковины по маске
-        // соседей), тень, декор (щебёнка/лестницы)
+        // тайлы подземелья юзера: images/dungeon_tiles/goblins_lair/<…>.png —
+        // полы 64×64 (floor/0-5) и стены walls/* по маске соседей
+        // (пока один набор на все подземелья, просил юзер)
         say("тайлы подземелья…");
         await frame();
-        for (const f of ["floor_0", "floor_1", "floor_2", "floor_3", "floor_4",
-            "floor_5", "floor_6", "floor_7", "floor_8", "shadow", "door_gate",
-            "stair_a", "stair_b", "stair_c", "rubble_0", "rubble_1",
-            "rubble_2", "rubble_3", "prop_barrel", "prop_crates", "prop_crate",
-            "walln_h_0", "walln_h_1", "walln_h_2", "walln_h_3",
-            "walln_h_el", "walln_h_er", "walln_h_eb",
-            "walln_cap_0", "walln_cap_1", "walln_cap_2", "walln_cap_3",
-            "walln_t_0", "walln_t_1", "walln_t_2", "walln_t_3",
-            "walln_v_l", "walln_v_l_f", "walln_v_l2", "walln_v_l2_f",
-            "walln_v_r", "walln_v_r_f", "walln_v_r2", "walln_v_r2_f",
-            "walln_v_b", "walln_v_b_f"]) {
+        for (const f of ["floor/0", "floor/1", "floor/2", "floor/3",
+            "floor/4", "floor/5", "walls/wall_h1", "walls/wall_h1_td",
+            "walls/wall_h1_tu", "walls/wall_v1", "walls/wall_v1_tl",
+            "walls/wall_v1_tr", "walls/wall_cross"]) {
             uiTextures[`dungeon_tiles/${f}.png`] =
-                await assets.loadTexture(`./images/dungeon_tiles/${f}.png`);
+                await assets.loadTexture(`./images/dungeon_tiles/goblins_lair/${f}.png`);
         }
         // лица карт стихий: images/cards/<elem>/<№>.png (def.img в dataCards)
         say("карты…");
@@ -353,16 +346,18 @@
                     G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp || 10 };
                     G.gold = r.gold || 0;
                     G.elem = r.elem || "strength";
-                    // поднимаются только этажи текущей геометрии (v3 —
-                    // тайлы 56px): сейвы волн с другой сеткой пересоберутся.
-                    // Архив адресуется «данж:этаж»; у старых сейвов (одни
-                    // гоблинские пещеры) данж по умолчанию gob
-                    G.dungeon = r.dungeon && r.dungeon.v === 3 ? r.dungeon : null;
+                    // поднимаются только этажи текущей геометрии (MAP_V —
+                    // теперь тайлы 64px goblins_lair): сейвы волн с другой
+                    // сеткой пересоберутся. Архив адресуется «данж:этаж»;
+                    // у старых сейвов (одни гоблинские пещеры) данж по
+                    // умолчанию gob
+                    const mapV = GAME_DUNGEON.MAP_V;
+                    G.dungeon = r.dungeon && r.dungeon.v === mapV ? r.dungeon : null;
                     if (G.dungeon && !G.dungeon.cave) G.dungeon.cave = "gob";
                     G.dungeonStates = {};
                     for (const k in (r.dungeonStates || {})) {
                         const st = r.dungeonStates[k];
-                        if (!st || st.v !== 3) continue;
+                        if (!st || st.v !== mapV) continue;
                         st.cave = st.cave || "gob";
                         G.dungeonStates[st.cave + ":" + st.floor] = st;
                     }
