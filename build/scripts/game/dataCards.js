@@ -155,6 +155,31 @@
                  spell: { target: "emptyCell", cultRow: true },
                  rarity: "epic", elem: "strength",
                  color: 0xb0402e, img: "strength/40" },
+        // ── Стихия «Рост» (зелёные) — вторая стихия, лица growth/41..46 ─────
+        // (сквозная нумерация артов юзера: после 40 карт Силы).
+        grw1: { type: "unit", cost: 1, atk: 0, hp: 1, speed: 1,
+                creature: "goblin", ability: "predator",
+                rarity: "common", elem: "growth",
+                color: 0x3f6d3a, img: "growth/41" },
+        grw2: { type: "unit", cost: 2, atk: 2, hp: 4, speed: 1,
+                creature: "goblin",
+                rarity: "common", elem: "growth",
+                color: 0x3f6d3a, img: "growth/42" },
+        grw3: { type: "unit", cost: 3, atk: 3, hp: 5, speed: 1,
+                creature: "goblin",
+                rarity: "common", elem: "growth",
+                color: 0x3f6d3a, img: "growth/43" },
+        grw4: { type: "trap", cost: 1,
+                trap: { event: "onEnemyCell", effect: "cellDebuff", atk: 1, hp: 1 },
+                rarity: "common", elem: "growth",
+                color: 0x2e5a2e, img: "growth/44" },
+        grw5: { type: "spell", cost: 1,
+                spell: { target: "anyUnit", buffAtk: 1, buffHp: 1 },
+                rarity: "common", elem: "growth",
+                color: 0x4a8a3e, img: "growth/45" },
+        grw6: { type: "building", cost: 1, atk: 0, hp: 1, sprout: 1,
+                rarity: "common", elem: "growth",
+                color: 0x2e5a3e, img: "growth/46" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -174,15 +199,25 @@
         "str1", "str1", "str2", "str2", "str3", "str3",
         "str4", "str4", "str9", "str9", "str12", "str12",
     ];
-    const DEFAULT_COLLECTION = {
-        str1: 2, str2: 2, str3: 2, str4: 2, str9: 2, str12: 2,
-        str5: 0, str6: 0, str7: 0, str8: 0, str10: 0, str11: 0,
-        str13: 0, str14: 0, str15: 0, str16: 0, str17: 0, str18: 0,
-        str19: 0, str20: 0, str21: 0, str22: 0, str23: 0, str24: 0,
-        str25: 0, str26: 0, str27: 0, str28: 0, str29: 0, str30: 0,
-        str31: 0, str32: 0, str33: 0, str34: 0, str35: 0, str36: 0,
-        str37: 0, str38: 0, str39: 0, str40: 0,
+    // Стартовые колоды по стихиям (выбор при «Новая игра»): Рост — карты
+    // 41–46 юзера по 2 копии (просил юзер).
+    const STARTER_DECKS = {
+        strength: DEFAULT_DECK,
+        growth: ["grw1", "grw1", "grw2", "grw2", "grw3", "grw3",
+                 "grw4", "grw4", "grw5", "grw5", "grw6", "grw6"],
     };
+    // Стартовый реестр коллекции: все карты игры по нулям + копии стартера
+    function starterCollection(starter) {
+        const coll = {};
+        for (const id of Object.keys(CARDS)) coll[id] = 0;
+        for (const id of starter) coll[id] = (coll[id] || 0) + 1;
+        return coll;
+    }
+    const STARTER_COLLECTIONS = {
+        strength: starterCollection(DEFAULT_DECK),
+        growth: starterCollection(STARTER_DECKS.growth),
+    };
+    const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     const DECK_MAX = 60, DECK_MIN = 12, TRAP_SLOTS = 2;
     const DECK_COPIES = 3; // максимум одинаковых карт в колоде
 
@@ -207,6 +242,14 @@
         "str6", "str8", "str10", "str18", "str21", "str25", "str28",
         "str40",
     ];
+    // Пулы наград по стихиям: сундуки/магазины подземелья дают карты ЕГО
+    // стихии (просил юзер: в гоблинских пещерах зелёные карты не встречаются)
+    const REWARD_POOLS = {
+        strength: REWARD_POOL,
+        growth: ["grw1", "grw1", "grw1", "grw2", "grw2", "grw2",
+                 "grw3", "grw3", "grw3", "grw4", "grw4", "grw4",
+                 "grw5", "grw5", "grw5", "grw6", "grw6", "grw6"],
+    };
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
     // Архетипы врагов: core — ядро колоды, всегда целиком; добор генерится
@@ -249,6 +292,23 @@
         // НЕ генерится ядром (enemyDeck), её кладёт драфт-сцена из карт,
         // что соперник забрал себе при выборе. База 15 — зеркально игроку.
         draft:    { scene: 1, baseHp: 15, core: [] },
+
+        // ── «Роща Роста» (второе подземелье, стихия «Рост») ───────────────
+        // Контент будет расти вместе с каталогом Роста (пока 6 карт):
+        // «Лесные звери» — существа и усиления, «Роща лоз» — ловушки
+        // и постройки; босс собирает всё.
+        grwBeasts: { scene: 1, baseHp: 10, elem: "growth",
+                     core: ["grw2", "grw2", "grw3", "grw3", "grw5", "grw5", "grw1"] },
+        grwGrove:  { scene: 1, baseHp: 12, elem: "growth",
+                     core: ["grw1", "grw1", "grw4", "grw4", "grw6", "grw6", "grw5", "grw2"] },
+        grwBoss:   { scene: 1, baseHp: 18, elem: "growth",
+                     core: ["grw1", "grw1", "grw2", "grw2", "grw3", "grw3",
+                            "grw4", "grw4", "grw5"] },
+    };
+    // Подземелья открытого мира: стихия (пул наград/драфта) и кап глубины
+    const CAVES = {
+        gob: { elem: "strength", maxFloor: 6, boss: "boss" },      // Гоблинские пещеры
+        grw: { elem: "growth", maxFloor: 6, boss: "grwBoss" },     // Роща Роста
     };
     // Этаж → какие обычные враги на нём водятся; после конца списка — набор
     // для самых глубоких этажей. Босс (B) есть на каждом этаже.
@@ -260,6 +320,16 @@
         ["gobFire", "gobElite"],              // 5
         ["gobElite", "gobTrap", "gobFire"],   // 6+
     ];
+    // Этажи «Рощи Роста»: существа с 1-го, ловушки/постройки со 2-го
+    const FLOOR_MOBS_GROWTH = [
+        ["grwBeasts", "grwBeasts"],           // 1
+        ["grwBeasts", "grwGrove"],            // 2
+        ["grwGrove", "grwBeasts"],            // 3
+        ["grwGrove", "grwBeasts", "grwGrove"],// 4
+        ["grwGrove", "grwGrove", "grwBeasts"],// 5
+        ["grwGrove", "grwGrove", "grwBeasts"],// 6+
+    ];
+    const MOB_TABLES = { gob: FLOOR_MOBS, grw: FLOOR_MOBS_GROWTH };
     // Пул добора колоды врага по редкости. Панельные карты (str11 жертва,
     // str25 руны, str26 путешествие) ИИ теперь разыгрывает сам — цель он
     // выбирает по своим приоритетам, без экрана (просил юзер).
@@ -273,10 +343,20 @@
         epic:   ["str6", "str8", "str10", "str18", "str21", "str25", "str28",
                  "str40"],
     };
+    // Пулы добора по стихии архетипа: враги Роста добирают только зелёное
+    // (редких/эпических в стихии пока нет — добор берёт обычные)
+    const ENEMY_FILLS = {
+        strength: ENEMY_FILL,
+        growth: {
+            common: ["grw1", "grw2", "grw3", "grw4", "grw5", "grw6"],
+            rare: [], epic: [],
+        },
+    };
     // Колода врага: ядро архетипа + 3..8 карт добора; с глубиной (floor ≥ 1)
     // шанс эпических в доборе растёт от 0% (этаж 1) до 45%, редких — до ~85%.
     function enemyDeck(encId, floor) {
         const enc = ENCOUNTERS[encId] || ENCOUNTERS.gob;
+        const fills = ENEMY_FILLS[enc.elem] || ENEMY_FILL;
         const deck = [...enc.core];
         const f = Math.max(1, floor | 0);
         // рост босса: с каждым этажом +2 карты из grow (без повторов внутри
@@ -293,18 +373,24 @@
         // пропускает карты, которые ядро/grow/предыдущий добор довели до трёх
         for (let k = 0; k < extra; k++) {
             const r = Math.random();
-            const base = r < epicP ? ENEMY_FILL.epic
-                : r < epicP + rareP ? ENEMY_FILL.rare : ENEMY_FILL.common;
-            const free = base.filter((id) =>
+            let base = r < epicP ? fills.epic
+                : r < epicP + rareP ? fills.rare : fills.common;
+            const underCap = (pool) => pool.filter((id) =>
                 deck.filter((c) => c === id).length < 3);
-            const pool = free.length ? free : base;
-            deck.push(pool[(Math.random() * pool.length) | 0]);
+            // в стихии может не быть редких/эпических (Рост пока весь
+            // обычный) — добор берёт обычные той же стихии
+            if (!base.length && fills.common.length) base = fills.common;
+            const free = underCap(base);
+            if (!free.length) continue; // всё уже в трёх копиях — не нарушаем кап
+            deck.push(free[(Math.random() * free.length) | 0]);
         }
         return deck;
     }
-    // Обычный враг для этажа: случайный архетип из таблицы этажа.
-    function mobForFloor(floor) {
-        const table = FLOOR_MOBS[Math.min(Math.max(1, floor | 0) - 1, FLOOR_MOBS.length - 1)];
+    // Обычный враг для этажа подземелья: случайный архетип из таблицы
+    // этажа СВОЕГО данжа (гоблинские пещеры / роща Роста).
+    function mobForFloor(cave, floor) {
+        const table = MOB_TABLES[CAVES[cave] ? cave : "gob"]
+            [Math.min(Math.max(1, floor | 0) - 1, FLOOR_MOBS.length - 1)];
         return table[(Math.random() * table.length) | 0];
     }
 
@@ -314,10 +400,12 @@
     const SHOP_BUY = { common: 10, rare: 30, epic: 100 };
     const SHOP_SELL = { common: 2, rare: 6, epic: 20 };
     // Случайная карта с редкостью «как у награды после боя» — веса заданы
-    // повторами REWARD_POOL (там все 30 карт игры, служебный gobA не входит):
-    // сундук и товары магазина кидаются им.
-    function rollLootCard() {
-        return REWARD_POOL[(Math.random() * REWARD_POOL.length) | 0];
+    // повторами пула стихии (там все лица карт, служебные gobA/gobC не
+    // входят): сундук и товары магазина кидаются им. Карты ДРУГОЙ стихии
+    // в подземелье не выпадают (просил юзер).
+    function rollLootCard(elem = "strength") {
+        const pool = REWARD_POOLS[elem] || REWARD_POOL;
+        return pool[(Math.random() * pool.length) | 0];
     }
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
@@ -333,7 +421,9 @@
 
     globalThis.GAME_DATA = {
         CARDS, RARITY_COLORS, DEFAULT_DECK, DEFAULT_COLLECTION, DECK_MAX, DECK_MIN, TRAP_SLOTS,
-        DECK_COPIES, REWARD_POOL, ENCOUNTERS, FLOOR_MOBS, ENEMY_FILL,
+        DECK_COPIES, REWARD_POOL, REWARD_POOLS, ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH,
+        MOB_TABLES, ENEMY_FILL, ENEMY_FILLS, CAVES,
+        STARTER_DECKS, STARTER_COLLECTIONS,
         enemyDeck, mobForFloor, ELEM_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,
     };
 })();

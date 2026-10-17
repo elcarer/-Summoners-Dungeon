@@ -312,9 +312,9 @@
                 c.addChild(g);
                 // метка эффекта: лагерь даёт +1 урона соседям, алтарь —
                 // +1 урона заклинаний/ловушек, костёр лечит соседей (♥),
-                // прочие ауры — ✦
+                // росток копит жизни и возвращается в руку (♥), прочие — ✦
                 const aura = T(u.def.campAura ? `+${u.def.campAura}⚔`
-                    : (u.def.campfire ? "♥"
+                    : ((u.def.campfire || u.def.sprout) ? "♥"
                         : (u.def.spellAura ? `+${u.def.spellAura}✦` : "✦")), 30, 0xffe9b0);
                 aura.anchor.set(0.5);
                 aura.position.set(0, -3);
@@ -392,7 +392,8 @@
                     hp += (u.def.aura && u.def.aura.hp) || 0;
                 }
                 for (const u of B.units) if (u.side === side && u.def.type === "unit") {
-                    const newAtk = u.def.atk + (u.bonusAtk || 0) + atk;
+                    // «Шипастые лозы» уводят бонус в минус — урон не ниже нуля
+                    const newAtk = Math.max(0, u.def.atk + (u.bonusAtk || 0) + atk);
                     if (u.curAtk !== newAtk) {
                         u.curAtk = newAtk;
                         const n = u.node.getChildByName("atk");
@@ -623,19 +624,33 @@
             let side = foe;
             let i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                 && (t.def.trap.effect === "cellDmg" || t.def.trap.effect === "ambush"
-                    || t.def.trap.effect === "confuse"));
+                    || t.def.trap.effect === "confuse" || t.def.trap.effect === "cellDebuff"));
             if (i < 0) {
-                // «Решётка с шипами» нейтральна: жалит ЛЮБОЕ существо,
-                // оказавшееся на клетке, — включая хозяина ловушки
+                // «Решётка с шипами» и «Шипастые лозы» нейтральны: жалит ЛЮБОЕ
+                // существо, оказавшееся на клетке, — включая хозяина ловушки
                 side = u.side;
                 i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
-                    && t.def.trap.effect === "cellDmgAll");
+                    && (t.def.trap.effect === "cellDmgAll" || t.def.trap.effect === "cellDebuff"));
             }
             if (i < 0) return;
             const trap = B.traps[side].splice(i, 1)[0];
             redrawTraps();
             const p = cellXY(u.col, u.row);
             floatText(p.x, p.y - 60, "?!", 0xe08cd0);
+            if (trap.def.trap.effect === "cellDebuff") {
+                // «Шипастые лозы» (grw4): существо на клетке теряет 1 урона
+                // и 1 жизни; не пережило шипы — гибнет (не «урон», но смерть)
+                u.bonusAtk = (u.bonusAtk || 0) - (trap.def.trap.atk || 1);
+                recalcAuras();
+                u.hp -= (trap.def.trap.hp || 1);
+                const hn = u.node.getChildByName("hp");
+                if (hn) hn.text = String(Math.max(0, u.hp));
+                sfx("acid");
+                if (u.hp <= 0) killUnit(u, null);
+                refreshHud();
+                checkEnd();
+                return;
+            }
             if (trap.def.trap.effect === "ambush") {
                 // «Гоблинская засада»: в каждой пустой соседней (верт/гориз)
                 // клетке появляется Гоблин 2/2 стороны-хозяйки ловушки
@@ -728,6 +743,20 @@
                 floatText(p.x, p.y - 66,
                     drawn ? GAME_LOC.t(`card.${drawn}.name`) : "…", 0xffd98c);
                 damageUnit(b, 1, null, "dam");
+            }
+            // «Хищное растение» (grw1): когда умирает ДРУГОЕ существо (любой
+            // стороны), каждое живое растение получает +1 урона и +1 жизни
+            if (u.def.type === "unit") for (const v of B.units.slice()) {
+                if (v === u || v.def.ability !== "predator" || !B.units.includes(v)) continue;
+                v.bonusAtk = (v.bonusAtk || 0) + 1;
+                v.hp += 1;
+                recalcAuras(); // обновит и бейдж урона (кламп ≥ 0)
+                const hn = v.node.getChildByName("hp");
+                if (hn) hn.text = String(v.hp);
+                const p = cellXY(v.col, v.row);
+                floatText(p.x, p.y - 66, "+1⚔ +1♥", 0x9fd489);
+                punch(v.node);
+                sfx("up");
             }
             // ловушки стороны погибшего: триггер «при гибели своего существа»
             if (killer && killer.def && killer.def.type === "unit" && killer.side !== u.side) {
@@ -826,8 +855,39 @@
                     }
                     damageUnit(b, 1, null, "dam");
                 }
+                if (b.def.sprout && b.hp >= 3) {
+                    // «Росток» (grw6): в начале хода владельца при 3+ жизнях
+                    // возвращается в руку, а соседнее СВОЁ существо получает
+                    // +3 жизни (нет своего — лечить некого, возврат всё равно
+                    // происходит)
+                    const id = cardIdOf(b.def);
+                    if (side === "p") B.hand.push(id); else B.eHand.push(id);
+                    const near = B.units.filter((v) => v.side === b.side
+                        && v.def.type === "unit"
+                        && Math.abs(v.col - b.col) + Math.abs(v.row - b.row) === 1);
+                    const p = cellXY(b.col, b.row);
+                    if (near.length) healUnit(near[(Math.random() * near.length) | 0], 3);
+                    floatText(p.x, p.y - 72, GAME_LOC.t("card.grw6.name"), 0x9fd489);
+                    sfx("chpoc");
+                    removeUnit(b); // ушёл в руку — не смерть, каскадов нет
+                }
             }
             refreshHud();
+        }
+
+        // «Росток» (grw6), конец хода владельца: постройка получает +1 жизнь
+        // (вызывается там же, где тик «Стены костров» этой стороны)
+        function sproutTick(side) {
+            for (const b of B.units.slice()) {
+                if (b.side !== side || !b.def.sprout || !B.units.includes(b)) continue;
+                b.hp += 1;
+                const hn = b.node.getChildByName("hp");
+                if (hn) hn.text = String(b.hp);
+                const p = cellXY(b.col, b.row);
+                floatText(p.x, p.y - 60, "+1♥", 0x9fd489);
+                punch(b.node);
+                sfx("up");
+            }
         }
 
         // ── Ловушки ─────────────────────────────────────────────────────────
@@ -1709,9 +1769,9 @@
             title.eventMode = "none";
             c.addChild(title);
 
-            // колода врага — рубашка гоблинов в правом верхнем углу; клик
-            // показывает, какие карты у него остались (просил юзер)
-            const eDeckPile = new PIXI.Sprite(uiTex("card_goblin_back.png"));
+            // колода врага — рубашка по стихии боя (гоблины/природа) в правом
+            // верхнем углу; клик показывает, какие карты у него остались
+            const eDeckPile = new PIXI.Sprite(uiTex(enemyBackTex()));
             eDeckPile.position.set(1725, 24);
             eDeckPile.scale.set(0.74); // 230×338 → 170×250
             eDeckPile.eventMode = "static";
@@ -2316,6 +2376,7 @@
             redrawHighlight();
             refreshHud();
             firewallTick("p"); // стена костров игрока — конец хода игрока
+            sproutTick("p");   // ростки игрока подросли — конец его хода
             if (B.stopped || B.phase === "over") return;
             banner(t("arena.enemyTurn"));
             await delay(0.5 / animK());
@@ -2364,12 +2425,20 @@
             enemyCard.node.destroy({ children: true });
             enemyCard = null;
         }
+        // Рубашка колоды врага по стихии боя: враги Роста — природная
+        // рубашка (card_nature_back), прочие (гоблины, драфт Силы) — гоблинская
+        function enemyBackTex() {
+            const enc = ENCOUNTERS[B.encId];
+            const cave = G.dungeon && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
+            const elem = (enc && enc.elem) || (cave && cave.elem);
+            return elem === "growth" ? "card_nature_back.png" : "card_goblin_back.png";
+        }
         // Ловушка врага — РУБАШКОЙ (просил юзер): игрок видит, что противник
         // сыграл карту, но какая именно ловушка — неизвестно; на поле встанет
-        // безликий «?» (гоблинская рубашка колоды — та же, что у колоды врага)
+        // безликий «?» (рубашка колоды — та же, что у колоды врага)
         function showEnemyBack() {
             hideEnemyCard();
-            const node = new PIXI.Sprite(uiTex("card_goblin_back.png"));
+            const node = new PIXI.Sprite(uiTex(enemyBackTex()));
             node.scale.set(0.75);
             node.eventMode = "none";
             node.position.set(430, 420);
@@ -2470,15 +2539,16 @@
             }
             return best[(Math.random() * best.length) | 0];
         }
-        // Постройки-ауры соседства (лагерь, костёр) — к существам и будущим
-        // призывам: своё существо рядом (костёр лечит сразу) и пустая клетка
-        // зоны призыва рядом (лагерь усилит того, кто встанет). Остальные
-        // постройки — как раньше, в тыл у своей базы.
+        // Постройки-ауры соседства (лагерь, костёр, росток) — к существам и
+        // будущим призывам: своё существо рядом (костёр лечит сразу, росток
+        // вернётся в руку с +3 жизни соседу) и пустая клетка зоны призыва
+        // рядом (лагерь усилит того, кто встанет). Остальные постройки —
+        // как раньше, в тыл у своей базы.
         function aiBuildingSpot(def) {
             const rows = deployRows("e");
             const free = freeCells(rows);
             if (!free.length) return null;
-            if (def.campAura || def.campfire) {
+            if (def.campAura || def.campfire || def.sprout) {
                 let best = [], bestScore = -1;
                 for (const [c, r] of free) {
                     let score = 0;
@@ -2625,6 +2695,13 @@
                         recalcAuras();
                         const p = cellXY(best.col, best.row);
                         floatText(p.x, p.y - 39, `+${s.buffAtk}⚔`, 0x9fd489);
+                    }
+                    if (s.buffHp) { // «Дар леса»: +N жизни
+                        best.hp += s.buffHp;
+                        const hn = best.node.getChildByName("hp");
+                        if (hn) hn.text = String(best.hp);
+                        const p = cellXY(best.col, best.row);
+                        floatText(p.x, p.y - 75, `+${s.buffHp}♥`, 0x9fd489);
                     }
                     if (s.berserk) addBerserk(best, s.berserk);
                 }
@@ -2921,6 +2998,7 @@
             B.spellTarget = false;
             refreshHud();
             firewallTick("e"); // стена костров врага — конец хода врага
+            sproutTick("e");   // ростки врага подросли — конец его хода
             if (B.stopped || B.phase === "over") return;
             banner(t("arena.yourTurn"));
             await delay(0.4 / animK());
@@ -3099,6 +3177,12 @@
                         u.bonusAtk = (u.bonusAtk || 0) + def.spell.buffAtk;
                         recalcAuras();
                         floatText(p.x, p.y - 39, `+${def.spell.buffAtk}⚔`, 0x9fd489);
+                    }
+                    if (def.spell.buffHp) { // «Дар леса»: +N жизни любому существу
+                        u.hp += def.spell.buffHp;
+                        const hn = u.node.getChildByName("hp");
+                        if (hn) hn.text = String(u.hp);
+                        floatText(p.x, p.y - 75, `+${def.spell.buffHp}♥`, 0x9fd489);
                     }
                     if (def.spell.berserk) addBerserk(u, def.spell.berserk);
                 }
@@ -3356,9 +3440,10 @@
                     if (G.saveRun) G.saveRun(); // враг побеждён — забег продолжается
                     scenes.go("reward");
                 } else {
-                    // поражение — забег закончен: сейв снимается
+                    // поражение — забег закончен: сейв снимается; стартер
+                    // той же стихии (забег был её)
                     if (globalThis.GAME_META.clearRun) globalThis.GAME_META.clearRun();
-                    G.resetRun();
+                    G.resetRun(G.elem);
                     scenes.go("menu");
                 }
             };
@@ -3721,6 +3806,8 @@
                 sprites: root.fireLayer.children.length }),
             // тест-хук: тик стены костров (как в конце хода стороны)
             _fwTick(side) { firewallTick(side); return B.firewalls.map((f) => ({ ...f })); },
+            // тест-хук: тик ростков — конец хода стороны (+1 жизни постройкам)
+            _sproutTick(side) { sproutTick(side); return true; },
             // «Поиск рун» (тесты): состав панели и выбор карты
             runesState: () => ({ picking: !!B.picking, top: [...runesTop] }),
             runesPick(idx) { pickRune(idx); },
@@ -3848,6 +3935,8 @@
                 ? { cards: enemyDrawPlan(), total: spheresTotal(),
                     nextMana: B.eEnergy + spheresTotal() }
                 : null),
+            // гейты ИИ по заклинанию (тесты): id карты → playable
+            aiSpellPlayable: (id) => !!CARDS[id] && aiSpellPlayable(CARDS[id]),
         };
         function cardIdOf(def) {
             return Object.keys(CARDS).find((k) => CARDS[k] === def);

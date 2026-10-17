@@ -50,9 +50,10 @@
         // фоны арен с нарисованной сеткой поля
         uiTextures["scenes/1.png"] = await assets.loadTexture("./images/scenes/1.png");
         uiTextures["scenes/2.png"] = await assets.loadTexture("./images/scenes/2.png");
-        // эффект поля «Стена костров» и рубашка колоды врага (гоблины)
+        // эффект поля «Стена костров» и рубашка колоды врага (гоблины/природа)
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
         uiTextures["card_goblin_back.png"] = await assets.loadTexture("./images/ui/card_goblin_back.png");
+        uiTextures["card_nature_back.png"] = await assets.loadTexture("./images/ui/card_nature_back.png");
         // тайлы подземелья юзера: images/dungeon_tiles/<…>.png — полы,
         // стены (кап/лицо), тень, декор (факелы/окошки/щебёнка/лестницы)
         say("тайлы подземелья…");
@@ -204,25 +205,29 @@
 
         const G = {
             hero: { hp: 10, maxHp: 10 }, gold: 0,
-            run: { floor: 1 },
+            run: { floor: 1, cave: "gob", floors: { gob: 1, grw: 1 } },
+            elem: "strength", // стихия забега — задаёт стартовую колоду
             settings,
             deck: savedDeck.length ? savedDeck : [...DEFAULT_DECK],
             collection: Object.keys(savedColl).length ? savedColl : { ...DEFAULT_COLLECTION },
             dungeon: null, activeEnemy: null, battle: null,
             world: { heroPos: null, out: false }, // открытый мир: где герой
-            dungeonStates: {}, // этажи подземелья по номеру — подъём наверх
+            dungeonStates: {}, // этажи подземелий, ключ «данж:этаж» (gob:1, grw:2…)
             // (враги/объекты этажа остаются как их оставили),
             rewardDeck: null, // колода побеждённого — пул трофея «1 из 3»
             rewardDraft: false, // трофей — выбор из всей драфт-колоды (драфт)
             draft: null, // мини-игра «Карта сокровищ»: picks/ePicks/objIdx
             draftBattle: false, // текущий бой — драфт-бой (итог ведёт в подземелье)
             uiReturn: null, // откуда открыты настройки/колода (кнопка «Назад»)
-            resetRun() {
+            resetRun(elem) {
                 // новая игра — забег И коллекция/колода с нуля (просил юзер:
-                // после кнопки оставалась прокачанная коллекция)
+                // после кнопки оставалась прокачанная коллекция). Стихия
+                // задаёт стартовую колоду (выбор в меню «Новая игра»)
+                const el = globalThis.GAME_DATA.STARTER_DECKS[elem] ? elem : "strength";
+                this.elem = el;
                 this.hero.hp = this.hero.maxHp;
                 this.gold = 0;
-                this.run.floor = 1;
+                this.run = { floor: 1, cave: "gob", floors: { gob: 1, grw: 1 } };
                 this.dungeon = null;
                 this.world = { heroPos: null, out: false };
                 this.dungeonStates = {};
@@ -232,8 +237,8 @@
                 this.rewardDraft = false;
                 this.draft = null;
                 this.draftBattle = false;
-                this.deck = [...DEFAULT_DECK];
-                this.collection = { ...DEFAULT_COLLECTION };
+                this.deck = [...globalThis.GAME_DATA.STARTER_DECKS[el]];
+                this.collection = { ...globalThis.GAME_DATA.STARTER_COLLECTIONS[el] };
                 globalThis.GAME_META.saveMeta(this.collection, this.deck);
             },
             // сейв забега (sd_run): этаж, герой, золото, подземелье целиком —
@@ -242,6 +247,9 @@
             saveRun() {
                 globalThis.GAME_META.saveRun({
                     floor: this.run.floor,
+                    cave: this.run.cave,
+                    floors: { ...this.run.floors },
+                    elem: this.elem,
                     hero: { hp: this.hero.hp, maxHp: this.hero.maxHp },
                     gold: this.gold,
                     dungeon: this.dungeon ? JSON.parse(JSON.stringify(this.dungeon)) : null,
@@ -322,17 +330,29 @@
                     if (!contEnabled || !r) return;
                     G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp || 10 };
                     G.gold = r.gold || 0;
-                    G.run.floor = r.floor;
+                    G.elem = r.elem || "strength";
                     // поднимаются только этажи текущей геометрии (v3 —
-                    // тайлы 56px): сейвы волн с другой сеткой пересоберутся
+                    // тайлы 56px): сейвы волн с другой сеткой пересоберутся.
+                    // Архив адресуется «данж:этаж»; у старых сейвов (одни
+                    // гоблинские пещеры) данж по умолчанию gob
                     G.dungeon = r.dungeon && r.dungeon.v === 3 ? r.dungeon : null;
+                    if (G.dungeon && !G.dungeon.cave) G.dungeon.cave = "gob";
                     G.dungeonStates = {};
                     for (const k in (r.dungeonStates || {})) {
-                        if (r.dungeonStates[k] && r.dungeonStates[k].v === 3)
-                            G.dungeonStates[k] = r.dungeonStates[k];
+                        const st = r.dungeonStates[k];
+                        if (!st || st.v !== 3) continue;
+                        st.cave = st.cave || "gob";
+                        G.dungeonStates[st.cave + ":" + st.floor] = st;
                     }
-                    if (!G.dungeon) G.dungeon = G.dungeonStates[r.floor] || null;
-                    if (G.dungeon && !G.dungeonStates[r.floor]) G.dungeonStates[r.floor] = G.dungeon;
+                    if (!G.dungeon) G.dungeon = G.dungeonStates[(r.cave || "gob") + ":" + r.floor] || null;
+                    if (G.dungeon)
+                        G.dungeonStates[G.dungeon.cave + ":" + G.dungeon.floor] = G.dungeon;
+                    // глубина у каждого подземелья своя; активное — где герой
+                    G.run.floor = r.floor;
+                    G.run.cave = G.dungeon ? G.dungeon.cave : (r.cave || "gob");
+                    G.run.floors = r.floors && typeof r.floors === "object"
+                        ? { gob: r.floors.gob || 1, grw: r.floors.grw || 1 }
+                        : { gob: r.floor, grw: 1 };
                     G.world = { heroPos: r.worldPos || null, out: !!r.worldOut };
                     // продолжение с середины этажа — в подземелье, иначе —
                     // в открытый мир (герой вышел из пещер или только начал);
@@ -341,10 +361,8 @@
                 });
                 if (!contEnabled) bCont.alpha = 0.45; // забега нет — кнопка приглушена
                 const bNew = addMenuBtn(t("menu.newGame"), 960, 720, () => {
-                    GAME_META.clearRun();
-                    G.resetRun();
-                    scenes.go("world"); // новый забег начинается в открытом мире
-                    G.saveRun(); // свежий забег сразу сохранён
+                    // стихия задаёт стартовую колоду — сначала выбор (юзер)
+                    scenes.go("elemPick");
                 });
                 addMenuBtn(t("menu.deck"), 960, 810, () => scenes.go("deck"));
                 addMenuBtn(t("menu.settings"), 960, 900, () => scenes.go("settings"));
@@ -417,6 +435,103 @@
             },
         });
 
+        // ── Сцена «Выбор стихии» (новая игра) ─────────────────────────────
+        // Стихия задаёт стартовую колоду/коллекцию (просил юзер): карточки
+        // с лого стихий из images/ui/logo. Пока две — Сила и Рост.
+        let epRoot = null;
+        const ELEM_ORDER = ["strength", "growth"];
+        scenes.add("elemPick", {
+            enter() {
+                gameMusic("menu");
+                epRoot = new PIXI.Container();
+                epRoot.eventMode = "static";
+                const bg = new PIXI.Sprite(uiTex("bg_corridor_2.png"));
+                const s = Math.max(1920 / bg.texture.width, 1080 / bg.texture.height);
+                bg.scale.set(s);
+                bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);
+                epRoot.addChild(bg);
+                const dim = new PIXI.Graphics();
+                dim.rect(0, 0, 1920, 1080);
+                dim.fill({ color: 0x000000, alpha: 0.5 });
+                epRoot.addChild(dim);
+
+                const title = T(t("menu.pickElem"), 96, 0xf0c96a,
+                    { stroke: { color: 0x241505, width: 9 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 118);
+                title.eventMode = "none";
+                epRoot.addChild(title);
+                const sub = T(t("menu.pickElemSub"), 30, 0xd8c79d);
+                sub.anchor.set(0.5, 0);
+                sub.position.set(960, 262);
+                sub.eventMode = "none";
+                epRoot.addChild(sub);
+
+                const cards = [];
+                ELEM_ORDER.forEach((elem, k) => {
+                    const cx = 600 + k * 720;
+                    const c = new PIXI.Container();
+                    c.position.set(cx, 640);
+                    const panel = new PIXI.Graphics();
+                    panel.roundRect(-230, -230, 460, 460, 22);
+                    panel.fill({ color: 0x171310, alpha: 0.94 });
+                    panel.stroke({ width: 4, color: 0x6b5c40 });
+                    c.addChild(panel);
+                    const logo = new PIXI.Sprite(uiTex(GAME_DATA.ELEM_LOGO[elem]));
+                    logo.anchor.set(0.5);
+                    logo.scale.set(1.55);
+                    c.addChild(logo);
+                    logo.position.set(0, -100);
+                    const name = T(t("elem." + elem), 57, 0xf0c96a,
+                        { stroke: { color: 0x241505, width: 8 } });
+                    name.anchor.set(0.5, 0);
+                    name.position.set(0, 24);
+                    name.eventMode = "none";
+                    c.addChild(name);
+                    const desc = T(t("menu.elem" + (elem === "strength" ? "Strength" : "Growth") + "Desc"),
+                        25, 0xd8c79d, { wordWrap: true, wordWrapWidth: 396, align: "center" });
+                    desc.anchor.set(0.5, 0);
+                    desc.position.set(0, 110);
+                    desc.eventMode = "none";
+                    c.addChild(desc);
+                    c.eventMode = "static";
+                    // подсветка наведения — отдельная рамка с альфой (повторный
+                    // Graphics.stroke дописывает команду, а не заменяет её)
+                    const glow = new PIXI.Graphics();
+                    glow.roundRect(-230, -230, 460, 460, 22);
+                    glow.stroke({ width: 5, color: 0xf0c96a });
+                    glow.alpha = 0;
+                    c.addChild(glow);
+                    c.on("pointerover", () => { glow.alpha = 1; logo.scale.set(1.68); });
+                    c.on("pointerout", () => { glow.alpha = 0; logo.scale.set(1.55); });
+                    c.on("pointertap", () => {
+                        if (ctx.sfx) ctx.sfx();
+                        GAME_META.clearRun();
+                        G.resetRun(elem);
+                        scenes.go("world"); // новый забег — в открытом мире
+                        G.saveRun(); // свежий забег сразу сохранён
+                    });
+                    epRoot.addChild(c);
+                    cards.push({ elem, node: c, x: cx, y: 640 });
+                });
+                epRoot.addChild(menuButton("button_menu.png", t("settings.back"), 165, 78, 1,
+                    () => scenes.go("menu")));
+                window.__GAME.elemPick = {
+                    options: () => cards.map((c) => ({ elem: c.elem, x: c.x, y: c.y })),
+                    pick(elem) {
+                        const c = cards.find((x) => x.elem === elem);
+                        if (c) c.node.emit("pointertap");
+                    },
+                };
+                ui.addChild(epRoot);
+                worldContainer.visible = false;
+            },
+            exit() {
+                window.__GAME.elemPick = null;
+                if (epRoot) { epRoot.destroy({ children: true }); epRoot = null; }
+            },
+        });
+
         // ── Открытый мир, подземелье, арена, колода, награда, настройки ──
         const worldScene = GAME_WORLD.createWorldScene(ctx);
         scenes.add("world", worldScene);
@@ -469,6 +584,8 @@
             stats: () => ({
                 scene: scenes.current,
                 hero: { ...G.hero }, floor: G.run.floor, gold: G.gold,
+                elem: G.elem, cave: G.run.cave,
+                floors: { ...(G.run.floors || {}) },
                 heroPos: (() => {
                     // герой живёт в подземелье или открытом мире (сцена)
                     const ids = [dungeonScene.heroId(), worldScene.heroId()];
@@ -481,6 +598,7 @@
                 collection: { ...G.collection },
                 settings: { ...G.settings },
                 dungeon: G.dungeon ? {
+                    cave: G.dungeon.cave || "gob",
                     enemies: G.dungeon.enemies.filter((e) => e.alive).length,
                     bossDead: G.dungeon.bossDead,
                     floors: Object.keys(G.dungeonStates || {}).map(Number), // посещённые этажи

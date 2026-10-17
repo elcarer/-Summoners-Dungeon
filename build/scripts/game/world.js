@@ -10,8 +10,9 @@
 (function () {
     const TS = 40;
     // '#': деревья/скалы (стена), '~': вода (тоже стена), '.': трава,
-    // 'W': старт героя, 'C': вход в Гоблинские пещеры. Вход стоит в поле
-    // у скального массива справа — арка читается без рамки.
+    // 'W': старт героя, 'C': вход в Гоблинские пещеры (Сила), 'G': вход
+    // в Рощу Роста (Рост). Вход стоит в поле у скального массива справа —
+    // арка читается без рамки.
     const ROWS = [
         "##############################",
         "#............................#",
@@ -25,12 +26,14 @@
         "#........##........##........#",
         "#....##........##............#",
         "#.....................##.....#",
-        "#........##..................#",
+        "#........##.............G....#",
         "#..............##............#",
         "#...##...................##..#",
         "#............................#",
         "##############################",
     ];
+    // входы подземелий: символ карты → id данжа (dataCards CAVES)
+    const CAVES_ON_MAP = { C: "gob", G: "grw" };
     const W = ROWS[0].length, H = ROWS.length;
 
     function findCh(ch) {
@@ -108,11 +111,12 @@
             return g;
         }
 
-        // Вход в Гоблинские пещеры: та же арка-спуск, что и выход этажа,
-        // с именем подземелья сверху. Триггер — касание героем.
-        function makeCave() {
+        // Входы в подземелья: та же арка-спуск, что и выход этажа, с именем
+        // подземелья сверху (Гоблинские пещеры / Роща Роста). Триггер —
+        // касание героем.
+        function makeCave(ch, labelKey) {
             const c = new PIXI.Container();
-            const p = findCh("C");
+            const p = findCh(ch);
             const shadow = new PIXI.Graphics();
             shadow.circle(0, 0, 21);
             shadow.fill({ color: 0x0d130a, alpha: 0.55 });
@@ -122,7 +126,7 @@
             sp.scale.set(0.66);
             c.addChild(sp);
             const t = new PIXI.Text({
-                text: GAME_LOC.t("world.cave"),
+                text: GAME_LOC.t(labelKey),
                 style: { fontFamily: "Kereru", fontSize: 13, fill: 0xffe9b0,
                     stroke: { color: 0x1c1207, width: 3 } },
             });
@@ -195,16 +199,28 @@
             return c;
         }
 
-        // Вход в подземелье: продолжить текущий этаж забега (состояния
+        // Вход в подземелье: продолжить текущий этаж ЭТОГО данжа (состояния
         // этажей хранит G.dungeonStates — враги/объекты как их оставили)
-        // или начать первый. Герой прибывает к старту этажа (у лестницы).
-        function enterCave() {
+        // или начать его первый. Герой прибывает к старту этажа (у лестницы).
+        // У каждого подземелья своя глубина (G.run.floors).
+        function enterCave(cave) {
+            const caveId = globalThis.GAME_DATA.CAVES[cave] ? cave : "gob";
             if (heroId !== null) {
                 G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
             }
+            // уходим в ДРУГОЙ данж — текущий этаж архивируется, чтобы
+            // прогресс (враги/объекты/позиция) не потерялся
+            if (G.dungeon && G.dungeon.v === 3 && G.dungeon.cave !== caveId) {
+                G.dungeonStates[(G.dungeon.cave || "gob") + ":" + G.dungeon.floor] = G.dungeon;
+            }
+            if (G.run.cave !== caveId) {
+                G.run.cave = caveId;
+                G.run.floor = (G.run.floors || (G.run.floors = {}))[caveId] || 1;
+            }
             // архив этажей другой геометрии (v≠3) не поднимается —
             // stateFor отдаст свежий этаж текущей сетки
-            const st = globalThis.GAME_DUNGEON.stateFor(G.dungeonStates, G.run.floor);
+            const st = globalThis.GAME_DUNGEON.stateFor(G.dungeonStates, caveId, G.run.floor);
+            st.cave = caveId;
             if (st.spawn) st.heroPos = { ...st.spawn }; // прибытие к лестнице
             st.exitCool = false;
             G.dungeon = st;
@@ -217,15 +233,23 @@
                 if (ctx.music) ctx.music("menu"); // трек мира (пока общий с меню)
                 ctx.collide.rows = ROWS; // коллизии героя — по карте мира
                 ctx.collide.ts = 40; // после подземелья (клетка 56) — вернуть шаг мира
-                const cave = findCh("C"), spawn = findCh("W");
-                // точка появления: вышедший из пещеры герой стоит у входа;
-                // сохранившаяся позиция у самого входа не должна мгновенно
-                // сработать триггер — ставим клеткой левее
+                const cave = findCh("C"), spawn = findCh("W"), grove = findCh("G");
+                // точка появления: вышедший из подземелья герой стоит у входа
+                // ТОГО данжа; сохранившаяся позиция у самого входа не должна
+                // мгновенно сработать триггер — ставим клеткой левее
+                const nearCave = (p) => [cave, grove].some((cv) =>
+                    Math.hypot(p.x - cv.x, p.y - cv.y) < TS * 1.2);
                 let hp = G.world.heroPos ? { ...G.world.heroPos } : null;
-                if (G.world.out) { hp = { x: cave.x - TS, y: cave.y }; G.world.out = false; }
+                if (G.world.out) {
+                    const at = G.world.outCave === "grw" ? grove : cave;
+                    hp = { x: at.x - TS, y: at.y };
+                    G.world.out = false;
+                }
                 else if (!hp) hp = { ...spawn };
-                else if (Math.hypot(hp.x - cave.x, hp.y - cave.y) < TS * 1.2) {
-                    hp = { x: cave.x - TS, y: cave.y };
+                else if (nearCave(hp)) {
+                    const at = Math.hypot(hp.x - grove.x, hp.y - grove.y)
+                        < Math.hypot(hp.x - cave.x, hp.y - cave.y) ? grove : cave;
+                    hp = { x: at.x - TS, y: at.y };
                 }
                 G.world.heroPos = { ...hp };
 
@@ -245,7 +269,8 @@
                 });
                 layer.addChild(zone);
                 layer.addChild(buildMapGfx());
-                layer.addChild(makeCave());
+                layer.addChild(makeCave("C", "world.cave"));
+                layer.addChild(makeCave("G", "world.caveGrowth"));
                 worldContainer.addChild(layer);
 
                 const sprite = new PIXI.AnimatedSprite(ctx.knight.animations.wait, false);
@@ -313,11 +338,13 @@
                 uiHud.userData.goldT.text = String(G.gold);
                 globalThis.GAME_UI.fit(uiHud.userData.hpT, 128, 11);
 
-                // вход в пещеру — касание арки
-                const cave = findCh("C");
-                if (Math.hypot(cave.x - hx, cave.y - hy) < TS * 0.85) {
-                    enterCave();
-                    return;
+                // входы в подземелья — касание арки
+                for (const [ch, caveId] of Object.entries(CAVES_ON_MAP)) {
+                    const at = findCh(ch);
+                    if (Math.hypot(at.x - hx, at.y - hy) < TS * 0.85) {
+                        enterCave(caveId);
+                        return;
+                    }
                 }
             },
             ROWS,
@@ -328,7 +355,10 @@
                     const hero = heroId !== null
                         ? { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] }
                         : { ...G.world.heroPos };
-                    return { heroPos: hero, spawn: findCh("W"), cave: findCh("C") };
+                    return {
+                        heroPos: hero, spawn: findCh("W"),
+                        cave: findCh("C"), grove: findCh("G"),
+                    };
                 },
                 setHeroPos(x, y) {
                     if (heroId === null) return false;
@@ -336,7 +366,7 @@
                     COMPONENTS.positionY[heroId] = y;
                     return true;
                 },
-                enterCave: () => enterCave(),
+                enterCave: (cave) => enterCave(cave),
                 path: () => path,
                 worldToScreen: (x, y) => (layer ? layer.toGlobal({ x, y }) : null),
             },

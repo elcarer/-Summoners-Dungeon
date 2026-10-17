@@ -12,14 +12,21 @@
 // сундук с картой и магазин (только со 2-го этажа, не больше 1 на этаж).
 (function () {
     const TS = 56; // клетка = размер тайлов юзера (пол 56×56, кап 56×28, лицо 56×54)
-    const MAX_FLOOR = 6; // глубина «Гоблинских пещер» (стихия «Сила»)
+    // Подземелья (id → стихия/глубина/босс) — dataCards CAVES; гоблинские
+    // пещеры и Роща Роста пока одной глубины 6
+    const CAVES = () => globalThis.GAME_DATA.CAVES;
+    const caveOf = (id) => CAVES()[id] || CAVES().gob;
+    const MAX_FLOOR = 6;
     // Версия раскладки этажа: тайлы 56px (v3). Сейвы волн с другой
-    // геометрией (координаты в других клетках) не поднимаются — этаж
+    // геометрии (координаты в других клетках) не поднимаются — этаж
     // пересобирается заново.
     const MAP_V = 3;
-    function stateFor(states, floor) {
-        const st = states && states[floor];
-        return st && st.v === MAP_V ? st : newDungeonState(floor);
+    // Ключ архива этажей — «данж:этаж» (gob:1, grw:2…): у каждого
+    // подземелья своя история подъёмов/спусков
+    const stKey = (cave, floor) => (caveOf(cave) && cave !== undefined ? cave : "gob") + ":" + floor;
+    function stateFor(states, cave, floor) {
+        const st = states && states[stKey(cave, floor)];
+        return st && st.v === MAP_V ? st : newDungeonState(cave, floor);
     }
     // #: стена, .: пол, H: старт героя, e: враг, B: главарь, X: выход.
     // Враги стоят В КОРИДОРАХ, перекрывая входы в комнаты (просил юзер),
@@ -58,8 +65,9 @@
     // из пула — не больше 1 каждого на этаж (драфт — долгое состязание).
     // Сумма кучи и карта сундука кидаются при генерации этажа и хранятся
     // в объекте — сейв/загрузка показывает то же самое.
-    function genObjects(floor) {
+    function genObjects(floor, cave = "gob") {
         const { rollLootCard } = globalThis.GAME_DATA;
+        const elem = caveOf(cave).elem; // карты сундуков/магазина — стихии данжа
         const centers = ROOM_CENTERS.slice(1); // стартовая комната — без объектов
         for (let i = centers.length - 1; i > 0; i--) {
             const j = (Math.random() * (i + 1)) | 0;
@@ -73,8 +81,8 @@
             if (type === "shop" || type === "map") pool.splice(pi, 1); // ≤ 1 на этаж
             const obj = { type, col, row, taken: false };
             if (type === "gold") obj.amount = 1 + ((Math.random() * 5) | 0) + (floor - 1);
-            if (type === "chest") obj.card = rollLootCard();
-            if (type === "shop") obj.stock = Array.from({ length: 6 }, () => rollLootCard());
+            if (type === "chest") obj.card = rollLootCard(elem);
+            if (type === "shop") obj.stock = Array.from({ length: 6 }, () => rollLootCard(elem));
             if (type === "shop") obj.sold = [false, false, false, false, false, false];
             return obj;
         });
@@ -87,25 +95,28 @@
         return Math.min(globalThis.GAME_DATA.DECK_MAX, 12 + floor);
     }
 
-    function newDungeonState(floor) {
+    function newDungeonState(cave, floor) {
+        const caveId = globalThis.GAME_DATA.CAVES[cave] ? cave : "gob";
         const { mobForFloor, enemyDeck } = globalThis.GAME_DATA;
         const st = {
             v: MAP_V,
+            cave: caveId,
             floor, heroPos: null, spawn: null, ladder: null, enemies: [],
             exit: null, exitCool: false, bossDead: false,
-            toast: null, toastT: 0, objects: genObjects(floor), win: null,
+            toast: null, toastT: 0, objects: genObjects(floor, caveId), win: null,
         };
+        const bossId = caveOf(caveId).boss; // главарь данжа (boss / grwBoss)
         for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
             const ch = ROWS[j][i];
             const x = i * TS + TS / 2, y = j * TS + TS / 2;
             if (ch === "H") { st.heroPos = { x, y }; st.spawn = { x, y }; }
             else if (ch === "e") {
-                // архетип по этажу; колода кидается один раз и хранится
+                // архетип по этажу ДАНЖА; колода кидается один раз и хранится
                 // в враге — тултип и бой показывают один и тот же состав
-                const enc = mobForFloor(floor);
+                const enc = mobForFloor(caveId, floor);
                 st.enemies.push({ x, y, enc, deck: enemyDeck(enc, floor), alive: true, boss: false });
             }
-            else if (ch === "B") st.enemies.push({ x, y, enc: "boss", deck: enemyDeck("boss", floor), alive: true, boss: true });
+            else if (ch === "B") st.enemies.push({ x, y, enc: bossId, deck: enemyDeck(bossId, floor), alive: true, boss: true });
             else if (ch === "X") st.exit = { x, y };
         }
         // лестница наверх — в стартовой комнате, клеткой выше героя:
@@ -830,8 +841,11 @@
         return {
             enter() {
                 if (ctx.music) ctx.music("dungeon");
-                // сейв другой геометрии (v≠3) — этаж пересобирается
-                if (!G.dungeon || G.dungeon.v !== MAP_V) G.dungeon = newDungeonState(G.run.floor);
+                // сейв другой геометрии (v≠3) — этаж пересобирается; сейвы
+                // до вторых данжей жили в гоблинских пещерах
+                if (!G.dungeon || G.dungeon.v !== MAP_V)
+                    G.dungeon = newDungeonState(G.run.cave, G.run.floor);
+                if (!G.dungeon.cave) G.dungeon.cave = "gob";
                 const st = G.dungeon;
                 myState = st;
                 ctx.collide.rows = ROWS; // коллизии героя — по карте этажа
@@ -842,7 +856,7 @@
                     st.heroPos = { ...st.spawn };
                 }
                 // сейвы старых волн без объектов — генерируются при заходе
-                if (!st.objects) { st.objects = genObjects(st.floor); st.win = null; }
+                if (!st.objects) { st.objects = genObjects(st.floor, st.cave); st.win = null; }
                 for (const o of st.objects)
                     if (o.type === "shop" && !o.sold) o.sold = [false, false, false, false, false, false];
                 // сейвы до «объектов вне стартовой комнаты»: в стартовой
@@ -1055,15 +1069,17 @@
                     && Math.hypot(st.ladder.x - hx, st.ladder.y - hy) < TS * 0.85) {
                     const from = st.floor;
                     st.heroPos = { x: hx, y: hy };
-                    G.dungeonStates[from] = st; // этаж остаётся в том виде, как оставили
+                    G.dungeonStates[stKey(st.cave, from)] = st; // этаж — в архив как оставили
                     if (from <= 1) {
                         G.dungeon = null;
                         G.world.heroPos = null;
                         G.world.out = true; // из пещеры — к самому входу
+                        G.world.outCave = st.cave || "gob"; // к входу ЭТОГО данжа
                         scenes.go("world");
                     } else {
                         G.run.floor = from - 1;
-                        const prev = stateFor(G.dungeonStates, from - 1);
+                        (G.run.floors || (G.run.floors = {}))[st.cave] = from - 1;
+                        const prev = stateFor(G.dungeonStates, st.cave, from - 1);
                         prev.heroPos = { x: prev.exit.x, y: prev.exit.y }; // у спуска
                         prev.exitCool = true; // не провалиться сразу обратно
                         G.dungeon = prev;
@@ -1082,8 +1098,8 @@
                         // поднялись и стоим на спуске: уйдём на клетку-другую —
                         // выход «остынет» и снова заработает
                     } else if (!st.bossDead) showToast(GAME_LOC.t("dungeon.exitSealed"));
-                    // дно подземелья: глубже MAX_FLOOR спуска нет (просил юзер)
-                    else if (st.floor >= MAX_FLOOR) {
+                    // дно подземелья: глубже его капа спуска нет (просил юзер)
+                    else if (st.floor >= caveOf(st.cave).maxFloor) {
                         showToast(GAME_LOC.t("dungeon.exitBottom"));
                     }
                     // спуск требует растущую колоду: на этаже N — минимум
@@ -1092,11 +1108,12 @@
                         showToast(GAME_LOC.t("dungeon.exitDeck", { n: deckNeed(st.floor) }));
                     } else {
                         st.heroPos = { x: hx, y: hy };
-                        G.dungeonStates[st.floor] = st;
+                        G.dungeonStates[stKey(st.cave, st.floor)] = st;
                         G.run.floor = st.floor + 1;
+                        (G.run.floors || (G.run.floors = {}))[st.cave] = st.floor + 1;
                         // посещённый этаж восстанавливается из архива, новый
                         // генерируется; герой прибывает к старту (у лестницы)
-                        const next = stateFor(G.dungeonStates, G.run.floor);
+                        const next = stateFor(G.dungeonStates, st.cave, G.run.floor);
                         next.heroPos = { ...next.spawn };
                         next.exitCool = false;
                         G.dungeon = next;
@@ -1164,9 +1181,9 @@
             hudGold: () => (uiHud && uiHud.userData.goldT ? uiHud.userData.goldT.text : null),
             // формула минимума колоды для спуска (тесты + единый источник)
             deckNeed: (f) => deckNeed(f),
-            // лестница наверх у старта этажа и предел глубины (тесты)
+            // лестница наверх у старта этажа и предел глубины данжа (тесты)
             ladderAt: () => (G.dungeon && G.dungeon.ladder ? { ...G.dungeon.ladder } : null),
-            maxFloor: () => MAX_FLOOR,
+            maxFloor: (cave) => caveOf(cave || (G.dungeon && G.dungeon.cave) || "gob").maxFloor,
         };
     }
 

@@ -6,10 +6,14 @@
 // назад в подземелье; «Уйти» — сдаться до боя, объект не расходуется.
 (function () {
     const DRAFT_ROUNDS = 12;
-    // Пул драфта — все карты стихии подземелья, в котором найдена карта.
-    // Подземелий пока одно («Сила») — стихию задаём константой; служебные
-    // карты без лица (gobA) не драфтятся.
-    const DRAFT_ELEM = "strength";
+    // Пул драфта — все карты стихии подземелья, в котором найдена карта
+    // сокровищ (гоблинские пещеры — Сила, Роща Роста — Рост); служебные
+    // карты без лица (gobA/gobC) не драфтятся.
+    function draftElemOf(G) {
+        const cave = G.dungeon && G.dungeon.cave;
+        const info = cave && globalThis.GAME_DATA.CAVES[cave];
+        return info ? info.elem : "strength";
+    }
 
     function createDraftScene(ctx) {
         const { scenes, G, ui, scheduler } = ctx;
@@ -22,8 +26,9 @@
         let lastPicked = -1, lastEnemy = -1;
 
         function draftPool() {
+            const elem = draftElemOf(G);
             return Object.keys(CARDS).filter((id) =>
-                CARDS[id].elem === DRAFT_ELEM && CARDS[id].img);
+                CARDS[id].elem === elem && CARDS[id].img);
         }
 
         function pickThree() {
@@ -202,5 +207,5 @@
         };
     }
 
-    globalThis.GAME_DRAFT = { createDraftScene, DRAFT_ROUNDS, DRAFT_ELEM };
+    globalThis.GAME_DRAFT = { createDraftScene, DRAFT_ROUNDS, draftElemOf };
 })();
