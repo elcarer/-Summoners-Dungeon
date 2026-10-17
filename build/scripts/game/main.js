@@ -62,7 +62,10 @@
         for (const f of ["floor/0", "floor/1", "floor/2", "floor/3",
             "floor/4", "floor/5", "walls/wall_h1", "walls/wall_h1_td",
             "walls/wall_h1_tu", "walls/wall_v1", "walls/wall_v1_tl",
-            "walls/wall_v1_tr", "walls/wall_cross"]) {
+            "walls/wall_v1_tr", "walls/wall_cross", "walls/wall_cor1",
+            "walls/wall_cor2", "walls/wall_cor3", "walls/wall_cor4",
+            "walls/wall_end1", "walls/wall_end2", "walls/wall_end3",
+            "walls/wall_end4"]) {
             uiTextures[`dungeon_tiles/${f}.png`] =
                 await assets.loadTexture(`./images/dungeon_tiles/goblins_lair/${f}.png`);
         }
