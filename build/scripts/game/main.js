@@ -53,6 +53,19 @@
         // эффект поля «Стена костров» и рубашка колоды врага (гоблины)
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
         uiTextures["card_goblin_back.png"] = await assets.loadTexture("./images/ui/card_goblin_back.png");
+        // тайлы подземелья юзера: images/dungeon_tiles/<…>.png — полы,
+        // стены (кап/лицо), тень, декор (факелы/окошки/щебёнка/лестницы)
+        say("тайлы подземелья…");
+        await frame();
+        for (const f of ["floor_0", "floor_1", "floor_2", "floor_3", "floor_4",
+            "floor_5", "floor_6", "floor_7", "floor_8", "wall_top_0", "wall_top_1",
+            "wall_top_2", "wall_top_3", "wall_face_0", "wall_face_1", "wall_face_2",
+            "wall_face_3", "shadow", "door_gate", "wall_torch", "wall_window_a",
+            "wall_window_b", "stair_a", "stair_b", "stair_c", "rubble_0", "rubble_1",
+            "rubble_2", "rubble_3", "prop_barrel", "prop_crates", "prop_crate"]) {
+            uiTextures[`dungeon_tiles/${f}.png`] =
+                await assets.loadTexture(`./images/dungeon_tiles/${f}.png`);
+        }
         // лица карт стихий: images/cards/<elem>/<№>.png (def.img в dataCards)
         say("карты…");
         await frame();
@@ -164,10 +177,11 @@
         const camera = createCamera({ app, container: worldContainer, addSystem });
 
         // Коллизии героя (character-система) — по карте АКТИВНОЙ сцены:
-        // подземелье и открытый мир подменяют collide.rows при входе
-        const collide = { rows: GAME_DUNGEON.ROWS };
+        // подземелье и открытый мир подменяют collide.rows при входе,
+        // а также шаг клетки (мир — 40px, подземелье — 56px тайлы)
+        const collide = { rows: GAME_DUNGEON.ROWS, ts: 40 };
         function blocked(px, py) {
-            const gx = Math.floor(px / 40), gy = Math.floor(py / 40);
+            const gx = Math.floor(px / collide.ts), gy = Math.floor(py / collide.ts);
             const rows = collide.rows;
             if (gy < 0 || gy >= rows.length || gx < 0 || gx >= rows[0].length) return true;
             const ch = rows[gy][gx];
@@ -309,15 +323,21 @@
                     G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp || 10 };
                     G.gold = r.gold || 0;
                     G.run.floor = r.floor;
-                    G.dungeon = r.dungeon || null;
-                    // этажи и мир: сейвы старых волн без архива — данный
-                    // этаж становится первым в архиве
-                    G.dungeonStates = r.dungeonStates
-                        || (r.dungeon ? { [r.floor]: r.dungeon } : {});
+                    // поднимаются только этажи текущей геометрии (v3 —
+                    // тайлы 56px): сейвы волн с другой сеткой пересоберутся
+                    G.dungeon = r.dungeon && r.dungeon.v === 3 ? r.dungeon : null;
+                    G.dungeonStates = {};
+                    for (const k in (r.dungeonStates || {})) {
+                        if (r.dungeonStates[k] && r.dungeonStates[k].v === 3)
+                            G.dungeonStates[k] = r.dungeonStates[k];
+                    }
+                    if (!G.dungeon) G.dungeon = G.dungeonStates[r.floor] || null;
+                    if (G.dungeon && !G.dungeonStates[r.floor]) G.dungeonStates[r.floor] = G.dungeon;
                     G.world = { heroPos: r.worldPos || null, out: !!r.worldOut };
                     // продолжение с середины этажа — в подземелье, иначе —
-                    // в открытый мир (герой вышел из пещер или только начал)
-                    scenes.go(r.dungeon ? "dungeon" : "world");
+                    // в открытый мир (герой вышел из пещер или только начал);
+                    // решает ОТФИЛЬТРОВАННОЕ состояние (G.dungeon), не сейв
+                    scenes.go(G.dungeon ? "dungeon" : "world");
                 });
                 if (!contEnabled) bCont.alpha = 0.45; // забега нет — кнопка приглушена
                 const bNew = addMenuBtn(t("menu.newGame"), 960, 720, () => {

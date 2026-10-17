@@ -1,6 +1,8 @@
 // СЦЕНА «ПОДЗЕМЕЛЬЕ» — top-down перемещение героя, энкаунтеры-враги, выход.
-// v0: фиксированная карта-ASCII (30×17, тайл 40px), тайлы — плоские заглушки,
-// враги — жетоны-ромбы, герой — спрайт движка knight_64 (заглушка).
+// Карта-ASCII 30×17 собирается из тайлов юзера (images/dungeon_tiles,
+// клетка 56px): пол — плиты с вариациями, стены — «верх» (кап) либо
+// кирпичное «лицо» с капом, если ниже пол; южные стены украшаются
+// факелами/окошками, пол — редкой щебёнкой.
 // Состояние живёт в G.dungeon (переживает уход в арену и обратно);
 // состояния пройденных этажей — в G.dungeonStates: по лестнице у старта
 // герой поднимается на этаж выше (на 1-м — выходит в открытый мир),
@@ -9,8 +11,16 @@
 // В центрах комнат (кроме боссовой) — интерактивные объекты: куча золота,
 // сундук с картой и магазин (только со 2-го этажа, не больше 1 на этаж).
 (function () {
-    const TS = 40;
+    const TS = 56; // клетка = размер тайлов юзера (пол 56×56, кап 56×28, лицо 56×54)
     const MAX_FLOOR = 6; // глубина «Гоблинских пещер» (стихия «Сила»)
+    // Версия раскладки этажа: тайлы 56px (v3). Сейвы волн с другой
+    // геометрией (координаты в других клетках) не поднимаются — этаж
+    // пересобирается заново.
+    const MAP_V = 3;
+    function stateFor(states, floor) {
+        const st = states && states[floor];
+        return st && st.v === MAP_V ? st : newDungeonState(floor);
+    }
     // #: стена, .: пол, H: старт героя, e: враг, B: главарь, X: выход.
     // Враги стоят В КОРИДОРАХ, перекрывая входы в комнаты (просил юзер),
     // а не в центрах: (3,7) — выход из стартовой комнаты, (24,6) — вход
@@ -80,6 +90,7 @@
     function newDungeonState(floor) {
         const { mobForFloor, enemyDeck } = globalThis.GAME_DATA;
         const st = {
+            v: MAP_V,
             floor, heroPos: null, spawn: null, ladder: null, enemies: [],
             exit: null, exitCool: false, bossDead: false,
             toast: null, toastT: 0, objects: genObjects(floor), win: null,
@@ -157,18 +168,54 @@
             COMPONENTS.ctrlVJ[heroId] = iy;
         }
 
+        // ── Карта из тайлов юзера ─────────────────────────────────────────
+        // Пол — 9 плит с вариациями (выбор по детерминированному хэшу клетки,
+        // чтобы сейв/перезаход показывали тот же пол); редкая щебёнка оживляет.
+        // Стена с полом снизу — «южная»: кирпичное лицо (низ по клетке) + кап
+        // поверх верхушки лица (нависает на 16px вверх); прочие стены — кап
+        // по центру клетки на тёмной подложке. Южные лица разнообразим
+        // факелом/окошками, спуск — лестницей-спрайтом вместо рисованной.
+        const FLOORS = 9, CAPS = 4, FACES = 4;
+        function hsh(i, j, k) { return ((i * 73856093 ^ j * 19349663 ^ (k || 0) * 83492791) >>> 0) % 1000; }
         function buildMapGfx() {
-            const g = new PIXI.Graphics();
+            const c = new PIXI.Container();
+            const base = new PIXI.Graphics(); // тёмная подложка всей карты
+            base.rect(0, 0, W * TS, H * TS);
+            base.fill(0x241f1a);
+            c.addChild(base);
+            const tile = (name, x, y, anchorBottom) => {
+                const sp = new PIXI.Sprite(uiTex(`dungeon_tiles/${name}.png`));
+                if (sp.texture.width !== TS) sp.scale.set(TS / sp.texture.width); // декор — в ширину клетки
+                if (anchorBottom) sp.anchor.set(0, 1); // левый-низ: лица/декор стен
+                else sp.anchor.set(0, 0);
+                sp.position.set(x, y);
+                c.addChild(sp);
+            };
+            // полы + щебёнка
             for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
-                const wall = ROWS[j][i] === "#";
-                g.rect(i * TS, j * TS, TS, TS);
-                g.fill(wall ? 0x2b2620 : 0x4a4136);
-                if (wall) { g.rect(i * TS + 2, j * TS + 2, TS - 4, TS - 4); g.fill(0x35302a); }
-                else { g.rect(i * TS + 1, j * TS + 1, TS - 2, TS - 2); g.fill(0x52493c); }
+                if (ROWS[j][i] === "#") continue;
+                tile(`floor_${hsh(i, j) % FLOORS}`, i * TS, j * TS);
+                const h = hsh(i, j, 7);
+                if (h < 80) tile(`rubble_${h % 4}`, i * TS, (j + 1) * TS, true);
             }
-            g.rect(0, 0, W * TS, H * TS);
-            g.stroke({ width: 4, color: 0x191512, alignment: 0.5 });
-            return g;
+            // стены: сверху вниз, чтобы лица верхних рядов ложились под нижние
+            for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+                if (ROWS[j][i] !== "#") continue;
+                const south = j + 1 >= H || ROWS[j + 1][i] !== "#";
+                if (south) {
+                    tile("shadow", i * TS, (j + 1) * TS, true); // тень на полу у стены
+                    tile(`wall_face_${hsh(i, j, 3) % FACES}`, i * TS, (j + 1) * TS, true);
+                    tile(`wall_top_${hsh(i, j * 3) % CAPS}`, i * TS, j * TS - 16);
+                    const h = hsh(i, j, 11);
+                    if (h < 145) { // украшение южной стены: факел либо окошко
+                        const pick = h < 55 ? "wall_torch" : h < 100 ? "wall_window_a" : "wall_window_b";
+                        tile(pick, i * TS, (j + 1) * TS, true);
+                    }
+                } else {
+                    tile(`wall_top_${hsh(i, j * 3) % CAPS}`, i * TS, j * TS + 14);
+                }
+            }
+            return c;
         }
 
         function makeToken(enemy) {
@@ -783,10 +830,12 @@
         return {
             enter() {
                 if (ctx.music) ctx.music("dungeon");
-                if (!G.dungeon) G.dungeon = newDungeonState(G.run.floor);
+                // сейв другой геометрии (v≠3) — этаж пересобирается
+                if (!G.dungeon || G.dungeon.v !== MAP_V) G.dungeon = newDungeonState(G.run.floor);
                 const st = G.dungeon;
                 myState = st;
                 ctx.collide.rows = ROWS; // коллизии героя — по карте этажа
+                ctx.collide.ts = TS; // клетка этажа — 56px (тайлы юзера)
                 // сейв стоя на лестнице не должен мгновенно поднимать героя
                 if (st.ladder && st.heroPos
                     && Math.hypot(st.ladder.x - st.heroPos.x, st.ladder.y - st.heroPos.y) < TS * 0.9) {
@@ -880,7 +929,7 @@
                 sprite.anchor.set(0.5, 1);
                 heroId = characters.spawn({
                     x: st.heroPos.x, y: st.heroPos.y, sprite, anims: ctx.knight.animations,
-                    speed: 170, fps: ctx.knight.fps, halfW: 7, halfH: 5,
+                    speed: 238, fps: ctx.knight.fps, halfW: 10, halfH: 7,
                 });
                 // виртуальные оси: их пишет и путь (клик-перемещение), и
                 // зеркало клавиш/джойстика в update — герой всегда на них
@@ -893,7 +942,7 @@
                     get y() { return heroId !== null ? COMPONENTS.positionY[heroId] : st.heroPos.y; },
                 }, 8);
                 camera.setBounds({ x: 0, y: 0, width: W * TS, height: H * TS });
-                camera.setZoom(2.1);
+                camera.setZoom(1.5); // клетка на экране ~84px — как было при TS40×2.1
                 camera.centerOn(st.heroPos.x, st.heroPos.y);
                 uiHud = buildHud();
                 ctx.ui.addChild(uiHud);
@@ -1014,7 +1063,7 @@
                         scenes.go("world");
                     } else {
                         G.run.floor = from - 1;
-                        const prev = G.dungeonStates[from - 1] || newDungeonState(from - 1);
+                        const prev = stateFor(G.dungeonStates, from - 1);
                         prev.heroPos = { x: prev.exit.x, y: prev.exit.y }; // у спуска
                         prev.exitCool = true; // не провалиться сразу обратно
                         G.dungeon = prev;
@@ -1047,8 +1096,7 @@
                         G.run.floor = st.floor + 1;
                         // посещённый этаж восстанавливается из архива, новый
                         // генерируется; герой прибывает к старту (у лестницы)
-                        const next = G.dungeonStates[G.run.floor]
-                            || newDungeonState(G.run.floor);
+                        const next = stateFor(G.dungeonStates, G.run.floor);
                         next.heroPos = { ...next.spawn };
                         next.exitCool = false;
                         G.dungeon = next;
@@ -1122,5 +1170,5 @@
         };
     }
 
-    globalThis.GAME_DUNGEON = { createDungeonScene, newDungeonState, deckNeed, ROWS, MAX_FLOOR };
+    globalThis.GAME_DUNGEON = { createDungeonScene, newDungeonState, stateFor, deckNeed, ROWS, MAX_FLOOR };
 })();

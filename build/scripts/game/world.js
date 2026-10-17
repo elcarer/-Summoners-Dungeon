@@ -202,8 +202,9 @@
             if (heroId !== null) {
                 G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
             }
-            const st = G.dungeonStates[G.run.floor]
-                || globalThis.GAME_DUNGEON.newDungeonState(G.run.floor);
+            // архив этажей другой геометрии (v≠3) не поднимается —
+            // stateFor отдаст свежий этаж текущей сетки
+            const st = globalThis.GAME_DUNGEON.stateFor(G.dungeonStates, G.run.floor);
             if (st.spawn) st.heroPos = { ...st.spawn }; // прибытие к лестнице
             st.exitCool = false;
             G.dungeon = st;
@@ -215,6 +216,7 @@
             enter() {
                 if (ctx.music) ctx.music("menu"); // трек мира (пока общий с меню)
                 ctx.collide.rows = ROWS; // коллизии героя — по карте мира
+                ctx.collide.ts = 40; // после подземелья (клетка 56) — вернуть шаг мира
                 const cave = findCh("C"), spawn = findCh("W");
                 // точка появления: вышедший из пещеры герой стоит у входа;
                 // сохранившаяся позиция у самого входа не должна мгновенно
