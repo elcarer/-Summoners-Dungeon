@@ -56,11 +56,13 @@
         // Листы существ поля боя — по стихии карты: Рост — эльф, Сила (и
         // прочие) — гоблин. Стандарт листа — 256×256, ряды front/back/right/
         // left по 6 кадров. Взгляд по стороне: юниты игрока идут вверх
-        // (виден затылок), врага — вниз (анфас). Позже у каждого типа
-        // существ будет свой лист — тогда выбор переедет на def.creature.
+        // (виден затылок), врага — вниз (анфас). Отдельный лист — полем
+        // def.sheet у карты (сейчас — «Проросший волк», wolf_256); позже,
+        // когда листов станет больше, выбор целиком переедет на def.sheet.
         const SPRITE_SCALE = 0.525; // кадр 256 → ~134px, фигура ~102px в клетке
         const sheetOf = (u) => ctx.creatureSheets
-            && ctx.creatureSheets[u.def.elem === "growth" ? "elf" : "goblin"];
+            && (ctx.creatureSheets[u.def.sheet]
+                || ctx.creatureSheets[u.def.elem === "growth" ? "elf" : "goblin"]);
 
         const T = (text, size, fill, opts = {}) => new PIXI.Text({
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
@@ -412,6 +414,7 @@
         }
 
         function addUnit(side, cardId, col, row) {
+            if (!root) return null; // сцена уже вышла: поле уничтожено, призыву некуда
             const def = CARDS[cardId];
             const u = { side, def, col, row, hp: def.hp, curAtk: def.atk || 0, auraHp: 0, bonusAtk: 0 };
             const node = makeUnitNode(u);
@@ -466,8 +469,22 @@
                     recalcAuras();
                     const hn = u.node.getChildByName("hp");
                     if (hn) hn.text = String(u.hp);
-                    const p = cellXY(col, row);
+                    const p = cellXY(u.col, u.row);
                     floatText(p.x, p.y - 75, `+${grove}♥`, 0x9fd489);
+                }
+                // «Три монолита» (grw26): призыв СВОЕГО существа по соседству
+                // — поиск в колоде существа с ценой на 1 больше призванного
+                // и в руку; монолит при этом теряет 1 жизнь (может и умереть)
+                for (const o of B.units.slice()) {
+                    if (o === u || o.side !== side || o.def.type !== "building"
+                        || !o.def.monolith || !B.units.includes(o)
+                        || Math.abs(o.col - col) + Math.abs(o.row - row) !== 1) continue;
+                    if (side === "p") queueMonolithSearch(def.cost + 1);
+                    else monolithEnemyTake(def.cost + 1);
+                    const mp = cellXY(o.col, o.row);
+                    floatText(mp.x, mp.y - 60, "−1♥", 0xef9f8c);
+                    punch(o.node);
+                    damageUnit(o, 1, null, "monolith");
                 }
                 // «Эльфийский друид»: каждый призыв СУЩЕСТВА (не постройки)
                 // даёт владельцу каждого друида на поле +1 энергии — будит
@@ -947,8 +964,8 @@
         // «Извлечение духа» (grw17): снимаемые свойства КАРТЫ (способности,
         // ауры, особости построек); активные состояния считаются отдельно
         const PURGE_DEF_KEYS = ["ability", "aura", "campAura", "campfire", "groveAura",
-            "leaderAura", "mycelium", "riteStump", "spellBuffAura", "sprout",
-            "sisterDraw", "berserkSummon", "portalLeap"];
+            "leaderAura", "monolith", "mycelium", "riteStump", "spellBuffAura",
+            "sprout", "sisterDraw", "berserkSummon", "portalLeap"];
         function countProps(u) {
             let n = PURGE_DEF_KEYS.filter((k) => u.def[k] !== undefined).length;
             if (u.bonusAtk) n++; // перманентные бонусы (лагерь, «Природная мощь»)
@@ -1918,6 +1935,87 @@
             closeRunesPanel();
             layoutHand();
             refreshHud();
+        }
+
+        // ── Панель «Трёх монолитов» (grw26): поиск по ВСЕЙ колоде существа
+        // заданной цены — одно в руку. Триггер — призыв своего существа по
+        // соседству с монолитом (см. summonUnit); если монолитов несколько,
+        // панели выстраиваются в очередь и открываются по очереди.
+        let monolithPanel = null;
+        const monolithQueue = [];
+        let monolithCost = null; // цена поиска открытой панели (уже снята с очереди)
+        function monolithMatches(cost) {
+            return B.deck.map((id, idx) => ({ id, idx }))
+                .filter((m) => CARDS[m.id].type === "unit" && CARDS[m.id].cost === cost);
+        }
+        function monolithTake(m) { // из колоды — в руку
+            B.deck.splice(m.idx, 1);
+            B.hand.push(m.id);
+            sfx("chpoc");
+            layoutHand();
+            refreshHud();
+            floatText(960, 840, "+1 " + GAME_LOC.t("card.grw20.draw"), 0x9fd489);
+        }
+        function closeMonolithPanel() {
+            if (monolithPanel) {
+                monolithPanel.destroy({ children: true });
+                monolithPanel = null;
+            }
+            pumpMonolithQueue();
+        }
+        function pumpMonolithQueue() {
+            if (!B || !root) return;
+            const cost = monolithQueue.shift();
+            monolithCost = cost ?? null;
+            if (cost === undefined) { B.picking = false; return; }
+            const matches = monolithMatches(cost);
+            if (!matches.length) { pumpMonolithQueue(); return; } // нет существа — пропускаем
+            if (matches.length === 1) { monolithTake(matches[0]); pumpMonolithQueue(); return; }
+            B.picking = true;
+            const node = new PIXI.Container();
+            node.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(0, 0, 1920, 1080);
+            dim.fill({ color: 0x000000, alpha: 0.6 });
+            dim.eventMode = "static";
+            node.addChild(dim);
+            const frame = new PIXI.Graphics();
+            frame.roundRect(285, 270, 1350, 540, 18);
+            frame.fill({ color: 0x171310, alpha: 0.96 });
+            frame.stroke({ width: 3, color: 0x6b5c40 });
+            node.addChild(frame);
+            const title = T(t("monolith.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(960, 297);
+            title.eventMode = "none";
+            node.addChild(title);
+            const hint = T(t("monolith.hint", { cost }), 25, 0xd8c79d);
+            hint.anchor.set(0.5, 0);
+            hint.position.set(960, 354);
+            hint.eventMode = "none";
+            node.addChild(hint);
+            const m = matches.length;
+            const spread = Math.min(210, 1260 / m);
+            matches.forEach((mt, idx) => {
+                const c = globalThis.GAME_UI.cardFace(ctx, mt.id, { scale: 0.66 });
+                c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                c.eventMode = "static";
+                c.on("pointertap", () => { monolithTake(mt); closeMonolithPanel(); });
+                node.addChild(c);
+            });
+            node.addChild(globalThis.GAME_UI.button(ctx, {
+                tex: "button_menu.png", label: t("monolith.back"), x: 960, y: 762, scale: 1,
+                onTap: closeMonolithPanel,
+            }));
+            root.addChild(node);
+            monolithPanel = node;
+        }
+        function queueMonolithSearch(cost) { monolithQueue.push(cost); pumpMonolithQueue(); }
+        // монолит врага: ИИ не выбирает — берёт первое попавшееся
+        function monolithEnemyTake(cost) {
+            const i = B.eDeck.findIndex((id) => CARDS[id].type === "unit" && CARDS[id].cost === cost);
+            if (i < 0) return;
+            B.eHand.push(B.eDeck.splice(i, 1)[0]);
         }
 
         // ── Панель «Пень обряда» (grw11): в начале хода владельца — взгляд
@@ -3931,6 +4029,14 @@
                 punch(root.hud);
                 sfx("aqua");
             }
+            if (def.spell.target === "none" && def.spell.energyPerHand) { // «Цветение кристаллов»: +1⚡ за карту в руке
+                // сама карта в момент эффекта ещё числится в руке — не считаем
+                const got = Math.max(0, B.hand.length - 1);
+                B.energy += got;
+                floatText(960, 840, `+${got}⚡`, 0xffd98c);
+                punch(root.hud);
+                sfx("aqua");
+            }
             if (def.spell.aoeDmg) { // «Раскалённые обломки»: всем вражеским существам и постройкам
                 const dmg = def.spell.aoeDmg + altarBonus("p");
                 for (const v of B.units.slice()) if (v.side !== "p") damageUnit(v, dmg, null, "rocket");
@@ -4327,6 +4433,9 @@
             closeRunesPanel();
             closeStumpPanel();
             closeJourneyPanel(); // узел умрёт вместе с root — снимаем ссылки
+            monolithPanel = null; // панель монолита умерла с root; очередь неактуальна
+            monolithQueue.length = 0;
+            monolithCost = null;
             hideEnemyCard(); // узел умер бы вместе с root — снимаем ссылку
             unitCard = null; // узел подсказки умер вместе с root
             if (root) { root.destroy({ children: true }); root = null; }
@@ -4583,6 +4692,19 @@
             brewChoose(side) { brewShow(side); },
             brewPick(idx) { pickBrew(idx); },
             scorch: () => ({ p: [...B.scorch.p], e: [...B.scorch.e] }),
+            // «Три монолита» (тесты): панель поиска, совпадения, выбор
+            monolithState: () => ({ open: !!monolithPanel, picking: !!(B && B.picking),
+                queue: monolithQueue.slice(), cost: monolithCost,
+                matches: monolithPanel ? monolithMatches(monolithCost ?? -1)
+                    .map((m) => m.id) : [] }),
+            monolithPick(cardIdx) {
+                if (!monolithPanel) return false;
+                const m = monolithMatches(monolithCost ?? -1)[cardIdx];
+                if (!m) return false;
+                monolithTake(m);
+                closeMonolithPanel();
+                return true;
+            },
             // тест-хуки поправок: свечение выбранной карты (п2) и сетка
             // оверлея-просмотра (п3)
             selGlow() {

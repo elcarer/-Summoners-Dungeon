@@ -289,7 +289,7 @@
                 heroShadow = new PIXI.Graphics();
                 heroShadow.ellipse(0, 0, 12, 5.5);
                 heroShadow.fill({ color: 0x0e140c, alpha: 0.45 });
-                heroShadow.position.set(hp.x, hp.y);
+                heroShadow.position.set(hp.x, hp.y - 0.7 * 5.5 * 2); // приподнята на 0.7 высоты (просил юзер)
                 heroShadow.zIndex = hp.y - 0.5;
                 layer.addChild(heroShadow);
                 layer.addChild(sprite);
@@ -320,7 +320,7 @@
             update(ticker) {
                 if (heroId === null || !uiHud) return;
                 const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
-                heroShadow.position.set(hx, hy);
+                heroShadow.position.set(hx, hy - 0.7 * 5.5 * 2);
                 heroShadow.zIndex = hy - 0.5;
 
                 // скорость анимаций из настроек (0..10; 5 = скорость листа) —

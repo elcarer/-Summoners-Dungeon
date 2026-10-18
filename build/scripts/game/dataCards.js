@@ -162,7 +162,7 @@
                 rarity: "common", elem: "growth",
                 color: 0x3f6d3a, img: "growth/41" },
         grw2: { type: "unit", cost: 2, atk: 2, hp: 4, speed: 1,
-                creature: "animal",
+                creature: "animal", sheet: "wolf",
                 rarity: "common", elem: "growth",
                 color: 0x3f6d3a, img: "growth/42" },
         grw3: { type: "unit", cost: 3, atk: 3, hp: 5, speed: 1,
@@ -263,6 +263,19 @@
                  creature: "elf", wolfSummon: true,
                  rarity: "epic", elem: "growth",
                  color: 0x3f6d3a, img: "growth/64" },
+        // ── Рост, шестая партия (глаза юзера): 65–66 ─────────────────────────
+        // «Цветение кристаллов»: +1⚡ за каждую карту в руке (кроме себя —
+        // к моменту эффекта карта уже покидает руку)
+        grw25: { type: "spell", cost: 2,
+                 spell: { target: "none", energyPerHand: true },
+                 rarity: "rare", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/65" },
+        // «Три монолита»: призыв СВОЕГО существа по соседству — поиск в
+        // колоде существа с ценой на 1 больше призванного и в руку;
+        // монолит при этом теряет 1 жизнь
+        grw26: { type: "building", cost: 3, atk: 0, hp: 3, monolith: true,
+                 rarity: "epic", elem: "growth",
+                 color: 0x2e5a3e, img: "growth/66" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -342,7 +355,8 @@
                  "grw17", "grw17", "grw17", "grw19", "grw19", "grw19",
                  "grw9", "grw9", "grw11", "grw11", "grw12", "grw12",
                  "grw13", "grw13", "grw14", "grw14", "grw20", "grw20",
-                 "grw21", "grw22", "grw23", "grw24", "grw15", "grw18"],
+                 "grw25", "grw25", "grw21", "grw22", "grw23", "grw24",
+                 "grw26", "grw15", "grw18"],
     };
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
