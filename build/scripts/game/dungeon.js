@@ -17,10 +17,10 @@
     const CAVES = () => globalThis.GAME_DATA.CAVES;
     const caveOf = (id) => CAVES()[id] || CAVES().gob;
     const MAX_FLOOR = 6;
-    // Версия раскладки этажа: тайлы 64px goblins_lair (v4). Сейвы волн с
-    // другой геометрии (координаты в других клетках) не поднимаются —
-    // этаж пересобирается заново.
-    const MAP_V = 4;
+    // Версия раскладки этажа: тайлы 64px goblins_lair (v5 — этажи
+    // генерируются, см. genMap). Сейвы другой геометрии (координаты в
+    // других клетках) не поднимаются — этаж пересобирается заново.
+    const MAP_V = 5;
     // Ключ архива этажей — «данж:этаж» (gob:1, grw:2…): у каждого
     // подземелья своя история подъёмов/спусков
     const stKey = (cave, floor) => (caveOf(cave) && cave !== undefined ? cave : "gob") + ":" + floor;
@@ -54,8 +54,20 @@
         "##############################",
     ];
     const W = ROWS[0].length, H = ROWS.length;
-    // центры комнат (колонка, строка): стартовая, верхняя средняя,
-    // верхняя правая, нижняя левая. Боссовая комната — без объектов.
+    // АКТИВНАЯ раскладка: строки сгенерированного этажа (st.rows).
+    // До первого входа — старая фиксированная карта (заглушка для
+    // collide в main.js; мир при входе ставит свои строки)
+    let MAPROWS = ROWS;
+    // ТОЛЩА — стена, у которой все четыре соседа тоже стены (за краем
+    // карты соседа нет): внутрь недоступных игроку массивов тайлы не
+    // рисуем ВООБЩЕ — ни стены, ни пол, только тёмная подложка (просил
+    // юзер: «пусть будет только граница»)
+    function wallInterior(x, y) {
+        const w = (a, b) => a >= 0 && b >= 0 && a < W && b < H && MAPROWS[b][a] === "#";
+        return w(x, y) && w(x - 1, y) && w(x + 1, y) && w(x, y - 1) && w(x, y + 1);
+    }
+    // центры комнат старой фиксированной карты — фолбэк для genObjects
+    // без раскладки (смоук зовёт с воздухом) и древних сейвов
     const ROOM_CENTERS = [[3, 3], [11, 3], [22, 2], [5, 12]];
 
     // Объекты этажа: по одному в центре каждой комнаты, кроме стартовой
@@ -66,10 +78,12 @@
     // каждого на этаж (драфт — долгое состязание). Сумма кучи и карта
     // сундука кидаются при генерации этажа и хранятся в объекте —
     // сейв/загрузка показывает то же самое.
-    function genObjects(floor, cave = "gob") {
+    function genObjects(floor, cave = "gob", centersArg = null) {
         const { rollLootCard } = globalThis.GAME_DATA;
         const elem = caveOf(cave).elem; // карты сундуков/магазина — стихии данжа
-        const centers = ROOM_CENTERS.slice(1); // стартовая комната — без объектов
+        // lootCenters уже без стартовой и боссовой комнат; фолбэк
+        // ROOM_CENTERS — старый список, стартовую отрезаем
+        const centers = centersArg ? centersArg.slice() : ROOM_CENTERS.slice(1);
         for (let i = centers.length - 1; i > 0; i--) {
             const j = (Math.random() * (i + 1)) | 0;
             [centers[i], centers[j]] = [centers[j], centers[i]];
@@ -97,19 +111,156 @@
         return Math.min(globalThis.GAME_DATA.DECK_MAX, 12 + floor);
     }
 
+    // ── ГЕНЕРАТОР РАСКЛАДКИ ЭТАЖА (просил юзер: комнаты и граф проходов
+    // между ними каждый раз другие, не одна и та же карта). Сетка та же
+    // 30×17 (зум/камера не тронуты), маркеры прежние (H/e/B/X) — парсер
+    // состояния ниже не менялся. Комнаты (4-6) бросаются случаем и
+    // сшиваются L-коридорами: остов + до двух петель — граф проходов
+    // каждый этаж новый. Враги встают в УЗКИХ коридорах у входов в
+    // комнаты (просил юзер), босс — в дальней комнате у выхода, герой —
+    // в центре стартовой (её центр и центры прочих комнат идут в
+    // st.roomCenters для объектов). Сид: globalThis.__MAP_SEED (смоук/
+    // пробы), иначе случайный; готовая раскладка хранится в состоянии
+    // этажа (st.rows) — перезаход и «Продолжить» показывают ту же карту.
+    function mulberry32(a) {
+        return function () {
+            a |= 0; a = (a + 0x6D2B79F5) | 0;
+            let t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+    function genMap(cave, floor) {
+        const rng = mulberry32(((globalThis.__MAP_SEED != null
+            ? globalThis.__MAP_SEED : (Math.random() * 2 ** 31) | 0)
+            + floor * 104729 + cave.length * 7919 + cave.charCodeAt(0) * 313) | 0);
+        const g = Array.from({ length: H }, () => Array(W).fill("#"));
+        const carve = (x, y) => { if (x > 0 && y > 0 && x < W - 1 && y < H - 1) g[y][x] = "."; };
+        const rooms = [];
+        // стартовая комната — первой: пошире (клик-тесты ходят по ней),
+        // в левой-верхней четверти
+        rooms.push({ x: 2 + ((rng() * 3) | 0), y: 2 + ((rng() * 2) | 0), w: 6 + ((rng() * 3) | 0), h: 4 });
+        const fits = (r) => r.x >= 2 && r.y >= 2 && r.x + r.w <= W - 2 && r.y + r.h <= H - 2 &&
+            !rooms.some((o) => r.x < o.x + o.w + 1 && r.x + r.w + 1 > o.x &&
+                                r.y < o.y + o.h + 1 && r.y + r.h + 1 > o.y);
+        for (let n = 0; n < 300 && rooms.length < 4 + ((rng() * 3) | 0); n++) {
+            const r = { w: 5 + ((rng() * 4) | 0), h: 3 + ((rng() * 3) | 0) };
+            r.x = 2 + ((rng() * (W - 4 - r.w)) | 0);
+            r.y = 2 + ((rng() * (H - 4 - r.h)) | 0);
+            if (fits(r)) rooms.push(r);
+        }
+        const center = (r) => [r.x + (r.w >> 1), r.y + (r.h >> 1)];
+        for (const r of rooms)
+            for (let j = r.y; j < r.y + r.h; j++) for (let i = r.x; i < r.x + r.w; i++) carve(i, j);
+        // коридоры: остов (жадный Prim — каждая комната к ближайшей уже
+        // соединённой) + до двух петель; L-форма, горизонталь/вертикаль
+        // первыми — случаем
+        const corridor = (a, b) => {
+            let [x, y] = a;
+            const [tx, ty] = b;
+            const goX = () => { while (x !== tx) { x += Math.sign(tx - x); carve(x, y); } };
+            const goY = () => { while (y !== ty) { y += Math.sign(ty - y); carve(x, y); } };
+            if (rng() < 0.5) { goX(); goY(); } else { goY(); goX(); }
+        };
+        const inTree = [0], linked = new Set();
+        while (inTree.length < rooms.length) {
+            let best = null;
+            for (const ai of inTree) for (let bi = 0; bi < rooms.length; bi++) {
+                if (inTree.includes(bi)) continue;
+                const [ax, ay] = center(rooms[ai]), [bx, by] = center(rooms[bi]);
+                const d = Math.abs(ax - bx) + Math.abs(ay - by);
+                if (!best || d < best.d) best = { ai, bi, d };
+            }
+            corridor(center(rooms[best.ai]), center(rooms[best.bi]));
+            linked.add(Math.min(best.ai, best.bi) + "-" + Math.max(best.ai, best.bi));
+            inTree.push(best.bi);
+        }
+        for (let n = 0, tries = 0; n < 2 && tries < 40; tries++) {
+            const a = (rng() * rooms.length) | 0, b = (rng() * rooms.length) | 0;
+            const key = Math.min(a, b) + "-" + Math.max(a, b);
+            if (a === b || linked.has(key)) continue;
+            linked.add(key);
+            corridor(center(rooms[a]), center(rooms[b]));
+            n++;
+        }
+        // маркеры: герой в центре стартовой, босс — в самой далёкой
+        // комнате, выход рядом с ним же (но не вплотную)
+        const [sx, sy] = center(rooms[0]);
+        const far = rooms.reduce((m, r, i) => {
+            if (!i) return m;
+            const [cx, cy] = center(r), [mx, my] = center(rooms[m]);
+            return Math.abs(cx - sx) + Math.abs(cy - sy) > Math.abs(mx - sx) + Math.abs(my - sy) ? i : m;
+        }, 0);
+        const [bx, by] = center(rooms[far]);
+        g[sy][sx] = "H";
+        g[by][bx] = "B";
+        for (let n = 0; n < 50; n++) {
+            const x = rooms[far].x + ((rng() * rooms[far].w) | 0);
+            const y = rooms[far].y + ((rng() * rooms[far].h) | 0);
+            if (g[y][x] === "." && Math.abs(x - bx) + Math.abs(y - by) >= 3) { g[y][x] = "X"; break; }
+        }
+        // враги — в УЗКИХ коридорах у входов в комнаты (не стартовую):
+        // клетка пола вне комнат, в шаге от клетки комнаты, с парой
+        // противоположных стен (проход шириной 1); трое, расходятся
+        // между собой, от героя и от босса
+        const inRoom = (x, y) => rooms.findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+        const narrow = (x, y) => (g[y][x - 1] === "#" && g[y][x + 1] === "#") ||
+                                 (g[y - 1][x] === "#" && g[y + 1][x] === "#");
+        const cands = [];
+        for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+            if (g[y][x] !== "." || inRoom(x, y) >= 0) continue;
+            const door = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inRoom(x + dx, y + dy) > 0);
+            if (door && narrow(x, y)) cands.push([x, y]);
+        }
+        let placed = 0;
+        for (let n = 0; n < 300 && placed < 3; n++) {
+            if (!cands.length) break;
+            const [x, y] = cands[(rng() * cands.length) | 0];
+            if (g[y][x] !== ".") continue;
+            if (Math.abs(x - sx) + Math.abs(y - sy) < 4) continue;
+            if (Math.abs(x - bx) + Math.abs(y - by) < 3) continue;
+            let apart = true;
+            for (let j = 0; j < H && apart; j++) for (let i = 0; i < W && apart; i++)
+                if (g[j][i] === "e" && Math.abs(i - x) + Math.abs(j - y) < 5) apart = false;
+            if (!apart) continue;
+            g[y][x] = "e";
+            placed++;
+        }
+        // мало узких дверей (редкая раскладка) — добираем любыми
+        // коридорными клетками подальше от героя
+        for (let y = 1; y < H - 1 && placed < 3; y++) for (let x = 1; x < W - 1 && placed < 3; x++) {
+            if (g[y][x] !== "." || inRoom(x, y) >= 0) continue;
+            if (Math.abs(x - sx) + Math.abs(y - sy) < 5) continue;
+            let apart = true;
+            for (let j = 0; j < H && apart; j++) for (let i = 0; i < W && apart; i++)
+                if (g[j][i] === "e" && Math.abs(i - x) + Math.abs(j - y) < 5) apart = false;
+            if (!apart) continue;
+            g[y][x] = "e";
+            placed++;
+        }
+        const roomCenters = rooms.map(center);
+        const lootCenters = roomCenters.filter((_, i) => i !== 0 && i !== far);
+        return { rows: g.map((r) => r.join("")), roomCenters, lootCenters };
+    }
+
     function newDungeonState(cave, floor) {
         const caveId = globalThis.GAME_DATA.CAVES[cave] ? cave : "gob";
         const { mobForFloor, enemyDeck } = globalThis.GAME_DATA;
+        const map = genMap(caveId, floor); // раскладка этажа (просил юзер)
         const st = {
             v: MAP_V,
             cave: caveId,
             floor, heroPos: null, spawn: null, ladder: null, enemies: [],
             exit: null, exitCool: false, bossDead: false,
-            toast: null, toastT: 0, objects: genObjects(floor, caveId), win: null,
+            toast: null, toastT: 0, win: null,
+            rows: map.rows, roomCenters: map.roomCenters,
+            lootCenters: map.lootCenters,
+            objects: genObjects(floor, caveId, map.lootCenters),
         };
         const bossId = caveOf(caveId).boss; // главарь данжа (boss / grwBoss)
+        const rows = st.rows;
         for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
-            const ch = ROWS[j][i];
+            const ch = rows[j][i];
             const x = i * TS + TS / 2, y = j * TS + TS / 2;
             if (ch === "H") { st.heroPos = { x, y }; st.spawn = { x, y }; }
             else if (ch === "e") {
@@ -134,7 +285,7 @@
     // возвращаем на место (бой перезапустится касанием, не падаем).
     function retreatCell(enemy) {
         const cx = Math.round(enemy.x / TS - 0.5), cy = Math.round(enemy.y / TS - 0.5);
-        const open = (gx, gy) => gx >= 0 && gy >= 0 && gx < W && gy < H && ROWS[gy][gx] !== "#";
+        const open = (gx, gy) => gx >= 0 && gy >= 0 && gx < W && gy < H && MAPROWS[gy][gx] !== "#";
         const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
         for (let i = dirs.length - 1; i > 0; i--) {
             const j = (Math.random() * (i + 1)) | 0;
@@ -148,7 +299,8 @@
 
     function createDungeonScene(ctx) {
         const { COMPONENTS, camera, characters, charInput, ECS, world, scenes, G, worldContainer, uiTex } = ctx;
-        let layer = null, heroId = null, heroSprite = null, tokens = [], uiHud = null;
+        let layer = null, heroId = null, heroSprite = null, heroShadow = null,
+            tokens = [], uiHud = null;
         let myState = null; // состояние, которым живёт этот инстанс сцены:
         // подъём/спуск меняет G.dungeon ДО переключения сцены — тогда
         // heroPos в exit() пишет уже не этому состоянию
@@ -161,7 +313,7 @@
         function blocked(px, py) {
             const gx = Math.floor(px / TS), gy = Math.floor(py / TS);
             if (gx < 0 || gy < 0 || gx >= W || gy >= H) return true;
-            return ROWS[gy][gx] === "#";
+            return MAPROWS[gy][gx] === "#";
         }
 
         // ── Клик-перемещение: BFS по клеткам + ведение героя по пути ────────
@@ -169,7 +321,7 @@
         // осями (ctrlVI/ctrlVJ — механизм ИИ): работают коллизии-скольжение и
         // походка из character-системы. Клавиши движения путь отменяют.
         function walkable(gx, gy) {
-            return gx >= 0 && gy >= 0 && gx < W && gy < H && ROWS[gy][gx] !== "#";
+            return gx >= 0 && gy >= 0 && gx < W && gy < H && MAPROWS[gy][gx] !== "#";
         }
         function bfsPath(sx, sy, tx, ty) {
             if (sx === tx && sy === ty) return null;
@@ -205,8 +357,9 @@
         // юзер): низ 64×64 — кирпичное лицо с коллизией, верхняя половина
         // 64×128-спрайтов нависает на клетку выше — козырёк кладки и колонна
         // вертикального пробега — и на движение героя не влияет (коллизия
-        // остаётся поклеточной). Набор закрывает все 16 масок: крест,
-        // Т-узлы, прямые, углы-«Г» (cor1-4) и торцы пробегов (end1-4).
+        // остаётся поклеточной). Маски краёв карты читают соседа ЗА краем
+        // как пол — по периметру стоят конечные/угловые спрайты, карту
+        // не «режет» (просил юзер); толща заливается сплошной кладкой.
         // Кладём стены рядами сверху вниз — нависание нижних рядов ложится
         // поверх верхних, колонны Т-узлов стыкуются сами. Каждая стена
         // получает zIndex по нижней кромке: герой и объекты (y-sort сцены)
@@ -214,7 +367,10 @@
         const FLOORS = 6;
         function hsh(i, j, k) { return ((i * 73856093 ^ j * 19349663 ^ (k || 0) * 83492791) >>> 0) % 1000; }
         function wallTexName(L, R, U, D) {
-            if (L && R && U && D) return "wall_cross";
+            // толща (стена со всех четырёх сторон) — СПЛОШНАЯ кладка без
+            // перекладин-«сеток» (просил юзер): у h1_td верх почти прозрачен,
+            // ряды дают ровное кирпичное поле
+            if (L && R && U && D) return "wall_h1_td";
             if (L && R && U) return "wall_h1_tu";
             if (L && R && D) return "wall_h1_td";
             if (L && U && D) return "wall_v1_tl";
@@ -239,8 +395,9 @@
             c.addChild(base);
             // пол КЛАДЁМ И ПОД СТЕНЫ: у боковых спрайтов (v1/tl/tr) сторона к
             // полу прозрачна нарочно — сквозь неё должен просвечивать пол,
-            // а не тёмная подложка
+            // а не тёмная подложка. В толще пола нет — там вообще без тайлов
             for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+                if (wallInterior(i, j)) continue;
                 const sp = new PIXI.Sprite(uiTex(`dungeon_tiles/floor/${hsh(i, j) % FLOORS}.png`));
                 sp.position.set(i * TS, j * TS);
                 c.addChild(sp);
@@ -248,9 +405,14 @@
             return c;
         }
         function addWalls(layer) {
-            const isW = (x, y) => x < 0 || y < 0 || x >= W || y >= H || ROWS[y][x] === "#";
+            // для ВЫБОРА ТАЙЛА сосед за краем карты — не стена: крайние
+            // клетки получают конечные/угловые спрайты и карта «цельная»
+            // (просил юзер); коллизию это не трогает — blocked() выше.
+            // Толщу (wallInterior) не рисуем вовсе — только граница,
+            // никакой заливки-кропов (просил юзер)
             for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
-                if (ROWS[j][i] !== "#") continue;
+                if (MAPROWS[j][i] !== "#" || wallInterior(i, j)) continue;
+                const isW = (x, y) => x >= 0 && y >= 0 && x < W && y < H && MAPROWS[y][x] === "#";
                 const sp = new PIXI.Sprite(uiTex(`dungeon_tiles/walls/${
                     wallTexName(isW(i - 1, j), isW(i + 1, j), isW(i, j - 1), isW(i, j + 1))
                 }.png`));
@@ -880,7 +1042,8 @@
                 if (!G.dungeon.cave) G.dungeon.cave = "gob";
                 const st = G.dungeon;
                 myState = st;
-                ctx.collide.rows = ROWS; // коллизии героя — по карте этажа
+                MAPROWS = st.rows || ROWS; // активная раскладка этажа
+                ctx.collide.rows = MAPROWS; // коллизии героя — по карте этажа
                 ctx.collide.ts = TS; // клетка этажа — 64px (тайлы goblins_lair)
                 // сейв стоя на лестнице не должен мгновенно поднимать героя
                 if (st.ladder && st.heroPos
@@ -888,46 +1051,24 @@
                     st.heroPos = { ...st.spawn };
                 }
                 // сейвы старых волн без объектов — генерируются при заходе
-                if (!st.objects) { st.objects = genObjects(st.floor, st.cave); st.win = null; }
+                if (!st.objects) { st.objects = genObjects(st.floor, st.cave, st.lootCenters || st.roomCenters); st.win = null; }
                 for (const o of st.objects)
                     if (o.type === "shop" && !o.sold) o.sold = [false, false, false, false, false, false];
                 // сейвы до «объектов вне стартовой комнаты»: в стартовой
                 // комнате героя объектов больше не бывает — выкидываем
                 {
-                    const [sc, sr] = ROOM_CENTERS[0];
+                    const [sc, sr] = (st.roomCenters || ROOM_CENTERS)[0];
                     const n0 = st.objects.length;
                     st.objects = st.objects.filter((o) => o.col !== sc || o.row !== sr);
                     if (st.objects.length !== n0) st.win = null;
                 }
-                // сейвы до волны «враги в коридорах»: враги стояли в центрах
-                // комнат (позиции хранятся в сейве) — пересаживаем живых
-                // обычных на коридорные клетки, босса не двигаем, побеждённые
-                // не возвращаются (просил юзер: вход в комнату открыт после
-                // победы над врагом-блокиратором в проходе)
-                {
-                    const slots = [[24, 6], [3, 7], [11, 12]];
-                    const cell = (e) => [Math.round(e.x / TS - 0.5), Math.round(e.y / TS - 0.5)];
-                    const alive = st.enemies.filter((e) => e.alive && !e.boss);
-                    const inCorridor = (e) => slots.some(([c, r]) =>
-                        cell(e)[0] === c && cell(e)[1] === r);
-                    if (alive.some((e) => !inCorridor(e))) {
-                        const busy = new Set(st.enemies.filter((e) => e.alive && e.boss)
-                            .map((e) => cell(e).join(",")));
-                        let si = 0;
-                        for (const e of alive) {
-                            while (si < slots.length && busy.has(slots[si].join(","))) si++;
-                            if (si >= slots.length) break;
-                            const [c, r] = slots[si++];
-                            e.x = c * TS + TS / 2;
-                            e.y = r * TS + TS / 2;
-                        }
-                    }
-                }
+                // (пересадка врагов «до волны в коридорах» удалена: этажи
+                // v5 генерируются с врагами уже в узких проходах — см. genMap)
                 // сейвы до волны «лестница наверх»: старт и лестница
                 // восстанавливаются из карты этажа
                 if (!st.spawn) {
                     for (let j = 0; j < H; j++) {
-                        const i = ROWS[j].indexOf("H");
+                        const i = MAPROWS[j].indexOf("H");
                         if (i >= 0) st.spawn = { x: i * TS + TS / 2, y: j * TS + TS / 2 };
                     }
                 }
@@ -989,6 +1130,14 @@
                 ECS.addComponent(world, heroId, "ctrlVI", 0);
                 ECS.addComponent(world, heroId, "ctrlVJ", 0);
                 heroSprite = sprite;
+                // тень под героем (просил юзер): эллипс на точке ног,
+                // в y-sort сразу под спрайтом
+                heroShadow = new PIXI.Graphics();
+                heroShadow.ellipse(0, 0, 15, 6.5);
+                heroShadow.fill({ color: 0x120d09, alpha: 0.45 });
+                heroShadow.position.set(st.heroPos.x, st.heroPos.y);
+                heroShadow.zIndex = st.heroPos.y - 0.5;
+                layer.addChild(heroShadow);
                 sprite.zIndex = st.heroPos.y; // y-sort со стенами (см. update)
                 layer.addChild(sprite);
                 worldContainer.visible = true;
@@ -1014,6 +1163,7 @@
                 if (st && G.saveRun) G.saveRun();
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
                 heroSprite = null;
+                heroShadow = null;
                 path = null;
                 hideTip();
                 closeModal();
@@ -1036,6 +1186,8 @@
                 // y-sort со стенами: низ героя (ноги) против нижней кромки
                 // клеток стен — с юга герой впереди, с севера уходит за стену
                 heroSprite.zIndex = hy;
+                heroShadow.position.set(hx, hy);
+                heroShadow.zIndex = hy - 0.5;
 
                 // ── ведение по пути (клик-перемещение) ─────────────────────
                 if (path && (charInput.ix || charInput.iy)) path = null; // клавиши главнее
@@ -1242,5 +1394,9 @@
         };
     }
 
-    globalThis.GAME_DUNGEON = { createDungeonScene, newDungeonState, stateFor, deckNeed, retreatCell, genObjects, ROWS, MAX_FLOOR, MAP_V };
+    globalThis.GAME_DUNGEON = {
+        createDungeonScene, newDungeonState, stateFor, deckNeed, retreatCell,
+        genObjects, MAX_FLOOR, MAP_V,
+        get ROWS() { return MAPROWS; }, // активная раскладка этажа
+    };
 })();

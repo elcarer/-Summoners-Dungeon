@@ -46,7 +46,7 @@
 
     function createWorldScene(ctx) {
         const { COMPONENTS, camera, characters, charInput, ECS, world, scenes, G, worldContainer, uiTex } = ctx;
-        let layer = null, heroId = null, uiHud = null;
+        let layer = null, heroId = null, heroShadow = null, uiHud = null;
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
 
         function walkable(gx, gy) {
@@ -285,6 +285,13 @@
                 });
                 ECS.addComponent(world, heroId, "ctrlVI", 0);
                 ECS.addComponent(world, heroId, "ctrlVJ", 0);
+                // тень под героем (просил юзер): эллипс на точке ног
+                heroShadow = new PIXI.Graphics();
+                heroShadow.ellipse(0, 0, 12, 5.5);
+                heroShadow.fill({ color: 0x0e140c, alpha: 0.45 });
+                heroShadow.position.set(hp.x, hp.y);
+                heroShadow.zIndex = hp.y - 0.5;
+                layer.addChild(heroShadow);
                 layer.addChild(sprite);
                 worldContainer.visible = true;
                 camera.follow({
@@ -304,6 +311,7 @@
                 // забег сохраняется и из мира (вход в пещеру/меню/настройки)
                 if (G.saveRun) G.saveRun();
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
+                heroShadow = null;
                 path = null;
                 if (layer) { layer.destroy({ children: true }); layer = null; }
                 if (uiHud) { uiHud.destroy({ children: true }); uiHud = null; }
@@ -312,6 +320,8 @@
             update(ticker) {
                 if (heroId === null || !uiHud) return;
                 const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
+                heroShadow.position.set(hx, hy);
+                heroShadow.zIndex = hy - 0.5;
 
                 // скорость анимаций из настроек (0..10; 5 = скорость листа) —
                 // живая, как в бою и подземелье (просил юзер)
