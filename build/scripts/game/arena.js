@@ -94,6 +94,14 @@
             return (def.spell.dmg || 0) + (def.spell.brew ? (B.brewCasts || 0) : 0)
                 + altarBonus(side);
         }
+        // Итоговый урон заклинания по цели: у «Роя светлячков» (grw30) он
+        // равен числу СВОИХ существ на поле (+ аура алтаря), у прочих — spellDmg
+        function spellHitDmg(def, side = "p") {
+            if (def.spell.fireflies)
+                return B.units.filter((v) => v.side === side && v.def.type === "unit").length
+                    + altarBonus(side);
+            return spellDmg(def, side);
+        }
 
         // «Заклинатель клинков» (spellBuffAura): после КАЖДОГО розыгрыша
         // заклинания — любой стороной, включая повторы «Горящих рун» — он и
@@ -426,6 +434,27 @@
             B.units.push(u);
             recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда
             if (def.type === "unit") {
+                // «Отряд эльфов» (grw27): при призыве потратить ВСЮ
+                // оставшуюся энергию — существо получает столько урона и
+                // жизней. bonusAtk — его снимает «Извлечение духа», как
+                // остальные эффекты карт
+                if (def.energyToStats) {
+                    const pool = side === "p" ? B.energy : B.eEnergy;
+                    if (pool > 0) {
+                        if (side === "p") B.energy = 0; else B.eEnergy = 0;
+                        u.bonusAtk += pool;
+                        u.hp += pool;
+                        recalcAuras();
+                        const an = u.node.getChildByName("atk");
+                        if (an) an.text = String(u.curAtk);
+                        const hn = u.node.getChildByName("hp");
+                        if (hn) hn.text = String(u.hp);
+                        const p = cellXY(col, row);
+                        floatText(p.x, p.y - 75, `+${pool}⚔ +${pool}♥`, 0x9fd489);
+                        floatText(960, side === "p" ? 840 : 240, `−${pool}⚡`, 0xffd98c);
+                        sfx("up");
+                    }
+                }
                 // «Хранитель леса» (grw22): при призыве урон и жизни = числу
                 // СВОИХ Животных на поле (включая его самого — он уже в
                 // B.units). База карты 1/1, масштаб уходит в bonusAtk — его
@@ -573,7 +602,11 @@
             const occ = unitAt(u.col, ahead);
             if (occ) {
                 if (occ.side !== u.side) {
+                    const hpBefore = occ.hp;
                     damageUnit(occ, u.curAtk, u, "sword");
+                    crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
+                    thicketSplash(u, occ); // «Древоброд глухой чащи»
+                    venomApply(u, occ); // «Ядовитость»
                     afterAttackPush(u, occ); // «Проросший кабан»
                     refreshHud();
                     checkEnd();
@@ -590,6 +623,47 @@
             setWalk(u, true, ddx < 0 ? "walk_left" : ddx > 0 ? "walk_right" : undefined);
             sfx("step");
             afterMoved(u); // перемещение — вражеские ловушки могут сработать
+        }
+
+        // ── Хуки атаки (марш, берсерк, «Скорость 1») ──────────────────────
+        // «Старейший древоброд» (grw28), «Сокрушение»: после удара лишний
+        // урон — разница между уроном атаки и жизнями цели ДО удара —
+        // переходит в базу противника
+        function crushHit(attacker, dmg, hpBefore) {
+            if (!attacker || !attacker.def || !attacker.def.crush
+                || !B.units.includes(attacker) || dmg <= 0) return;
+            const excess = dmg - hpBefore;
+            if (excess <= 0) return;
+            if (attacker.side === "p") {
+                B.enemyBase -= excess;
+                floatText(960, 60, `−${excess}`, 0xff8f6e);
+            } else {
+                B.playerBase -= excess;
+                floatText(960, 840, `−${excess}`, 0xff5f4e);
+            }
+            punch(root.hud);
+            sfx("crash");
+        }
+        // «Древоброд глухой чащи» (grw31): при атаке урон атаки получают
+        // и ВСЕ существа и постройки по соседству (верт/гориз) с целью —
+        // сам древоброд от собственного всплеска не страдает
+        function thicketSplash(attacker, target) {
+            if (!attacker || !attacker.def || !attacker.def.thicket
+                || !B.units.includes(attacker)) return;
+            for (const v of B.units.slice()) {
+                if (v === attacker || !B.units.includes(v)) continue;
+                if (Math.abs(v.col - target.col) + Math.abs(v.row - target.row) !== 1) continue;
+                damageUnit(v, attacker.curAtk, attacker, "sword");
+            }
+        }
+        // «Ядовитость N» («Отравленные лезвия» grw29): атака по существу
+        // противника вешает на него «Яд» N (свой яд не расплёскивается,
+        // постройки не травятся)
+        function venomApply(attacker, target) {
+            if (!attacker || !(attacker.venom > 0) || !B.units.includes(attacker)) return;
+            if (!target || target.def.type !== "unit" || target.side === attacker.side
+                || !B.units.includes(target)) return;
+            addPoison(target, attacker.venom);
         }
 
         // «Проросший кабан» (grw13): после атаки по существу отталкивает
@@ -961,6 +1035,70 @@
             sfx("up");
         }
 
+        // «Ядовитость N» (grw29): метка на существе — его атаки вешают на
+        // цель «Яд» N. «Яд M» копится на отравленном; в начале хода
+        // владельца (до марша) существо теряет M жизней
+        function addVenom(u, n) {
+            u.venom = (u.venom || 0) + n;
+            let mark = u.node.getChildByName("venomMark");
+            if (!mark) {
+                mark = new PIXI.Container();
+                mark.name = "venomMark";
+                mark.eventMode = "none";
+                const g = new PIXI.Graphics();
+                g.circle(0, 0, 13.5);
+                g.fill({ color: 0x2a5a2e });
+                g.stroke({ width: 3, color: 0x9fd489 });
+                mark.addChild(g);
+                const tx = T("", 17, 0xd8f0c0);
+                tx.anchor.set(0.5);
+                mark.addChild(tx);
+                mark.position.set(18, -66); // запутанность по центру, яд слева
+                u.node.addChild(mark);
+            }
+            mark.getChildAt(1).text = String(u.venom);
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 66, `☠ ${u.venom}`, 0x9fd489);
+            punch(u.node);
+            sfx("acid");
+        }
+        function addPoison(u, m) {
+            if (!B.units.includes(u)) return; // цель умерла от самой атаки
+            u.poison = (u.poison || 0) + m;
+            let mark = u.node.getChildByName("poisonMark");
+            if (!mark) {
+                mark = new PIXI.Container();
+                mark.name = "poisonMark";
+                mark.eventMode = "none";
+                const g = new PIXI.Graphics();
+                g.circle(0, 0, 13.5);
+                g.fill({ color: 0x5a7a2e });
+                g.stroke({ width: 3, color: 0xd8f0a0 });
+                mark.addChild(g);
+                const tx = T("", 17, 0xf0fad0);
+                tx.anchor.set(0.5);
+                mark.addChild(tx);
+                mark.position.set(-18, -66);
+                u.node.addChild(mark);
+            }
+            mark.getChildAt(1).text = String(u.poison);
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 60, "☠", 0xb7d178);
+            sfx("acid");
+        }
+        // Начало хода стороны, ДО марша: каждое отравленное её существо
+        // теряет жизни по мощности яда (штатный урон — яд может убить)
+        function poisonTick(side) {
+            for (const u of B.units.slice()) {
+                if (u.side !== side || u.def.type !== "unit" || !(u.poison > 0)) continue;
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 60, `☠ −${u.poison}`, 0xb7d178);
+                damageUnit(u, u.poison, null, "acid");
+            }
+            refreshHud();
+            checkEnd();
+        }
+
         // «Извлечение духа» (grw17): снимаемые свойства КАРТЫ (способности,
         // ауры, особости построек); активные состояния считаются отдельно
         const PURGE_DEF_KEYS = ["ability", "aura", "campAura", "campfire", "groveAura",
@@ -974,6 +1112,8 @@
             if (u.protect) n++;
             if (u.berserk) n++;
             if (u.confused) n++;
+            if (u.venom) n++;
+            if (u.poison) n++;
             return n;
         }
         // Снять ВСЕ свойства/эффекты цели; возвращает, сколько снято, —
@@ -991,7 +1131,10 @@
             if (u.protect) { u.protect = 0; n++; }
             if (u.berserk) { u.berserk = 0; n++; }
             if (u.confused) { u.confused = 0; n++; }
-            for (const m of ["sporeMark", "enchMark", "protectMark", "berserkMark", "confuseMark"]) {
+            if (u.venom) { u.venom = 0; n++; }
+            if (u.poison) { u.poison = 0; n++; }
+            for (const m of ["sporeMark", "enchMark", "protectMark", "berserkMark", "confuseMark",
+                "venomMark", "poisonMark"]) {
                 const node = u.node.getChildByName(m);
                 if (node) node.destroy({ children: true });
             }
@@ -2914,7 +3057,11 @@
                                 if (checkEnd()) return;
                                 break;
                             }
+                            const hpBefore = occ.hp;
                             damageUnit(occ, u.curAtk, u, "sword");
+                            crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
+                            thicketSplash(u, occ); // «Древоброд глухой чащи»
+                            venomApply(u, occ); // «Ядовитость»
                             afterAttackPush(u, occ); // «Проросший кабан»
                             triggerAttackTraps(u); // руна: существо атаковало
                             refreshHud();
@@ -2954,7 +3101,11 @@
                         if (!occ || occ.side === u.side) break;
                         const p = cellXY(u.col, u.row);
                         floatText(p.x, p.y - 60, "⚔", 0xffb26e);
+                        const hpBefore = occ.hp;
                         damageUnit(occ, u.curAtk, u, "sword");
+                        crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
+                        thicketSplash(u, occ); // «Древоброд глухой чащи»
+                        venomApply(u, occ); // «Ядовитость»
                         afterAttackPush(u, occ); // «Проросший кабан»
                         triggerAttackTraps(u);
                     }
@@ -3038,6 +3189,7 @@
             if (B.stopped) return;
             upkeep("e"); // грибницы врага
             riteStumpTick("e"); // пень обряда врага подсмотрел и решил
+            poisonTick("e"); // яд: до марша (просил юзер)
             await marchSide("e");
             if (B.stopped || B.phase === "over") return;
             await aiPlay();
@@ -3159,14 +3311,15 @@
                     && v.def.type === "unit" && v.curAtk >= B.playerBase)) return 0;
                 if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
                     || s.sacrifice || s.baseHit || s.copyLast
-                    || s.purge || s.stealEnergy) return 2;
+                    || s.purge || s.stealEnergy || s.fireflies) return 2;
                 if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk
-                    || s.enchantFire || s.cocoon) return 4;
+                    || s.enchantFire || s.cocoon || s.venom) return 4;
                 return 6; // поиск рун / гадание / глубокое путешествие
             }
             if (def.type === "building") return 1;
             if (def.type === "trap") return 5;
             if (def.leaderAura || def.spellBuffAura) return 1; // вождь / заклинатель клинков
+            if (def.energyToStats) return 3.5; // эльф — последним: соберёт остаток энергии
             return 3;
         }
         // Клетка призыва существа ИИ: связки с «Военным лагерем» (+урон при
@@ -3266,6 +3419,8 @@
                 if (hits.length < 2 && !hits.some((v) =>
                     v.hp <= s.aoeDmg + altarBonus("e") && v.curAtk >= 3)) return false;
             }
+            // «Рой светлячков» — 4⚡ за урон числом существ: играем при 2+ урона
+            if (s.fireflies && spellHitDmg(def, "e") < 2) return false;
             // «Культ кочерыжки» — нужна хоть одна пустая клетка под гоблинов
             if (s.cultRow && B.units.length >= GRID * GRID) return false;
             // «Поднять стяги!» — окупается при двух и более своих существах
@@ -3329,7 +3484,7 @@
             const d = CARDS[id], s = d && d.spell;
             if (!s) return false;
             return !!(s.aoeDmg || s.baseDmg || s.firewall || s.sacrifice
-                || s.drainAll || (s.dmg || 0) + altarBonus("e") >= 2);
+                || s.drainAll || s.fireflies || (s.dmg || 0) + altarBonus("e") >= 2);
         }
         // Есть ли смысл повторять последнее заклинание («Горящие руны»):
         // оно есть, это не сами руны, оно достойно повтора и применимо
@@ -3391,6 +3546,7 @@
                         floatText(p.x, p.y - 39, `+${best.hp}⚔`, 0x9fd489);
                     }
                     if (s.berserk) addBerserk(best, s.berserk);
+                    if (s.venom) addVenom(best, s.venom); // «Отравленные лезвия»
                 }
                 punch(best.node);
                 sfx("up");
@@ -3418,10 +3574,10 @@
                     let best = own.slice().sort((a, b) => (b.hp - a.hp) || (b.curAtk - a.curAtk))[0];
                     if (focus && own.includes(focus)) best = focus;
                     if (best) addProtect(best);
-                } else { // дротик/варево/огнешар
+                } else { // дротик/варево/огнешар/светлячки
                     const dmg = s.drainAll // вся энергия сверх цены — в урон
                         ? Math.max(0, B.eEnergy - (free ? 0 : effCost(cardIdOf(def), "e"))) + altarBonus("e")
-                        : spellDmg(def, "e");
+                        : spellHitDmg(def, "e");
                     // ИИ добивает: если есть цель под убийство (урон ≥
                     // жизней) — бьём её (из них сильнейшую и ближе к базе),
                     // иначе просто сильнейшего юза игрока
@@ -3589,6 +3745,10 @@
                 for (const pick of affordable) {
                     const def = pick.def;
                     if (def.type === "unit" || def.type === "building") {
+                        // «Отряд эльфов» забирает ВСЮ энергию: без запаса в 2⚡
+                        // это 0–1/0–1 — карту не переводим (группа 3.5 уже
+                        // отодвинула его в конец розыгрыша)
+                        if (def.energyToStats && B.eEnergy - effCost(pick.id, "e") < 2) continue;
                         // клетка — по правилам связок: строения-ауры соседства
                         // к существам и будущим призывам, прочие в тыл; существа —
                         // рядом с лагерем/костром/заклинателем клинков
@@ -3751,6 +3911,7 @@
             await delay(0.4 / animK());
             if (B.stopped) return;
             upkeep("p"); // грибницы игрока
+            poisonTick("p"); // яд: до марша (просил юзер)
             await marchSide("p");
             if (B.stopped || B.phase === "over") return;
             B.phase = "player";
@@ -3958,6 +4119,7 @@
                         floatText(p.x, p.y - 39, `+${u.hp}⚔`, 0x9fd489);
                     }
                     if (def.spell.berserk) addBerserk(u, def.spell.berserk);
+                    if (def.spell.venom) addVenom(u, def.spell.venom); // «Отравленные лезвия»
                 }
                 punch(u.node);
                 sfx("up");
@@ -3978,6 +4140,8 @@
                 } else if (def.spell.drainAll) { // «Огнешар»: вся энергия сверх цены — в урон
                     damageUnit(u, Math.max(0, B.energy - (free ? 0 : effCost(cardId)))
                         + altarBonus("p"), null, "rocket");
+                } else if (def.spell.fireflies) { // «Рой светлячков»: урон = своим существам
+                    damageUnit(u, spellHitDmg(def, "p"), null, "rocket");
                 } else {
                     damageUnit(u, spellDmg(def), null, "rocket");
                 }
@@ -4101,7 +4265,7 @@
                 }
                 const dmg = def.spell.drainAll
                     ? Math.max(0, B.energy) + altarBonus("p") // повтор — цена не вычитается
-                    : spellDmg(def);
+                    : spellHitDmg(def);
                 const targets = B.units.filter((u) => u.side !== "p"
                     && (u.def.type === "unit"
                         || (u.def.type === "building" && !def.spell.noBuildings)));
@@ -4659,7 +4823,7 @@
                     lastSpell: B.lastSpell.p,
                     journeySummon: B.journeySummon,
                     eDeck: B.eDeck.length,
-                    units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0 })),
+                    units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0, venom: u.venom || 0, poison: u.poison || 0 })),
                     traps: { p: B.traps.p.length, e: B.traps.e.length },
                     firewalls: B.firewalls.map((f) => ({ side: f.side, row: f.row, left: f.left })),
                 };
@@ -4824,6 +4988,10 @@
             _trap(side, cardId, col, row) { return armTrap(side, cardId, col, row); },
             // тест-хук: upkeep стороны (начало её хода: грибницы, костры)
             _upkeep(side) { upkeep(side); return true; },
+            // тест-хуки боевых хуков атаки: марш одной стороны и тик яда
+            // (проба сокрушения/чащи/ядовитости без полного хода ИИ)
+            async _march(side) { await marchSide(side); return true; },
+            _poisonTick(side) { poisonTick(side); return true; },
             // план добора ИИ по шкале (тесты мягкого правила): сколько карт
             // возьмёт и какой доход всего
             aiDrawPlan: () => (B

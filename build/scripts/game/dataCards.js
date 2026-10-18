@@ -276,6 +276,38 @@
         grw26: { type: "building", cost: 3, atk: 0, hp: 3, monolith: true,
                  rarity: "epic", elem: "growth",
                  color: 0x2e5a3e, img: "growth/66" },
+        // ── Рост, седьмая партия (глаза юзера): 67–71 ────────────────────────
+        // «Отряд эльфов»: при призыве потратить ВСЮ оставшуюся энергию —
+        // существо получает столько урона и жизней
+        grw27: { type: "unit", cost: 0, atk: 0, hp: 0, speed: 1,
+                 creature: "elf", energyToStats: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/67" },
+        // «Старейший древоброд»: Сокрушение — после удара лишний урон
+        // (урон атаки минус жизни цели) переходит в базу противника
+        grw28: { type: "unit", cost: 6, atk: 6, hp: 6, speed: 1,
+                 creature: "goblin", crush: true, plant: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/68" },
+        // «Отравленные лезвия»: существо получает «Ядовитость 1» — при
+        // атаке вешает на атакованное существо противника «Яд 1», тот
+        // теряет 1 жизнь в начале своего хода перед перемещением
+        grw29: { type: "spell", cost: 1,
+                 spell: { target: "anyUnit", venom: 1 },
+                 rarity: "common", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/69" },
+        // «Рой светлячков»: урон цели = числу СВОИХ существ на поле
+        grw30: { type: "spell", cost: 4,
+                 spell: { target: "anyUnitDmg", fireflies: true },
+                 rarity: "epic", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/70" },
+        // «Древоброд глухой чащи»: при атаке урон атаки получают и ВСЕ
+        // существа и постройки по соседству с атакованным (сам он не
+        // страдает от собственного всплеска)
+        grw31: { type: "unit", cost: 7, atk: 8, hp: 8, speed: 1,
+                 creature: "goblin", thicket: true, plant: true,
+                 rarity: "epic", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/71" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -356,7 +388,9 @@
                  "grw9", "grw9", "grw11", "grw11", "grw12", "grw12",
                  "grw13", "grw13", "grw14", "grw14", "grw20", "grw20",
                  "grw25", "grw25", "grw21", "grw22", "grw23", "grw24",
-                 "grw26", "grw15", "grw18"],
+                 "grw26", "grw15", "grw18",
+                 "grw29", "grw29", "grw29", "grw27", "grw27",
+                 "grw28", "grw28", "grw30", "grw31"],
     };
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
@@ -459,9 +493,12 @@
         strength: ENEMY_FILL,
         growth: {
             common: ["grw1", "grw2", "grw3", "grw4", "grw5", "grw6",
-                     "grw7", "grw8", "grw10", "grw16", "grw17", "grw19"],
-            rare:   ["grw9", "grw11", "grw12", "grw13", "grw14", "grw20"],
-            epic:   ["grw15", "grw18", "grw21", "grw22", "grw23", "grw24"],
+                     "grw7", "grw8", "grw10", "grw16", "grw17", "grw19",
+                     "grw29"],
+            rare:   ["grw9", "grw11", "grw12", "grw13", "grw14", "grw20",
+                     "grw27", "grw28"],
+            epic:   ["grw15", "grw18", "grw21", "grw22", "grw23", "grw24",
+                     "grw30", "grw31"],
         },
     };
     // Колода врага: ядро архетипа + 3..8 карт добора; с глубиной (floor ≥ 1)
