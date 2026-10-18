@@ -75,11 +75,28 @@
         function goblinDiscount(side) {
             return B.units.some((u) => u.side === side && u.def.leaderAura) ? 1 : 0;
         }
-        function effCost(cardId, side = "p") {
+        function effCost(cardId, side = "p", target = null) {
             const def = CARDS[cardId];
             if (!def) return 0;
-            const d = isGoblin(def) && B ? goblinDiscount(side) : 0;
+            let d = isGoblin(def) && B ? goblinDiscount(side) : 0;
+            // «Озверевший шатун» (grw36): −1 за каждое СВОЁ Животное на поле
+            if (def.animalCost && B)
+                d += B.units.filter((v) => v.side === side
+                    && v.def.type === "unit" && v.def.creature === "animal").length;
+            // «Заклятый древоброд» (grw37): заклинание с прицелом на него
+            // стоит на 1 энергию меньше — любому кастующему
+            if (def.type === "spell" && target && target.col !== undefined && B) {
+                const aim = unitAt(target.col, target.row);
+                if (aim && aim.def.targetDiscount) d += 1;
+            }
             return Math.max(0, def.cost - d);
+        }
+        // «Пастух росянок» (grw40): пока он на поле стороны, способности
+        // Растений (метка plant) этой стороны срабатывают на 1 раз больше
+        // (несколько Пастухов складываются)
+        function plantEcho(side) {
+            if (!B) return 0;
+            return B.units.filter((u) => u.side === side && u.def.plantEcho).length;
         }
         // Урон заклинания с ростом: «Колдовское варево» — +1 за каждое
         // разыгранное ранее в этом бою (счёт общий на обе стороны).
@@ -640,16 +657,15 @@
         function crushHit(attacker, dmg, hpBefore) {
             if (!attacker || !attacker.def || !attacker.def.crush
                 || !B.units.includes(attacker) || dmg <= 0) return;
-            const excess = dmg - hpBefore;
-            if (excess <= 0) return;
-            if (attacker.side === "p") {
-                B.enemyBase -= excess;
-                floatText(960, 60, `−${excess}`, 0xff8f6e);
-            } else {
-                B.playerBase -= excess;
-                floatText(960, 840, `−${excess}`, 0xff5f4e);
-            }
-            punch(root.hud);
+            const raw = dmg - hpBefore;
+            if (raw <= 0) return;
+            // «Пастух росянок»: Сокрушение — способность Растения, лишний
+            // урон списывается в базу дважды
+            const excess = raw * (1 + (attacker.def.plant ? plantEcho(attacker.side) : 0));
+            damageBase(attacker.side === "p" ? "e" : "p", excess,
+                attacker.side === "p"
+                    ? { x: 960, y: 60, fill: 0xff8f6e }
+                    : { x: 960, y: 840, fill: 0xff5f4e });
             sfx("crash");
         }
         // «Древоброд глухой чащи» (grw31): при атаке урон атаки получают
@@ -658,10 +674,14 @@
         function thicketSplash(attacker, target) {
             if (!attacker || !attacker.def || !attacker.def.thicket
                 || !B.units.includes(attacker)) return;
-            for (const v of B.units.slice()) {
-                if (v === attacker || !B.units.includes(v)) continue;
-                if (Math.abs(v.col - target.col) + Math.abs(v.row - target.row) !== 1) continue;
-                damageUnit(v, attacker.curAtk, attacker, "sword");
+            // «Пастух росянок»: всплеск — способность Растения, бьёт дважды
+            const times = 1 + (attacker.def.plant ? plantEcho(attacker.side) : 0);
+            for (let t = 0; t < times; t++) {
+                for (const v of B.units.slice()) {
+                    if (v === attacker || !B.units.includes(v)) continue;
+                    if (Math.abs(v.col - target.col) + Math.abs(v.row - target.row) !== 1) continue;
+                    damageUnit(v, attacker.curAtk, attacker, "sword");
+                }
             }
         }
         // «Круговая атака» (grw34): цель наносит 1 урон каждому соседу
@@ -921,16 +941,10 @@
                 }
             }
             sfx("crash");
-            if (u.side === "p") {
-                B.enemyBase -= 1;
-                const p = cellXY(u.col, 0);
-                floatText(p.x, p.y - 15, "−1", 0xff8f6e);
-            } else {
-                B.playerBase -= 1;
-                const p = cellXY(u.col, GRID - 1);
-                floatText(p.x, p.y + 15, "−1", 0xff5f4e);
-            }
-            punch(root.hud);
+            damageBase(u.side === "p" ? "e" : "p", 1,
+                u.side === "p"
+                    ? { x: cellXY(u.col, 0).x, y: cellXY(u.col, 0).y - 15, fill: 0xff8f6e }
+                    : { x: cellXY(u.col, GRID - 1).x, y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff5f4e });
             refreshHud();
             checkEnd();
         }
@@ -996,15 +1010,17 @@
             }
             // «Хищное растение» (grw1): когда умирает ДРУГОЕ существо (любой
             // стороны), каждое живое растение получает +1 урона и +1 жизни
+            // («Пастух росянок» — способность Растения срабатывает дважды)
             if (u.def.type === "unit") for (const v of B.units.slice()) {
                 if (v === u || v.def.ability !== "predator" || !B.units.includes(v)) continue;
-                v.bonusAtk = (v.bonusAtk || 0) + 1;
-                v.hp += 1;
+                const k = 1 + (v.def.plant ? plantEcho(v.side) : 0);
+                v.bonusAtk = (v.bonusAtk || 0) + k;
+                v.hp += k;
                 recalcAuras(); // обновит и бейдж урона (кламп ≥ 0)
                 const hn = v.node.getChildByName("hp");
                 if (hn) hn.text = String(v.hp);
                 const p = cellXY(v.col, v.row);
-                floatText(p.x, p.y - 66, "+1⚔ +1♥", 0x9fd489);
+                floatText(p.x, p.y - 66, `+${k}⚔ +${k}♥`, 0x9fd489);
                 punch(v.node);
                 sfx("up");
             }
@@ -1055,14 +1071,10 @@
         // столько же, сколько оно нанесло (checkEnd зовут вызывающие)
         function procSpores(u, amount) {
             if (!u || !u.spores || !B.units.includes(u) || !(amount > 0)) return;
-            if (u.side === "p") {
-                B.playerBase -= amount;
-                floatText(960, 840, `−${amount}`, 0xff5f4e);
-            } else {
-                B.enemyBase -= amount;
-                floatText(960, 60, `−${amount}`, 0xff8f6e);
-            }
-            punch(root.hud);
+            damageBase(u.side, amount,
+                u.side === "p"
+                    ? { x: 960, y: 840, fill: 0xff5f4e }
+                    : { x: 960, y: 60, fill: 0xff8f6e });
             sfx("acid");
         }
 
@@ -1303,20 +1315,33 @@
             sfx("up");
         }
 
+        // Урон базе стороны — единая точка для всех источников. «Дома на
+        // деревьях» (grw38): пока такая постройка на поле, урон базе
+        // ЦЕЛИКОМ уходит в неё (без остатка базе; несколько — первая).
+        // where — позиция/цвет всплывающего «−N» у базы (при редиректе
+        // не показывается: урон виден на самой постройке).
+        function damageBase(side, amount, where = null) {
+            if (!B || !(amount > 0)) return;
+            const house = B.units.find((v) => v.side === side
+                && v.def.type === "building" && v.def.treeHomes);
+            if (house) {
+                damageUnit(house, amount, null, "crash");
+                punch(root.hud);
+                return;
+            }
+            if (side === "p") B.playerBase -= amount; else B.enemyBase -= amount;
+            if (where) floatText(where.x, where.y, `−${amount}`, where.fill);
+            punch(root.hud);
+        }
+
         function baseHit(side, u) {
             sfx("crash");
             procEnchantFire(u); // «Огненное дыхание» срабатывает и на базе
             procSpores(u, u.curAtk); // споры: удар по чужой базе бьёт и свою
-            if (side === "p") {
-                B.enemyBase -= u.curAtk;
-                const p = cellXY(u.col, 0);
-                floatText(p.x, p.y - 15, `−${u.curAtk}`, 0xff8f6e);
-            } else {
-                B.playerBase -= u.curAtk;
-                const p = cellXY(u.col, GRID - 1);
-                floatText(p.x, p.y + 15, `−${u.curAtk}`, 0xff5f4e);
-            }
-            punch(root.hud);
+            damageBase(side === "p" ? "e" : "p", u.curAtk,
+                side === "p"
+                    ? { x: cellXY(u.col, 0).x, y: cellXY(u.col, 0).y - 15, fill: 0xff8f6e }
+                    : { x: cellXY(u.col, GRID - 1).x, y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff5f4e });
         }
 
         // «Грибница»: в начало хода владельца даёт 1 энергию и теряет 1 жизнь
@@ -1346,14 +1371,18 @@
                     // «Росток» (grw6): в начале хода владельца при 3+ жизнях
                     // возвращается в руку, а соседнее СВОЁ существо получает
                     // +3 жизни (нет своего — лечить некого, возврат всё равно
-                    // происходит)
+                    // происходит); «Пастух росянок» — лечение срабатывает
+                    // на раз больше (возврат в руку — один)
                     const id = cardIdOf(b.def);
                     if (side === "p") B.hand.push(id); else B.eHand.push(id);
-                    const near = B.units.filter((v) => v.side === b.side
-                        && v.def.type === "unit"
-                        && Math.abs(v.col - b.col) + Math.abs(v.row - b.row) === 1);
+                    const heals = 1 + (b.def.plant ? plantEcho(b.side) : 0);
+                    for (let t = 0; t < heals; t++) {
+                        const near = B.units.filter((v) => v.side === b.side
+                            && v.def.type === "unit"
+                            && Math.abs(v.col - b.col) + Math.abs(v.row - b.row) === 1);
+                        if (near.length) healUnit(near[(Math.random() * near.length) | 0], 3);
+                    }
                     const p = cellXY(b.col, b.row);
-                    if (near.length) healUnit(near[(Math.random() * near.length) | 0], 3);
                     floatText(p.x, p.y - 72, GAME_LOC.t("card.grw6.name"), 0x9fd489);
                     sfx("chpoc");
                     removeUnit(b); // ушёл в руку — не смерть, каскадов нет
@@ -1398,11 +1427,12 @@
         function sproutTick(side) {
             for (const b of B.units.slice()) {
                 if (b.side !== side || !b.def.sprout || !B.units.includes(b)) continue;
-                b.hp += 1;
+                const k = 1 + (b.def.plant ? plantEcho(b.side) : 0);
+                b.hp += k;
                 const hn = b.node.getChildByName("hp");
                 if (hn) hn.text = String(b.hp);
                 const p = cellXY(b.col, b.row);
-                floatText(p.x, p.y - 60, "+1♥", 0x9fd489);
+                floatText(p.x, p.y - 60, `+${k}♥`, 0x9fd489);
                 punch(b.node);
                 sfx("up");
             }
@@ -2545,6 +2575,81 @@
             refreshHud();
         }
 
+        // ── Панель «Раскопок» (grw39): выбранная своя постройка убрана в
+        // сброс — теперь постройка ИЗ СВОЕГО сброса встаёт в её клетку.
+        // «Оставить»/Esc — обмен не завершён: клетка пустует, постройки
+        // остаются в сбросе. Построек в сбросе нет — панель не открывается.
+        let excavatePanel = null, excavateCell = null;
+        function closeExcavatePanel() {
+            if (!excavatePanel) return;
+            excavatePanel.destroy({ children: true });
+            excavatePanel = null;
+            excavateCell = null;
+            if (B) B.picking = false;
+            refreshHud();
+        }
+        function buildingsInDiscard() {
+            return B.discard.filter((id) => CARDS[id] && CARDS[id].type === "building");
+        }
+        function openExcavatePanel(cell) {
+            closeExcavatePanel();
+            const blds = buildingsInDiscard();
+            if (!blds.length) { // в сбросе построек нет — поменять не на что
+                floatText(cellXY(cell.col, cell.row).x,
+                    cellXY(cell.col, cell.row).y - 60, t("excavate.empty"), 0x8a7c5e);
+                return;
+            }
+            B.picking = true;
+            excavateCell = cell;
+            const node = new PIXI.Container();
+            node.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(0, 0, 1920, 1080);
+            dim.fill({ color: 0x000000, alpha: 0.6 });
+            dim.eventMode = "static";
+            node.addChild(dim);
+            node.addChild(stumpFrame());
+            const title = T(t("excavate.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(960, 297);
+            title.eventMode = "none";
+            node.addChild(title);
+            const hint = T(t("excavate.hint"), 25, 0xd8c79d);
+            hint.anchor.set(0.5, 0);
+            hint.position.set(960, 354);
+            hint.eventMode = "none";
+            node.addChild(hint);
+            const m = blds.length;
+            const spread = Math.min(210, 1260 / m);
+            blds.forEach((cardId, idx) => {
+                const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                c.eventMode = "static";
+                c.on("pointertap", () => pickExcavate(idx));
+                node.addChild(c);
+            });
+            node.addChild(globalThis.GAME_UI.button(ctx, {
+                tex: "button_menu.png", label: t("excavate.back"), x: 960, y: 762, scale: 1,
+                onTap: closeExcavatePanel,
+            }));
+            root.addChild(node);
+            excavatePanel = node;
+        }
+        function pickExcavate(idx) { // idx — номер карты среди построек сброса
+            if (!B || !B.picking || !excavatePanel || !excavateCell) return;
+            const blds = buildingsInDiscard();
+            const cardId = blds[idx];
+            if (!cardId) return;
+            const cell = excavateCell;
+            B.discard.splice(B.discard.indexOf(cardId), 1);
+            closeExcavatePanel();
+            addUnit("p", cardId, cell.col, cell.row); // ловушка на клетке сработает, как при призыве
+            layoutHand();
+            redrawHighlight();
+            refreshHud();
+            checkEnd();
+        }
+
         // ── HUD боя ────────────────────────────────────────────────────────
         function buildHud() {
             const c = new PIXI.Container();
@@ -3022,16 +3127,10 @@
             sfx("crash");
             procEnchantFire(u);
             procSpores(u, u.curAtk); // споры: удар по базе — тоже нанесение урона
-            if (u.side === "p") {
-                B.playerBase -= u.curAtk;
-                const p = cellXY(u.col, GRID - 1);
-                floatText(p.x, p.y + 15, `−${u.curAtk}`, 0xff5f4e);
-            } else {
-                B.enemyBase -= u.curAtk;
-                const p = cellXY(u.col, 0);
-                floatText(p.x, p.y - 15, `−${u.curAtk}`, 0xff8f6e);
-            }
-            punch(root.hud);
+            damageBase(u.side, u.curAtk,
+                u.side === "p"
+                    ? { x: cellXY(u.col, GRID - 1).x, y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff5f4e }
+                    : { x: cellXY(u.col, 0).x, y: cellXY(u.col, 0).y - 15, fill: 0xff8f6e });
         }
         // Ход запутанного существа (вместо марша): шаг назад или удар
         // встанавшего на пути; у задней кромки позади своя база — бьёт её
@@ -3581,6 +3680,16 @@
             // заклинание, которое стоит тащить (саму Варку ИИ не берёт)
             if (s.discardPick && !spellsInDiscard("e").concat(spellsInDiscard("p"))
                 .some((id) => id !== "grw23")) return false;
+            // «Раскопки» — нужна своя постройка и постройка сброса ДОРОЖЕ
+            // худшей своей (иначе обмен картой не окупается)
+            if (s.excavate) {
+                const own = B.units.filter((v) => v.side === "e" && v.def.type === "building");
+                const back = B.eDiscard.filter((id) => CARDS[id] && CARDS[id].type === "building");
+                if (!own.length || !back.length) return false;
+                const worst = own.slice().sort((a, b) =>
+                    (a.def.cost - b.def.cost) || (a.hp - b.hp))[0];
+                if (!back.some((id) => CARDS[id].cost > worst.def.cost)) return false;
+            }
             // «Защитный кокон» — есть кому защищать и есть от кого
             if (s.cocoon && !B.units.some((v) => v.side === "e")
                 && !B.units.some((v) => v.side === "p" && v.def.type === "unit"
@@ -3622,8 +3731,13 @@
         // free=true — цена повтора не вычитается из урона). focus —
         // приоритетная цель руны-ловушки: если заклинание умеет целиться
         // в это существо, бьёт именно его (просил юзер).
+        // Скидка «Заклятого древоброда» (grw37): если целью вышел он,
+        // aiPlay платит на 1 энергию меньше (флаг ставится здесь).
+        let castTargetOff = 0;
         function enemyCastSpellEffect(def, free = false, focus = null) {
             const s = def.spell;
+            castTargetOff = 0;
+            const aimOff = (u) => { if (u && u.def.targetDiscount) castTargetOff = 1; };
             if (s.nova) { // «Круговая атака»: своё существо с наибольшим числом соседей-врагов
                 const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
                 let best = null, bestN = 0;
@@ -3633,11 +3747,13 @@
                     if (n > bestN) { bestN = n; best = v; }
                 }
                 if (focus && own.includes(focus)) best = focus; // руна
+                aimOff(best);
                 if (best) { novaSplash(best); punch(best.node); sfx("up"); }
             }
             if (s.wolfVolley) { // «Атака духами волков»: сильнейшее своё стреляет
                 const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit")
                     .slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row));
+                aimOff(own[0]);
                 if (own[0]) wolfVolley(own[0]);
             }
             if (s.target === "anyUnit" && !s.nova) { // усиление/очарование — своему сильнейшему
@@ -3652,6 +3768,7 @@
                     : ((b.curAtk - a.curAtk) || (b.row - a.row)))[0];
                 if (focus && own.includes(focus)) best = focus;
                 if (!best) return;
+                aimOff(best); // скидка «Заклятого древоброда» — оплатит aiPlay
                 if (s.enchantFire) { // «Огненное дыхание»
                     best.enchantFire = true;
                     const mark = new PIXI.Graphics();
@@ -3713,17 +3830,20 @@
                     if (focus && own.includes(focus)) best = focus;
                     if (best) addProtect(best);
                 } else { // дротик/варево/огнешар/светлячки
-                    const dmg = s.drainAll // вся энергия сверх цены — в урон
-                        ? Math.max(0, B.eEnergy - (free ? 0 : effCost(cardIdOf(def), "e"))) + altarBonus("e")
-                        : spellHitDmg(def, "e");
                     // ИИ добивает: если есть цель под убийство (урон ≥
                     // жизней) — бьём её (из них сильнейшую и ближе к базе),
                     // иначе просто сильнейшего юза игрока
-                    const kills = targets.filter((v) => v.hp <= dmg);
+                    const probe = spellHitDmg(def, "e");
+                    const kills = targets.filter((v) => v.hp <= probe);
                     let best = (kills.length ? kills : targets)
                         .slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
                     if (focus && targets.includes(focus)) best = focus; // руна
                     if (!best) return;
+                    aimOff(best); // скидка «Заклятого древоброда»
+                    const dmg = s.drainAll // вся энергия сверх цены — в урон
+                        ? Math.max(0, B.eEnergy - (free ? 0 : effCost(cardIdOf(def), "e",
+                            { col: best.col, row: best.row }))) + altarBonus("e")
+                        : probe;
                     damageUnit(best, dmg, null, "rocket");
                 }
             }
@@ -3753,15 +3873,12 @@
                         : targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
                     damageUnit(best, s.dmg, null, "rocket");
                 } else {
-                    B.playerBase -= s.dmg;
-                    floatText(960, 840, `−${s.dmg}`, 0xff5f4e);
+                    damageBase("p", s.dmg, { x: 960, y: 840, fill: 0xff5f4e });
                     sfx("rocket");
                 }
             }
             if (s.target === "none" && s.baseDmg) { // землетрясение
-                B.playerBase -= s.baseDmg;
-                floatText(960, 840, `−${s.baseDmg}`, 0xff5f4e);
-                punch(root.hud);
+                damageBase("p", s.baseDmg, { x: 960, y: 840, fill: 0xff5f4e });
                 sfx("rocket");
             }
             if (s.stealEnergy) { // «Похищение энергии»: 2⚡ игрока — нам
@@ -3828,6 +3945,22 @@
                     disc.splice(disc.indexOf(id), 1);
                     B.eHand.push(id);
                     B.scorch.e.add(id); // сожжётся после розыгрыша
+                }
+            }
+            if (s.excavate) { // «Раскопки»: худшую свою постройку — в сброс, из сброса — дорогую
+                const own = B.units.filter((v) => v.side === "e" && v.def.type === "building")
+                    .sort((a, b) => (a.def.cost - b.def.cost) || (a.hp - b.hp));
+                const back = B.eDiscard.filter((id) => CARDS[id] && CARDS[id].type === "building")
+                    .sort((a, b) => (CARDS[b].cost - CARDS[a].cost))[0];
+                const out = own[0];
+                if (out && back && CARDS[back].cost > out.def.cost) {
+                    const cell = { col: out.col, row: out.row };
+                    removeUnit(out); // в сброс без каскадов смерти
+                    recalcAuras();
+                    B.eDiscard.push(cardIdOf(out.def));
+                    B.eDiscard.splice(B.eDiscard.indexOf(back), 1);
+                    addUnit("e", back, cell.col, cell.row);
+                    sfx("chpoc");
                 }
             }
             if (s.journey) { // «Глубокое путешествие»: призыв из верхних карт — бесплатно
@@ -4009,7 +4142,12 @@
                         // indexOf: панельные эффекты кладут карты в руку —
                         // индексы могли сместиться
                         B.eHand.splice(B.eHand.indexOf(cardId), 1);
-                        B.eEnergy = def.spell.drainAll ? 0 : B.eEnergy - effCost(cardId, "e");
+                        // «Заклятый древоброд» целью — цена заклинания на 1 меньше
+                        // (повтор «Горящими рунами» бесплатен — скидка не копится)
+                        const tOff = def.spell.copyLast ? 0 : castTargetOff;
+                        castTargetOff = 0;
+                        B.eEnergy = def.spell.drainAll
+                            ? 0 : B.eEnergy - Math.max(0, effCost(cardId, "e") - tOff);
                         // рука ИИ тоже не больше 7 — излишек панельных доборов
                         // сбрасывается случайно (как панель сброса у игрока)
                         while (B.eHand.length > HAND_MAX) {
@@ -4151,9 +4289,12 @@
                 const typeOk = u && (tg === "anyUnitDmg"
                     ? (u.def.type === "unit"
                         || (u.def.type === "building" && !sdef.spell.noBuildings))
+                    : tg === "ownBuilding" ? u.def.type === "building"
                     : u.def.type === "unit");
-                const sideOk = !u || tg !== "ownUnit" || u.side === "p";
-                const known = tg === "anyUnit" || tg === "anyUnitDmg" || tg === "ownUnit";
+                const sideOk = !u || !(tg === "ownUnit" || tg === "ownBuilding")
+                    || u.side === "p";
+                const known = tg === "anyUnit" || tg === "anyUnitDmg"
+                    || tg === "ownUnit" || tg === "ownBuilding";
                 if (u && typeOk && sideOk && known) castSpell(B.selected, { col, row });
                 else deselect(); // мимо цели — снять выбор
                 return;
@@ -4283,7 +4424,7 @@
                 } else if (def.spell.cocoon) { // «Защитный кокон»: «Защита 1» цели
                     addProtect(u);
                 } else if (def.spell.drainAll) { // «Огнешар»: вся энергия сверх цены — в урон
-                    damageUnit(u, Math.max(0, B.energy - (free ? 0 : effCost(cardId)))
+                    damageUnit(u, Math.max(0, B.energy - (free ? 0 : effCost(cardId, "p", target)))
                         + altarBonus("p"), null, "rocket");
                 } else if (def.spell.fireflies) { // «Рой светлячков»: урон = своим существам
                     damageUnit(u, spellHitDmg(def, "p"), null, "rocket");
@@ -4331,10 +4472,22 @@
                     }
                 }
             }
+            if (def.spell.target === "ownBuilding" && def.spell.excavate) { // «Раскопки»
+                if (!target || target.col === undefined) return false;
+                const u = unitAt(target.col, target.row);
+                if (!u || u.side !== "p" || u.def.type !== "building") return false;
+                const cell = { col: u.col, row: u.row };
+                const id = cardIdOf(u.def);
+                removeUnit(u); // в сброс без каскадов смерти — постройка не «убита»
+                recalcAuras();
+                B.discard.push(id);
+                const p = cellXY(cell.col, cell.row);
+                floatText(p.x, p.y - 60, "⤓", 0xef9f8c);
+                sfx("chpoc");
+                openExcavatePanel(cell); // выбор постройки сброса в освободившуюся клетку
+            }
             if (def.spell.target === "none" && def.spell.baseDmg) { // землетрясение
-                B.enemyBase -= def.spell.baseDmg;
-                floatText(960, 60, `−${def.spell.baseDmg}`, 0xff8f6e);
-                punch(root.hud);
+                damageBase("e", def.spell.baseDmg, { x: 960, y: 60, fill: 0xff8f6e });
                 sfx("rocket");
             }
             if (def.spell.target === "none" && def.spell.stealEnergy) { // «Похищение энергии»: 2⚡
@@ -4372,9 +4525,7 @@
             if (def.spell.target === "enemyAny") {
                 if (!target) return false;
                 if (target.base === true) {
-                    B.enemyBase -= def.spell.dmg;
-                    floatText(960, 60, `−${def.spell.dmg}`, 0xff8f6e);
-                    punch(root.hud);
+                    damageBase("e", def.spell.dmg, { x: 960, y: 60, fill: 0xff8f6e });
                     sfx("rocket");
                 } else if (target.col !== undefined) {
                     const u = unitAt(target.col, target.row);
@@ -4428,6 +4579,10 @@
                     .slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
                 return { col: best.col, row: best.row };
             }
+            if (tg === "ownBuilding") { // раскопки — первая своя постройка
+                const own = B.units.filter((u) => u.side === "p" && u.def.type === "building");
+                return own.length ? { col: own[0].col, row: own[0].row } : null;
+            }
             if (tg === "enemyAny") {
                 const targets = B.units.filter((u) => u.side !== "p");
                 if (!targets.length) return { base: true };
@@ -4478,12 +4633,13 @@
             if (B.phase !== "player" || B.discarding || B.picking) return false;
             const cardId = B.hand[handIdx];
             const def = CARDS[cardId];
-            if (!def || def.type !== "spell" || effCost(cardId) > B.energy) return false;
+            if (!def || def.type !== "spell"
+                || effCost(cardId, "p", target) > B.energy) return false;
             if (def.spell.copyLast) { // «Горящие руны»: повтор последнего бесплатно
                 const last = B.lastSpell.p;
                 if (!last || last === "str25" || !CARDS[last]
                     || CARDS[last].type !== "spell") return false;
-                B.energy -= effCost(cardId);
+                B.energy -= effCost(cardId, "p", target);
                 spendCard(handIdx);
                 B.lastSpell.p = "str25"; // повтор самой себя — бесконечная цепочка
                 replaySpell(last);
@@ -4495,7 +4651,7 @@
                 return true;
             }
             if (!applySpellP(cardId, target)) return false;
-            B.energy = def.spell.drainAll ? 0 : B.energy - effCost(cardId);
+            B.energy = def.spell.drainAll ? 0 : B.energy - effCost(cardId, "p", target);
             spendCard(handIdx);
             B.lastSpell.p = cardId;
             afterSpellPlayed(); // «Заклинатель клинков» и его соседи
@@ -5022,6 +5178,10 @@
                 closeMonolithPanel();
                 return true;
             },
+            // «Раскопки» (тесты): панель обмена и выбор постройки из сброса
+            excavateState: () => ({ open: !!excavatePanel, picking: !!(B && B.picking),
+                cell: excavateCell, blds: excavatePanel ? buildingsInDiscard() : [] }),
+            excavatePick(idx) { pickExcavate(idx); },
             // тест-хуки поправок: свечение выбранной карты (п2) и сетка
             // оверлея-просмотра (п3)
             selGlow() {
@@ -5152,6 +5312,10 @@
                 const u = unitAt(col, row);
                 if (u) triggerCellTraps(u);
                 return true;
+            },
+            // итоговая цена карты (проба скидок: Вождь, шатун, древоброд)
+            _effCost(cardId, side = "p", target = null) {
+                return effCost(cardId, side, target);
             },
             // план добора ИИ по шкале (тесты мягкого правила): сколько карт
             // возьмёт и какой доход всего

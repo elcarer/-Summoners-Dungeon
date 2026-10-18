@@ -335,6 +335,35 @@
                  trap: { event: "onCell", effect: "entangle", entangle: 2 },
                  rarity: "common", elem: "growth",
                  color: 0x4a8a3e, img: "growth/75" },
+        // ── Рост, девятая партия (глаза юзера): 76–80 ────────────────────────
+        // «Озверевший шатун»: −1 энергию за каждое СВОЁ Животное на поле
+        grw36: { type: "unit", cost: 5, atk: 5, hp: 6, speed: 1,
+                 creature: "animal", animalCost: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/76" },
+        // «Заклятый древоброд»: заклинания, выбравшие его целью, — на 1
+        // энергию дешевле (для любого кастующего, просил юзер)
+        grw37: { type: "unit", cost: 5, atk: 5, hp: 5, speed: 1,
+                 creature: "goblin", plant: true, targetDiscount: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/77" },
+        // «Дома на деревьях»: урон базе стороны целиком уходит в эту
+        // постройку (вместо базы)
+        grw38: { type: "building", cost: 3, atk: 0, hp: 7, treeHomes: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x2e5a3e, img: "growth/78" },
+        // «Раскопки»: свою постройку с поля — в сброс, затем постройку из
+        // сброса — в клетку убранной (панель выбора, как у «Варки зелий»)
+        grw39: { type: "spell", cost: 2,
+                 spell: { target: "ownBuilding", excavate: true },
+                 rarity: "rare", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/79" },
+        // «Пастух росянок»: способности Растений (метка plant) его стороны
+        // срабатывают на 1 раз больше
+        grw40: { type: "unit", cost: 4, atk: 1, hp: 1, speed: 1,
+                 creature: "elf", plantEcho: true,
+                 rarity: "epic", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/80" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -420,7 +449,10 @@
                  "grw28", "grw28", "grw30", "grw31",
                  // 72–75: обычные ×3, редкая ×2, эпическая ×1
                  "grw34", "grw34", "grw34", "grw35", "grw35", "grw35",
-                 "grw32", "grw32", "grw33"],
+                 "grw32", "grw32", "grw33",
+                 // 76–80: редкие ×2, эпическая ×1
+                 "grw36", "grw36", "grw37", "grw37", "grw38", "grw38",
+                 "grw39", "grw39", "grw40"],
     };
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
@@ -526,9 +558,10 @@
                      "grw7", "grw8", "grw10", "grw16", "grw17", "grw19",
                      "grw29", "grw34", "grw35"],
             rare:   ["grw9", "grw11", "grw12", "grw13", "grw14", "grw20",
-                     "grw27", "grw28", "grw32"],
+                     "grw27", "grw28", "grw32", "grw36", "grw37", "grw38",
+                     "grw39"],
             epic:   ["grw15", "grw18", "grw21", "grw22", "grw23", "grw24",
-                     "grw30", "grw31", "grw33"],
+                     "grw30", "grw31", "grw33", "grw40"],
         },
     };
     // Колода врага: ядро архетипа + 3..8 карт добора; с глубиной (floor ≥ 1)
