@@ -95,11 +95,19 @@
                 + altarBonus(side);
         }
         // Итоговый урон заклинания по цели: у «Роя светлячков» (grw30) он
-        // равен числу СВОИХ существ на поле (+ аура алтаря), у прочих — spellDmg
+        // равен числу СВОИХ существ на поле (+ аура алтаря), у «Выстрела
+        // стихией» (grw32) — числу карт Роста в руке, у прочих — spellDmg
         function spellHitDmg(def, side = "p") {
             if (def.spell.fireflies)
                 return B.units.filter((v) => v.side === side && v.def.type === "unit").length
                     + altarBonus(side);
+            if (def.spell.growthHand) {
+                const hand = side === "p" ? B.hand : B.eHand;
+                let n = hand.filter((id) => CARDS[id] && CARDS[id].elem === "growth").length;
+                // эффект срабатывает до списания карты — сама она ещё в руке
+                if (hand.includes(cardIdOf(def))) n -= 1;
+                return n;
+            }
             return spellDmg(def, side);
         }
 
@@ -656,6 +664,19 @@
                 damageUnit(v, attacker.curAtk, attacker, "sword");
             }
         }
+        // «Круговая атака» (grw34): цель наносит 1 урон каждому соседу
+        // (верт/гориз) — существам и постройкам обеих сторон (фикс 1,
+        // аура алтаря не добавляется)
+        function novaSplash(u) {
+            if (!u || !B.units.includes(u)) return;
+            for (const v of B.units.slice()) {
+                if (v === u || !B.units.includes(v)) continue;
+                if (Math.abs(v.col - u.col) + Math.abs(v.row - u.row) !== 1) continue;
+                damageUnit(v, 1, u, "dam");
+            }
+            refreshHud();
+            checkEnd();
+        }
         // «Ядовитость N» («Отравленные лезвия» grw29): атака по существу
         // противника вешает на него «Яд» N (свой яд не расплёскивается,
         // постройки не травятся)
@@ -796,13 +817,15 @@
             let i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                 && (t.def.trap.effect === "cellDmg" || t.def.trap.effect === "ambush"
                     || t.def.trap.effect === "confuse" || t.def.trap.effect === "cellDebuff"
-                    || t.def.trap.effect === "ancestor"));
+                    || t.def.trap.effect === "ancestor" || t.def.trap.effect === "entangle"));
             if (i < 0) {
-                // «Решётка с шипами» и «Шипастые лозы» нейтральны: жалит ЛЮБОЕ
-                // существо, оказавшееся на клетке, — включая хозяина ловушки
+                // «Решётка с шипами», «Шипастые лозы» и «Опутывание корней»
+                // нейтральны: срабатывают на ЛЮБОЕ существо, оказавшееся на
+                // клетке, — включая хозяина ловушки
                 side = u.side;
                 i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
-                    && (t.def.trap.effect === "cellDmgAll" || t.def.trap.effect === "cellDebuff"));
+                    && (t.def.trap.effect === "cellDmgAll" || t.def.trap.effect === "cellDebuff"
+                        || t.def.trap.effect === "entangle"));
             }
             if (i < 0) return;
             const trap = B.traps[side].splice(i, 1)[0];
@@ -840,6 +863,15 @@
                 // «Путь грибов»: существо получает «Запутанность 2» — два
                 // своих хода вместо марша пятится к своей базе (просил юзер)
                 addConfusion(u, trap.def.trap.turns || 2);
+                refreshHud();
+                checkEnd();
+                return;
+            }
+            if (trap.def.trap.effect === "entangle") {
+                // «Опутывание корней» (grw35): существо получает «Опутывание
+                // 2» — два своих хода пропускает перемещение (атака по
+                // стоящему впереди врагу остаётся)
+                addEntangle(u, trap.def.trap.entangle || 2);
                 refreshHud();
                 checkEnd();
                 return;
@@ -899,6 +931,33 @@
                 floatText(p.x, p.y + 15, "−1", 0xff5f4e);
             }
             punch(root.hud);
+            refreshHud();
+            checkEnd();
+        }
+
+        // «Атака духами волков» (grw33): выбранное существо делает Выстрел —
+        // урон атаки вперёд по вертикали ближайшему существу или строению
+        // (любой стороны, как у лучника), а если вертикаль пуста — базе
+        // противника. На всех пустых клетках пути являются Волки 2/4
+        // стороны кастовавшего (штатный addUnit: ауры/монолит/сестра работают)
+        function wolfVolley(u) {
+            if (!B.units.includes(u) || u.def.type !== "unit") return;
+            const dir = u.side === "p" ? -1 : 1;
+            let hit = null;
+            const path = [];
+            for (let r = u.row + dir; r >= 0 && r < GRID; r += dir) {
+                const o = unitAt(u.col, r);
+                if (o) { hit = o; break; }
+                path.push(r);
+            }
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 60, "➤", 0xcfe8b0);
+            if (hit) {
+                damageUnit(hit, u.curAtk, u, "dam");
+            } else {
+                baseHit(u.side, u); // вертикаль пуста — выстрел в базу
+            }
+            for (const r of path) addUnit(u.side, "grw2", u.col, r);
             refreshHud();
             checkEnd();
         }
@@ -1098,6 +1157,37 @@
             refreshHud();
             checkEnd();
         }
+        // «Опутывание N» (grw35): корни держат существо на месте — оно
+        // пропускает перемещение в начале своего хода, счётчик тает на 1;
+        // на ноль — эффект снят. Атака по стоящему впереди врагу остаётся
+        function addEntangle(u, n) {
+            if (!B.units.includes(u)) return; // цель умерла от той же ловушки
+            u.entangle = (u.entangle || 0) + n;
+            let mark = u.node.getChildByName("entangleMark");
+            if (!mark) {
+                mark = new PIXI.Container();
+                mark.name = "entangleMark";
+                mark.eventMode = "none";
+                const g = new PIXI.Graphics();
+                g.circle(0, 0, 13.5);
+                g.fill({ color: 0x6b4a2e });
+                g.stroke({ width: 3, color: 0xc9a06a });
+                mark.addChild(g);
+                const tx = T("", 17, 0xf0dcb0);
+                tx.anchor.set(0.5);
+                mark.addChild(tx);
+                mark.position.set(-36, -66); // опутывание — левее яда
+                u.node.addChild(mark);
+            }
+            mark.getChildAt(1).text = String(u.entangle);
+            const p = cellXY(u.col, u.row);
+            floatText(p.x, p.y - 60, "≡", 0xc9a06a);
+            sfx("acid");
+        }
+        function removeEntangleMark(u) {
+            const mark = u.node && u.node.getChildByName("entangleMark");
+            if (mark) mark.destroy({ children: true });
+        }
 
         // «Извлечение духа» (grw17): снимаемые свойства КАРТЫ (способности,
         // ауры, особости построек); активные состояния считаются отдельно
@@ -1114,6 +1204,7 @@
             if (u.confused) n++;
             if (u.venom) n++;
             if (u.poison) n++;
+            if (u.entangle) n++;
             return n;
         }
         // Снять ВСЕ свойства/эффекты цели; возвращает, сколько снято, —
@@ -1133,8 +1224,9 @@
             if (u.confused) { u.confused = 0; n++; }
             if (u.venom) { u.venom = 0; n++; }
             if (u.poison) { u.poison = 0; n++; }
+            if (u.entangle) { u.entangle = 0; n++; }
             for (const m of ["sporeMark", "enchMark", "protectMark", "berserkMark", "confuseMark",
-                "venomMark", "poisonMark"]) {
+                "venomMark", "poisonMark", "entangleMark"]) {
                 const node = u.node.getChildByName(m);
                 if (node) node.destroy({ children: true });
             }
@@ -3019,7 +3111,26 @@
                     continue; // доб. атаки берсерка пропускает — не марширует
                 }
                 if (u.def.ability === "coward") { fleeCoward(u, side); continue; } // «Трусливый гоблин»
-                for (let step = 0; step < u.def.speed; step++) {
+                if (u.entangle > 0) {
+                    // «Опутывание корней» (grw35): перемещение пропущено,
+                    // счётчик тает на 1; атака по стоящему впереди врагу
+                    // остаётся (до базы опутанный не достаёт), берсерк не страдает
+                    u.entangle -= 1;
+                    if (u.entangle <= 0) { u.entangle = 0; removeEntangleMark(u); refreshHud(); }
+                    const ahead = u.row + dir;
+                    const occ = ahead >= 0 && ahead < GRID ? unitAt(u.col, ahead) : null;
+                    if (occ && occ.side !== u.side) {
+                        const hpBefore = occ.hp;
+                        damageUnit(occ, u.curAtk, u, "sword");
+                        crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
+                        thicketSplash(u, occ); // «Древоброд глухой чащи»
+                        venomApply(u, occ); // «Ядовитость»
+                        afterAttackPush(u, occ); // «Проросший кабан»
+                        triggerAttackTraps(u); // руна: существо атаковало
+                        refreshHud();
+                        if (checkEnd()) return;
+                    }
+                } else for (let step = 0; step < u.def.speed; step++) {
                     if (B.stopped || !B.units.includes(u)) break;
                     const ahead = u.row + dir;
                     if (ahead < 0 || ahead >= GRID) {
@@ -3311,7 +3422,8 @@
                     && v.def.type === "unit" && v.curAtk >= B.playerBase)) return 0;
                 if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
                     || s.sacrifice || s.baseHit || s.copyLast
-                    || s.purge || s.stealEnergy || s.fireflies) return 2;
+                    || s.purge || s.stealEnergy || s.fireflies
+                    || s.growthHand || s.wolfVolley || s.nova) return 2;
                 if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk
                     || s.enchantFire || s.cocoon || s.venom) return 4;
                 return 6; // поиск рун / гадание / глубокое путешествие
@@ -3421,6 +3533,15 @@
             }
             // «Рой светлячков» — 4⚡ за урон числом существ: играем при 2+ урона
             if (s.fireflies && spellHitDmg(def, "e") < 2) return false;
+            // «Выстрел стихией Роста» — без карт Роста в руке урона нет
+            if (s.growthHand && spellHitDmg(def, "e") < 1) return false;
+            // «Атака духами волков» — нужно своё существо, которое выстрелит
+            if (s.wolfVolley && !B.units.some((v) => v.side === "e"
+                && v.def.type === "unit")) return false;
+            // «Круговая атака» — есть своё существо впритык к врагу
+            if (s.nova && !B.units.some((v) => v.side === "e" && v.def.type === "unit"
+                && B.units.some((o) => o.side === "p"
+                    && Math.abs(o.col - v.col) + Math.abs(o.row - v.row) === 1))) return false;
             // «Культ кочерыжки» — нужна хоть одна пустая клетка под гоблинов
             if (s.cultRow && B.units.length >= GRID * GRID) return false;
             // «Поднять стяги!» — окупается при двух и более своих существах
@@ -3484,7 +3605,8 @@
             const d = CARDS[id], s = d && d.spell;
             if (!s) return false;
             return !!(s.aoeDmg || s.baseDmg || s.firewall || s.sacrifice
-                || s.drainAll || s.fireflies || (s.dmg || 0) + altarBonus("e") >= 2);
+                || s.drainAll || s.fireflies || s.growthHand
+                || (s.dmg || 0) + altarBonus("e") >= 2);
         }
         // Есть ли смысл повторять последнее заклинание («Горящие руны»):
         // оно есть, это не сами руны, оно достойно повтора и применимо
@@ -3502,7 +3624,23 @@
         // в это существо, бьёт именно его (просил юзер).
         function enemyCastSpellEffect(def, free = false, focus = null) {
             const s = def.spell;
-            if (s.target === "anyUnit") { // усиление/очарование — своему сильнейшему
+            if (s.nova) { // «Круговая атака»: своё существо с наибольшим числом соседей-врагов
+                const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
+                let best = null, bestN = 0;
+                for (const v of own) {
+                    const n = B.units.filter((o) => o.side === "p"
+                        && Math.abs(o.col - v.col) + Math.abs(o.row - v.row) === 1).length;
+                    if (n > bestN) { bestN = n; best = v; }
+                }
+                if (focus && own.includes(focus)) best = focus; // руна
+                if (best) { novaSplash(best); punch(best.node); sfx("up"); }
+            }
+            if (s.wolfVolley) { // «Атака духами волков»: сильнейшее своё стреляет
+                const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit")
+                    .slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row));
+                if (own[0]) wolfVolley(own[0]);
+            }
+            if (s.target === "anyUnit" && !s.nova) { // усиление/очарование — своему сильнейшему
                 const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
                     && (!s.enchantFire || !v.enchantFire));
                 // очарование «Огненного дыхания» вешается на крепкого атакующего
@@ -3817,10 +3955,11 @@
                                 v.side === "p" && Math.abs(v.col - c2) + Math.abs(v.row - r2) === 1));
                             pool = near.length ? near : spots;
                         } else pool = spots;
-                        // «Путь грибов» (Запутанность): на клетку следующего
-                        // шага СИЛЬНЕЙШЕГО существа игрока — пусть лучший
-                        // бегун два хода пятится домой (правило юзера)
-                        if (def.trap.effect === "confuse" && front.length) {
+                        // «Путь грибов» (Запутанность) и «Опутывание корней»:
+                        // на клетку следующего шага СИЛЬНЕЙШЕГО существа
+                        // игрока — лучший бегун два хода теряет марш (правило юзера)
+                        if ((def.trap.effect === "confuse" || def.trap.effect === "entangle")
+                            && front.length) {
                             const strong = B.units.filter((v) =>
                                 v.side === "p" && v.def.type === "unit")
                                 .sort((a, b) => aiVal(b) - aiVal(a))[0];
@@ -4039,10 +4178,15 @@
                     refreshHud();
                     return;
                 }
-                if (unitAt(col, row)) { deselect(); return; } // мина — пустая клетка
+                // «Опутывание корней» (grw35) — на ЛЮБУЮ клетку поля, даже
+                // под существо: «нахождение» — условие срабатывания, оно
+                // опутывается сразу; прочие ловушки — только пустая клетка
+                const occupant = unitAt(col, row);
+                if (occupant && def.trap.effect !== "entangle") { deselect(); return; }
                 B.energy -= effCost(B.hand[B.selected]); // цена ловушки
                 const cardId = spendCard(B.selected);
                 armTrap("p", cardId, col, row);
+                if (occupant) triggerCellTraps(occupant); // сработала сразу
                 deselect();
                 layoutHand();
                 redrawHighlight();
@@ -4120,6 +4264,7 @@
                     }
                     if (def.spell.berserk) addBerserk(u, def.spell.berserk);
                     if (def.spell.venom) addVenom(u, def.spell.venom); // «Отравленные лезвия»
+                    if (def.spell.nova) novaSplash(u); // «Круговая атака»
                 }
                 punch(u.node);
                 sfx("up");
@@ -4141,6 +4286,8 @@
                     damageUnit(u, Math.max(0, B.energy - (free ? 0 : effCost(cardId)))
                         + altarBonus("p"), null, "rocket");
                 } else if (def.spell.fireflies) { // «Рой светлячков»: урон = своим существам
+                    damageUnit(u, spellHitDmg(def, "p"), null, "rocket");
+                } else if (def.spell.growthHand) { // «Выстрел стихией Роста»: урон = картам Роста в руке
                     damageUnit(u, spellHitDmg(def, "p"), null, "rocket");
                 } else {
                     damageUnit(u, spellDmg(def), null, "rocket");
@@ -4164,6 +4311,12 @@
                 if (!u || u.side !== "p" || u.def.type !== "unit") return false;
                 baseHit("p", u);
                 triggerAttackTraps(u);
+            }
+            if (def.spell.target === "ownUnit" && def.spell.wolfVolley) { // «Атака духами волков»: Выстрел + волки на пути
+                if (!target || target.col === undefined) return false;
+                const u = unitAt(target.col, target.row);
+                if (!u || u.side !== "p" || u.def.type !== "unit") return false;
+                wolfVolley(u);
             }
             if (def.spell.target === "ownUnit" && def.spell.sacrifice) { // жертва: убить своё, ударить соседей
                 if (!target || target.col === undefined) return false;
@@ -4823,7 +4976,7 @@
                     lastSpell: B.lastSpell.p,
                     journeySummon: B.journeySummon,
                     eDeck: B.eDeck.length,
-                    units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0, venom: u.venom || 0, poison: u.poison || 0 })),
+                    units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0, venom: u.venom || 0, poison: u.poison || 0, entangle: u.entangle || 0 })),
                     traps: { p: B.traps.p.length, e: B.traps.e.length },
                     firewalls: B.firewalls.map((f) => ({ side: f.side, row: f.row, left: f.left })),
                 };
@@ -4992,6 +5145,14 @@
             // (проба сокрушения/чащи/ядовитости без полного хода ИИ)
             async _march(side) { await marchSide(side); return true; },
             _poisonTick(side) { poisonTick(side); return true; },
+            // установка ловушки стороной (проба опутывания без розыгрыша
+            // карты); существо на клетке — «нахождение», как у клика игрока
+            _armTrap(side, cardId, col, row) {
+                armTrap(side, cardId, col, row);
+                const u = unitAt(col, row);
+                if (u) triggerCellTraps(u);
+                return true;
+            },
             // план добора ИИ по шкале (тесты мягкого правила): сколько карт
             // возьмёт и какой доход всего
             aiDrawPlan: () => (B
