@@ -99,7 +99,7 @@
             bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);
             root.addChild(bg);
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1920, 1080);
+            dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.55 });
             root.addChild(dim);
 

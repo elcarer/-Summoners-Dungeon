@@ -609,20 +609,25 @@
                 G.uiReturn = "dungeon";
                 scenes.go("deck");
             }, 0.675));
-            // карточка героя (просил юзер): под кнопками, клик — в колоду
+            // карточка героя (просил юзер): под кнопками, клик — в колоду,
+            // наведение — рост до натурального размера (ctx.heroHover)
             const dHero = globalThis.GAME_DATA.HEROES[G.heroId]
                 || globalThis.GAME_DATA.HEROES.gorbag;
+            const heroHolder = new PIXI.Container();
+            heroHolder.position.set(1839, 245);
+            heroHolder.hitArea = new PIXI.Rectangle(-57.5, 0, 115, 169); // исходное место
             const heroCard = new PIXI.Sprite(uiTex(`heroes/${dHero.img}.png`));
             heroCard.anchor.set(0.5, 0);
             heroCard.scale.set(0.5); // 230×338 → 115×169
-            heroCard.position.set(1839, 245);
-            heroCard.eventMode = "static";
-            heroCard.on("pointertap", () => {
+            heroCard.eventMode = "none";
+            heroHolder.addChild(heroCard);
+            heroHolder.on("pointertap", () => {
                 if (ctx.sfx) ctx.sfx();
                 G.uiReturn = "dungeon";
                 scenes.go("deck");
             });
-            c.addChild(heroCard);
+            ctx.heroHover(heroHolder, heroCard, -35, 0); // большой вид: правый край 1919
+            c.addChild(heroHolder);
             const hint = new PIXI.Text({
                 text: GAME_LOC.t("dungeon.hint"),
                 style: { fontFamily: "Kereru", fontSize: 22, fill: 0xbfae87 },
@@ -745,7 +750,10 @@
             const c = new PIXI.Container();
             c.eventMode = "static";
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1920, 1080);
+            // дим с запасом за 1920×1080: накрыть поля letterbox — мир
+            // рисуется на весь канвас, и без этого справа остаётся светлая
+            // незатенённая полоса (просил юзер)
+            dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.55 });
             c.addChild(dim);
             const w = 760, h = 560, top = 540 - h / 2;
@@ -802,7 +810,7 @@
             const c = new PIXI.Container();
             c.eventMode = "static";
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1920, 1080);
+            dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.55 });
             c.addChild(dim);
             const w = 640, h = chest ? 720 : 400, top = 540 - h / 2;
@@ -911,7 +919,7 @@
             const c = new PIXI.Container();
             c.eventMode = "static";
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1920, 1080);
+            dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.65 });
             c.addChild(dim);
             const title = T(t("obj.shop"), 51, 0xf0c96a, { stroke: { color: 0x241505, width: 9 } });

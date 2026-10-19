@@ -1,4 +1,4 @@
-// БУТ «Подземелье призывателей»: движок → ассеты → шрифт → мета/настройки →
+// БУТ «Развернутый Мир»: движок → ассеты → шрифт → мета/настройки →
 // сцены → меню. Базовое разрешение UI — 1920×1080, все координаты
 // интерфейса заданы прямо в нём; вписывается в окно (letterbox).
 // Коллекция/колода/настройки живут в localStorage (meta.js) и переживают
@@ -304,12 +304,49 @@
         };
         if (!G.deck.length) G.deck = [...DEFAULT_DECK];
 
+        // ── Ховер-увеличение карточки героя в HUD (просил юзер) ────────────
+        // Зона наведения — исходное место карточки (hitArea держателя не
+        // едет, нет дребезга на границе), сам спрайт плавно растёт до
+        // натурального размера текстуры (scale 1, 230×338) и уменьшается
+        // обратно. bigX/bigY — позиция увеличенного спрайта относительно
+        // держателя (подгон, чтобы карточка не вылезала за экран).
+        const hoverAnims = [];
+        app.ticker.add(() => {
+            for (let i = hoverAnims.length - 1; i >= 0; i--) {
+                const a = hoverAnims[i];
+                if (a.sp.destroyed) { hoverAnims.splice(i, 1); continue; }
+                const tgt = a.on ? a.big : a.base;
+                if (a.sp.x === tgt.x && a.sp.y === tgt.y && a.sp.scale.x === tgt.s) continue;
+                a.sp.position.set(a.sp.x + (tgt.x - a.sp.x) * 0.22,
+                    a.sp.y + (tgt.y - a.sp.y) * 0.22);
+                a.sp.scale.set(a.sp.scale.x + (tgt.s - a.sp.scale.x) * 0.22);
+                if (Math.abs(tgt.x - a.sp.x) < 0.5 && Math.abs(tgt.y - a.sp.y) < 0.5
+                    && Math.abs(tgt.s - a.sp.scale.x) < 0.004) {
+                    a.sp.position.set(tgt.x, tgt.y);
+                    a.sp.scale.set(tgt.s);
+                }
+            }
+        });
+        const heroHover = (holder, sp, bigX, bigY) => {
+            const a = {
+                sp,
+                base: { x: sp.x, y: sp.y, s: sp.scale.x },
+                big: { x: bigX, y: bigY, s: 1 },
+                on: false,
+            };
+            holder.eventMode = "static";
+            holder.on("pointerover", () => { a.on = true; });
+            holder.on("pointerout", () => { a.on = false; });
+            hoverAnims.push(a);
+        };
+
         const ctx = {
             app, world, ECS, COMPONENTS, DATA, worldContainer, addSystem,
             assets, uiTex, scheduler, input, camera, characters, charInput,
             heroSheet: heroSheets.strength, heroSheets, creatureSheets, G, ui, audio, collide,
             sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
+            heroHover,        // ctx.heroHover(держатель, спрайт, bigX, bigY)
         };
 
         const scenes = createScenes({ addSystem });
@@ -469,7 +506,7 @@
                 fwRoot = new PIXI.Container();
                 fwRoot.eventMode = "static";
                 const dim = new PIXI.Graphics();
-                dim.rect(0, 0, 1920, 1080);
+                dim.rect(-3000, -2000, 7920, 5080);
                 dim.fill({ color: 0x000000, alpha: 0.65 });
                 fwRoot.addChild(dim);
                 const panel = new PIXI.Sprite(uiTex("panel_allert.png"));
@@ -511,7 +548,7 @@
                 bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);
                 epRoot.addChild(bg);
                 const dim = new PIXI.Graphics();
-                dim.rect(0, 0, 1920, 1080);
+                dim.rect(-3000, -2000, 7920, 5080);
                 dim.fill({ color: 0x000000, alpha: 0.5 });
                 epRoot.addChild(dim);
 

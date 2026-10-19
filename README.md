@@ -1,4 +1,4 @@
-# Подземелье призывателей (Summoners Dungeon)
+# Развернутый Мир (The Unfolded World)
 
 Карточный рогалик: путешествие героя по подземелью + бои «карточные батлеры»
 на арене 5×5. Движок — [zero_engine](https://github.com/elcarer/zero_engine)

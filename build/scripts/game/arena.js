@@ -2084,7 +2084,7 @@
             const node = new PIXI.Container();
             node.eventMode = "static";
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1920, 1080);
+            dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.6 });
             dim.eventMode = "static";
             node.addChild(dim);
@@ -2173,7 +2173,7 @@
             const node = new PIXI.Container();
             node.eventMode = "static";
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1920, 1080);
+            dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.6 });
             dim.eventMode = "static";
             node.addChild(dim);
@@ -2267,7 +2267,7 @@
             const node = new PIXI.Container();
             node.eventMode = "static";
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1920, 1080);
+            dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.6 });
             dim.eventMode = "static";
             node.addChild(dim);
@@ -2363,7 +2363,7 @@
             const node = new PIXI.Container();
             node.eventMode = "static";
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1920, 1080);
+            dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.6 });
             dim.eventMode = "static";
             node.addChild(dim);
@@ -2431,7 +2431,7 @@
             const node = new PIXI.Container();
             node.eventMode = "static";
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1920, 1080);
+            dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.6 });
             dim.eventMode = "static";
             node.addChild(dim);
@@ -2531,7 +2531,7 @@
             const node = new PIXI.Container();
             node.eventMode = "static";
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1920, 1080);
+            dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.6 });
             dim.eventMode = "static";
             node.addChild(dim);
@@ -2631,7 +2631,7 @@
             const node = new PIXI.Container();
             node.eventMode = "static";
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1920, 1080);
+            dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.6 });
             dim.eventMode = "static";
             node.addChild(dim);
@@ -2861,14 +2861,19 @@
             c.addChild(gear);
 
             // карточка героя (просил юзер): под шестерёнкой, зеркально
-            // колоде врага справа-сверху. Его baseHp — жизни базы игрока
+            // колоде врага справа-сверху. Его baseHp — жизни базы игрока.
+            // Наведение — рост до натурального размера (ctx.heroHover)
             const aHeroDef = globalThis.GAME_DATA.HEROES[G.heroId]
                 || globalThis.GAME_DATA.HEROES.gorbag;
+            const heroHolder = new PIXI.Container();
+            heroHolder.position.set(58, 118);
+            heroHolder.hitArea = new PIXI.Rectangle(0, 0, 143, 210); // исходное место
             const heroCard = new PIXI.Sprite(uiTex(`heroes/${aHeroDef.img}.png`));
-            heroCard.position.set(58, 118);
             heroCard.scale.set(0.62); // 230×338 → ~143×210
             heroCard.eventMode = "none";
-            c.addChild(heroCard);
+            heroHolder.addChild(heroCard);
+            ctx.heroHover(heroHolder, heroCard, 0, 0);
+            c.addChild(heroHolder);
 
             const targetHint = T("", 24, 0xef9f8c, { stroke: { color: 0x1c1207, width: 6 } });
             targetHint.anchor.set(0.5);
@@ -4738,7 +4743,7 @@
             refreshHud();
             const ov = new PIXI.Container();
             const dim = new PIXI.Graphics();
-            dim.rect(0, 0, 1920, 1080);
+            dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.6 });
             ov.addChild(dim);
             const panel = new PIXI.Sprite(uiTex("panel_allert.png"));

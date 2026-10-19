@@ -196,14 +196,19 @@
             root.addChild(left);
             // шапка левой панели: карточка героя (просил юзер) + счётчики
             // колоды правее. Герой определяет стихии, разрешённые в колоде.
-            // Всё компактно до верха карт первого ряда (y=236)
+            // Всё компактно до верха карт первого ряда (y=236). Держатель
+            // карточки добавляем ПОСЛЕ панели: в увеличенном виде карточка
+            // накрывает счётчики, а не уходит под них
             const hd = heroDef();
+            const heroHolder = new PIXI.Container();
+            heroHolder.position.set(146, 130);
+            heroHolder.hitArea = new PIXI.Rectangle(0, 0, 71, 105); // исходное место
             const heroCard = new PIXI.Sprite(uiTex(`heroes/${hd.img}.png`));
             heroCard.anchor.set(0, 0);
             heroCard.scale.set(105 / heroCard.texture.height); // ~71×105
-            heroCard.position.set(146, 130);
             heroCard.eventMode = "none";
-            root.addChild(heroCard);
+            heroHolder.addChild(heroCard);
+            ctx.heroHover(heroHolder, heroCard, 0, 0);
             const deckH = T("", 30, 0xf3e6c2);
             deckH.position.set(240, 148);
             deckH.eventMode = "none";
@@ -221,6 +226,7 @@
             headerRef = { deck: deckH, min: minH };
             leftPane = scrollPane(ctx, { x: 90, y: 222, w: 609, h: 774, onScroll: () => hideZoom(false) });
             root.addChild(leftPane.node);
+            root.addChild(heroHolder);
 
             // правая рамка + фильтры + скролл-панель
             const right = new PIXI.Graphics();

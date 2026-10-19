@@ -188,20 +188,25 @@
                 G.uiReturn = "world";
                 scenes.go("deck");
             }, 0.675));
-            // карточка героя (просил юзер): под кнопками, клик — в колоду
+            // карточка героя (просил юзер): под кнопками, клик — в колоду,
+            // наведение — рост до натурального размера (ctx.heroHover)
             const wHero = globalThis.GAME_DATA.HEROES[G.heroId]
                 || globalThis.GAME_DATA.HEROES.gorbag;
+            const heroHolder = new PIXI.Container();
+            heroHolder.position.set(1839, 245);
+            heroHolder.hitArea = new PIXI.Rectangle(-57.5, 0, 115, 169); // исходное место
             const heroCard = new PIXI.Sprite(uiTex(`heroes/${wHero.img}.png`));
             heroCard.anchor.set(0.5, 0);
             heroCard.scale.set(0.5); // 230×338 → 115×169
-            heroCard.position.set(1839, 245);
-            heroCard.eventMode = "static";
-            heroCard.on("pointertap", () => {
+            heroCard.eventMode = "none";
+            heroHolder.addChild(heroCard);
+            heroHolder.on("pointertap", () => {
                 if (ctx.sfx) ctx.sfx();
                 G.uiReturn = "world";
                 scenes.go("deck");
             });
-            c.addChild(heroCard);
+            ctx.heroHover(heroHolder, heroCard, -35, 0); // большой вид: правый край 1919
+            c.addChild(heroHolder);
             const hint = new PIXI.Text({
                 text: GAME_LOC.t("world.hint"),
                 style: { fontFamily: "Kereru", fontSize: 22, fill: 0xbfae87 },
