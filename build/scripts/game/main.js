@@ -55,12 +55,13 @@
         uiTextures["card_goblin_back.png"] = await assets.loadTexture("./images/ui/card_goblin_back.png");
         uiTextures["card_nature_back.png"] = await assets.loadTexture("./images/ui/card_nature_back.png");
         // тайлы подземелья юзера: images/dungeon_tiles/goblins_lair/<…>.png —
-        // полы 64×64 (floor/0-5) и стены walls/* по маске соседей
+        // полы 64×64 (floor/0-9) и стены walls/* по маске соседей
         // (пока один набор на все подземелья, просил юзер)
         say("тайлы подземелья…");
         await frame();
         for (const f of ["floor/0", "floor/1", "floor/2", "floor/3",
-            "floor/4", "floor/5", "walls/wall_h1", "walls/wall_h1_td",
+            "floor/4", "floor/5", "floor/6", "floor/7", "floor/8",
+            "floor/9", "walls/wall_h1", "walls/wall_h1_td",
             "walls/wall_h1_tu", "walls/wall_v1", "walls/wall_v1_tl",
             "walls/wall_v1_tr", "walls/wall_cross", "walls/wall_cor1",
             "walls/wall_cor2", "walls/wall_cor3", "walls/wall_cor4",
