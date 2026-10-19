@@ -399,7 +399,16 @@
                 });
                 addMenuBtn(t("menu.deck"), 960, 810, () => scenes.go("deck"));
                 addMenuBtn(t("menu.settings"), 960, 900, () => scenes.go("settings"));
-                addMenuBtn(t("menu.exit"), 960, 990, () => { menuRoot.userData.bye.visible = true; });
+                addMenuBtn(t("menu.exit"), 960, 990, () => {
+                    // выйти по-настоящему: в Electron window.close() закрывает
+                    // окно (и приложение), браузер обычно запрещает закрытие
+                    // вкладки, открытой не скриптом — тогда остаётся «До встречи»
+                    try { window.close(); } catch (e) { /* блокировка браузера */ }
+                    setTimeout(() => {
+                        if (menuRoot && !window.closed)
+                            menuRoot.userData.bye.visible = true;
+                    }, 250);
+                });
                 // хендл для смоука: подписи/размеры кнопок, заголовок, нажатие
                 window.__GAME.menu = {
                     buttons: () => menuInfo.map((b) => ({ ...b })),

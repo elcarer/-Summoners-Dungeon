@@ -204,7 +204,7 @@
                  rarity: "rare", elem: "growth",
                  color: 0x2e5a2e, img: "growth/52" },
         grw13: { type: "unit", cost: 2, atk: 2, hp: 2, speed: 1,
-                 creature: "animal", ability: "pushBack",
+                 creature: "animal", sheet: "wolf", ability: "pushBack",
                  rarity: "rare", elem: "growth",
                  color: 0x3f6d3a, img: "growth/53" },
         grw14: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
@@ -338,7 +338,7 @@
         // ── Рост, девятая партия (глаза юзера): 76–80 ────────────────────────
         // «Озверевший шатун»: −1 энергию за каждое СВОЁ Животное на поле
         grw36: { type: "unit", cost: 5, atk: 5, hp: 6, speed: 1,
-                 creature: "animal", animalCost: true,
+                 creature: "animal", sheet: "bear", animalCost: true,
                  rarity: "rare", elem: "growth",
                  color: 0x3f6d3a, img: "growth/76" },
         // «Заклятый древоброд»: заклинания, выбравшие его целью, — на 1
