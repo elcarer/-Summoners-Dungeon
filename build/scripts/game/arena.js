@@ -3519,6 +3519,9 @@
                 if (s.baseDmg && B.playerBase <= s.baseDmg) return 0; // землетрясение добивает
                 if (s.baseHit && B.units.some((v) => v.side === "e"
                     && v.def.type === "unit" && v.curAtk >= B.playerBase)) return 0;
+                // «Цветение кристаллов» — ускоритель: энергия за размер руки,
+                // разыгрывается первым, чтобы хватило и на остальные карты
+                if (s.energyPerHand) return 1;
                 if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
                     || s.sacrifice || s.baseHit || s.copyLast
                     || s.purge || s.stealEnergy || s.fireflies
@@ -3527,9 +3530,18 @@
                     || s.enchantFire || s.cocoon || s.venom) return 4;
                 return 6; // поиск рун / гадание / глубокое путешествие
             }
-            if (def.type === "building") return 1;
+            // «Три монолита» — без спешки (просил юзер: не в приоритете):
+            // движок добора, играется, когда важное уже разыграно
+            if (def.type === "building") return def.monolith ? 5.5 : 1;
             if (def.type === "trap") return 5;
-            if (def.leaderAura || def.spellBuffAura) return 1; // вождь / заклинатель клинков
+            // вождь / заклинатель клинков / пастух росянок — двигатели связок:
+            // пастуха ставим до Растений, чьи способности он удвоит
+            if (def.leaderAura || def.spellBuffAura || def.plantEcho) return 1;
+            // «Хранитель леса»: тело = числу своих Животных при призыве —
+            // с двумя и больше зверями играет в общий поток, иначе ждёт
+            if (def.keeperScale) return B.units.filter((v) => v.side === "e"
+                && v.def.type === "unit" && v.def.creature === "animal").length >= 2
+                ? 3 : 5.5;
             if (def.energyToStats) return 3.5; // эльф — последним: соберёт остаток энергии
             return 3;
         }
@@ -3554,6 +3566,11 @@
                     if (b.def.type === "building" && b.def.campAura) score += 3;
                     if (b.def.type === "building" && b.def.campfire) score += 2;
                     if (b.def.spellBuffAura) score += 2;
+                    // «Три монолита»: призыв рядом добирает из колоды существо
+                    // на 1⚡ дороже — встаём рядом, если такое в колоде есть
+                    if (b.def.type === "building" && b.def.monolith
+                        && B.eDeck.some((x) => CARDS[x].type === "unit"
+                            && CARDS[x].cost === def.cost + 1)) score += 3;
                 }
                 if (def.ability === "coward"
                     && B.units.some((v) => v.side === "p" && v.col === c && v.row === r + 1)) score += 2.5;
@@ -3562,17 +3579,18 @@
             }
             return best[(Math.random() * best.length) | 0];
         }
-        // Постройки-ауры соседства (лагерь, костёр, росток, монолит) — к
-        // существам и будущим призывам: своё существо рядом (костёр лечит
-        // сразу, росток вернётся в руку с +3 жизни соседу, монолит даст
-        // +1 жизни при призыве) и пустая клетка зоны призыва рядом (лагерь
-        // усилит того, кто встанет). Остальные постройки — как раньше,
-        // в тыл у своей базы.
+        // Постройки-ауры соседства (лагерь, костёр, росток, лесной монолит,
+        // три монолита) — к существам и будущим призывам: своё существо рядом
+        // (костёр лечит сразу, росток вернётся в руку с +3 жизни соседу,
+        // монолит даст +1 жизни при призыве, «Три монолита» — добор существа)
+        // и пустая клетка зоны призыва рядом (лагерь усилит того, кто
+        // встанет). Остальные постройки — как раньше, в тыл у своей базы.
         function aiBuildingSpot(def) {
             const rows = deployRows("e");
             const free = freeCells(rows);
             if (!free.length) return null;
-            if (def.campAura || def.campfire || def.sprout || def.groveAura) {
+            if (def.campAura || def.campfire || def.sprout || def.groveAura
+                || def.monolith) {
                 let best = [], bestScore = -1;
                 for (const [c, r] of free) {
                     let score = 0;
@@ -3634,6 +3652,8 @@
             if (s.fireflies && spellHitDmg(def, "e") < 2) return false;
             // «Выстрел стихией Роста» — без карт Роста в руке урона нет
             if (s.growthHand && spellHitDmg(def, "e") < 1) return false;
+            // «Цветение кристаллов» — разгон: играется при 4+ картах в руке
+            if (s.energyPerHand && B.eHand.length < 4) return false;
             // «Атака духами волков» — нужно своё существо, которое выстрелит
             if (s.wolfVolley && !B.units.some((v) => v.side === "e"
                 && v.def.type === "unit")) return false;
@@ -3886,6 +3906,13 @@
                 B.energy -= got;
                 B.eEnergy += got;
                 floatText(960, 840, `−${got}⚡`, 0xff5f4e);
+                floatText(960, 60, `+${got}⚡`, 0xffd98c);
+                punch(root.hud);
+                sfx("aqua");
+            }
+            if (s.energyPerHand) { // «Цветение кристаллов»: +1⚡ за карту руки (сама не считается)
+                const got = Math.max(0, B.eHand.length - 1);
+                B.eEnergy += got;
                 floatText(960, 60, `+${got}⚡`, 0xffd98c);
                 punch(root.hud);
                 sfx("aqua");
@@ -5325,6 +5352,8 @@
                 : null),
             // гейты ИИ по заклинанию (тесты): id карты → playable
             aiSpellPlayable: (id) => !!CARDS[id] && aiSpellPlayable(CARDS[id]),
+            // группы приоритета ИИ (тесты связок): id карты → группа
+            _aiGroup: (id) => (B && CARDS[id] ? aiGroup(id, CARDS[id]) : null),
         };
         function cardIdOf(def) {
             // «Извлечение духа» подменяет def существа «очищенной» копией —

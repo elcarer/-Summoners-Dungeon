@@ -498,19 +498,40 @@
         draft:    { scene: 1, baseHp: 15, core: [] },
 
         // ── «Роща Роста» (второе подземелье, стихия «Рост») ───────────────
-        // Каталог Роста — 24 карты (глаза юзера 41–64): «Лесные звери» —
-        // существа и усиления (друид-эльф кормит связку волками), «Роща
-        // лоз» — ловушки, постройки, контроль и добор заклинаний; босс
-        // собирает всё.
+        // Каталог Роста — 40 карт (глаза юзера 41–80), свой архетип на этаж
+        // (FLOOR_MOBS_GROWTH, принципы гоблинских пещер — просил юзер):
+        // «Лесные звери» — звери и усиления, «Роща лоз» — контроль и добор,
+        // дальше — свежий архетип каждого этажа; босс собирает всё и с
+        // глубиной добирает grow-карты (механика вождя гоблинов).
         grwBeasts: { scene: 1, baseHp: 10, elem: "growth",
-                     core: ["grw2", "grw2", "grw3", "grw3", "grw8", "grw8",
-                            "grw13", "grw14", "grw20", "grw22", "grw24"] },
-        grwGrove:  { scene: 1, baseHp: 12, elem: "growth",
-                     core: ["grw4", "grw4", "grw10", "grw10", "grw11", "grw12",
-                            "grw19", "grw19", "grw17", "grw21", "grw23"] },
+                     core: ["grw2", "grw2", "grw3", "grw3", "grw13", "grw22",
+                            "grw24", "grw5", "grw5", "grw10", "grw12"] },
+        grwGrove:  { scene: 1, baseHp: 11, elem: "growth",
+                     core: ["grw4", "grw4", "grw19", "grw19", "grw17", "grw23",
+                            "grw7", "grw8", "grw8", "grw16", "grw27"] },
+        grwWild:   { scene: 1, baseHp: 12, elem: "growth",
+                     core: ["grw1", "grw1", "grw6", "grw6", "grw20", "grw29",
+                            "grw34", "grw34", "grw35", "grw35", "grw40"] },
+        grwMagic:  { scene: 1, baseHp: 13, elem: "growth",
+                     core: ["grw14", "grw14", "grw20", "grw23", "grw25",
+                            "grw30", "grw30", "grw32", "grw32", "grw37",
+                            "grw28"] },
+        grwCity:   { scene: 1, baseHp: 14, elem: "growth",
+                     core: ["grw6", "grw10", "grw10", "grw11", "grw13", "grw15",
+                            "grw19", "grw21", "grw38", "grw38", "grw39",
+                            "grw39"] },
+        grwControl: { scene: 1, baseHp: 15, elem: "growth",
+                      core: ["grw26", "grw23", "grw18", "grw18", "grw22",
+                             "grw33", "grw17", "grw1", "grw9", "grw3",
+                             "grw24"] },
+        // «Хранитель рощи» — главарь этажа (B на карте). Ядро — 11 карт
+        // (составом просил юзер); с глубиной добавляются карты из grow
+        // (2 за этаж; к 6-му забирает весь список), добор — как у обычных.
         grwBoss:   { scene: 1, baseHp: 18, elem: "growth",
-                     core: ["grw3", "grw3", "grw8", "grw8", "grw13", "grw12",
-                            "grw11", "grw15", "grw18", "grw9", "grw22"] },
+                     core: ["grw3", "grw3", "grw13", "grw12", "grw15", "grw18",
+                            "grw9", "grw22", "grw36", "grw40", "grw1"],
+                     grow: ["grw24", "grw28", "grw31", "grw2", "grw26", "grw25",
+                            "grw21", "grw38", "grw33", "grw30"] },
     };
     // Подземелья открытого мира: стихия (пул наград/драфта) и кап глубины
     const CAVES = {
@@ -527,14 +548,15 @@
         ["gobFire", "gobElite"],              // 5
         ["gobElite", "gobTrap", "gobFire"],   // 6+
     ];
-    // Этажи «Рощи Роста»: существа с 1-го, ловушки/постройки со 2-го
+    // Этажи «Рощи Роста»: каждый этаж приводит свой архетип, принципы —
+    // как в гоблинских пещерах (просил юзер); на 6+ правят три старших
     const FLOOR_MOBS_GROWTH = [
-        ["grwBeasts", "grwBeasts"],           // 1
-        ["grwBeasts", "grwGrove"],            // 2
-        ["grwGrove", "grwBeasts"],            // 3
-        ["grwGrove", "grwBeasts", "grwGrove"],// 4
-        ["grwGrove", "grwGrove", "grwBeasts"],// 5
-        ["grwGrove", "grwGrove", "grwBeasts"],// 6+
+        ["grwBeasts", "grwBeasts"],             // 1
+        ["grwBeasts", "grwGrove"],              // 2
+        ["grwGrove", "grwWild"],                // 3
+        ["grwWild", "grwMagic"],                // 4
+        ["grwMagic", "grwCity"],                // 5
+        ["grwControl", "grwCity", "grwMagic"],  // 6+
     ];
     const MOB_TABLES = { gob: FLOOR_MOBS, grw: FLOOR_MOBS_GROWTH };
     // Пул добора колоды врага по редкости. Панельные карты (str11 жертва,
@@ -550,7 +572,9 @@
         epic:   ["str6", "str8", "str10", "str18", "str21", "str25", "str28",
                  "str40"],
     };
-    // Пулы добора по стихии архетипа: враги Роста добирают только зелёное
+    // Пулы добора по стихии архетипа: враги Роста добирают только зелёное,
+    // и это ВСЕ 40 карт Роста — включая «Цветение кристаллов» и «Три
+    // монолита» (ИИ играет всеми картами — просил юзер)
     const ENEMY_FILLS = {
         strength: ENEMY_FILL,
         growth: {
@@ -558,10 +582,10 @@
                      "grw7", "grw8", "grw10", "grw16", "grw17", "grw19",
                      "grw29", "grw34", "grw35"],
             rare:   ["grw9", "grw11", "grw12", "grw13", "grw14", "grw20",
-                     "grw27", "grw28", "grw32", "grw36", "grw37", "grw38",
-                     "grw39"],
+                     "grw25", "grw27", "grw28", "grw32", "grw36", "grw37",
+                     "grw38", "grw39"],
             epic:   ["grw15", "grw18", "grw21", "grw22", "grw23", "grw24",
-                     "grw30", "grw31", "grw33", "grw40"],
+                     "grw26", "grw30", "grw31", "grw33", "grw40"],
         },
     };
     // Колода врага: ядро архетипа + 3..8 карт добора; с глубиной (floor ≥ 1)
@@ -575,7 +599,8 @@
         // него) — на 1-м этаже он без них, к 6-му забирает весь список
         if (enc.grow) {
             const pool = [...enc.grow];
-            for (let k = 0; k < Math.min((f - 1) * 2, pool.length); k++)
+            const take = Math.min((f - 1) * 2, pool.length);
+            for (let k = 0; k < take; k++)
                 deck.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
         }
         const extra = Math.min(3 + (((f - 1) / 2) | 0), 8);
