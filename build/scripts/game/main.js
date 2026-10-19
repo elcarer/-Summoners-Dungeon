@@ -102,12 +102,17 @@
         // Листы существ поля боя. Стандарт: <имя>_256.png — сетка 256×256,
         // 4 ряда анимаций (спереди/сзади/справа/слева) по 6 кадров + json-манифест.
         // По умолчанию лист — по стихии (Рост — эльф, остальное — гоблин);
-        // конкретное существо может указать свой лист полем def.sheet
-        // (сейчас — волк у «Проросшего волка»), новые добавлять сюда записью.
+        // конкретное существо указывает свой лист полем def.sheet, новые
+        // добавлять сюда записью. scale — множитель к боевому скейлу
+        // (SPRITE_SCALE арены): медведь ×1.1, древоброд ×1.3, росянка ×0.8
+        // (просил юзер).
         const creatureSheets = {
             goblin: heroSheets.strength,
             elf: heroSheets.growth,
             wolf: await assets.loadCharacter("./images/sprites/wolf_256"),
+            bear: { ...(await assets.loadCharacter("./images/sprites/bear_256")), scale: 1.1 },
+            ent: { ...(await assets.loadCharacter("./images/sprites/ent_256")), scale: 1.3 },
+            plant: { ...(await assets.loadCharacter("./images/sprites/plant_256")), scale: 0.8 },
         };
 
         // ── UI-корень: базовое разрешение 1920×1080, вписывается в окно ────

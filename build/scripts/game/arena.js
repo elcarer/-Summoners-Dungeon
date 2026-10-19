@@ -57,8 +57,8 @@
         // прочие) — гоблин. Стандарт листа — 256×256, ряды front/back/right/
         // left по 6 кадров. Взгляд по стороне: юниты игрока идут вверх
         // (виден затылок), врага — вниз (анфас). Отдельный лист — полем
-        // def.sheet у карты (сейчас — «Проросший волк», wolf_256); позже,
-        // когда листов станет больше, выбор целиком переедет на def.sheet.
+        // def.sheet у карты (волк, медведь, древоброд, росянка); у листа
+        // может быть свой scale — множитель к SPRITE_SCALE (см. main.js).
         const SPRITE_SCALE = 0.525; // кадр 256 → ~134px, фигура ~102px в клетке
         const sheetOf = (u) => ctx.creatureSheets
             && (ctx.creatureSheets[u.def.sheet]
@@ -372,7 +372,7 @@
                 c.addChild(ring);
                 const body = new PIXI.AnimatedSprite(sheet.animations[face], false);
                 body.anchor.set(0.5, 0.85); // ноги (y≈0.93 кадра) чуть ниже центра клетки
-                body.scale.set(SPRITE_SCALE);
+                body.scale.set(SPRITE_SCALE * (sheet.scale || 1));
                 body.animationSpeed = sheet.animationSpeed || 0.2;
                 body.gotoAndStop(0); // стоит — статичный кадр, играет только в движении
                 body.eventMode = "none"; // клики уходят в клетки поля под существом
@@ -4828,7 +4828,9 @@
         function enter() {
             const encId = G.activeEnemy ? G.activeEnemy.enc : "gob";
             const enc = ENCOUNTERS[encId] || ENCOUNTERS.gob;
-            curScene = 1; // в этом подземелье один фон поля боя (просил юзер)
+            // фон и сетка поля — по подземелью: гоблинские пещеры —
+            // scenes/1.png, Роща Роста — scenes/2.png (просил юзер)
+            curScene = enc.elem === "growth" ? 2 : 1;
             if (ctx.music) ctx.music("battle");
             // колода врага хранится в враге подземелья (кидается при
             // генерации этажа по глубине); для старых сейвов — генерим.
@@ -4876,9 +4878,8 @@
 
             root = new PIXI.Container();
             root.eventMode = "static";
-            // фон арены — нарисованная сцена с сеткой поля; в этом подземелье
-            // фон всегда один — scenes/1.png (просил юзер)
-            const bg = new PIXI.Sprite(uiTex("scenes/1.png"));
+            // фон арены — нарисованная сцена с сеткой поля (см. curScene выше)
+            const bg = new PIXI.Sprite(uiTex(`scenes/${curScene}.png`));
             const s = Math.max(1920 / bg.texture.width, 1080 / bg.texture.height);
             bg.scale.set(s);
             bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);

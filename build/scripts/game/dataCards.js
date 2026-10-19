@@ -158,7 +158,7 @@
         // ── Стихия «Рост» (зелёные) — вторая стихия, лица growth/41..46 ─────
         // (сквозная нумерация артов юзера: после 40 карт Силы).
         grw1: { type: "unit", cost: 1, atk: 0, hp: 1, speed: 1,
-                creature: "goblin", ability: "predator", plant: true,
+                creature: "goblin", sheet: "plant", ability: "predator", plant: true,
                 rarity: "common", elem: "growth",
                 color: 0x3f6d3a, img: "growth/41" },
         grw2: { type: "unit", cost: 2, atk: 2, hp: 4, speed: 1,
@@ -166,7 +166,7 @@
                 rarity: "common", elem: "growth",
                 color: 0x3f6d3a, img: "growth/42" },
         grw3: { type: "unit", cost: 3, atk: 3, hp: 5, speed: 1,
-                creature: "animal",
+                creature: "animal", sheet: "bear",
                 rarity: "common", elem: "growth",
                 color: 0x3f6d3a, img: "growth/43" },
         grw4: { type: "trap", cost: 1,
@@ -186,7 +186,7 @@
                 rarity: "common", elem: "growth",
                 color: 0x4a8a3e, img: "growth/47" },
         grw8: { type: "unit", cost: 4, atk: 4, hp: 6, speed: 1,
-                creature: "goblin", plant: true,
+                creature: "goblin", sheet: "ent", plant: true,
                 rarity: "common", elem: "growth",
                 color: 0x3f6d3a, img: "growth/48" },
         grw9: { type: "unit", cost: 2, atk: 1, hp: 1, speed: 1,
@@ -286,7 +286,7 @@
         // «Старейший древоброд»: Сокрушение — после удара лишний урон
         // (урон атаки минус жизни цели) переходит в базу противника
         grw28: { type: "unit", cost: 6, atk: 6, hp: 6, speed: 1,
-                 creature: "goblin", crush: true, plant: true,
+                 creature: "goblin", sheet: "ent", crush: true, plant: true,
                  rarity: "rare", elem: "growth",
                  color: 0x3f6d3a, img: "growth/68" },
         // «Отравленные лезвия»: существо получает «Ядовитость 1» — при
@@ -305,7 +305,7 @@
         // существа и постройки по соседству с атакованным (сам он не
         // страдает от собственного всплеска)
         grw31: { type: "unit", cost: 7, atk: 8, hp: 8, speed: 1,
-                 creature: "goblin", thicket: true, plant: true,
+                 creature: "goblin", sheet: "ent", thicket: true, plant: true,
                  rarity: "epic", elem: "growth",
                  color: 0x3f6d3a, img: "growth/71" },
         // ── Рост, восьмая партия (глаза юзера): 72–75 ────────────────────────
@@ -344,7 +344,7 @@
         // «Заклятый древоброд»: заклинания, выбравшие его целью, — на 1
         // энергию дешевле (для любого кастующего, просил юзер)
         grw37: { type: "unit", cost: 5, atk: 5, hp: 5, speed: 1,
-                 creature: "goblin", plant: true, targetDiscount: true,
+                 creature: "goblin", sheet: "ent", plant: true, targetDiscount: true,
                  rarity: "rare", elem: "growth",
                  color: 0x3f6d3a, img: "growth/77" },
         // «Дома на деревьях»: урон базе стороны целиком уходит в эту
@@ -373,7 +373,7 @@
         // Медведь из «Духа предка» (grw12) — служебная карта без лица,
         // как gobA/gobC: спавнится только ловушкой.
         ancBear: { type: "unit", cost: 3, atk: 3, hp: 5, speed: 1,
-                   creature: "animal", rarity: "common", elem: "growth",
+                   creature: "animal", sheet: "bear", rarity: "common", elem: "growth",
                    color: 0x2e5a2e },
         // Гоблин из «Культа кочерыжки» (str40) — служебная карта без лица,
         // как gobA: ряд выбранной клетки заполняется Гоблинами 3/4.
