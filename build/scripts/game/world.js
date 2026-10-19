@@ -188,6 +188,20 @@
                 G.uiReturn = "world";
                 scenes.go("deck");
             }, 0.675));
+            // карточка героя (просил юзер): под кнопками, клик — в колоду
+            const wHero = globalThis.GAME_DATA.HEROES[G.heroId]
+                || globalThis.GAME_DATA.HEROES.gorbag;
+            const heroCard = new PIXI.Sprite(uiTex(`heroes/${wHero.img}.png`));
+            heroCard.anchor.set(0.5, 0);
+            heroCard.scale.set(0.5); // 230×338 → 115×169
+            heroCard.position.set(1839, 245);
+            heroCard.eventMode = "static";
+            heroCard.on("pointertap", () => {
+                if (ctx.sfx) ctx.sfx();
+                G.uiReturn = "world";
+                scenes.go("deck");
+            });
+            c.addChild(heroCard);
             const hint = new PIXI.Text({
                 text: GAME_LOC.t("world.hint"),
                 style: { fontFamily: "Kereru", fontSize: 22, fill: 0xbfae87 },

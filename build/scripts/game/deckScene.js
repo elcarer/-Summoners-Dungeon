@@ -9,7 +9,7 @@
 (function () {
     function createDeckScene(ctx) {
         const { scenes, G, ui, uiTex } = ctx;
-        const { CARDS, DECK_MAX, DECK_MIN, DECK_COPIES, ELEM_LOGO } = globalThis.GAME_DATA;
+        const { CARDS, DECK_MAX, DECK_MIN, DECK_COPIES, ELEM_LOGO, HEROES } = globalThis.GAME_DATA;
         const { T, fit, button, chip, cardFace, dimBg, scrollPane } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
         let root = null, leftPane = null, rightPane = null;
@@ -55,6 +55,10 @@
         function countIn(id) {
             return G.deck.reduce((n, c) => n + (c === id ? 1 : 0), 0);
         }
+        // герой забега и его стихии: карты других стихий в колоду класть
+        // нельзя (герой определяет стихии колоды — просил юзер)
+        const heroDef = () => HEROES[G.heroId] || HEROES.gorbag;
+        const heroElemOk = (id) => !!CARDS[id] && heroDef().elems.includes(CARDS[id].elem);
         function passes(id) {
             const def = CARDS[id];
             if (!def) return false;
@@ -110,9 +114,12 @@
                 const owned = G.collection[id] || 0;
                 const inDeck = countIn(id);
                 const capped = inDeck >= DECK_COPIES; // лимит одинаковых карт
-                const canAdd = owned > inDeck && !capped && G.deck.length < DECK_MAX;
+                const elemOk = heroElemOk(id);
+                const canAdd = owned > inDeck && !capped && G.deck.length < DECK_MAX && elemOk;
                 const cx = 93 + col * 198, cy = 138 + rowI * 307.5;
-                const card = cardFace(ctx, id, { scale: 0.5, dim: owned <= inDeck || capped });
+                const card = cardFace(ctx, id, {
+                    scale: 0.5, dim: owned <= inDeck || capped || !elemOk,
+                });
                 card.position.set(cx, cy);
                 card.eventMode = "static"; // ховер-зум — на любой карте
                 card.on("pointerover", () => showZoom(id, "right", cx, cy, card));
@@ -187,14 +194,30 @@
             left.fill({ color: 0x171310, alpha: 0.92 });
             left.stroke({ width: 3, color: 0x6b5c40 });
             root.addChild(left);
+            // шапка левой панели: карточка героя (просил юзер) + счётчики
+            // колоды правее. Герой определяет стихии, разрешённые в колоде.
+            // Всё компактно до верха карт первого ряда (y=236)
+            const hd = heroDef();
+            const heroCard = new PIXI.Sprite(uiTex(`heroes/${hd.img}.png`));
+            heroCard.anchor.set(0, 0);
+            heroCard.scale.set(105 / heroCard.texture.height); // ~71×105
+            heroCard.position.set(146, 130);
+            heroCard.eventMode = "none";
+            root.addChild(heroCard);
             const deckH = T("", 30, 0xf3e6c2);
-            deckH.position.set(99, 132);
+            deckH.position.set(240, 148);
             deckH.eventMode = "none";
             root.addChild(deckH);
             const minH = T("", 19, 0x8a7c5e);
-            minH.position.set(99, 189);
+            minH.position.set(500, 156);
             minH.eventMode = "none";
+            fit(minH, 210, 13);
             root.addChild(minH);
+            const abilT = T(t(`hero.${hd.id}.ability`), 17, 0x8a7c5e);
+            abilT.position.set(240, 198);
+            abilT.eventMode = "none";
+            fit(abilT, 460, 13); // одна строка — не наезжает на карты колоды
+            root.addChild(abilT);
             headerRef = { deck: deckH, min: minH };
             leftPane = scrollPane(ctx, { x: 90, y: 222, w: 609, h: 774, onScroll: () => hideZoom(false) });
             root.addChild(leftPane.node);
@@ -309,6 +332,7 @@
         const api = {
             add(id) {
                 if (G.deck.length >= DECK_MAX) return false;
+                if (!heroElemOk(id)) return false; // стихия не из героя
                 if (countIn(id) >= (G.collection[id] || 0)) return false;
                 if (countIn(id) >= DECK_COPIES) return false; // не более 3 одинаковых
                 G.deck.push(id);
@@ -348,6 +372,8 @@
                 logo: elemSprites[0] ? { x: elemSprites[0].x, y: elemSprites[0].y } : null,
             }),
             elemTap(i) { const g = elemBtns[i]; if (g) g.emit("pointertap"); },
+            // герой забега (тесты): id + разрешённые стихии колоды
+            heroInfo: () => ({ id: heroDef().id, elems: [...heroDef().elems] }),
         };
 
         return {

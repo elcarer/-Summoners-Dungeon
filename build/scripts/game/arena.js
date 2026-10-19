@@ -446,7 +446,7 @@
             }
         }
 
-        function addUnit(side, cardId, col, row) {
+        function addUnit(side, cardId, col, row, opts = {}) {
             if (!root) return null; // сцена уже вышла: поле уничтожено, призыву некуда
             const def = CARDS[cardId];
             const u = { side, def, col, row, hp: def.hp, curAtk: def.atk || 0, auraHp: 0, bonusAtk: 0 };
@@ -557,6 +557,33 @@
                 else if (def.ability === "spiritSummoner") summonSpiritCaller(u); // призыватель духов
                 else if (def.ability === "bombling") summonBombling(u); // бомблинг
                 if (def.berserkSummon) addBerserk(u, def.berserkSummon); // «Берсерк» — уже при призыве
+                // Способность героя (просил юзер): ПЕРВОЕ призванное игроком
+                // существо получает бонус — Горбаг +2 к урону, Эльмир +3 к
+                // жизням. Один раз за бой; после собственных эффектов карты
+                // (Хранитель леса переписывает жизни — герой поверх них).
+                // Тест-хук _spawn (opts.testSummon) подстройку поля героя
+                // НЕ триггерит
+                if (side === "p" && !B.heroFirstSummon && !opts.testSummon) {
+                    const hd = globalThis.GAME_DATA.HEROES[G.heroId]
+                        || globalThis.GAME_DATA.HEROES.gorbag;
+                    B.heroFirstSummon = true;
+                    const hp2 = cellXY(col, row);
+                    if (hd.ability === "firstSummonAtk") {
+                        u.bonusAtk += hd.abilityVal;
+                        recalcAuras();
+                        const an = u.node.getChildByName("atk");
+                        if (an) an.text = String(u.curAtk);
+                        floatText(hp2.x, hp2.y - 75, `+${hd.abilityVal}⚔`, 0x9fd489);
+                        sfx("up");
+                    } else if (hd.ability === "firstSummonHp") {
+                        u.hp += hd.abilityVal;
+                        recalcAuras();
+                        const hn = u.node.getChildByName("hp");
+                        if (hn) hn.text = String(u.hp);
+                        floatText(hp2.x, hp2.y - 75, `+${hd.abilityVal}♥`, 0x9fd489);
+                        sfx("up");
+                    }
+                }
             }
             // «Сестра леса»: каждый призыв Растения (метка plant — существо
             // или постройка) даёт владельцу каждой Сестры на поле 1 карту
@@ -2833,6 +2860,16 @@
             gear.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("settings"); });
             c.addChild(gear);
 
+            // карточка героя (просил юзер): под шестерёнкой, зеркально
+            // колоде врага справа-сверху. Его baseHp — жизни базы игрока
+            const aHeroDef = globalThis.GAME_DATA.HEROES[G.heroId]
+                || globalThis.GAME_DATA.HEROES.gorbag;
+            const heroCard = new PIXI.Sprite(uiTex(`heroes/${aHeroDef.img}.png`));
+            heroCard.position.set(58, 118);
+            heroCard.scale.set(0.62); // 230×338 → ~143×210
+            heroCard.eventMode = "none";
+            c.addChild(heroCard);
+
             const targetHint = T("", 24, 0xef9f8c, { stroke: { color: 0x1c1207, width: 6 } });
             targetHint.anchor.set(0.5);
             targetHint.position.set(960, 849);
@@ -4828,6 +4865,9 @@
         function enter() {
             const encId = G.activeEnemy ? G.activeEnemy.enc : "gob";
             const enc = ENCOUNTERS[encId] || ENCOUNTERS.gob;
+            // герой забега: его baseHp — жизни базы игрока в бою (просил юзер)
+            const heroDef = globalThis.GAME_DATA.HEROES[G.heroId]
+                || globalThis.GAME_DATA.HEROES.gorbag;
             // фон и сетка поля — по подземелью: гоблинские пещеры —
             // scenes/1.png, Роща Роста — scenes/2.png (просил юзер)
             curScene = enc.elem === "growth" ? 2 : 1;
@@ -4846,7 +4886,11 @@
                 encId, phase: "player", stopped: false, turnNo: 1,
                 energy: 1, eEnergy: 1,
                 split: 1, // положение ползунка «карты↔энергия» (1 карта / 2 энергии)
-                playerBase: 15, playerBaseMax: 15,
+                playerBase: heroDef.baseHp, playerBaseMax: heroDef.baseHp,
+                // способность героя «первое призванное существо…» — ещё
+                // не сработала в этом бою
+                heroFirstSummon: heroDef.ability !== "firstSummonAtk"
+                    && heroDef.ability !== "firstSummonHp",
                 enemyBase: enc.baseHp, enemyBaseMax: enc.baseHp,
                 deck: shuffle([...pDeck]), discard: [], hand: [],
                 eDeck: shuffle([...eBase]),
@@ -5320,10 +5364,10 @@
                 finish(!!victory);
                 return true;
             },
-            // тест-хук: разместить юнита любой стороны
+            // тест-хук: разместить юнита любой стороны (героя не будит)
             _spawn(side, cardId, col, row) {
                 if (unitAt(col, row)) return false;
-                return addUnit(side, cardId, col, row);
+                return addUnit(side, cardId, col, row, { testSummon: true });
             },
             // тест-хук: взвести ловушку стороны (как розыгрыш карты ловушки)
             _trap(side, cardId, col, row) { return armTrap(side, cardId, col, row); },

@@ -410,6 +410,27 @@
     const DECK_MAX = 60, DECK_MIN = 12, TRAP_SLOTS = 2;
     const DECK_COPIES = 3; // максимум одинаковых карт в колоде
 
+    // ГЕРОИ — выбор при «Новой игре» (вместо стихии, просил юзер). Герой
+    // определяет: жизни базы в бою (baseHp), стихии, которые можно класть
+    // в колоду (elems), стартовую колоду (starter — ключ STARTER_DECKS,
+    // у каждого героя своя стихия) и особую способность (ability +
+    // abilityVal: firstSummonAtk / firstSummonHp — бонус первому
+    // призванному ИГРОКОМ существу). Изображение — полная карточка
+    // 230×338 юзера: images/heroes/<img>.png. Список будет расширяться.
+    const HEROES = {
+        gorbag: {
+            id: "gorbag", rarity: "common",
+            baseHp: 15, elems: ["strength"], starter: "strength",
+            img: "0", ability: "firstSummonAtk", abilityVal: 2,
+        },
+        elmir: {
+            id: "elmir", rarity: "common",
+            baseHp: 15, elems: ["growth"], starter: "growth",
+            img: "1", ability: "firstSummonHp", abilityVal: 3,
+        },
+    };
+    const HERO_ORDER = ["gorbag", "elmir"];
+
     // Пул наград «1 из 3» — запасной (сейчас трофеи берутся из колоды
     // побеждённого врага; пул работает для старых сейвов/прямых заходов).
     // Вес повторами — обычные чаще, эпик реже.
@@ -660,7 +681,7 @@
         CARDS, RARITY_COLORS, DEFAULT_DECK, DEFAULT_COLLECTION, DECK_MAX, DECK_MIN, TRAP_SLOTS,
         DECK_COPIES, REWARD_POOL, REWARD_POOLS, ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH,
         MOB_TABLES, ENEMY_FILL, ENEMY_FILLS, CAVES,
-        STARTER_DECKS, STARTER_COLLECTIONS,
+        STARTER_DECKS, STARTER_COLLECTIONS, HEROES, HERO_ORDER,
         enemyDeck, mobForFloor, ELEM_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,
     };
 })();
