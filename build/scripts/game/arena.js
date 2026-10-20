@@ -139,6 +139,10 @@
             }
             if (hd.ability === "strengthSpellDmg" && def && def.elem === "strength"
                 && toUnit) b += 1;
+            // «Лесная магия» (growthSpellDmg): заклинания стихии «Рост»
+            // бьют существ на 1 сильнее (постройки и базу — нет)
+            if (hd.ability === "growthSpellDmg" && def && def.elem === "growth"
+                && toUnit) b += hd.abilityVal || 1;
             return b;
         }
         function spellDmg(def, side = "p", toUnit = true, consume = false) {
@@ -671,6 +675,16 @@
                     sfx("chpoc");
                 }
             }
+            // «Лесной город» (firstBuildingGuard, просил юзер): первое
+            // сыгранное стороной строение боя получает «Защита 1»
+            if (def.type === "building" && !u.token) {
+                const hd = heroDefOf(side);
+                if (hd && hd.ability === "firstBuildingGuard"
+                    && !B.heroFlags.builtGuard[side]) {
+                    B.heroFlags.builtGuard[side] = true;
+                    addProtect(u);
+                }
+            }
             // ловушка врага на клетке призыва (и существа, и строения)
             triggerCellTraps(u);
             return u;
@@ -930,6 +944,18 @@
         // «Гоблинская засада» (выход гоблинов стороны-хозяйки), «Дух
         // предка» (явление Медведя перед ловушкой). Срабатывают, когда
         // вражеское существо призвано или переместилось на её клетку.
+        // «Роща лоз» (trapEcho, просил юзер): первая сработавшая в бою
+        // ловушка стороны применяет свой эффект дополнительный раз.
+        // Возвращает true один раз за бой; флаг тратится на первом
+        // срабатывании, даже если повторять эффект не по кому.
+        function trapEchoOnce(side) {
+            const hd = heroDefOf(side);
+            if (!hd || hd.ability !== "trapEcho"
+                || B.heroFlags.trapEcho[side]) return false;
+            B.heroFlags.trapEcho[side] = true;
+            return true;
+        }
+
         function triggerCellTraps(u) {
             if (!B.units.includes(u)) return; // умер раньше (рывок+мина на шаге)
             const foe = u.side === "p" ? "e" : "p";
@@ -952,6 +978,14 @@
             redrawTraps();
             const p = cellXY(u.col, u.row);
             floatText(p.x, p.y - 60, "?!", 0xe08cd0);
+            const echo = trapEchoOnce(side); // первая ловушка боя — флаг потрачен
+            applyCellTrap(trap, side, u);
+            if (echo && B.units.includes(u)) applyCellTrap(trap, side, u);
+        }
+
+        // Эффект сработавшей ловушки на клетке (отделён от поиска ловушки —
+        // «Роща лоз» применяет его дважды); u — существо, наступившее на неё
+        function applyCellTrap(trap, side, u) {
             if (trap.def.trap.effect === "cellDebuff") {
                 // «Шипастые лозы» (grw4): существо на клетке теряет 1 урона
                 // и 1 жизни; не пережило шипы — гибнет (не «урон», но смерть)
@@ -1129,6 +1163,30 @@
                 triggerTraps(u.side, killer);
             }
             heroDeathReplay(u); // «Гоблин-вождь»: первый погибший гоблин возвращается
+            heroBuildingReplay(u); // «Хранитель рощи»: первая погибшая постройка возвращается
+        }
+
+        // Способность «Хранителя рощи» (buildingDeathReplay, просил юзер):
+        // ПЕРВАЯ за бой погибшая постройка стороны-владелицы возвращается —
+        // её карта уходит в руку, и она сразу разыгрывается в ту же клетку
+        // без траты энергии (штатный addUnit: ауры, ловушки клетки)
+        function heroBuildingReplay(u) {
+            if (!u || u.def.type !== "building") return;
+            const side = u.side;
+            const hd = heroDefOf(side);
+            if (!hd || hd.ability !== "buildingDeathReplay"
+                || B.heroFlags.buildReplay[side]) return;
+            B.heroFlags.buildReplay[side] = true;
+            const id = cardIdOf(u.def);
+            const hand = side === "p" ? B.hand : B.eHand;
+            const col = u.col, row = u.row;
+            hand.push(id);
+            const p = cellXY(col, row);
+            floatText(p.x, p.y - 90, GAME_LOC.t(`card.${id}.name`), 0xffd98c);
+            sfx("chpoc");
+            // тут же разыгрывается в ту же клетку (занята — карта остаётся
+            // в руке)
+            if (!unitAt(col, row)) addUnit(side, id, col, row);
         }
 
         // Способность «Гоблин-вождя» (goblinDeathReplay, просил юзер):
@@ -1583,10 +1641,13 @@
             const k = cellXY(killer.col, killer.row);
             floatText(k.x, k.y - 60, "?!", 0xe08cd0);
             if (trap.def.trap.effect === "rowDmg") {
-                const amount = trap.def.trap.amount + altarBonus(side);
-                const victims = B.units.filter((v) => v.side !== side && v.row === killer.row);
-                for (const v of victims) {
-                    if (B.units.includes(v)) damageUnit(v, amount, null, "acid");
+                const echo = trapEchoOnce(side);
+                for (let n = 0; n < (echo ? 2 : 1); n++) {
+                    const amount = trap.def.trap.amount + altarBonus(side);
+                    const victims = B.units.filter((v) => v.side !== side && v.row === killer.row);
+                    for (const v of victims) {
+                        if (B.units.includes(v)) damageUnit(v, amount, null, "acid");
+                    }
                 }
                 refreshHud();
                 checkEnd();
@@ -1608,7 +1669,9 @@
                 const p = cellXY(attacker.col, attacker.row);
                 floatText(p.x, p.y - 60, "?!", 0xe08cd0);
                 sfx("mine");
+                const echo = trapEchoOnce(side);
                 castRandomSpell(side, attacker);
+                if (echo) castRandomSpell(side, attacker); // «Роща лоз»
                 refreshHud();
                 checkEnd();
             }
@@ -3251,18 +3314,26 @@
 
         // ── Способность героя «начиная бой берёт дополнительную случайную
         // карту … из колоды» (просил юзер): «Банда гоблинов» — карту
-        // гоблина, «Засада гоблинов» — карту ловушки. Вызывается в enter()
-        // ПОСЛЕ сборки root (всплывающий текст рисуется в root.fx).
+        // гоблина, «Засада гоблинов» — карту ловушки, «Лесные звери» —
+        // карту животного, «Буйная растительность» — карту растения.
+        // Вызывается в enter() ПОСЛЕ сборки root (всплывающий текст
+        // рисуется в root.fx).
         function heroStartDraw(side) {
             const hd = heroDefOf(side);
             if (!hd) return;
             const want = hd.ability === "startDrawGoblin" ? "goblin"
-                : hd.ability === "startDrawTrap" ? "trap" : null;
+                : hd.ability === "startDrawTrap" ? "trap"
+                : hd.ability === "startDrawAnimal" ? "animal"
+                : hd.ability === "startDrawPlant" ? "plant" : null;
             if (!want) return;
             const deck = side === "p" ? B.deck : B.eDeck;
             const hand = side === "p" ? B.hand : B.eHand;
             const pool = deck.map((id, i) => ({ id, i, def: CARDS[id] }))
-                .filter((x) => want === "goblin" ? isGoblin(x.def) : x.def.type === "trap");
+                .filter((x) => want === "goblin" ? isGoblin(x.def)
+                    : want === "trap" ? x.def.type === "trap"
+                    : want === "animal"
+                        ? x.def.type === "unit" && x.def.creature === "animal"
+                        : !!x.def.plant); // растение — существо или постройка
             if (!pool.length) return;
             const pick = pool[(Math.random() * pool.length) | 0];
             deck.splice(pick.i, 1);
@@ -5071,10 +5142,16 @@
                     && heroDef.ability !== "firstSummonHp",
                 // флаги способностей карт персонажей: первое уронное
                 // заклинание боя; возврат первого погибшего гоблина;
-                // возврат первого Силового заклинания («Мастера огня»)
+                // возврат первого Силового заклинания («Мастера огня»);
+                // «Защита 1» первому строению («Лесной город»); повторный
+                // эффект первой сработавшей ловушки («Роща лоз»); возврат
+                // первой погибшей постройки («Хранитель рощи»)
                 heroFlags: { firstSpell: { p: false, e: false },
                     deathReplay: { p: false, e: false },
-                    strReplay: { p: false, e: false } },
+                    strReplay: { p: false, e: false },
+                    builtGuard: { p: false, e: false },
+                    trapEcho: { p: false, e: false },
+                    buildReplay: { p: false, e: false } },
                 enemyBase: eHeroDef ? eHeroDef.baseHp : enc.baseHp,
                 enemyBaseMax: eHeroDef ? eHeroDef.baseHp : enc.baseHp,
                 deck: shuffle([...pDeck]), discard: [], hand: [],
@@ -5093,6 +5170,11 @@
                 scorch: { p: new Set(), e: new Set() },
             };
             G.battle = B;
+            // «Контроль природы» (firstTurnEnergyDown, просил юзер): на
+            // первый ход в бою противник героя получает на 1 энергию
+            // меньше — старт с 0 вместо 1 (дальнейшие ходы как раньше)
+            if (eHeroDef && eHeroDef.ability === "firstTurnEnergyDown") B.energy = 0;
+            if (heroDef.ability === "firstTurnEnergyDown") B.eEnergy = 0;
             drawCards(4);
             moves.length = 0; floats.length = 0; punches.length = 0; // хвосты прошлого боя
             overlay = null;

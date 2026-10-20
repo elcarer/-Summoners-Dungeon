@@ -460,11 +460,36 @@
         boss: { id: "boss", rarity: "epic", baseHp: 18,
                 elems: ["strength"], starter: "strength",
                 img: "7", ability: "goblinDeathReplay" },
+        // ── «Роща Роста»: карты персонажей её врагов (просил юзер) ────────
+        grwBeasts: { id: "grwBeasts", rarity: "common", baseHp: 10,
+                     elems: ["growth"], starter: "growth",
+                     img: "9", ability: "startDrawAnimal" },
+        grwGrove: { id: "grwGrove", rarity: "common", baseHp: 11,
+                    elems: ["growth"], starter: "growth",
+                    img: "10", ability: "trapEcho" },
+        grwWild: { id: "grwWild", rarity: "common", baseHp: 12,
+                   elems: ["growth"], starter: "growth",
+                   img: "11", ability: "startDrawPlant" },
+        grwMagic: { id: "grwMagic", rarity: "common", baseHp: 13,
+                    elems: ["growth"], starter: "growth",
+                    img: "12", ability: "growthSpellDmg", abilityVal: 1 },
+        grwCity: { id: "grwCity", rarity: "rare", baseHp: 14,
+                   elems: ["growth"], starter: "growth",
+                   img: "13", ability: "firstBuildingGuard" },
+        grwControl: { id: "grwControl", rarity: "rare", baseHp: 15,
+                      elems: ["growth"], starter: "growth",
+                      img: "14", ability: "firstTurnEnergyDown" },
+        grwBoss: { id: "grwBoss", rarity: "epic", baseHp: 18,
+                   elems: ["growth"], starter: "growth",
+                   img: "15", ability: "buildingDeathReplay" },
     };
     const HERO_ORDER = ["gorbag", "elmir"];
-    // Порядок карт персонажей противников во вкладке «Герои»
+    // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
+    // пещеры, затем Роща Роста (просил юзер)
     const HERO_FOE_ORDER = ["gob", "gobBig", "gobTrap", "gobFire", "gobElite",
-        "gobMaster", "boss"];
+        "gobMaster", "boss",
+        "grwBeasts", "grwGrove", "grwWild", "grwMagic", "grwCity",
+        "grwControl", "grwBoss"];
 
     // Пул наград «1 из 3» — запасной (сейчас трофеи берутся из колоды
     // побеждённого врага; пул работает для старых сейвов/прямых заходов).
@@ -568,32 +593,33 @@
         // (FLOOR_MOBS_GROWTH, принципы гоблинских пещер — просил юзер):
         // «Лесные звери» — звери и усиления, «Роща лоз» — контроль и добор,
         // дальше — свежий архетип каждого этажа; босс собирает всё и с
-        // глубиной добирает grow-карты (механика вождя гоблинов).
-        grwBeasts: { scene: 1, baseHp: 10, elem: "growth",
+        // глубиной добирает grow-карты (механика вождя гоблинов). hero —
+        // карта персонажа: baseHp — жизни базы врага, победа даёт карту
+        grwBeasts: { scene: 1, baseHp: 10, elem: "growth", hero: "grwBeasts",
                      core: ["grw2", "grw2", "grw3", "grw3", "grw13", "grw22",
                             "grw24", "grw5", "grw5", "grw10", "grw12"] },
-        grwGrove:  { scene: 1, baseHp: 11, elem: "growth",
+        grwGrove:  { scene: 1, baseHp: 11, elem: "growth", hero: "grwGrove",
                      core: ["grw4", "grw4", "grw19", "grw19", "grw17", "grw23",
                             "grw7", "grw8", "grw8", "grw16", "grw27"] },
-        grwWild:   { scene: 1, baseHp: 12, elem: "growth",
+        grwWild:   { scene: 1, baseHp: 12, elem: "growth", hero: "grwWild",
                      core: ["grw1", "grw1", "grw6", "grw6", "grw20", "grw29",
                             "grw34", "grw34", "grw35", "grw35", "grw40"] },
-        grwMagic:  { scene: 1, baseHp: 13, elem: "growth",
+        grwMagic:  { scene: 1, baseHp: 13, elem: "growth", hero: "grwMagic",
                      core: ["grw14", "grw14", "grw20", "grw23", "grw25",
                             "grw30", "grw30", "grw32", "grw32", "grw37",
                             "grw28"] },
-        grwCity:   { scene: 1, baseHp: 14, elem: "growth",
+        grwCity:   { scene: 1, baseHp: 14, elem: "growth", hero: "grwCity",
                      core: ["grw6", "grw10", "grw10", "grw11", "grw13", "grw15",
                             "grw19", "grw21", "grw38", "grw38", "grw39",
                             "grw39"] },
-        grwControl: { scene: 1, baseHp: 15, elem: "growth",
+        grwControl: { scene: 1, baseHp: 15, elem: "growth", hero: "grwControl",
                       core: ["grw26", "grw23", "grw18", "grw18", "grw22",
                              "grw33", "grw17", "grw1", "grw9", "grw3",
                              "grw24"] },
         // «Хранитель рощи» — главарь этажа (B на карте). Ядро — 11 карт
         // (составом просил юзер); с глубиной добавляются карты из grow
         // (2 за этаж; к 6-му забирает весь список), добор — как у обычных.
-        grwBoss:   { scene: 1, baseHp: 18, elem: "growth",
+        grwBoss:   { scene: 1, baseHp: 18, elem: "growth", hero: "grwBoss",
                      core: ["grw3", "grw3", "grw13", "grw12", "grw15", "grw18",
                             "grw9", "grw22", "grw36", "grw40", "grw1"],
                      grow: ["grw24", "grw28", "grw31", "grw2", "grw26", "grw25",

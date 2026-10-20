@@ -274,33 +274,34 @@
             ids.forEach((id, i) => {
                 const h = HEROES[id];
                 const col = i % 4, rowI = (i / 4) | 0;
-                // 9 карточек = 3 ряда — шаг подобран, чтобы нижний умещался
-                // в рамку (129..1017)
-                const cx = 900 + col * 250, cy = 300 + rowI * 280;
+                // до 16 карточек = 4 ряда: масштаб и шаг подобраны, чтобы
+                // имя каждого ряда было видно ЦЕЛИКОМ (не пряталось под
+                // картой следующего), а нижний ряд — в рамке (129..1017)
+                const cx = 900 + col * 250, cy = 285 + rowI * 201;
                 const c = new PIXI.Container();
                 c.position.set(cx, cy);
                 if (G.heroId === id) { // активный — золотая рамка
                     const glow = new PIXI.Graphics();
-                    glow.roundRect(-76, -110, 152, 220, 10);
+                    glow.roundRect(-66, -92, 132, 184, 10);
                     glow.stroke({ width: 5, color: 0xf0c96a });
                     glow.eventMode = "none";
                     c.addChild(glow);
                 }
                 const card = new PIXI.Sprite(uiTex(`heroes/${h.img}.png`));
                 card.anchor.set(0.5, 0.5);
-                card.scale.set(0.62); // 230×338 → ~143×210
+                card.scale.set(0.5); // 230×338 → 115×169
                 c.addChild(card);
                 c.eventMode = "static";
                 if (G.heroId !== id) {
                     c.on("pointertap", () => api.setActive(id));
-                    c.on("pointerover", () => { card.scale.set(0.68); });
-                    c.on("pointerout", () => { card.scale.set(0.62); });
+                    c.on("pointerover", () => { card.scale.set(0.56); });
+                    c.on("pointerout", () => { card.scale.set(0.5); });
                 }
                 const nm = T(heroName(id), 20,
                     G.heroId === id ? 0xf0c96a : 0xd8c79d,
                     { stroke: { color: 0x1c1207, width: 4.5 } });
                 nm.anchor.set(0.5, 0);
-                nm.position.set(0, 112);
+                nm.position.set(0, 92);
                 nm.eventMode = "none";
                 fit(nm, 230, 10);
                 c.addChild(nm);
