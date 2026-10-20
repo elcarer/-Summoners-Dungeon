@@ -5201,7 +5201,11 @@
             // меньше — старт с 0 вместо 1 (дальнейшие ходы как раньше)
             if (eHeroDef && eHeroDef.ability === "firstTurnEnergyDown") B.energy = 0;
             if (heroDef.ability === "firstTurnEnergyDown") B.eEnergy = 0;
+            // Стандартный старт обеих сторон (просил юзер): 1 энергия
+            // (выше) и 4 карты в руке; геройские доборы (startDraw*,
+            // heroStartDraw ниже) всегда ЛЯГУТ СВЕРХУ этих четырёх
             drawCards(4);
+            drawEnemy(4); // у врага раньше было 0 карт — добор только на его ходу
             moves.length = 0; floats.length = 0; punches.length = 0; // хвосты прошлого боя
             overlay = null;
             drag = null;
