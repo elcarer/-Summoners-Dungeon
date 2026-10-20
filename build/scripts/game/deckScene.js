@@ -13,7 +13,7 @@
             HERO_ORDER, HERO_FOE_ORDER } = globalThis.GAME_DATA;
         const { T, fit, button, chip, cardFace, dimBg, scrollPane } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
-        let root = null, leftPane = null, rightPane = null;
+        let root = null, leftPane = null, rightPane = null, heroesPane = null;
         let tab = "deck"; // вкладка сцены: «Колода» | «Герои» (просил юзер)
         const heroCards = []; // вкладка «Герои»: {id, node} (тесты)
         const filters = { type: null, cost: null, rarity: null, elem: null };
@@ -270,50 +270,59 @@
             sub.eventMode = "none";
             fit(sub, 1000, 14);
             root.addChild(sub);
+            // сетка героев в скролл-панели — как во вкладке карт: карты
+            // ростом с карты колоды (276 px), колесо мыши и полоса прокрутки
+            heroesPane = scrollPane(ctx, { x: 790, y: 190, w: 1030, h: 810,
+                onScroll: () => {} });
+            root.addChild(heroesPane.node);
+            const list = new PIXI.Container();
             const ids = heroesOwnedOrder();
             ids.forEach((id, i) => {
                 const h = HEROES[id];
                 const col = i % 4, rowI = (i / 4) | 0;
-                // до 16 карточек = 4 ряда: масштаб и шаг подобраны, чтобы
-                // имя каждого ряда было видно ЦЕЛИКОМ (не пряталось под
-                // картой следующего), а нижний ряд — в рамке (129..1017)
-                const cx = 900 + col * 250, cy = 285 + rowI * 201;
+                // шаг — как в сетках колоды (307.5 там): карта 276 + имя
+                // ниже, следующий ряд не наезжает
+                const cx = 140 + col * 250, cy = 150 + rowI * 314;
                 const c = new PIXI.Container();
                 c.position.set(cx, cy);
                 if (G.heroId === id) { // активный — золотая рамка
                     const glow = new PIXI.Graphics();
-                    glow.roundRect(-66, -92, 132, 184, 10);
+                    glow.roundRect(-101, -146, 202, 292, 10);
                     glow.stroke({ width: 5, color: 0xf0c96a });
                     glow.eventMode = "none";
                     c.addChild(glow);
                 }
                 const card = new PIXI.Sprite(uiTex(`heroes/${h.img}.png`));
                 card.anchor.set(0.5, 0.5);
-                card.scale.set(0.5); // 230×338 → 115×169
+                card.scale.set(0.82); // 230×338 → ~189×277, рост карт колоды
                 c.addChild(card);
                 c.eventMode = "static";
                 if (G.heroId !== id) {
                     c.on("pointertap", () => api.setActive(id));
-                    c.on("pointerover", () => { card.scale.set(0.56); });
-                    c.on("pointerout", () => { card.scale.set(0.5); });
+                    c.on("pointerover", () => { card.scale.set(0.88); });
+                    c.on("pointerout", () => { card.scale.set(0.82); });
                 }
                 const nm = T(heroName(id), 20,
                     G.heroId === id ? 0xf0c96a : 0xd8c79d,
                     { stroke: { color: 0x1c1207, width: 4.5 } });
                 nm.anchor.set(0.5, 0);
-                nm.position.set(0, 92);
+                nm.position.set(0, 150);
                 nm.eventMode = "none";
                 fit(nm, 230, 10);
                 c.addChild(nm);
-                root.addChild(c);
+                list.addChild(c);
                 heroCards.push({ id, node: c });
             });
+            const rowsN = Math.ceil(ids.length / 4);
+            heroesPane.setContent(list,
+                ids.length ? 150 + (rowsN - 1) * 314 + 238 : 60);
         }
 
         function rebuild() {
             hideZoom(true); // смена вкладки — ховер-зум мимо (узлы умрут с root)
             if (root) root.destroy({ children: true });
             heroCards.length = 0;
+            heroesPane = null; // панель героев живёт только на своей вкладке
             root = new PIXI.Container();
             root.eventMode = "static";
             root.addChild(dimBg(ctx, 0.85));
@@ -514,7 +523,10 @@
                 .filter((id) => (G.collection[id] || 0) > 0 && passes(id)),
             deckListIds: () => [...new Set(G.deck)].filter(passes),
             counts() { return { deck: G.deck.length, collection: { ...G.collection } }; },
-            scroll(side, dy) { (side === "left" ? leftPane : rightPane).scrollBy(dy); },
+            scroll(side, dy) {
+                if (side === "heroes") { if (heroesPane) heroesPane.scrollBy(dy); return; }
+                (side === "left" ? leftPane : rightPane).scrollBy(dy);
+            },
             paneState: (side) => (side === "left" ? leftPane : rightPane).state,
             paneDebug: (side) => (side === "left" ? leftPane : rightPane).debug(),
             // ховер-зум карт: состояние анимации (тесты)
