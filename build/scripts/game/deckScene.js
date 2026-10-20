@@ -182,12 +182,12 @@
         // энкаунтеров («Банда гоблинов», …)
         const heroName = (id) => t(HERO_ORDER.includes(id)
             ? `hero.${id}.name` : `enc.${id}.title`);
-        // Все герои вкладки: свои (всегда есть), завоёванные, затем
-        // ещё не взятые — серыми, для виду (просил юзер: просматривать)
+        // Все герои вкладки: свои (всегда есть) и завоёванные. Карты
+        // противников, которые ещё не взяты, не показываются вовсе —
+        // как неполученные карты коллекции (просил юзер)
         function heroesOwnedOrder() {
             return [...HERO_ORDER,
-                ...HERO_FOE_ORDER.filter((id) => G.captured.includes(id)),
-                ...HERO_FOE_ORDER.filter((id) => !G.captured.includes(id))];
+                ...HERO_FOE_ORDER.filter((id) => G.captured.includes(id))];
         }
 
         // ── вкладка «Герои»: слева активный герой, справа все карты ────────
@@ -273,7 +273,6 @@
             const ids = heroesOwnedOrder();
             ids.forEach((id, i) => {
                 const h = HEROES[id];
-                const owned = HERO_ORDER.includes(id) || G.captured.includes(id);
                 const col = i % 4, rowI = (i / 4) | 0;
                 const cx = 900 + col * 250, cy = 320 + rowI * 300;
                 const c = new PIXI.Container();
@@ -288,18 +287,15 @@
                 const card = new PIXI.Sprite(uiTex(`heroes/${h.img}.png`));
                 card.anchor.set(0.5, 0.5);
                 card.scale.set(0.62); // 230×338 → ~143×210
-                card.alpha = owned ? 1 : 0.4; // не завоёван — серым
                 c.addChild(card);
-                if (owned) {
-                    c.eventMode = "static";
-                    if (G.heroId !== id) {
-                        c.on("pointertap", () => api.setActive(id));
-                        c.on("pointerover", () => { card.scale.set(0.68); });
-                        c.on("pointerout", () => { card.scale.set(0.62); });
-                    }
+                c.eventMode = "static";
+                if (G.heroId !== id) {
+                    c.on("pointertap", () => api.setActive(id));
+                    c.on("pointerover", () => { card.scale.set(0.68); });
+                    c.on("pointerout", () => { card.scale.set(0.62); });
                 }
-                const nm = T(owned ? heroName(id) : t("heroes.locked"), 20,
-                    G.heroId === id ? 0xf0c96a : owned ? 0xd8c79d : 0x8a7c5e,
+                const nm = T(heroName(id), 20,
+                    G.heroId === id ? 0xf0c96a : 0xd8c79d,
                     { stroke: { color: 0x1c1207, width: 4.5 } });
                 nm.anchor.set(0.5, 0);
                 nm.position.set(0, 112);
