@@ -693,6 +693,9 @@
         const floats = [], punches = [];
         const moves = []; // плавные переходы существ между клетками
         function floatText(x, y, text, fill) {
+            // эффект запаздывающего урона мог дожить до выхода со сцены
+            // (root уничтожен) — показывать уже нечего, молча пропускаем
+            if (!root || !root.fx) return;
             const tt = T(text, 36, fill, { stroke: { color: 0x1c1207, width: 7.5 } });
             tt.anchor.set(0.5);
             tt.position.set(x, y);
@@ -2073,6 +2076,7 @@
                 root.cardsLayer.addChildAt(n,
                     Math.min(n.__homeIdx, root.cardsLayer.children.length - 1));
                 n.scale.set(n.__homeScale);
+                n.y = HAND_Y;
             }
         }
         function hoverCard(idx, on) {
@@ -2091,6 +2095,9 @@
                 root.cardsLayer.addChild(node); // поверх соседних карт веера
             }
             node.scale.set((raised ? 1.12 : 1) * HAND_SCALE);
+            // приподнять карту ещё на 40px — текст на ней виден целиком
+            // (просил юзер); выбранная карта держится приподнятой тоже
+            node.y = HAND_Y - (raised ? 40 : 0);
             const f = node.getChildByName("selframe");
             if (f) f.visible = raised;
         }
@@ -2907,30 +2914,39 @@
             eCardsT.eventMode = "none";
             c.addChild(eCardsT);
 
-            // имя противника — каменная плашка слева от его колоды
-            const namePlate = new PIXI.Sprite(uiTex("panel_label.png"));
-            namePlate.position.set(1314, 24);
-            namePlate.eventMode = "none";
-            c.addChild(namePlate);
-            const title = T("", 30, 0xf0c96a);
-            title.anchor.set(0.5, 0.5);
-            title.position.set(1484, 67);
-            title.eventMode = "none";
-            c.addChild(title);
-
-            // колода врага — рубашка по стихии боя (гоблины/природа) в правом
-            // верхнем углу; клик показывает, какие карты у него остались
+            // колода врага — рубашка по стихии боя (гоблины/природа); клик
+            // показывает, какие карты у него остались. Сдвинута влево
+            // (просил юзер): плашку с именем убрали, на старом месте колоды
+            // теперь его сброс
             const eDeckPile = new PIXI.Sprite(uiTex(enemyBackTex()));
-            eDeckPile.position.set(1725, 24);
+            eDeckPile.position.set(1545, 24);
             eDeckPile.scale.set(0.74); // 230×338 → 170×250
             eDeckPile.eventMode = "static";
             eDeckPile.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("edeck"); });
             c.addChild(eDeckPile);
             const eDeckCnt = T("", 22, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4.5 } });
             eDeckCnt.anchor.set(0.5, 1);
-            eDeckCnt.position.set(1810, 266);
+            eDeckCnt.position.set(1630, 266);
             eDeckCnt.eventMode = "none";
             c.addChild(eDeckCnt);
+
+            // сброс врага — на прежнем месте его колоды: пусто — тусклая
+            // полупрозрачная рубашка стихии боя, в бою — последняя ушедшая
+            // карта приглушённым лицом; клик — просмотр сброса (механика
+            // сброса игрока, просил юзер)
+            const eDiscardFace = new PIXI.Sprite(uiTex(enemyBackTex()));
+            eDiscardFace.position.set(1725, 24);
+            eDiscardFace.scale.set(0.74); // рубашка 230×338 → слот 170×250
+            eDiscardFace.tint = 0x5a5a5a;
+            eDiscardFace.alpha = 0.6;
+            eDiscardFace.eventMode = "static";
+            eDiscardFace.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("ediscard"); });
+            c.addChild(eDiscardFace);
+            const eDiscardCnt = T("", 22, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4.5 } });
+            eDiscardCnt.anchor.set(0.5, 1);
+            eDiscardCnt.position.set(1810, 266);
+            eDiscardCnt.eventMode = "none";
+            c.addChild(eDiscardCnt);
 
             // карта персонажа врага (просил юзер): под его колодой, её
             // baseHp — жизни базы врага. Наведение — рост до натурального
@@ -2951,8 +2967,9 @@
                 c.addChild(eHeroHolder);
             }
 
-            // база игрока — зелёная полоса над треком «энергия-карты», число
-            // в её центре; по краям трека — энергия и карты игрока (иконки
+            // база игрока — зелёная полоса в левой колонке, между картой
+            // героя и его колодой, число — в её центре (просил юзер); по
+            // краям трека справа внизу — энергия и карты игрока (иконки
             // юзера): текущее число у энергии сопровождает «+добавка» по
             // положению шкалы, у карт — «рука+добавка» (референс юзера)
             const pBar = new PIXI.Graphics();
@@ -2960,7 +2977,7 @@
             c.addChild(pBar);
             const pBaseT = T("", 22, 0xffff99, { stroke: { color: 0x2a1c10, width: 5 } });
             pBaseT.anchor.set(0.5, 0.5);
-            pBaseT.position.set(1663, 535);
+            pBaseT.position.set(239, 778);
             pBaseT.eventMode = "none";
             c.addChild(pBaseT);
             const pEnergyIcon = new PIXI.Sprite(uiTex("UI_energy.png"));
@@ -2994,10 +3011,11 @@
             pCardsT.eventMode = "none";
             c.addChild(pCardsT);
 
-            // колода игрока — рубашка в левом нижнем углу; клик — просмотр
-            const pDeckPile = new PIXI.Sprite(uiTex("card_back_min.png"));
+            // колода игрока — рубашка его стихии (просил юзер: вместо общей
+            // card_back_min) в левом нижнем углу; клик — просмотр
+            const pDeckPile = new PIXI.Sprite(uiTex(playerBackTex()));
             pDeckPile.position.set(25, 806);
-            pDeckPile.scale.set(0.775); // 230×330 → 178×256
+            pDeckPile.scale.set(0.775, (0.775 * 330) / 338); // 230×338 → 178×256
             pDeckPile.eventMode = "static";
             pDeckPile.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("deck"); });
             c.addChild(pDeckPile);
@@ -3008,10 +3026,10 @@
             c.addChild(pDeckCnt);
 
             // сброс — правый нижний угол: последняя ушедшая карта приглушённым
-            // лицом (пусто — тусклая рубашка); клик — просмотр сброса
-            const discardFace = new PIXI.Sprite(uiTex("card_back_min.png"));
+            // лицом (пусто — тусклая рубашка стихии игрока); клик — просмотр
+            const discardFace = new PIXI.Sprite(uiTex(playerBackTex()));
             discardFace.position.set(1668, 724);
-            discardFace.scale.set(1, 338 / 330); // рубашка 230×330 → слот 230×338
+            discardFace.scale.set(1); // рубашка стихии 230×338 — натуральный слот
             discardFace.tint = 0x5a5a5a;
             discardFace.alpha = 0.6;
             discardFace.eventMode = "static";
@@ -3031,7 +3049,7 @@
             c.addChild(endBtn);
             const endLabel = T(t("arena.endTurn"), 28, 0xffe9b0,
                 { stroke: { color: 0x1c1207, width: 5 }, wordWrap: true, wordWrapWidth: 120,
-                  breakWords: true, align: "center", lineHeight: 34 });
+                  breakWords: true, align: "center", lineHeight: 22 });
             endLabel.anchor.set(0.5);
             endLabel.position.set(1552, 919);
             endLabel.eventMode = "none";
@@ -3069,19 +3087,20 @@
             gear.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("settings"); });
             c.addChild(gear);
 
-            // карточка героя (просил юзер): под шестерёнкой, зеркально
-            // колоде врага справа-сверху. Его baseHp — жизни базы игрока.
-            // Наведение — рост до натурального размера (ctx.heroHover)
+            // карточка героя (просил юзер): НАД колодой игрока, та же
+            // координата x. Его baseHp — жизни базы игрока. Наведение — рост
+            // до натурального размера (ctx.heroHover); большой вид смещается
+            // вверх, чтобы не накрывать полосу базы и колоду
             const aHeroDef = globalThis.GAME_DATA.HEROES[G.heroId]
                 || globalThis.GAME_DATA.HEROES.gorbag;
             const heroHolder = new PIXI.Container();
-            heroHolder.position.set(58, 118);
+            heroHolder.position.set(25, 544);
             heroHolder.hitArea = new PIXI.Rectangle(0, 0, 143, 210); // исходное место
             const heroCard = new PIXI.Sprite(uiTex(`heroes/${aHeroDef.img}.png`));
             heroCard.scale.set(0.62); // 230×338 → ~143×210
             heroCard.eventMode = "none";
             heroHolder.addChild(heroCard);
-            ctx.heroHover(heroHolder, heroCard, 0, 0);
+            ctx.heroHover(heroHolder, heroCard, 0, -128);
             c.addChild(heroHolder);
 
             const targetHint = T("", 24, 0xef9f8c, { stroke: { color: 0x1c1207, width: 6 } });
@@ -3097,10 +3116,12 @@
             banner.eventMode = "none"; // баннер не ест клики поля под ним
             c.addChild(banner);
 
-            c.userData = { eBar, eBaseT, eEnergyT, eCardsT, title, pBar, pBaseT, pEnergyT,
-                pEnergyGainT, pEnergyCostT, pCardsT, eDeckCnt, pDeckCnt, discardCnt,
-                eEnergyIcon, pEnergyIcon,
-                discardFace, lastDiscard: undefined, endBtn, endLabel, banner, targetHint,
+            c.userData = { eBar, eBaseT, eEnergyT, eCardsT, pBar, pBaseT, pEnergyT,
+                pEnergyGainT, pEnergyCostT, pCardsT, eDeckCnt, eDiscardCnt, pDeckCnt, discardCnt,
+                eEnergyIcon, pEnergyIcon, pDeckPile, eDeckPile,
+                discardFace, lastDiscard: undefined,
+                eDiscardFace, eLastDiscard: undefined,
+                endBtn, endLabel, banner, targetHint,
                 slider: { wrap: slWrap, track: slTrack, thumb: slThumb } };
             return c;
         }
@@ -3175,10 +3196,11 @@
                 node.addChild(panel.node);
             } else { // deck / edeck / discard — только просмотр, без редактирования:
                 // колода — ОСТАТОК (B.deck), колода врага — его остаток (B.eDeck),
-                // сброс — лежащие карты (B.discard)
+                // сброс — лежащие карты (свой B.discard / вражеский B.eDiscard)
                 const { T, button, cardFace, scrollPane } = globalThis.GAME_UI;
                 const { CARDS } = globalThis.GAME_DATA;
                 const pile = name === "discard" ? B.discard
+                    : name === "ediscard" ? B.eDiscard
                     : name === "edeck" ? B.eDeck : B.deck;
                 const frame = new PIXI.Graphics();
                 frame.roundRect(285, 81, 1350, 885, 18);
@@ -3186,6 +3208,7 @@
                 frame.stroke({ width: 3, color: 0x6b5c40 });
                 node.addChild(frame);
                 const title = T(t(name === "discard" ? "deck.discardTitle"
+                    : name === "ediscard" ? "deck.enemyDiscardTitle"
                     : name === "edeck" ? "deck.enemyTitle" : "deck.viewTitle"),
                     45, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
                 title.anchor.set(0.5, 0);
@@ -3258,23 +3281,23 @@
         function refreshHud() {
             if (!root || !B) return;
             const ud = root.hud.userData;
-            ud.title.text = t(`enc.${B.encId}.title`);
-            globalThis.GAME_UI.fit(ud.title, 300);
             // полоса базы врага — верх экрана по центру (742..1182)
             drawBar(ud.eBar, 742, 31, 440, 33, B.enemyBase / B.enemyBaseMax, 0xc0503c);
             ud.eBaseT.text = `${Math.max(0, B.enemyBase)}/${B.enemyBaseMax}`;
             // энергия и карты врага — числа на иконках по краям его полосы
             ud.eEnergyT.text = String(B.eEnergy);
             ud.eCardsT.text = String(B.eHand.length);
-            // база игрока — зелёная полоса над треком (1449..1877); энергия
-            // и карты — на иконках, добавку шкалы дорисует refreshSlider
-            drawBar(ud.pBar, 1449, 520, 428, 31, B.playerBase / B.playerBaseMax, 0x579e52);
+            // база игрока — зелёная полоса слева, между картой героя и его
+            // колодой (просил юзер); энергия и карты — на иконках справа
+            // внизу, добавку шкалы дорисует refreshSlider
+            drawBar(ud.pBar, 25, 762, 428, 31, B.playerBase / B.playerBaseMax, 0x579e52);
             ud.pBaseT.text = `${Math.max(0, B.playerBase)}/${B.playerBaseMax}`;
             ud.pEnergyT.text = String(B.energy);
             updateEnergyHint(); // «−X» у энергии — стоимость карты под курсором
             ud.pDeckCnt.text = String(B.deck.length);
             ud.eDeckCnt.text = String(B.eDeck.length);
             ud.discardCnt.text = String(B.discard.length);
+            ud.eDiscardCnt.text = String(B.eDiscard.length);
             // сброс: последняя ушедшая карта приглушённым лицом
             const last = B.discard[B.discard.length - 1] || null;
             if (ud.lastDiscard !== last) {
@@ -3285,10 +3308,27 @@
                     ud.discardFace.tint = 0x8a8a8a;
                     ud.discardFace.alpha = 1;
                 } else {
-                    ud.discardFace.texture = uiTex("card_back_min.png");
-                    ud.discardFace.scale.set(1, 338 / 330);
+                    ud.discardFace.texture = uiTex(playerBackTex());
+                    ud.discardFace.scale.set(1); // рубашка стихии 230×338 — тот же слот
                     ud.discardFace.tint = 0x5a5a5a;
                     ud.discardFace.alpha = 0.6;
+                }
+            }
+            // сброс врага — та же механика (просил юзер), приглушённей:
+            // кучка полупрозрачная и в лицо последней карты
+            const eLast = B.eDiscard[B.eDiscard.length - 1] || null;
+            if (ud.eLastDiscard !== eLast) {
+                ud.eLastDiscard = eLast;
+                if (eLast && CARDS[eLast] && CARDS[eLast].img) {
+                    ud.eDiscardFace.texture = uiTex(`cards/${CARDS[eLast].img}.png`);
+                    ud.eDiscardFace.scale.set(0.74); // лицо 230×338 → слот 170×250
+                    ud.eDiscardFace.tint = 0x9a9a9a;
+                    ud.eDiscardFace.alpha = 0.8;
+                } else {
+                    ud.eDiscardFace.texture = uiTex(enemyBackTex());
+                    ud.eDiscardFace.scale.set(0.74); // рубашка 230×338 → слот 170×250
+                    ud.eDiscardFace.tint = 0x5a5a5a;
+                    ud.eDiscardFace.alpha = 0.6;
                 }
             }
             const on = B.phase === "player";
@@ -3732,6 +3772,12 @@
             const cave = G.dungeon && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
             const elem = (enc && enc.elem) || (cave && cave.elem);
             return elem === "growth" ? "card_nature_back.png" : "card_goblin_back.png";
+        }
+        // Рубашка колоды и сброса ИГРОКА — по его стихии забега (просил
+        // юзер): у Горбага и прочих героев Силы — гоблинская, у героев
+        // Роста — природная
+        function playerBackTex() {
+            return G.elem === "growth" ? "card_nature_back.png" : "card_goblin_back.png";
         }
         // Ловушка врага — РУБАШКОЙ (просил юзер): игрок видит, что противник
         // сыграл карту, но какая именно ловушка — неизвестно; на поле встанет
@@ -5608,6 +5654,8 @@
             handCardNode: (idx) => (root && root.cardsLayer.children[idx]) || null,
             // пересборка руки (тесты: свежие узлы после подмены B.hand)
             relayoutHand: () => { if (root) { layoutHand(); return true; } return false; },
+            // перерисовка HUD (тесты: сбросы/счётчики после подмен B.*)
+            refreshHud: () => { if (B && root) { refreshHud(); return true; } return false; },
             // геометрия/цвета HUD (тесты): иконки энергии, цвет карт врага
             hudGeom: () => {
                 if (!root || !root.hud) return null;
