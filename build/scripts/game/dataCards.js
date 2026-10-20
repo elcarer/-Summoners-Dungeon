@@ -454,13 +454,17 @@
         gobElite: { id: "gobElite", rarity: "rare", baseHp: 14,
                     elems: ["strength"], starter: "strength",
                     img: "6", ability: "goblinChainSummon", abilityVal: 1 },
+        gobMaster: { id: "gobMaster", rarity: "rare", baseHp: 15,
+                     elems: ["strength"], starter: "strength",
+                     img: "8", ability: "strengthSpellReplay" },
         boss: { id: "boss", rarity: "epic", baseHp: 18,
                 elems: ["strength"], starter: "strength",
                 img: "7", ability: "goblinDeathReplay" },
     };
     const HERO_ORDER = ["gorbag", "elmir"];
     // Порядок карт персонажей противников во вкладке «Герои»
-    const HERO_FOE_ORDER = ["gob", "gobBig", "gobTrap", "gobFire", "gobElite", "boss"];
+    const HERO_FOE_ORDER = ["gob", "gobBig", "gobTrap", "gobFire", "gobElite",
+        "gobMaster", "boss"];
 
     // Пул наград «1 из 3» — запасной (сейчас трофеи берутся из колоды
     // побеждённого врага; пул работает для старых сейвов/прямых заходов).
@@ -539,6 +543,12 @@
         gobElite: { scene: 1, baseHp: 14, hero: "gobElite",
                     core: ["str3", "str5", "str7", "str7", "str8", "str13",
                            "str13", "str16", "str30"] },
+        // «Мастера огня» — огненная колода (просил юзер): огнешары, стены
+        // костров, алтари, руны; герой возвращает первое Силовое заклинание
+        gobMaster: { scene: 1, baseHp: 15, hero: "gobMaster",
+                     core: ["str24", "str24", "str21", "str21", "str10",
+                            "str19", "str19", "str23", "str23", "str28",
+                            "str40"] },
         // «Гоблин-вождь» — главарь этажа (B на карте). Ядро — 10 карт элиты
         // (составом просил юзер); с глубиной добавляются карты из grow
         // (2 за этаж; часть пересекается с ядром — дубликаты в колоде
@@ -602,17 +612,17 @@
         ["gobBig", "gobTrap"],                // 3
         ["gobTrap", "gobFire"],               // 4
         ["gobFire", "gobElite"],              // 5
-        ["gobElite", "gobTrap", "gobFire"],   // 6+
+        ["gobElite", "gobMaster"],            // 6+ (просил юзер)
     ];
     // Этажи «Рощи Роста»: каждый этаж приводит свой архетип, принципы —
-    // как в гоблинских пещерах (просил юзер); на 6+ правят три старших
+    // как в гоблинских пещерах (просил юзер); на 6+ правят два старших
     const FLOOR_MOBS_GROWTH = [
         ["grwBeasts", "grwBeasts"],             // 1
         ["grwBeasts", "grwGrove"],              // 2
         ["grwGrove", "grwWild"],                // 3
         ["grwWild", "grwMagic"],                // 4
         ["grwMagic", "grwCity"],                // 5
-        ["grwControl", "grwCity", "grwMagic"],  // 6+
+        ["grwCity", "grwControl"],              // 6+ (просил юзер)
     ];
     const MOB_TABLES = { gob: FLOOR_MOBS, grw: FLOOR_MOBS_GROWTH };
     // Пул добора колоды врага по редкости. Панельные карты (str11 жертва,

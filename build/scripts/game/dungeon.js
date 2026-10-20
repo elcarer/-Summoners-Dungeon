@@ -212,10 +212,14 @@
         const [bx, by] = center(rooms[far]);
         g[sy][sx] = "H";
         g[by][bx] = "B";
-        for (let n = 0; n < 50; n++) {
-            const x = rooms[far].x + ((rng() * rooms[far].w) | 0);
-            const y = rooms[far].y + ((rng() * rooms[far].h) | 0);
-            if (g[y][x] === "." && Math.abs(x - bx) + Math.abs(y - by) >= 3) { g[y][x] = "X"; break; }
+        // спуск ставится только если есть куда: на последнем этаже данжа
+        // выхода вниз нет вовсе (просил юзер)
+        if (floor < caveOf(cave).maxFloor) {
+            for (let n = 0; n < 50; n++) {
+                const x = rooms[far].x + ((rng() * rooms[far].w) | 0);
+                const y = rooms[far].y + ((rng() * rooms[far].h) | 0);
+                if (g[y][x] === "." && Math.abs(x - bx) + Math.abs(y - by) >= 3) { g[y][x] = "X"; break; }
+            }
         }
         // враги — в УЗКИХ коридорах у входов в комнаты (не стартовую):
         // клетка пола вне комнат, в шаге от клетки комнаты, с парой
@@ -1143,7 +1147,7 @@
                 layer.addChild(zone);
                 layer.addChild(buildMapGfx()); // подложка + пол (zIndex 0)
                 addWalls(layer); // стены поверх пола, zIndex по нижней кромке
-                layer.addChild(makeExit());
+                if (st.exit) layer.addChild(makeExit()); // на дне данжа спуска нет
                 if (st.ladder) layer.addChild(makeLadder(st));
                 tokens = [];
                 for (const e of st.enemies) if (e.alive) {

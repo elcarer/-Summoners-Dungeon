@@ -145,6 +145,26 @@
             return (def.spell.dmg || 0) + (def.spell.brew ? (B.brewCasts || 0) : 0)
                 + altarBonus(side) + heroSpellBonus(def, side, toUnit, consume);
         }
+        // «Мастера огня» (strengthSpellReplay): первое сыгранное стороной
+        // заклинание стихии «Сила» возвращается в её руку (энергия уже
+        // потрачена). Сожжённая «Сожжением» карта из боя уходит — флаг не
+        // тратим, способность ждёт следующего заклинания. Бесплатные касты
+        // (руна-ловушка, повторы «Горящих рун») способность не считают.
+        function heroStrReplay(side, cardId, def) {
+            if (!B || B.heroFlags.strReplay[side]) return;
+            const hd = heroDefOf(side);
+            if (!hd || hd.ability !== "strengthSpellReplay") return;
+            if (!def || def.type !== "spell" || def.elem !== "strength") return;
+            const hand = side === "p" ? B.hand : B.eHand;
+            const discard = side === "p" ? B.discard : B.eDiscard;
+            if (discard[discard.length - 1] !== cardId) return; // сожжена
+            discard.pop();
+            hand.push(cardId);
+            B.heroFlags.strReplay[side] = true;
+            floatText(960, side === "p" ? 640 : 300,
+                `↩ ${GAME_LOC.t(`card.${cardId}.name`)}`, 0x9fd489);
+            sfx("up");
+        }
         // Итоговый урон заклинания по цели: у «Роя светлячков» (grw30) он
         // равен числу СВОИХ существ на поле (+ аура алтаря), у «Выстрела
         // стихией» (grw32) — числу карт Роста в руке, у прочих — spellDmg
@@ -4361,6 +4381,7 @@
                             floatText(960, 640, `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
                             sfx("rocket");
                         } else B.eDiscard.push(cardId);
+                        heroStrReplay("e", cardId, def); // «Мастера огня»
                         B.lastSpell.e = cardId;
                         afterSpellPlayed(); // «Заклинатель клинков» на поле
                         hideEnemyCard();
@@ -4852,6 +4873,7 @@
                     || CARDS[last].type !== "spell") return false;
                 B.energy -= effCost(cardId, "p", target);
                 spendCard(handIdx);
+                heroStrReplay("p", cardId, def); // «Мастера огня»
                 B.lastSpell.p = "str25"; // повтор самой себя — бесконечная цепочка
                 replaySpell(last);
                 afterSpellPlayed();
@@ -4864,6 +4886,7 @@
             if (!applySpellP(cardId, target)) return false;
             B.energy = def.spell.drainAll ? 0 : B.energy - effCost(cardId, "p", target);
             spendCard(handIdx);
+            heroStrReplay("p", cardId, def); // «Мастера огня»
             B.lastSpell.p = cardId;
             afterSpellPlayed(); // «Заклинатель клинков» и его соседи
             layoutHand();
@@ -5047,9 +5070,11 @@
                 heroFirstSummon: heroDef.ability !== "firstSummonAtk"
                     && heroDef.ability !== "firstSummonHp",
                 // флаги способностей карт персонажей: первое уронное
-                // заклинание боя; возврат первого погибшего гоблина
+                // заклинание боя; возврат первого погибшего гоблина;
+                // возврат первого Силового заклинания («Мастера огня»)
                 heroFlags: { firstSpell: { p: false, e: false },
-                    deathReplay: { p: false, e: false } },
+                    deathReplay: { p: false, e: false },
+                    strReplay: { p: false, e: false } },
                 enemyBase: eHeroDef ? eHeroDef.baseHp : enc.baseHp,
                 enemyBaseMax: eHeroDef ? eHeroDef.baseHp : enc.baseHp,
                 deck: shuffle([...pDeck]), discard: [], hand: [],

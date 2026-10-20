@@ -274,7 +274,9 @@
             ids.forEach((id, i) => {
                 const h = HEROES[id];
                 const col = i % 4, rowI = (i / 4) | 0;
-                const cx = 900 + col * 250, cy = 320 + rowI * 300;
+                // 9 карточек = 3 ряда — шаг подобран, чтобы нижний умещался
+                // в рамку (129..1017)
+                const cx = 900 + col * 250, cy = 300 + rowI * 280;
                 const c = new PIXI.Container();
                 c.position.set(cx, cy);
                 if (G.heroId === id) { // активный — золотая рамка
