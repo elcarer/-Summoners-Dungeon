@@ -37,7 +37,7 @@
     // Лимит руки — 7 карт, проверяется ТОЛЬКО в конце хода (после добора со
     // шкалы): лишнее игрок сбрасывает по своему выбору (панель сброса).
     const HAND_MAX = 7;
-    const { CARDS, ENCOUNTERS, TRAP_SLOTS, enemyDeck } = globalThis.GAME_DATA;
+    const { CARDS, ENCOUNTERS, TRAP_SLOTS, enemyDeck, HEROES } = globalThis.GAME_DATA;
 
     function createArenaScene(ctx) {
         const { scenes, G, uiTex, scheduler } = ctx;
@@ -107,25 +107,59 @@
                 + (u.side === side && u.def.type === "building" && u.def.spellAura
                     ? u.def.spellAura : 0), 0);
         }
-        function spellDmg(def, side = "p") {
+
+        // ── Герой стороны (карты персонажей, просил юзер): у игрока —
+        // G.heroId, у врага — hero энкаунтера (HEROES[enc.hero]). У драфта
+        // и Рощи Роста карты пока нет — null.
+        function heroDefOf(side) {
+            if (!B) return null;
+            if (side !== "e") return HEROES[G.heroId] || HEROES.gorbag;
+            const enc = ENCOUNTERS[B.encId] || ENCOUNTERS.gob;
+            return enc.hero && HEROES[enc.hero] ? HEROES[enc.hero] : null;
+        }
+        // Бонус урона заклинаний от способности героя стороны:
+        // «Гоблины-мародёры» (firstSpellDmg) — ПЕРВОЕ уронное заклинание
+        // боя бьёт на 1 сильнее (флаг на бой, тратится при реальном уроне);
+        // «Гоблины-поджигатели» (strengthSpellDmg) — заклинания стихии
+        // «Сила» бьют существ на 1 сильнее (постройки и базу — нет).
+        // consume=false — прикидка (выбор цели ИИ): флаг не тратится.
+        function spellDealsDmg(def) {
+            return !!(def && def.spell && (def.spell.dmg || def.spell.baseDmg
+                || def.spell.aoeDmg || def.spell.drainAll
+                || def.spell.fireflies || def.spell.growthHand));
+        }
+        function heroSpellBonus(def, side, toUnit, consume = false) {
+            const hd = heroDefOf(side);
+            if (!hd) return 0;
+            let b = 0;
+            if (hd.ability === "firstSpellDmg" && spellDealsDmg(def)
+                && !B.heroFlags.firstSpell[side]) {
+                if (consume) B.heroFlags.firstSpell[side] = true;
+                b += 1;
+            }
+            if (hd.ability === "strengthSpellDmg" && def && def.elem === "strength"
+                && toUnit) b += 1;
+            return b;
+        }
+        function spellDmg(def, side = "p", toUnit = true, consume = false) {
             return (def.spell.dmg || 0) + (def.spell.brew ? (B.brewCasts || 0) : 0)
-                + altarBonus(side);
+                + altarBonus(side) + heroSpellBonus(def, side, toUnit, consume);
         }
         // Итоговый урон заклинания по цели: у «Роя светлячков» (grw30) он
         // равен числу СВОИХ существ на поле (+ аура алтаря), у «Выстрела
         // стихией» (grw32) — числу карт Роста в руке, у прочих — spellDmg
-        function spellHitDmg(def, side = "p") {
+        function spellHitDmg(def, side = "p", toUnit = true, consume = false) {
             if (def.spell.fireflies)
                 return B.units.filter((v) => v.side === side && v.def.type === "unit").length
-                    + altarBonus(side);
+                    + altarBonus(side) + heroSpellBonus(def, side, toUnit, consume);
             if (def.spell.growthHand) {
                 const hand = side === "p" ? B.hand : B.eHand;
                 let n = hand.filter((id) => CARDS[id] && CARDS[id].elem === "growth").length;
                 // эффект срабатывает до списания карты — сама она ещё в руке
                 if (hand.includes(cardIdOf(def))) n -= 1;
-                return n;
+                return n + heroSpellBonus(def, side, toUnit, consume);
             }
-            return spellDmg(def, side);
+            return spellDmg(def, side, toUnit, consume);
         }
 
         // «Заклинатель клинков» (spellBuffAura): после КАЖДОГО розыгрыша
@@ -449,7 +483,10 @@
         function addUnit(side, cardId, col, row, opts = {}) {
             if (!root) return null; // сцена уже вышла: поле уничтожено, призыву некуда
             const def = CARDS[cardId];
-            const u = { side, def, col, row, hp: def.hp, curAtk: def.atk || 0, auraHp: 0, bonusAtk: 0 };
+            const u = { side, def, col, row, hp: def.hp, curAtk: def.atk || 0, auraHp: 0, bonusAtk: 0,
+                // жетон — существо без карты призыва (засада, культ, дух
+                // предка, волки): «Гоблин-вождь» такие не возвращает
+                token: !!opts.token };
             const node = makeUnitNode(u);
             u.node = node;
             node.scale.set(0.2);
@@ -581,6 +618,22 @@
                         const hn = u.node.getChildByName("hp");
                         if (hn) hn.text = String(u.hp);
                         floatText(hp2.x, hp2.y - 75, `+${hd.abilityVal}♥`, 0x9fd489);
+                        sfx("up");
+                    }
+                }
+                // «Свита вождя» (goblinChainSummon, просил юзер): гоблин
+                // призвал ДРУГОГО гоблина ИЗ КОЛОДЫ (opts.viaGoblin ставит
+                // «Шаман гоблинов») — призванный получает +1 к урону
+                if (opts.viaGoblin && !opts.testSummon) {
+                    const hd = heroDefOf(side);
+                    if (hd && hd.ability === "goblinChainSummon" && isGoblin(def)
+                        && def.type === "unit") {
+                        u.bonusAtk += hd.abilityVal || 1;
+                        recalcAuras();
+                        const an = u.node.getChildByName("atk");
+                        if (an) an.text = String(u.curAtk);
+                        const cp = cellXY(col, row);
+                        floatText(cp.x, cp.y - 75, `+${hd.abilityVal || 1}⚔`, 0x9fd489);
                         sfx("up");
                     }
                 }
@@ -777,7 +830,7 @@
             const cells = near.filter(([c2, r2]) => cellOk(pick.def, c2, r2));
             const [col, row] = cells[(Math.random() * cells.length) | 0];
             if (pick.def.type === "trap") armTrap(u.side, pick.id, col, row);
-            else addUnit(u.side, pick.id, col, row);
+            else addUnit(u.side, pick.id, col, row, { viaGoblin: u });
             const p = cellXY(u.col, u.row);
             floatText(p.x, p.y - 69, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
         }
@@ -900,7 +953,7 @@
                     const c2 = trap.col + dc, r2 = trap.row + dr;
                     if (c2 < 0 || c2 >= GRID || r2 < 0 || r2 >= GRID) continue;
                     if (unitAt(c2, r2)) continue;
-                    addUnit(side, trap.def.trap.spawn, c2, r2);
+                    addUnit(side, trap.def.trap.spawn, c2, r2, { token: true });
                 }
                 refreshHud();
                 checkEnd();
@@ -937,7 +990,7 @@
                     }
                     if (spot) break;
                 }
-                if (spot) addUnit(side, trap.def.trap.spawn, spot[0], spot[1]);
+                if (spot) addUnit(side, trap.def.trap.spawn, spot[0], spot[1], { token: true });
                 refreshHud();
                 checkEnd();
                 return;
@@ -998,7 +1051,7 @@
             } else {
                 baseHit(u.side, u); // вертикаль пуста — выстрел в базу
             }
-            for (const r of path) addUnit(u.side, "grw2", u.col, r);
+            for (const r of path) addUnit(u.side, "grw2", u.col, r, { token: true });
             refreshHud();
             checkEnd();
         }
@@ -1055,6 +1108,34 @@
             if (killer && killer.def && killer.def.type === "unit" && killer.side !== u.side) {
                 triggerTraps(u.side, killer);
             }
+            heroDeathReplay(u); // «Гоблин-вождь»: первый погибший гоблин возвращается
+        }
+
+        // Способность «Гоблин-вождя» (goblinDeathReplay, просил юзер):
+        // ПЕРВЫЙ за бой гоблин стороны-владелицы, погибнув, возвращается —
+        // его карта уходит в руку, и он сразу разыгрывается в ту же клетку
+        // без траты энергии. «Не токен, с картой призыва»: жетоны (засада,
+        // культ, дух предка, волки друида/выстрела) не возвращаются.
+        function heroDeathReplay(u) {
+            // без лица карты — служебный жетон (gobA/gobC/ancBear): вождь
+            // такие не возвращает, даже если метки token не было
+            if (!u || u.def.type !== "unit" || u.token || !u.def.img
+                || !isGoblin(u.def)) return;
+            const side = u.side;
+            const hd = heroDefOf(side);
+            if (!hd || hd.ability !== "goblinDeathReplay"
+                || B.heroFlags.deathReplay[side]) return;
+            B.heroFlags.deathReplay[side] = true;
+            const id = cardIdOf(u.def);
+            const hand = side === "p" ? B.hand : B.eHand;
+            const col = u.col, row = u.row;
+            hand.push(id);
+            const p = cellXY(col, row);
+            floatText(p.x, p.y - 90, GAME_LOC.t(`card.${id}.name`), 0xffd98c);
+            sfx("chpoc");
+            // тут же разыгрывается в ту же клетку (занята — карта остаётся
+            // в руке); штатный addUnit: ауры, ловушки клетки — как у призыва
+            if (!unitAt(col, row)) addUnit(side, id, col, row);
         }
 
         // «Огненное дыхание»: зачарованное существо при КАЖДОМ нанесении
@@ -1324,7 +1405,7 @@
             }
             if (!near.length) return; // кругом свои — волку нет места
             const [col, row] = near[(Math.random() * near.length) | 0];
-            addUnit(u.side, "grw2", col, row);
+            addUnit(u.side, "grw2", col, row, { token: true });
             const p = cellXY(col, row);
             floatText(p.x, p.y - 75, GAME_LOC.t("card.grw2.name"), 0x9fd489);
         }
@@ -2742,6 +2823,25 @@
             eDeckCnt.eventMode = "none";
             c.addChild(eDeckCnt);
 
+            // карта персонажа врага (просил юзер): под его колодой, её
+            // baseHp — жизни базы врага. Наведение — рост до натурального
+            // размера (как у карточки героя игрока). У драфта/Рощи карты
+            // пока нет — держатель не строится
+            const eHeroDef = ENCOUNTERS[B.encId] && ENCOUNTERS[B.encId].hero
+                && HEROES[ENCOUNTERS[B.encId].hero]
+                ? HEROES[ENCOUNTERS[B.encId].hero] : null;
+            if (eHeroDef) {
+                const eHeroHolder = new PIXI.Container();
+                eHeroHolder.position.set(1740, 286);
+                eHeroHolder.hitArea = new PIXI.Rectangle(0, 0, 143, 210);
+                const eHeroCard = new PIXI.Sprite(uiTex(`heroes/${eHeroDef.img}.png`));
+                eHeroCard.scale.set(0.62); // 230×338 → ~143×210
+                eHeroCard.eventMode = "none";
+                eHeroHolder.addChild(eHeroCard);
+                ctx.heroHover(eHeroHolder, eHeroCard, -50, 0); // большой вид: край 1920
+                c.addChild(eHeroHolder);
+            }
+
             // база игрока — зелёная полоса над треком «энергия-карты», число
             // в её центре; по краям трека — энергия и карты игрока (иконки
             // юзера): текущее число у энергии сопровождает «+добавка» по
@@ -3127,6 +3227,29 @@
                 if (!B.eDeck.length) break;
                 B.eHand.push(B.eDeck.pop());
             }
+        }
+
+        // ── Способность героя «начиная бой берёт дополнительную случайную
+        // карту … из колоды» (просил юзер): «Банда гоблинов» — карту
+        // гоблина, «Засада гоблинов» — карту ловушки. Вызывается в enter()
+        // ПОСЛЕ сборки root (всплывающий текст рисуется в root.fx).
+        function heroStartDraw(side) {
+            const hd = heroDefOf(side);
+            if (!hd) return;
+            const want = hd.ability === "startDrawGoblin" ? "goblin"
+                : hd.ability === "startDrawTrap" ? "trap" : null;
+            if (!want) return;
+            const deck = side === "p" ? B.deck : B.eDeck;
+            const hand = side === "p" ? B.hand : B.eHand;
+            const pool = deck.map((id, i) => ({ id, i, def: CARDS[id] }))
+                .filter((x) => want === "goblin" ? isGoblin(x.def) : x.def.type === "trap");
+            if (!pool.length) return;
+            const pick = pool[(Math.random() * pool.length) | 0];
+            deck.splice(pick.i, 1);
+            hand.push(pick.id);
+            sfx("chpoc");
+            floatText(960, side === "p" ? 840 : 240,
+                `+ ${GAME_LOC.t(`card.${pick.id}.name`)}`, 0xffd98c);
         }
 
         // ── «Запутанность N» (ловушка «Путь грибов», просил юзер) ─────────
@@ -3894,7 +4017,8 @@
                 } else { // дротик/варево/огнешар/светлячки
                     // ИИ добивает: если есть цель под убийство (урон ≥
                     // жизней) — бьём её (из них сильнейшую и ближе к базе),
-                    // иначе просто сильнейшего юза игрока
+                    // иначе просто сильнейшего юза игрока. Прикидка БЕЗ
+                    // траты флага «первого уронного» (consume=false)
                     const probe = spellHitDmg(def, "e");
                     const kills = targets.filter((v) => v.hp <= probe);
                     let best = (kills.length ? kills : targets)
@@ -3905,7 +4029,8 @@
                     const dmg = s.drainAll // вся энергия сверх цены — в урон
                         ? Math.max(0, B.eEnergy - (free ? 0 : effCost(cardIdOf(def), "e",
                             { col: best.col, row: best.row }))) + altarBonus("e")
-                        : probe;
+                            + heroSpellBonus(def, "e", best.def.type === "unit", true)
+                        : spellHitDmg(def, "e", best.def.type === "unit", true);
                     damageUnit(best, dmg, null, "rocket");
                 }
             }
@@ -3933,14 +4058,17 @@
                     const best = focus && targets.includes(focus)
                         ? focus // руна: именно атакующий
                         : targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
-                    damageUnit(best, s.dmg, null, "rocket");
+                    damageUnit(best, s.dmg + heroSpellBonus(def, "e",
+                        best.def.type === "unit", true), null, "rocket");
                 } else {
-                    damageBase("p", s.dmg, { x: 960, y: 840, fill: 0xff5f4e });
+                    damageBase("p", s.dmg + heroSpellBonus(def, "e", false, true),
+                        { x: 960, y: 840, fill: 0xff5f4e });
                     sfx("rocket");
                 }
             }
             if (s.target === "none" && s.baseDmg) { // землетрясение
-                damageBase("p", s.baseDmg, { x: 960, y: 840, fill: 0xff5f4e });
+                damageBase("p", s.baseDmg + heroSpellBonus(def, "e", false, true),
+                    { x: 960, y: 840, fill: 0xff5f4e });
                 sfx("rocket");
             }
             if (s.stealEnergy) { // «Похищение энергии»: 2⚡ игрока — нам
@@ -3961,7 +4089,11 @@
             }
             if (s.aoeDmg) { // «Раскалённые обломки»: всем существам и постройкам игрока
                 const dmg = s.aoeDmg + altarBonus("e");
-                for (const v of B.units.slice()) if (v.side !== "e") damageUnit(v, dmg, null, "rocket");
+                const fs = heroSpellBonus(def, "e", false, true); // первое уронное — всем ударам
+                for (const v of B.units.slice()) if (v.side !== "e")
+                    damageUnit(v, dmg + fs
+                        + (v.def.type === "unit" ? heroSpellBonus(def, "e", true) : 0),
+                        null, "rocket");
                 sfx("rocket");
             }
             if (s.buffAllAtk) { // «Поднять стяги!»: +1 урона всем своим существам
@@ -4427,7 +4559,7 @@
             let n = 0;
             for (let col = 0; col < GRID; col++) {
                 if (unitAt(col, row)) continue;
-                addUnit(side, "gobC", col, row);
+                addUnit(side, "gobC", col, row, { token: true });
                 n++;
             }
             return n;
@@ -4494,13 +4626,14 @@
                     addProtect(u);
                 } else if (def.spell.drainAll) { // «Огнешар»: вся энергия сверх цены — в урон
                     damageUnit(u, Math.max(0, B.energy - (free ? 0 : effCost(cardId, "p", target)))
-                        + altarBonus("p"), null, "rocket");
+                        + altarBonus("p")
+                        + heroSpellBonus(def, "p", u.def.type === "unit", true), null, "rocket");
                 } else if (def.spell.fireflies) { // «Рой светлячков»: урон = своим существам
-                    damageUnit(u, spellHitDmg(def, "p"), null, "rocket");
+                    damageUnit(u, spellHitDmg(def, "p", u.def.type === "unit", true), null, "rocket");
                 } else if (def.spell.growthHand) { // «Выстрел стихией Роста»: урон = картам Роста в руке
-                    damageUnit(u, spellHitDmg(def, "p"), null, "rocket");
+                    damageUnit(u, spellHitDmg(def, "p", u.def.type === "unit", true), null, "rocket");
                 } else {
-                    damageUnit(u, spellDmg(def), null, "rocket");
+                    damageUnit(u, spellDmg(def, "p", u.def.type === "unit", true), null, "rocket");
                 }
             }
             if (def.spell.target === "emptyCell") { // культ кочерыжки: ряд в гоблинах
@@ -4556,7 +4689,8 @@
                 openExcavatePanel(cell); // выбор постройки сброса в освободившуюся клетку
             }
             if (def.spell.target === "none" && def.spell.baseDmg) { // землетрясение
-                damageBase("e", def.spell.baseDmg, { x: 960, y: 60, fill: 0xff8f6e });
+                damageBase("e", def.spell.baseDmg + heroSpellBonus(def, "p", false, true),
+                    { x: 960, y: 60, fill: 0xff8f6e });
                 sfx("rocket");
             }
             if (def.spell.target === "none" && def.spell.stealEnergy) { // «Похищение энергии»: 2⚡
@@ -4578,7 +4712,13 @@
             }
             if (def.spell.aoeDmg) { // «Раскалённые обломки»: всем вражеским существам и постройкам
                 const dmg = def.spell.aoeDmg + altarBonus("p");
-                for (const v of B.units.slice()) if (v.side !== "p") damageUnit(v, dmg, null, "rocket");
+                // первое уронное заклинание — +1 ко ВСЕМ ударам этого каста;
+                // «Поджигатели» — +1 только существам (постройки не считаются)
+                const fs = heroSpellBonus(def, "p", false, true);
+                for (const v of B.units.slice()) if (v.side !== "p")
+                    damageUnit(v, dmg + fs
+                        + (v.def.type === "unit" ? heroSpellBonus(def, "p", true) : 0),
+                        null, "rocket");
                 sfx("rocket");
             }
             if (def.spell.buffAllAtk) { // «Поднять стяги!»: +1 урона всем своим существам
@@ -4594,12 +4734,14 @@
             if (def.spell.target === "enemyAny") {
                 if (!target) return false;
                 if (target.base === true) {
-                    damageBase("e", def.spell.dmg, { x: 960, y: 60, fill: 0xff8f6e });
+                    damageBase("e", def.spell.dmg + heroSpellBonus(def, "p", false, true),
+                        { x: 960, y: 60, fill: 0xff8f6e });
                     sfx("rocket");
                 } else if (target.col !== undefined) {
                     const u = unitAt(target.col, target.row);
                     if (!u || u.side === "p") return false;
-                    damageUnit(u, def.spell.dmg, null, "rocket");
+                    damageUnit(u, def.spell.dmg + heroSpellBonus(def, "p",
+                        u.def.type === "unit", true), null, "rocket");
                 } else return false;
             }
             if (def.spell.draw) drawCards(def.spell.draw);
@@ -4769,6 +4911,11 @@
             if (victory && !draft) {
                 // трофеи «1 из 3» берутся из колоды побеждённого (просил юзер)
                 G.rewardDeck = [...new Set(B.eDeckBase || [])].filter((id) => CARDS[id]);
+                // карта персонажа побеждённого — игроку (просил юзер):
+                // показывается в меню трофея рядом с картами
+                const enc2 = ENCOUNTERS[B.encId] || ENCOUNTERS.gob;
+                if (enc2.hero && G.captureHero && G.captureHero(enc2.hero))
+                    G.wonHero = enc2.hero;
             }
             if (draft && victory) {
                 // награда драфта — одна ЛЮБАЯ карта драфт-колоды на выбор
@@ -4884,6 +5031,9 @@
             const eBase = G.activeEnemy && G.activeEnemy.deck
                 ? [...G.activeEnemy.deck]
                 : enemyDeck(encId, G.run ? G.run.floor : 1);
+            // карта персонажа противника: её baseHp — жизни базы врага
+            // (10/11/12/13/14/18 по картам юзера); нет карты — как раньше
+            const eHeroDef = enc.hero && HEROES[enc.hero] ? HEROES[enc.hero] : null;
             // драфт («Карта сокровищ»): колода игрока — 12 отобранных карт,
             // НЕ G.deck (настоящая колода в мини-игре не участвует)
             const pDeck = G.draftBattle && G.draft ? G.draft.picks : G.deck;
@@ -4896,7 +5046,12 @@
                 // не сработала в этом бою
                 heroFirstSummon: heroDef.ability !== "firstSummonAtk"
                     && heroDef.ability !== "firstSummonHp",
-                enemyBase: enc.baseHp, enemyBaseMax: enc.baseHp,
+                // флаги способностей карт персонажей: первое уронное
+                // заклинание боя; возврат первого погибшего гоблина
+                heroFlags: { firstSpell: { p: false, e: false },
+                    deathReplay: { p: false, e: false } },
+                enemyBase: eHeroDef ? eHeroDef.baseHp : enc.baseHp,
+                enemyBaseMax: eHeroDef ? eHeroDef.baseHp : enc.baseHp,
                 deck: shuffle([...pDeck]), discard: [], hand: [],
                 eDeck: shuffle([...eBase]),
                 eDeckBase: eBase,
@@ -4965,6 +5120,8 @@
                 }
             });
             ctx.ui.addChild(root);
+            heroStartDraw("p"); // способность героя: добор в начале боя
+            heroStartDraw("e");
             layoutHand();
             refreshHud();
             banner(t("arena.yourTurn"));

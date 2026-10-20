@@ -9,10 +9,13 @@
 (function () {
     function createDeckScene(ctx) {
         const { scenes, G, ui, uiTex } = ctx;
-        const { CARDS, DECK_MAX, DECK_MIN, DECK_COPIES, ELEM_LOGO, HEROES } = globalThis.GAME_DATA;
+        const { CARDS, DECK_MAX, DECK_MIN, DECK_COPIES, ELEM_LOGO, HEROES,
+            HERO_ORDER, HERO_FOE_ORDER } = globalThis.GAME_DATA;
         const { T, fit, button, chip, cardFace, dimBg, scrollPane } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
         let root = null, leftPane = null, rightPane = null;
+        let tab = "deck"; // вкладка сцены: «Колода» | «Герои» (просил юзер)
+        const heroCards = []; // вкладка «Герои»: {id, node} (тесты)
         const filters = { type: null, cost: null, rarity: null, elem: null };
         const ELEM_KEYS = Object.keys(ELEM_LOGO);
         const PANE_POS = { left: { x: 90, y: 222 }, right: { x: 780, y: 279 } };
@@ -68,7 +71,7 @@
             if (filters.elem && def.elem !== filters.elem) return false;
             return true;
         }
-        function save() { globalThis.GAME_META.saveMeta(G.collection, G.deck); }
+        function save() { G.persistMeta(); } // колода героя — она же G.deck
 
         // ── левое окно: колода карточками (как коллекция) ──────────────────
         function buildDeckList() {
@@ -175,19 +178,170 @@
             headerRef.min.style.fill = G.deck.length < DECK_MIN ? 0xff8f6e : 0x8a7c5e;
         }
 
+        // Имя героя: стартовые — свои ключи, карты противников — названия
+        // энкаунтеров («Банда гоблинов», …)
+        const heroName = (id) => t(HERO_ORDER.includes(id)
+            ? `hero.${id}.name` : `enc.${id}.title`);
+        // Все герои вкладки: свои (всегда есть), завоёванные, затем
+        // ещё не взятые — серыми, для виду (просил юзер: просматривать)
+        function heroesOwnedOrder() {
+            return [...HERO_ORDER,
+                ...HERO_FOE_ORDER.filter((id) => G.captured.includes(id)),
+                ...HERO_FOE_ORDER.filter((id) => !G.captured.includes(id))];
+        }
+
+        // ── вкладка «Герои»: слева активный герой, справа все карты ────────
+        function buildHeroesTab() {
+            const active = HEROES[G.heroId] || HEROES.gorbag;
+            // левая рамка: карточка активного героя и его данные
+            const left = new PIXI.Graphics();
+            left.roundRect(72, 129, 645, 888, 15);
+            left.fill({ color: 0x171310, alpha: 0.92 });
+            left.stroke({ width: 3, color: 0x6b5c40 });
+            root.addChild(left);
+            const nameT = T(heroName(active.id), 40, 0xf0c96a,
+                { stroke: { color: 0x241505, width: 7 } });
+            nameT.anchor.set(0.5, 0);
+            nameT.position.set(394, 165);
+            nameT.eventMode = "none";
+            fit(nameT, 600, 34);
+            root.addChild(nameT);
+            const face = new PIXI.Sprite(uiTex(`heroes/${active.img}.png`));
+            face.anchor.set(0.5, 0);
+            face.scale.set(1); // натуральный размер 230×338
+            face.position.set(215, 235);
+            face.eventMode = "none";
+            root.addChild(face);
+            const statY = 245;
+            const lines = [
+                t("hero.baseLine", { n: active.baseHp }),
+                t("hero.elemLine", { elems: active.elems.map((e) => t("elem." + e)).join(", ") }),
+                t("filter.rarity") + ": " + t(`rarity.${active.rarity}`),
+                t("heroes.deckCount", { n: G.heroDecksOf()[active.id]
+                    ? G.heroDecksOf()[active.id].length : 0 }),
+            ];
+            lines.forEach((s, i) => {
+                const ln = T(s, 24, 0xd8c79d);
+                ln.position.set(360, statY + i * 36);
+                ln.eventMode = "none";
+                fit(ln, 330, 12);
+                root.addChild(ln);
+            });
+            const abil = T(t("hero.abilityLabel", { text: t(`hero.${active.id}.ability`) }),
+                21, 0xbfd489, { wordWrap: true, wordWrapWidth: 330, align: "left" });
+            abil.position.set(360, statY + lines.length * 36 + 14);
+            abil.eventMode = "none";
+            root.addChild(abil);
+            // своя колода ещё не собрана — подсказка (завоёванные герои
+            // начинают с пустой колодой, просил юзер); ниже текста
+            // способности — у длинных способностей он высок
+            if ((G.heroDecksOf()[active.id] || []).length === 0) {
+                const warn = T(t("heroes.emptyDeck"), 20, 0xffb26e,
+                    { wordWrap: true, wordWrapWidth: 330 });
+                warn.position.set(360, abil.y + abil.height + 14);
+                warn.eventMode = "none";
+                root.addChild(warn);
+            }
+            if (HERO_ORDER.includes(active.id) || G.captured.includes(active.id)) {
+                if (G.heroId === active.id) {
+                    const mark = T(t("heroes.active"), 32, 0xf0c96a,
+                        { stroke: { color: 0x241505, width: 6 } });
+                    mark.anchor.set(0.5);
+                    mark.position.set(394, 930);
+                    mark.eventMode = "none";
+                    root.addChild(mark);
+                } else {
+                    root.addChild(button(ctx, {
+                        tex: "button_menu.png", label: t("heroes.pick"), x: 394, y: 930, scale: 1,
+                        onTap: () => api.setActive(active.id),
+                    }));
+                }
+            }
+
+            // правая рамка: сетка всех карт персонажей
+            const right = new PIXI.Graphics();
+            right.roundRect(762, 129, 1086, 888, 15);
+            right.fill({ color: 0x171310, alpha: 0.92 });
+            right.stroke({ width: 3, color: 0x6b5c40 });
+            root.addChild(right);
+            const sub = T(t("heroes.subtitle"), 22, 0x8a7c5e);
+            sub.anchor.set(0.5, 0);
+            sub.position.set(1305, 150);
+            sub.eventMode = "none";
+            fit(sub, 1000, 14);
+            root.addChild(sub);
+            const ids = heroesOwnedOrder();
+            ids.forEach((id, i) => {
+                const h = HEROES[id];
+                const owned = HERO_ORDER.includes(id) || G.captured.includes(id);
+                const col = i % 4, rowI = (i / 4) | 0;
+                const cx = 900 + col * 250, cy = 320 + rowI * 300;
+                const c = new PIXI.Container();
+                c.position.set(cx, cy);
+                if (G.heroId === id) { // активный — золотая рамка
+                    const glow = new PIXI.Graphics();
+                    glow.roundRect(-76, -110, 152, 220, 10);
+                    glow.stroke({ width: 5, color: 0xf0c96a });
+                    glow.eventMode = "none";
+                    c.addChild(glow);
+                }
+                const card = new PIXI.Sprite(uiTex(`heroes/${h.img}.png`));
+                card.anchor.set(0.5, 0.5);
+                card.scale.set(0.62); // 230×338 → ~143×210
+                card.alpha = owned ? 1 : 0.4; // не завоёван — серым
+                c.addChild(card);
+                if (owned) {
+                    c.eventMode = "static";
+                    if (G.heroId !== id) {
+                        c.on("pointertap", () => api.setActive(id));
+                        c.on("pointerover", () => { card.scale.set(0.68); });
+                        c.on("pointerout", () => { card.scale.set(0.62); });
+                    }
+                }
+                const nm = T(owned ? heroName(id) : t("heroes.locked"), 20,
+                    G.heroId === id ? 0xf0c96a : owned ? 0xd8c79d : 0x8a7c5e,
+                    { stroke: { color: 0x1c1207, width: 4.5 } });
+                nm.anchor.set(0.5, 0);
+                nm.position.set(0, 112);
+                nm.eventMode = "none";
+                fit(nm, 230, 10);
+                c.addChild(nm);
+                root.addChild(c);
+                heroCards.push({ id, node: c });
+            });
+        }
+
         function rebuild() {
+            hideZoom(true); // смена вкладки — ховер-зум мимо (узлы умрут с root)
             if (root) root.destroy({ children: true });
+            heroCards.length = 0;
             root = new PIXI.Container();
             root.eventMode = "static";
             root.addChild(dimBg(ctx, 0.85));
 
-            const title = T(t("deck.title"), 51, 0xf0c96a, { stroke: { color: 0x241505, width: 9 } });
+            const title = T(t(tab === "heroes" ? "heroes.title" : "deck.title"),
+                51, 0xf0c96a, { stroke: { color: 0x241505, width: 9 } });
             title.anchor.set(0.5, 0);
             title.position.set(960, 21);
             title.eventMode = "none";
             fit(title, 1350, 30);
             root.addChild(title);
 
+            // вкладки «Колода» / «Герои» (просил юзер): чипы по центру
+            // под заголовком
+            let chipX = 795;
+            for (const [key, label] of [["deck", t("deck.tabDeck")], ["heroes", t("deck.tabHeroes")]]) {
+                const ch = chip(ctx, {
+                    label, x: chipX, y: 95, active: tab === key,
+                    onTap: () => { if (tab !== key) { tab = key; rebuild(); } },
+                });
+                chipX += ch.userData.w + 18;
+                root.addChild(ch);
+            }
+
+            if (tab === "heroes") {
+                buildHeroesTab();
+            } else {
             // левая рамка + заголовок + скролл-панель
             const left = new PIXI.Graphics();
             left.roundRect(72, 129, 645, 888, 15);
@@ -249,6 +403,7 @@
             const rc = buildCollection();
             rightPane.setContent(rc, rc.userData.contentH);
             headerText();
+            }
 
             root.addChild(button(ctx, {
                 tex: "button_menu.png", label: t("deck.back"), x: 165, y: 78, scale: 1,
@@ -380,6 +535,30 @@
             elemTap(i) { const g = elemBtns[i]; if (g) g.emit("pointertap"); },
             // герой забега (тесты): id + разрешённые стихии колоды
             heroInfo: () => ({ id: heroDef().id, elems: [...heroDef().elems] }),
+            // ── вкладка «Герои» (тесты + смена героя) ──────────────────────
+            // сделать героя активным: колода переключается на его собственную
+            setActive(id) {
+                if (!G.setHero(id)) return false;
+                if (ctx.sfx) ctx.sfx();
+                // забег жив — активный герой сохраняется в сейве забега
+                if (globalThis.GAME_META.loadRun()) G.saveRun();
+                rebuild();
+                return true;
+            },
+            heroesState: () => ({
+                tab,
+                active: G.heroId,
+                captured: [...G.captured],
+                owned: heroesOwnedOrder(),
+                decks: Object.fromEntries(Object.entries(G.heroDecksOf())
+                    .map(([k, v]) => [k, v.length])),
+                cards: heroCards.map((c) => ({ id: c.id })),
+            }),
+            heroTap(id) {
+                const c = heroCards.find((x) => x.id === id);
+                if (c) c.node.emit("pointertap");
+            },
+            setTab(next) { if (tab !== next) { tab = next; rebuild(); } },
         };
 
         return {

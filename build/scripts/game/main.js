@@ -142,7 +142,7 @@
         const settings = GAME_META.loadSettings();
         GAME_LOC.setLang(settings.lang);
         const savedMeta = GAME_META.loadMeta();
-        const { DEFAULT_DECK, DEFAULT_COLLECTION } = GAME_DATA;
+        const { DEFAULT_DECK, DEFAULT_COLLECTION, HERO_ORDER } = GAME_DATA;
 
         // ── Звук: два канала движка — эффекты («звук») и музыка («музыка») ──
         const audio = createAudio();
@@ -239,15 +239,63 @@
             settings,
             deck: savedDeck.length ? savedDeck : [...DEFAULT_DECK],
             collection: Object.keys(savedColl).length ? savedColl : { ...DEFAULT_COLLECTION },
+            // колода каждого героя своя (переключение во вкладке «Герои»);
+            // heroDecks[heroId] всегда указывает на АКТИВНУЮ G.deck
+            heroDecks: savedMeta && savedMeta.heroDecks ? savedMeta.heroDecks : null,
+            // завоёванные карты персонажей противников (просил юзер)
+            captured: savedMeta && Array.isArray(savedMeta.captured) ? savedMeta.captured : [],
             dungeon: null, activeEnemy: null, battle: null,
             world: { heroPos: null, out: false }, // открытый мир: где герой
             dungeonStates: {}, // этажи подземелий, ключ «данж:этаж» (gob:1, grw:2…)
             // (враги/объекты этажа остаются как их оставили),
             rewardDeck: null, // колода побеждённого — пул трофея «1 из 3»
+            wonHero: null, // карта персонажа, завоёванная в последнем бою
             rewardDraft: false, // трофей — выбор из всей драфт-колоды (драфт)
             draft: null, // мини-игра «Карта сокровищ»: picks/ePicks/objIdx
             draftBattle: false, // текущий бой — драфт-бой (итог ведёт в подземелье)
             uiReturn: null, // откуда открыты настройки/колода (кнопка «Назад»)
+            // миграция старых сейвов: колода без «колод по героям» —
+            // становится колодой активного героя
+            heroDecksOf() {
+                if (!this.heroDecks) this.heroDecks = { [this.heroId]: this.deck };
+                if (!this.heroDecks[this.heroId]) this.heroDecks[this.heroId] = this.deck;
+                return this.heroDecks;
+            },
+            // мета (коллекция/колоды/герои) — единая точка записи
+            persistMeta() {
+                globalThis.GAME_META.saveMeta(this.collection, this.deck, {
+                    heroDecks: this.heroDecksOf(),
+                    captured: this.captured,
+                    activeHeroId: this.heroId,
+                });
+            },
+            // смена активного героя (вкладка «Герои», просил юзер): колода
+            // переключается на его собственную; у завоёванных героев она
+            // изначально пуста — игрок собирает её из общей коллекции
+            setHero(id) {
+                const HEROES = globalThis.GAME_DATA.HEROES;
+                if (!HEROES[id]) return false;
+                const owned = HERO_ORDER.includes(id) || this.captured.includes(id);
+                if (!owned) return false;
+                this.heroId = id;
+                this.elem = HEROES[id].elems[0];
+                this.heroDecksOf();
+                this.deck = this.heroDecks[id];
+                this.persistMeta();
+                return true;
+            },
+            // победа над противником: его карта персонажа — игроку
+            // (просил юзер). Возвращает true, если карта завоёвана сейчас
+            captureHero(id) {
+                const HEROES = globalThis.GAME_DATA.HEROES;
+                if (!HEROES[id] || HERO_ORDER.includes(id) || this.captured.includes(id)) return false;
+                this.captured.push(id);
+                this.heroDecksOf();
+                // захваченный герой начинает БЕЗ карт в колоде (просил юзер)
+                this.heroDecks[id] = [];
+                this.persistMeta();
+                return true;
+            },
             resetRun(heroId) {
                 // новая игра — забег И коллекция/колода с нуля (просил юзер:
                 // после кнопки оставалась прокачанная коллекция). Герой
@@ -270,7 +318,9 @@
                 this.draftBattle = false;
                 this.deck = [...globalThis.GAME_DATA.STARTER_DECKS[h.starter]];
                 this.collection = { ...globalThis.GAME_DATA.STARTER_COLLECTIONS[h.starter] };
-                globalThis.GAME_META.saveMeta(this.collection, this.deck);
+                this.heroDecks = { [this.heroId]: this.deck }; // новая игра — колоды заново
+                this.captured = []; // завоёванные карты тоже с нуля
+                this.persistMeta();
             },
             // сейв забега (sd_run): этаж, герой, золото, подземелье целиком —
             // «Продолжить» в меню поднимает его (dungeon — простые данные,
@@ -298,7 +348,7 @@
                 if (!this.deck.length) return null;
                 const id = this.deck.splice((Math.random() * this.deck.length) | 0, 1)[0];
                 if (this.collection[id]) this.collection[id] = Math.max(0, this.collection[id] - 1);
-                globalThis.GAME_META.saveMeta(this.collection, this.deck);
+                this.persistMeta(); // колода активного героя — она же G.deck
                 return id;
             },
         };
@@ -692,6 +742,12 @@
                 scene: scenes.current,
                 hero: { ...G.hero }, floor: G.run.floor, gold: G.gold,
                 heroId: G.heroId, elem: G.elem, cave: G.run.cave,
+                // герои: активный, завоёванные карты, колоды по героям
+                heroes: {
+                    captured: [...G.captured],
+                    decks: Object.fromEntries(
+                        Object.entries(G.heroDecksOf()).map(([k, v]) => [k, v.length])),
+                },
                 floors: { ...(G.run.floors || {}) },
                 heroPos: (() => {
                     // герой живёт в подземелье или открытом мире (сцена)

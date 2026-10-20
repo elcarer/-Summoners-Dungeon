@@ -853,7 +853,7 @@
                 onTap: () => {
                     if (chest) {
                         G.collection[o.card] = (G.collection[o.card] || 0) + 1;
-                        globalThis.GAME_META.saveMeta(G.collection, G.deck);
+                        G.persistMeta(); // коллекция + колоды героев/захваты (модульное хранилище)
                     } else {
                         G.gold += o.amount;
                     }
@@ -878,7 +878,7 @@
             G.gold -= price;
             G.collection[o.stock[i]] = (G.collection[o.stock[i]] || 0) + 1;
             o.sold[i] = true;
-            globalThis.GAME_META.saveMeta(G.collection, G.deck);
+            G.persistMeta(); // коллекция + колоды героев/захваты (модульное хранилище)
             if (G.saveRun) G.saveRun();
             if (ctx.sfx) ctx.sfx("coins");
             if (refreshShop) refreshShop();
@@ -905,7 +905,7 @@
             if (sellLocked()) return false;
             G.collection[id] -= 1;
             G.gold += SHOP_SELL[CARDS[id].rarity];
-            globalThis.GAME_META.saveMeta(G.collection, G.deck);
+            G.persistMeta(); // коллекция + колоды героев/захваты (модульное хранилище)
             if (G.saveRun) G.saveRun();
             if (ctx.sfx) ctx.sfx("coins");
             if (refreshShop) refreshShop();

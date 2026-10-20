@@ -417,6 +417,17 @@
     // abilityVal: firstSummonAtk / firstSummonHp — бонус первому
     // призванному ИГРОКОМ существу). Изображение — полная карточка
     // 230×338 юзера: images/heroes/<img>.png. Список будет расширяться.
+    //
+    // Карты персонажей противников (просил юзер, волна «Герои-враги»):
+    // ключ = id энкаунтера (ENCOUNTERS.<id>.hero ссылается сюда), defeat
+    // добавляет карту в коллекцию героев (G.captured). Способности работают
+    // у ОБЕИХ сторон: ИИ играет своим персонажем, игрок — захваченной
+    // картой. ability: startDrawGoblin / startDrawTrap — добор карты в
+    // начале боя; firstSpellDmg — первое уронное заклинание боя +1;
+    // strengthSpellDmg — заклинания Силы +1 существам; goblinChainSummon —
+    // гоблин призвал гоблина из колоды → +1⚔ призванному; goblinDeathReplay
+    // — первый погибший гоблин (не токен) возвращается картой в руку и
+    // сразу разыгрывается на место.
     const HEROES = {
         gorbag: {
             id: "gorbag", rarity: "common",
@@ -428,8 +439,28 @@
             baseHp: 15, elems: ["growth"], starter: "growth",
             img: "1", ability: "firstSummonHp", abilityVal: 3,
         },
+        gob: { id: "gob", rarity: "common", baseHp: 10,
+               elems: ["strength"], starter: "strength",
+               img: "2", ability: "startDrawGoblin" },
+        gobBig: { id: "gobBig", rarity: "common", baseHp: 11,
+                  elems: ["strength"], starter: "strength",
+                  img: "3", ability: "firstSpellDmg", abilityVal: 1 },
+        gobTrap: { id: "gobTrap", rarity: "common", baseHp: 12,
+                   elems: ["strength"], starter: "strength",
+                   img: "4", ability: "startDrawTrap" },
+        gobFire: { id: "gobFire", rarity: "rare", baseHp: 13,
+                   elems: ["strength"], starter: "strength",
+                   img: "5", ability: "strengthSpellDmg", abilityVal: 1 },
+        gobElite: { id: "gobElite", rarity: "rare", baseHp: 14,
+                    elems: ["strength"], starter: "strength",
+                    img: "6", ability: "goblinChainSummon", abilityVal: 1 },
+        boss: { id: "boss", rarity: "epic", baseHp: 18,
+                elems: ["strength"], starter: "strength",
+                img: "7", ability: "goblinDeathReplay" },
     };
     const HERO_ORDER = ["gorbag", "elmir"];
+    // Порядок карт персонажей противников во вкладке «Герои»
+    const HERO_FOE_ORDER = ["gob", "gobBig", "gobTrap", "gobFire", "gobElite", "boss"];
 
     // Пул наград «1 из 3» — запасной (сейчас трофеи берутся из колоды
     // побеждённого врага; пул работает для старых сейвов/прямых заходов).
@@ -481,34 +512,38 @@
     // по этажу (enemyDeck): чем глубже, тем больше карт и тем выше доля
     // редких и эпических. На каждом этаже — свои архетипы (FLOOR_MOBS).
     // Название — ключ локализации enc.<id>.title; scene — фон арены.
+    // hero — карта персонажа противника (ключ HEROES): её baseHp — жизни
+    // базы врага в бою (10/11/12/13/14/18 по картам юзера), победа над
+    // врагом добавляет карту в коллекцию героев. Без hero (драфт, Роща)
+    // действует baseHp как раньше.
     const ENCOUNTERS = {
         // «Банда гоблинов» — первый этаж: только обычные карты
-        gob:      { scene: 1, baseHp: 10,
+        gob:      { scene: 1, baseHp: 10, hero: "gob",
                     core: ["str1", "str1", "str2", "str3", "str4", "str15",
                            "str26"] },
         // «Гоблины-мародёры» — обычные + первые редкие (лучник, наездник)
-        gobBig:   { scene: 1, baseHp: 12,
+        gobBig:   { scene: 1, baseHp: 11, hero: "gobBig",
                     core: ["str1", "str2", "str3", "str4", "str9", "str9",
                            "str13", "str16", "str23"] },
         // «Засада гоблинов» — ловушечная колода (мина, приманка, засада),
         // трусливый гоблин — бесплатная стена в коридоре поля
-        gobTrap:  { scene: 2, baseHp: 12,
+        gobTrap:  { scene: 2, baseHp: 12, hero: "gobTrap",
                     core: ["str3", "str6", "str6", "str12", "str12", "str14",
                            "str14", "str20", "str20", "str29"] },
         // «Гоблины-поджигатели» — заклинательная колода (огонь, огнешары,
         // горящие руны)
-        gobFire:  { scene: 2, baseHp: 14,
+        gobFire:  { scene: 2, baseHp: 13, hero: "gobFire",
                     core: ["str2", "str9", "str9", "str19", "str21", "str22",
                            "str23", "str24", "str24", "str25"] },
         // «Свита вождя» — элитные редкие (лагерь, шаман, вождь, стяги)
-        gobElite: { scene: 1, baseHp: 16,
+        gobElite: { scene: 1, baseHp: 14, hero: "gobElite",
                     core: ["str3", "str5", "str7", "str7", "str8", "str13",
                            "str13", "str16", "str30"] },
         // «Гоблин-вождь» — главарь этажа (B на карте). Ядро — 10 карт элиты
         // (составом просил юзер); с глубиной добавляются карты из grow
         // (2 за этаж; часть пересекается с ядром — дубликаты в колоде
         // врага легальны), добор — как у обычных.
-        boss:     { scene: 2, baseHp: 20,
+        boss:     { scene: 2, baseHp: 18, hero: "boss",
                     core: ["str8", "str7", "str13", "str29", "str30", "str11",
                            "str16", "str31", "str18", "str5"],
                     grow: ["str5", "str6", "str7", "str8", "str16", "str17",
@@ -681,7 +716,7 @@
         CARDS, RARITY_COLORS, DEFAULT_DECK, DEFAULT_COLLECTION, DECK_MAX, DECK_MIN, TRAP_SLOTS,
         DECK_COPIES, REWARD_POOL, REWARD_POOLS, ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH,
         MOB_TABLES, ENEMY_FILL, ENEMY_FILLS, CAVES,
-        STARTER_DECKS, STARTER_COLLECTIONS, HEROES, HERO_ORDER,
+        STARTER_DECKS, STARTER_COLLECTIONS, HEROES, HERO_ORDER, HERO_FOE_ORDER,
         enemyDeck, mobForFloor, ELEM_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,
     };
 })();

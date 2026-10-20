@@ -8,7 +8,7 @@
         const { REWARD_POOL, CARDS } = globalThis.GAME_DATA;
         const { T, cardFace, dimBg, button } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
-        let root = null, options = [], picked = null, draftMode = false;
+        let root = null, options = [], picked = null, draftMode = false, wonHero = null;
 
         function pickThree() {
             // Награда — из колоды ПОБЕЖДЁННОГО противника (просил юзер):
@@ -28,7 +28,7 @@
             picked = index;
             const id = options[index];
             G.collection[id] = (G.collection[id] || 0) + 1;
-            globalThis.GAME_META.saveMeta(G.collection, G.deck);
+            G.persistMeta(); // трофей в коллекцию (+ колоды героев/захваты целы)
             if (G.saveRun) G.saveRun(); // трофей получен — забег сохранён
             if (ctx.sfx) ctx.sfx("coins");
             rebuild();
@@ -65,6 +65,31 @@
             sub.position.set(960, 159);
             sub.eventMode = "none";
             root.addChild(sub);
+
+            // карта персонажа побеждённого (просил юзер): слева от трофеев,
+            // с подписью — теперь она в коллекции героев
+            if (wonHero && globalThis.GAME_DATA.HEROES[wonHero]) {
+                const h = globalThis.GAME_DATA.HEROES[wonHero];
+                const face = new PIXI.Sprite(ctx.uiTex(`heroes/${h.img}.png`));
+                face.anchor.set(0.5, 0);
+                face.scale.set(0.85); // 230×338 → ~196×287
+                face.position.set(175, 420);
+                face.eventMode = "none";
+                root.addChild(face);
+                const lbl = T(t("arena.wonHero"), 24, 0xffe2a8,
+                    { stroke: { color: 0x1c1207, width: 6 },
+                        wordWrap: true, wordWrapWidth: 300, align: "center" });
+                lbl.anchor.set(0.5, 0);
+                lbl.position.set(175, 340);
+                lbl.eventMode = "none";
+                root.addChild(lbl);
+                const nm = T(t(`enc.${wonHero}.title`), 24, 0xf0c96a,
+                    { stroke: { color: 0x1c1207, width: 5 } });
+                nm.anchor.set(0.5, 0);
+                nm.position.set(175, 725);
+                nm.eventMode = "none";
+                root.addChild(nm);
+            }
 
             options.forEach((id, i) => {
                 const isPicked = picked === i;
@@ -122,6 +147,10 @@
                         ? [...new Set(G.rewardDeck || [])].filter((id) => CARDS[id])
                         : pickThree();
                     picked = null;
+                    // карта персонажа, завоёванная в этом бою (арена кладёт
+                    // G.wonHero) — показывается один раз
+                    wonHero = G.wonHero || null;
+                    G.wonHero = null;
                 }
                 rebuild();
             },

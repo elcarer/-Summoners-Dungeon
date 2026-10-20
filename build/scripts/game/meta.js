@@ -25,13 +25,29 @@
         try {
             const raw = JSON.parse(localStorage.getItem(LS_META));
             if (raw && typeof raw === "object" && Array.isArray(raw.deck)) {
-                return { collection: raw.collection || {}, deck: raw.deck };
+                return {
+                    collection: raw.collection || {},
+                    deck: raw.deck,
+                    // колоды по героям и завоёванные карты персонажей
+                    // (просил юзер): у старых сейвов их нет — миграция в main.js
+                    heroDecks: raw.heroDecks || null,
+                    captured: Array.isArray(raw.captured) ? raw.captured : null,
+                    activeHeroId: raw.activeHeroId || null,
+                };
             }
         } catch (e) { /* дефолт ниже */ }
         return null;
     }
-    function saveMeta(collection, deck) {
-        localStorage.setItem(LS_META, JSON.stringify({ collection, deck }));
+    // extra — { heroDecks, captured, activeHeroId }: колода каждого героя
+    // своя (переключение героя в коллекции), захваченные карты персонажей
+    function saveMeta(collection, deck, extra) {
+        localStorage.setItem(LS_META, JSON.stringify({
+            collection,
+            deck,
+            heroDecks: (extra && extra.heroDecks) || undefined,
+            captured: (extra && extra.captured) || undefined,
+            activeHeroId: (extra && extra.activeHeroId) || undefined,
+        }));
     }
 
     // Количество копий карты в колоде
