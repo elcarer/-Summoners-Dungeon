@@ -299,8 +299,21 @@
                 c.eventMode = "static";
                 if (G.heroId !== id) {
                     c.on("pointertap", () => api.setActive(id));
-                    c.on("pointerover", () => { card.scale.set(0.88); });
-                    c.on("pointerout", () => { card.scale.set(0.82); });
+                    c.on("pointerover", () => {
+                        card.scale.set(0.88);
+                        // увеличенная — поверх соседних (просил юзер)
+                        if (c.__z === undefined) {
+                            c.__z = list.getChildIndex(c);
+                            list.addChild(c);
+                        }
+                    });
+                    c.on("pointerout", () => {
+                        card.scale.set(0.82);
+                        if (c.__z !== undefined && c.parent === list) {
+                            list.addChildAt(c, Math.min(c.__z, list.children.length - 1));
+                            c.__z = undefined;
+                        }
+                    });
                 }
                 const nm = T(heroName(id), 20,
                     G.heroId === id ? 0xf0c96a : 0xd8c79d,

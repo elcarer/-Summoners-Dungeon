@@ -3,7 +3,9 @@
 //   import { cdp, shot, evalJs, mouse } from "D:/ZCode/project2/cdp.mjs"
 //   await cdp([["Page.navigate", { url: "http://127.0.0.1:8124/index.html" }]])
 
-const PORT = 9333
+// Порт можно переопределить (CDP_PORT=9334 node probe.mjs) — когда 9333
+// занят штатным браузером смоук-харнесса
+const PORT = +process.env.CDP_PORT || 9333
 
 async function getTargetWs() {
     const list = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json()

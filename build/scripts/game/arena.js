@@ -1985,6 +1985,7 @@
             for (const n of root.cardsLayer.children) n.destroy({ children: true });
             root.cardsLayer.removeChildren();
             hoverIdx = null; // карта под курсором уничтожена — подсказку погасить
+            raisedCard = null; // узлы руки пересобраны — выдвинутой карты нет
             updateEnergyHint();
             const n = B.hand.length;
             B.hand.forEach((card, idx) => {
@@ -2059,11 +2060,36 @@
             ht.visible = true;
         }
 
+        // увеличенная наведением карта руки выдвигается поверх соседних
+        // (просил юзер), с уходом курсора возвращается в свой слот —
+        // порядок детей cardsLayer всегда совпадает с порядком руки
+        let raisedCard = null;
+        function lowerRaisedCard() {
+            if (!raisedCard) return;
+            const n = raisedCard;
+            raisedCard = null;
+            if (root && !n.destroyed && n.__homeIdx !== undefined
+                && n.parent === root.cardsLayer) {
+                root.cardsLayer.addChildAt(n,
+                    Math.min(n.__homeIdx, root.cardsLayer.children.length - 1));
+                n.scale.set(n.__homeScale);
+            }
+        }
         function hoverCard(idx, on) {
-            if (!G.settings.dragSummon || drag || B.phase !== "player" || overlay || B.discarding || B.picking) return;
+            if (!G.settings.dragSummon || drag || B.phase !== "player" || overlay || B.discarding || B.picking) {
+                lowerRaisedCard(); // фаза/режим сменились — слот вернуть сразу
+                return;
+            }
+            if (!on) lowerRaisedCard();
             const node = root.cardsLayer.children[idx];
             if (!node) return;
             const raised = on || B.selected === idx;
+            if (on && !raisedCard) {
+                raisedCard = node;
+                node.__homeIdx = root.cardsLayer.getChildIndex(node);
+                node.__homeScale = node.scale.x;
+                root.cardsLayer.addChild(node); // поверх соседних карт веера
+            }
             node.scale.set((raised ? 1.12 : 1) * HAND_SCALE);
             const f = node.getChildByName("selframe");
             if (f) f.visible = raised;

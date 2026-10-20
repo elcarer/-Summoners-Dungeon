@@ -374,19 +374,43 @@
                     && Math.abs(tgt.s - a.sp.scale.x) < 0.004) {
                     a.sp.position.set(tgt.x, tgt.y);
                     a.sp.scale.set(tgt.s);
+                    if (!a.on) a.back(); // сжатие досчиталось — слой вернуть
                 }
             }
         });
         const heroHover = (holder, sp, bigX, bigY) => {
             const a = {
                 sp,
+                holder,
                 base: { x: sp.x, y: sp.y, s: sp.scale.x },
                 big: { x: bigX, y: bigY, s: 1 },
                 on: false,
+                z: -1, // слой держателя до увеличения
+                back() { // держатель обратно в свой слой
+                    if (a.z >= 0 && !holder.destroyed && holder.parent) {
+                        holder.parent.addChildAt(holder,
+                            Math.min(a.z, holder.parent.children.length - 1));
+                        a.z = -1;
+                    }
+                },
             };
             holder.eventMode = "static";
-            holder.on("pointerover", () => { a.on = true; });
-            holder.on("pointerout", () => { a.on = false; });
+            holder.on("pointerover", () => {
+                a.on = true;
+                // увеличенная карточка — поверх всего своего слоя (просил
+                // юзер: карта врага наезжала на полоску хп базы и пряталась
+                // под ней)
+                if (a.z < 0 && holder.parent) {
+                    a.z = holder.parent.getChildIndex(holder);
+                    holder.parent.addChild(holder);
+                }
+            });
+            holder.on("pointerout", () => {
+                a.on = false;
+                // курсор ушёл до начала роста (карточка в базовом размере,
+                // тикеру нечего досчитывать) — слой вернуть сразу
+                if (sp.x === a.base.x && sp.y === a.base.y && sp.scale.x === a.base.s) a.back();
+            });
             hoverAnims.push(a);
         };
 
