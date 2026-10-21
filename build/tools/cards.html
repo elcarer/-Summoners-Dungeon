@@ -132,6 +132,11 @@
     #slotEmpty { color: var(--dim); font-size: 13px; }
 
     /* ── вкладка персонажей ────────────────────────────────────────────── */
+    #heroFilters {
+        display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+        padding: 12px 16px 0;
+    }
+    #heroFilters .lbl { color: var(--dim); font-size: 13px; }
     #heroGrid { display: flex; flex-wrap: wrap; gap: 14px; padding: 14px 16px 40px; }
     .htile { width: 170px; cursor: pointer; transition: transform .12s; }
     .htile:hover { transform: translateY(-3px); }
@@ -189,9 +194,14 @@
         <span class="lbl" id="lblElem"></span><span id="elemBtns"></span>
         <span class="lbl" id="lblType"></span><span id="typeBtns"></span>
         <span class="lbl" id="lblRarity"></span><span id="rarityBtns"></span>
+        <span class="lbl" id="lblSub"></span><span id="subBtns"></span>
         <span class="lbl" id="lblCost"></span>
         <select id="costSel"></select>
         <select id="sortSel"></select>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
+            <input type="checkbox" id="tokChk" style="cursor:pointer;">
+            <span id="tokTxt" style="font-size:13px;"></span>
+        </label>
         <button id="resetBtn"></button>
     </div>
     <div id="statusLine"></div>
@@ -224,7 +234,15 @@
     </div>
 </div>
 
-<div id="heroView" style="display:none"><div id="heroGrid"></div></div>
+<div id="heroView" style="display:none">
+    <div id="heroFilters">
+        <span class="lbl" id="lblHeroElem"></span><span id="heroElemBtns"></span>
+        <span class="lbl" id="lblHeroRarity"></span><span id="heroRarityBtns"></span>
+        <select id="heroSortSel"></select>
+        <span id="heroStatus" style="color:var(--dim);font-size:13px;"></span>
+    </div>
+    <div id="heroGrid"></div>
+</div>
 
 <div id="dim"></div>
 <div id="detail"><button id="detailClose">✕</button><div class="cols" id="detailCols"></div></div>
@@ -246,8 +264,12 @@
         ru: {
             title: "Картотека", tabCards: "КАРТЫ", tabHeroes: "ПЕРСОНАЖИ",
             elem: "Стихия:", type: "Тип:", rarity: "Редкость:", cost: "Цена:",
+            sub: "Подтип:", tokens: "токены (без лица)",
+            subNone: "без подтипа",
+            subNames: { goblin: "Гоблин", animal: "Животное", elf: "Эльф", plant: "Растение" },
             all: "все", sort: "Сортировка:", reset: "Сброс",
             sortId: "по каталогу", sortCostAsc: "цена ↑", sortCostDesc: "цена ↓", sortName: "имя",
+            sortHpAsc: "жизни ↑", sortHpDesc: "жизни ↓",
             shown: "Показано: {n} из {m}", deck: "КОЛОДА", deckName: "Моя колода",
             deckEmpty: "Колода пуста — кликните «+» на карте",
             maxLine: "{n} / {max} карт", fewLine: "{n} / {max} · минимум {min}",
@@ -265,8 +287,12 @@
         en: {
             title: "Card Files", tabCards: "CARDS", tabHeroes: "HEROES",
             elem: "Element:", type: "Type:", rarity: "Rarity:", cost: "Cost:",
+            sub: "Subtype:", tokens: "tokens (no face)",
+            subNone: "no subtype",
+            subNames: { goblin: "Goblin", animal: "Animal", elf: "Elf", plant: "Plant" },
             all: "any", sort: "Sort:", reset: "Reset",
             sortId: "by catalog", sortCostAsc: "cost ↑", sortCostDesc: "cost ↓", sortName: "name",
+            sortHpAsc: "health ↑", sortHpDesc: "health ↓",
             shown: "Shown: {n} of {m}", deck: "DECK", deckName: "My deck",
             deckEmpty: "Deck is empty — press «+» on a card",
             maxLine: "{n} / {max} cards", fewLine: "{n} / {max} · min {min}",
@@ -291,6 +317,12 @@
     const state = {
         view: "cards",
         q: "", elem: "all", type: "all", rarity: "all", cost: "all", sort: "id",
+        // токены (карты без лица/призыва: gobA/gobC/ancBear) в общем каталоге
+        // и конструкторе скрыты — включаются галочкой (просил юзер, w25)
+        includeTokens: false, subtype: "all",
+        // вкладка «Персонажи»: свои фильтры (стихия/редкость) и сортировка
+        // по макс. жизням базы (просил юзер, w25)
+        heroElem: "all", heroRarity: "all", heroSort: "id",
         deck: { name: "", cards: {} }, // id → число копий
     };
 
@@ -313,10 +345,19 @@
     const hex = (n) => "#" + Number(n).toString(16).padStart(6, "0");
 
     // ── фильтрация и сортировка каталога ────────────────────────────────
+    function subtypeMatch(d) { // подтипы: creature (гоблин/животное/эльф) +
+        // растения (метка plant, бывает у существ и строения)
+        if (state.subtype === "all") return true;
+        if (state.subtype === "none") return !d.creature && !d.plant;
+        if (state.subtype === "plant") return !!d.plant;
+        return d.creature === state.subtype;
+    }
     function filteredIds() {
         const q = state.q.trim().toLowerCase();
         let ids = Object.keys(CARDS).filter((id) => {
             const d = CARDS[id];
+            if (!state.includeTokens && !d.img) return false; // токены — по галочке
+            if (!subtypeMatch(d)) return false;
             if (state.elem !== "all" && d.elem !== state.elem) return false;
             if (state.type !== "all" && d.type !== state.type) return false;
             if (state.rarity !== "all" && d.rarity !== state.rarity) return false;
@@ -618,6 +659,8 @@
             badgeLine("id: " + id),
         );
         if (!d.img) badges.appendChild(badgeLine(T("noFace")));
+        if (d.creature) badges.appendChild(badgeLine(T("subNames")[d.creature] || d.creature));
+        if (d.plant) badges.appendChild(badgeLine(T("subNames").plant));
         info.appendChild(badges);
         const stats = document.createElement("div");
         stats.className = "stats";
@@ -684,13 +727,15 @@
 
     // ── вкладка персонажей ──────────────────────────────────────────────
     function renderHeroes() {
+        const ids = heroIds();
+        $("heroStatus").textContent = T("shown", { n: ids.length, m: Object.keys(D.HEROES).length });
         const grid = $("heroGrid");
         grid.textContent = "";
-        [...D.HERO_ORDER, ...D.HERO_FOE_ORDER].forEach((id) => {
+        ids.forEach((id) => {
             const d = D.HEROES[id];
-            if (!d) return;
             const tile = document.createElement("div");
             tile.className = "htile";
+            tile.title = heroName(id); // для тестов и подсказки
             const img = document.createElement("img");
             img.src = "../images/heroes/" + d.img + ".png";
             const cap = document.createElement("div");
@@ -708,11 +753,15 @@
     }
 
     // ── фильтры: сборка контролов ───────────────────────────────────────
-    function chip(parent, label, isOn, onPick) {
+    // redraw — что перерисовать после выбора (карты или вкладка героев)
+    function chip(parent, label, isOn, onPick, redraw) {
         const b = document.createElement("button");
         b.textContent = label;
         if (isOn) b.className = "on";
-        b.addEventListener("click", () => { onPick(); renderFilters(); renderGrid(); });
+        b.addEventListener("click", () => {
+            onPick();
+            (redraw || (() => { renderFilters(); renderGrid(); }))();
+        });
         parent.appendChild(b);
         return b;
     }
@@ -735,11 +784,57 @@
         ["all", "common", "rare", "epic"].forEach((r) =>
             chip(rBtns, r === "all" ? T("all") : t("rarity." + r), state.rarity === r,
                 () => { state.rarity = r; }));
+        const sBtns = $("subBtns");
+        sBtns.textContent = "";
+        ["all", "goblin", "animal", "elf", "plant", "none"].forEach((s) =>
+            chip(sBtns, s === "all" ? T("all")
+                : s === "none" ? T("subNone") : T("subNames")[s], state.subtype === s,
+                () => { state.subtype = s; }));
+        $("tokChk").checked = state.includeTokens;
         $("q").value = state.q;
         $("costSel").value = state.cost;
         $("sortSel").value = state.sort;
         $("tabCards").className = state.view === "cards" ? "on" : "";
         $("tabHeroes").className = state.view === "heroes" ? "on" : "";
+    }
+    // фильтры вкладки «Персонажи» (просил юзер, w25): стихия, редкость,
+    // сортировка по макс. жизням базы
+    function heroIds() {
+        const all = [...D.HERO_ORDER, ...D.HERO_FOE_ORDER].filter((id) => D.HEROES[id]);
+        const f = all.filter((id) => {
+            const d = D.HEROES[id];
+            if (state.heroElem !== "all" && !d.elems.includes(state.heroElem)) return false;
+            if (state.heroRarity !== "all" && d.rarity !== state.heroRarity) return false;
+            return true;
+        });
+        const sorts = {
+            id: null,
+            hpAsc: (a, b) => D.HEROES[a].baseHp - D.HEROES[b].baseHp,
+            hpDesc: (a, b) => D.HEROES[b].baseHp - D.HEROES[a].baseHp,
+        };
+        return sorts[state.heroSort] ? f.sort(sorts[state.heroSort]) : f;
+    }
+    function renderHeroFilters() {
+        const elems = ["all", ...Object.keys(D.HEROES).reduce((acc, id) => {
+            D.HEROES[id].elems.forEach((e) => { if (!acc.includes(e)) acc.push(e); });
+            return acc; }, [])];
+        const eBtns = $("heroElemBtns");
+        eBtns.textContent = "";
+        elems.forEach((e) =>
+            chip(eBtns, e === "all" ? T("all") : t("elem." + e), state.heroElem === e,
+                () => { state.heroElem = e; }, renderHeroesView));
+        const rBtns = $("heroRarityBtns");
+        rBtns.textContent = "";
+        ["all", "common", "rare", "epic"].forEach((r) =>
+            chip(rBtns, r === "all" ? T("all") : t("rarity." + r), state.heroRarity === r,
+                () => { state.heroRarity = r; }, renderHeroesView));
+        $("heroSortSel").value = state.heroSort;
+        $("tabCards").className = state.view === "cards" ? "on" : "";
+        $("tabHeroes").className = state.view === "heroes" ? "on" : "";
+    }
+    function renderHeroesView() { // перерисовать вкладку героев целиком
+        renderHeroFilters();
+        renderHeroes();
     }
     function buildStatic() {
         const costs = [...new Set(Object.keys(CARDS).map((id) => CARDS[id].cost))].sort((a, b) => a - b);
@@ -768,7 +863,19 @@
         $("lblElem").textContent = T("elem");
         $("lblType").textContent = T("type");
         $("lblRarity").textContent = T("rarity");
+        $("lblSub").textContent = T("sub");
+        $("tokTxt").textContent = T("tokens");
         $("lblCost").textContent = T("cost");
+        $("lblHeroElem").textContent = T("elem");
+        $("lblHeroRarity").textContent = T("rarity");
+        const hs = $("heroSortSel");
+        hs.textContent = "";
+        [["id", T("sortId")], ["hpAsc", T("sortHpAsc")], ["hpDesc", T("sortHpDesc")]]
+            .forEach(([v, label]) => {
+                const o = document.createElement("option");
+                o.value = v; o.textContent = T("sort") + ": " + label;
+                hs.appendChild(o);
+            });
         $("lblDeck").textContent = T("deck");
         $("deckName").placeholder = T("deckName");
         $("presetStr").textContent = T("presetStr");
@@ -786,6 +893,15 @@
     $("q").addEventListener("input", () => { state.q = $("q").value; renderGrid(); });
     $("costSel").addEventListener("change", () => { state.cost = $("costSel").value; renderGrid(); });
     $("sortSel").addEventListener("change", () => { state.sort = $("sortSel").value; renderGrid(); });
+    $("tokChk").addEventListener("change", () => {
+        state.includeTokens = $("tokChk").checked;
+        renderFilters();
+        renderGrid();
+    });
+    $("heroSortSel").addEventListener("change", () => {
+        state.heroSort = $("heroSortSel").value;
+        renderHeroesView();
+    });
     $("resetBtn").addEventListener("click", () => {
         Object.assign(state, { q: "", elem: "all", type: "all", rarity: "all", cost: "all" });
         renderFilters(); renderGrid();
@@ -807,7 +923,7 @@
         $("cardsView").style.display = v === "cards" ? "" : "none";
         $("heroView").style.display = v === "heroes" ? "" : "none";
         renderFilters();
-        if (v === "heroes") renderHeroes();
+        if (v === "heroes") renderHeroesView();
     }
     $("langBtn").addEventListener("click", () => {
         const next = loc.lang === "ru" ? "en" : "ru";
@@ -823,20 +939,26 @@
         renderGrid();
         renderDeck();
         renderSlots();
-        if (state.view === "heroes") renderHeroes();
+        if (state.view === "heroes") renderHeroesView();
     }
 
     // ── тестовый API (пробы через CDP) ──────────────────────────────────
     globalThis.__CARDSDB = {
         state: () => ({ view: state.view, lang: loc.lang,
             filter: { q: state.q, elem: state.elem, type: state.type,
-                rarity: state.rarity, cost: state.cost, sort: state.sort },
+                rarity: state.rarity, cost: state.cost, sort: state.sort,
+                subtype: state.subtype, includeTokens: state.includeTokens,
+                heroElem: state.heroElem, heroRarity: state.heroRarity,
+                heroSort: state.heroSort },
             shown: filteredIds().length, total: Object.keys(CARDS).length,
+            heroesShown: state.view === "heroes" ? heroIds().length : undefined,
             deck: { name: state.deck.name, count: deckCount(),
                 cards: JSON.parse(JSON.stringify(state.deck.cards)) },
             slots: Object.keys(slots()) }),
         setFilter: (patch) => { Object.assign(state, patch);
-            renderFilters(); renderGrid(); },
+            if (state.view === "heroes") renderHeroesView();
+            else { renderFilters(); renderGrid(); } },
+        heroIds: () => heroIds(),
         deckIds: () => filteredIds(),
         add: addCard, remove: removeCard,
         clear: () => { state.deck.cards = {}; persist(); renderDeck(); renderGrid(); },
