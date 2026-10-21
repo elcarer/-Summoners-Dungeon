@@ -1,8 +1,9 @@
 // СЦЕНА «ПОДЗЕМЕЛЬЕ» — top-down перемещение героя, энкаунтеры-враги, выход.
-// Карта-ASCII 30×17 собирается из тайлов юзера (images/dungeon_tiles/
-// goblins_lair, клетка 64px): пол — плиты с вариациями, стены — 7 спрайтов
-// по маске соседей (низ 64×64 — лицо с коллизией, верх 64×128-спрайтов
-// нависает на клетку выше и на движение не влияет).
+// Карта-ASCII 30×17 собирается из тайлов юзера (images/dungeon_tiles/<данж>,
+// клетка 64px): пол — плиты с вариациями, стены — спрайты по маске соседей
+// (низ 64×64 — лицо с коллизией, верх 64×128-спрайтов нависает на клетку
+// выше и на движение не влияет). Набор тайлов — свой у каждого данжа:
+// goblins_lair (Сила), growth_lair (Рост).
 // Состояние живёт в G.dungeon (переживает уход в арену и обратно);
 // состояния пройденных этажей — в G.dungeonStates: по лестнице у старта
 // герой поднимается на этаж выше (на 1-м — выходит в открытый мир),
@@ -17,7 +18,11 @@
     const CAVES = () => globalThis.GAME_DATA.CAVES;
     const caveOf = (id) => CAVES()[id] || CAVES().gob;
     const MAX_FLOOR = 6;
-    // Версия раскладки этажа: тайлы 64px goblins_lair (v5 — этажи
+    // Набор тайлов по данжу — папка images/dungeon_tiles/<имя> (просил юзер:
+    // у Рощи Роста свой арт): Сила — goblins_lair, Рост — growth_lair
+    const TILE_SETS = { gob: "goblins_lair", grw: "growth_lair" };
+    const tileSetOf = (cave) => TILE_SETS[cave] || TILE_SETS.gob;
+    // Версия раскладки этажа: тайлы 64px данжа (v5 — этажи
     // генерируются, см. genMap). Сейвы другой геометрии (координаты в
     // других клетках) не поднимаются — этаж пересобирается заново.
     const MAP_V = 5;
@@ -374,7 +379,7 @@
             COMPONENTS.ctrlVJ[heroId] = iy;
         }
 
-        // ── Карта из тайлов юзера (goblins_lair, клетка 64) ───────────────
+        // ── Карта из тайлов юзера (набор по данжу, клетка 64) ─────────────
         // Пол — 10 плит (детерминированный хэш клетки, чтобы сейв/перезаход
         // показывали тот же пол). Стены — спрайт по маске соседей: Т-стыки
         // гладкие (wall_h1/wall_v1), углы — wall_cor1-4 (в т.ч. диагональные
@@ -415,6 +420,7 @@
         }
         function buildMapGfx() {
             const c = new PIXI.Container(); // подложка + пол; стены поверх, с y-sort
+            const lair = tileSetOf(myState && myState.cave); // набор тайлов данжа
             const base = new PIXI.Graphics(); // чёрный фон всей карты (просил юзер)
             base.rect(0, 0, W * TS, H * TS);
             base.fill(0x000000);
@@ -425,13 +431,14 @@
             // нет — там вообще без тайлов
             for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
                 if (MAPROWS[j][i] === "#" && !wallDrawn(i, j)) continue;
-                const sp = new PIXI.Sprite(uiTex(`dungeon_tiles/floor/${hsh(i, j) % FLOORS}.png`));
+                const sp = new PIXI.Sprite(uiTex(`dungeon_tiles/${lair}/floor/${hsh(i, j) % FLOORS}.png`));
                 sp.position.set(i * TS, j * TS);
                 c.addChild(sp);
             }
             return c;
         }
         function addWalls(layer) {
+            const lair = tileSetOf(myState && myState.cave); // набор тайлов данжа
             // для ВЫБОРА ТАЙЛА сосед за краем карты — не стена: крайние
             // клетки получают конечные/угловые спрайты и карта «цельная»
             // (просил юзер); коллизию это не трогает — blocked() выше.
@@ -442,7 +449,7 @@
                 if (!wallDrawn(i, j)) continue;
                 const isW = (x, y) => x >= 0 && y >= 0 && x < W && y < H && MAPROWS[y][x] === "#";
                 const isF = (x, y) => !isW(x, y); // «за краем карты» — как пол
-                const sp = new PIXI.Sprite(uiTex(`dungeon_tiles/walls/${
+                const sp = new PIXI.Sprite(uiTex(`dungeon_tiles/${lair}/walls/${
                     wallTexName(isW(i - 1, j), isW(i + 1, j), isW(i, j - 1), isW(i, j + 1),
                         isF(i + 1, j + 1), isF(i - 1, j + 1), isF(i - 1, j - 1), isF(i + 1, j - 1))
                 }.png`));
@@ -1096,7 +1103,7 @@
                 myState = st;
                 MAPROWS = st.rows || ROWS; // активная раскладка этажа
                 ctx.collide.rows = MAPROWS; // коллизии героя — по карте этажа
-                ctx.collide.ts = TS; // клетка этажа — 64px (тайлы goblins_lair)
+                ctx.collide.ts = TS; // клетка этажа — 64px (тайлы данжа)
                 // сейв стоя на лестнице не должен мгновенно поднимать героя
                 if (st.ladder && st.heroPos
                     && Math.hypot(st.ladder.x - st.heroPos.x, st.ladder.y - st.heroPos.y) < TS * 0.9) {

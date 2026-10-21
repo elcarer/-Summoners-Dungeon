@@ -54,21 +54,24 @@
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
         uiTextures["card_goblin_back.png"] = await assets.loadTexture("./images/ui/card_goblin_back.png");
         uiTextures["card_nature_back.png"] = await assets.loadTexture("./images/ui/card_nature_back.png");
-        // тайлы подземелья юзера: images/dungeon_tiles/goblins_lair/<…>.png —
-        // полы 64×64 (floor/0-9) и стены walls/* по маске соседей
-        // (пока один набор на все подземелья, просил юзер)
+        // тайлы подземелий юзера: images/dungeon_tiles/<данж>/<…>.png —
+        // полы 64×64 (floor/0-9) и стены walls/* по маске соседей.
+        // Свой набор на каждый данж: goblins_lair (Сила), growth_lair (Рост)
         say("тайлы подземелья…");
         await frame();
-        for (const f of ["floor/0", "floor/1", "floor/2", "floor/3",
+        const TILE_FILES = ["floor/0", "floor/1", "floor/2", "floor/3",
             "floor/4", "floor/5", "floor/6", "floor/7", "floor/8",
             "floor/9", "walls/wall_h1", "walls/wall_h1_td",
             "walls/wall_h1_tu", "walls/wall_v1", "walls/wall_v1_tl",
             "walls/wall_v1_tr", "walls/wall_cross", "walls/wall_cor1",
             "walls/wall_cor2", "walls/wall_cor3", "walls/wall_cor4",
             "walls/wall_end1", "walls/wall_end2", "walls/wall_end3",
-            "walls/wall_end4"]) {
-            uiTextures[`dungeon_tiles/${f}.png`] =
-                await assets.loadTexture(`./images/dungeon_tiles/goblins_lair/${f}.png`);
+            "walls/wall_end4"];
+        for (const lair of ["goblins_lair", "growth_lair"]) {
+            for (const f of TILE_FILES) {
+                uiTextures[`dungeon_tiles/${lair}/${f}.png`] =
+                    await assets.loadTexture(`./images/dungeon_tiles/${lair}/${f}.png`);
+            }
         }
         // лица карт стихий: images/cards/<elem>/<№>.png (def.img в dataCards)
         say("карты…");
