@@ -5,67 +5,91 @@
 // Имена/описания — в loc.js (card.<id>.name / .desc).
 // Стихии идут волнами; id внутри стихии = номер карты он же спрайт:
 // images/cards/<elem>/<№>.png — готовое лицо карты (рамка/имя/тексты).
+// Подтипы и типы эффектов карт ведёт ЮЗЕР в спецификации
+// for_work/cards.txt («Я тебе каждый раз пишу подтипы») — брать только
+// оттуда, не по названиям. subtype — явный подтип карт, у которых он не
+// выводится из creature/plant (creature в данных — лист поля боя, у
+// ростовских эльфов там плейсхолдер «goblin»); kind — тип эффекта
+// заклинания/ловушки (Нанесение урона, Усиление, …). Читает картотека
+// tools/cards.html (фильтры по подтипам и типам эффекта, просил юзер).
 (function () {
     // ── Стихия «Сила» (красные) ──────────────────────────────────────────
     // img — файл лица карты; creature — лист поля боя (creatureSheets).
     const CARDS = {
         str1: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1, ability: "dash1",
+                subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                 creature: "goblin", rarity: "common", elem: "strength",
                 color: 0x9c4a3a, img: "strength/1" },
         str2: { type: "unit", cost: 2, atk: 1, hp: 5, speed: 1,
+                subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                 creature: "goblin", rarity: "common", elem: "strength",
                 color: 0x9c4a3a, img: "strength/2" },
         str3: { type: "unit", cost: 3, atk: 4, hp: 4, speed: 1,
+                subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                 creature: "goblin", rarity: "common", elem: "strength",
                 color: 0x9c4a3a, img: "strength/3" },
         str4: { type: "spell", cost: 1, spell: { target: "anyUnit", buffAtk: 2 },
+                kind: "buff", // тип эффекта — по спеке юзера (cards.txt)
                 rarity: "common", elem: "strength",
                 color: 0xb0402e, img: "strength/4" },
         str5: { type: "building", cost: 3, atk: 0, hp: 2, campAura: 1,
                 rarity: "rare", elem: "strength",
                 color: 0x8a5a3e, img: "strength/5" },
         str6: { type: "trap", cost: 2, trap: { event: "onEnemyCell", effect: "cellDmg", amount: 3, splash: 1 },
+                kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                 rarity: "epic", elem: "strength",
                 color: 0x6e4a2e, img: "strength/6" },
         str7: { type: "unit", cost: 3, atk: 1, hp: 2, speed: 1,
                 creature: "goblin", ability: "shaman",
+                subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                 rarity: "rare", elem: "strength",
                 color: 0x9c4a3a, img: "strength/7" },
         str8: { type: "unit", cost: 4, atk: 3, hp: 3, speed: 1,
                 creature: "goblin", leaderAura: 1,
+                subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                 rarity: "epic", elem: "strength",
                 color: 0x9c4a3a, img: "strength/8" },
         str9: { type: "spell", cost: 2, spell: { target: "anyUnitDmg", dmg: 2 },
+                kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                 rarity: "common", elem: "strength",
                 color: 0xb0402e, img: "strength/9" },
         str10: { type: "spell", cost: 5, spell: { target: "none", baseDmg: 5 },
+                kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                 rarity: "epic", elem: "strength",
                 color: 0xb0402e, img: "strength/10" },
         str11: { type: "spell", cost: 1, spell: { target: "ownUnit", dmg: 3, sacrifice: true },
+                kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                 rarity: "rare", elem: "strength",
                 color: 0xb0402e, img: "strength/11" },
         str12: { type: "trap", cost: 1, race: "goblin",
                  trap: { event: "onEnemyMoveFromAdj", effect: "lure", dmg: 1 },
+                 kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
+                 subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0x6e4a2e, img: "strength/12" },
         str13: { type: "unit", cost: 2, atk: 2, hp: 1, speed: 1,
                  creature: "goblin", ability: "archer",
+                 subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "strength",
                  color: 0x9c4a3a, img: "strength/13" },
         str14: { type: "unit", cost: 2, atk: 1, hp: 1, speed: 1,
                  creature: "goblin", ability: "bombling",
+                 subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "strength",
                  color: 0x9c4a3a, img: "strength/14" },
         str15: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
                  creature: "goblin", ability: "assassin",
+                 subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0x9c4a3a, img: "strength/15" },
         str16: { type: "unit", cost: 4, atk: 5, hp: 5, speed: 1,
                  creature: "goblin",
+                 subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0x9c4a3a, img: "strength/16" },
         str17: { type: "spell", cost: 1,
                  spell: { target: "anyUnitDmg", dmg: 1, noBuildings: true, brew: true },
+                 kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "strength",
                  color: 0xb0402e, img: "strength/17" },
         str18: { type: "building", cost: 2, atk: 0, hp: 5, mycelium: 1,
@@ -76,46 +100,58 @@
                  color: 0x8a5a3e, img: "strength/19" },
         str20: { type: "trap", cost: 2,
                  trap: { event: "onEnemyCell", effect: "ambush", spawn: "gobA" },
+                 subtype: "goblin", // «Гоблинская засада» — поправка спеки (Ловушка Гоблин)
+                 kind: "summon", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "strength",
                  color: 0x6e4a2e, img: "strength/20" },
         str21: { type: "spell", cost: 3,
                  spell: { target: "anyCell", firewall: 2, turns: 3 },
+                 kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "strength",
                  color: 0xb0402e, img: "strength/21" },
         str22: { type: "spell", cost: 1,
                  spell: { target: "anyUnit", enchantFire: true },
+                 kind: "buff", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0xb0402e, img: "strength/22" },
         str23: { type: "spell", cost: 1,
                  spell: { target: "none", search: 6 },
+                 kind: "search", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0xb0402e, img: "strength/23" },
         str24: { type: "spell", cost: 1,
                  spell: { target: "anyUnitDmg", drainAll: true },
+                 kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "strength",
                  color: 0xb0402e, img: "strength/24" },
         str25: { type: "spell", cost: 1,
                  spell: { target: "none", copyLast: true },
+                 kind: "copy", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "strength",
                  color: 0xb0402e, img: "strength/25" },
         str26: { type: "spell", cost: 3,
                  spell: { target: "none", journey: 6 },
+                 kind: "search", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0xb0402e, img: "strength/26" },
         str27: { type: "unit", cost: 3, atk: 2, hp: 1, speed: 1,
                  creature: "goblin", spellBuffAura: 1,
+                 subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "strength",
                  color: 0x9c4a3a, img: "strength/27" },
         str28: { type: "spell", cost: 6,
                  spell: { target: "none", aoeDmg: 3 },
+                 kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "strength",
                  color: 0xb0402e, img: "strength/28" },
         str29: { type: "unit", cost: 0, atk: 0, hp: 1, speed: 1,
                  creature: "goblin", ability: "coward",
+                 subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0x9c4a3a, img: "strength/29" },
         str30: { type: "spell", cost: 1,
                  spell: { target: "none", buffAllAtk: 1 },
+                 kind: "buff", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0xb0402e, img: "strength/30" },
         str31: { type: "building", cost: 1, atk: 0, hp: 6, runeMonolith: true,
@@ -123,26 +159,32 @@
                  color: 0x8a5a3e, img: "strength/31" },
         str32: { type: "trap", cost: 1,
                  trap: { event: "onAttack", effect: "castRandom" },
+                 kind: "castSpell", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0x6e4a2e, img: "strength/32" },
         str33: { type: "spell", cost: 2,
                  spell: { target: "anyUnit", berserk: 1 },
+                 kind: "buff", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0xb0402e, img: "strength/33" },
         str34: { type: "unit", cost: 3, atk: 1, hp: 4, speed: 1,
                  creature: "goblin", berserkSummon: 2,
+                 subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0x9c4a3a, img: "strength/34" },
         str35: { type: "spell", cost: 3,
                  spell: { target: "ownUnit", baseHit: true },
+                 kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0xb0402e, img: "strength/35" },
         str36: { type: "trap", cost: 0,
                  trap: { event: "onEnemyCell", effect: "cellDmgAll", amount: 1 },
+                 kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0x6e4a2e, img: "strength/36" },
         str37: { type: "unit", cost: 4, atk: 1, hp: 3, speed: 1,
                  creature: "goblin", ability: "spiritSummoner",
+                 subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "strength",
                  color: 0x9c4a3a, img: "strength/37" },
         str38: { type: "building", cost: 2, atk: 0, hp: 3, campfire: 1,
@@ -150,48 +192,59 @@
                  color: 0x8a5a3e, img: "strength/38" },
         str39: { type: "trap", cost: 3,
                  trap: { event: "onEnemyCell", effect: "confuse", turns: 2 },
+                 kind: "control", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "strength",
                  color: 0x6e4a2e, img: "strength/39" },
         str40: { type: "spell", cost: 6,
                  spell: { target: "emptyCell", cultRow: true },
+                 kind: "summon", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "strength",
                  color: 0xb0402e, img: "strength/40" },
         // ── Стихия «Рост» (зелёные) — вторая стихия, лица growth/41..46 ─────
         // (сквозная нумерация артов юзера: после 40 карт Силы).
         grw1: { type: "unit", cost: 1, atk: 0, hp: 1, speed: 1,
                 creature: "goblin", sheet: "plant", ability: "predator", plant: true,
+                subtype: "plant", // подтип — по спеке юзера (cards.txt)
                 rarity: "common", elem: "growth",
                 color: 0x3f6d3a, img: "growth/41" },
         grw2: { type: "unit", cost: 2, atk: 2, hp: 4, speed: 1,
                 creature: "animal", sheet: "wolf",
+                subtype: "animal", // подтип — по спеке юзера (cards.txt)
                 rarity: "common", elem: "growth",
                 color: 0x3f6d3a, img: "growth/42" },
         grw3: { type: "unit", cost: 3, atk: 3, hp: 5, speed: 1,
                 creature: "animal", sheet: "bear",
+                subtype: "animal", // подтип — по спеке юзера (cards.txt)
                 rarity: "common", elem: "growth",
                 color: 0x3f6d3a, img: "growth/43" },
         grw4: { type: "trap", cost: 1,
                 trap: { event: "onEnemyCell", effect: "cellDebuff", atk: 1, hp: 1 },
+                kind: ["damage", "debuff"], // тип эффекта — по спеке юзера (cards.txt)
                 rarity: "common", elem: "growth",
                 color: 0x2e5a2e, img: "growth/44" },
         grw5: { type: "spell", cost: 1,
                 spell: { target: "anyUnit", buffAtk: 1, buffHp: 1 },
+                kind: "buff", // тип эффекта — по спеке юзера (cards.txt)
                 rarity: "common", elem: "growth",
                 color: 0x4a8a3e, img: "growth/45" },
         grw6: { type: "building", cost: 1, atk: 0, hp: 1, sprout: 1, plant: true,
+                subtype: "plant", // подтип — по спеке юзера (cards.txt)
                 rarity: "common", elem: "growth",
                 color: 0x2e5a3e, img: "growth/46" },
         // ── Рост, вторая партия (глаза юзера): 47–56 ────────────────────────
         grw7: { type: "spell", cost: 1,
                 spell: { target: "anyUnit", buffAtkByHp: true },
+                kind: "buff", // тип эффекта — по спеке юзера (cards.txt)
                 rarity: "common", elem: "growth",
                 color: 0x4a8a3e, img: "growth/47" },
         grw8: { type: "unit", cost: 4, atk: 4, hp: 6, speed: 1,
                 creature: "goblin", sheet: "ent", plant: true,
+                subtype: "plant", // подтип — по спеке юзера (cards.txt)
                 rarity: "common", elem: "growth",
                 color: 0x3f6d3a, img: "growth/48" },
         grw9: { type: "unit", cost: 2, atk: 1, hp: 1, speed: 1,
                 creature: "goblin", ability: "druidEnergy",
+                subtype: "elf", // подтип — по спеке юзера (cards.txt)
                 rarity: "rare", elem: "growth",
                 color: 0x3f6d3a, img: "growth/49" },
         grw10: { type: "building", cost: 2, atk: 0, hp: 1, groveAura: 1,
@@ -202,39 +255,48 @@
                  color: 0x2e5a3e, img: "growth/51" },
         grw12: { type: "trap", cost: 1,
                  trap: { event: "onEnemyCell", effect: "ancestor", spawn: "ancBear" },
+                 kind: "summon", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "growth",
                  color: 0x2e5a2e, img: "growth/52" },
         grw13: { type: "unit", cost: 2, atk: 2, hp: 2, speed: 1,
                  creature: "animal", sheet: "wolf", ability: "pushBack",
+                 subtype: "animal", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "growth",
                  color: 0x3f6d3a, img: "growth/53" },
         grw14: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
                  creature: "goblin", ability: "flyOver",
+                 subtype: "elf", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "growth",
                  color: 0x3f6d3a, img: "growth/54" },
         grw15: { type: "trap", cost: 2,
                  trap: { event: "onUnitDamage", effect: "sporeCurse" },
+                 kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x2e5a2e, img: "growth/55" },
         grw16: { type: "spell", cost: 1,
                  spell: { target: "none", searchUnit: 6 },
+                 kind: "search", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "growth",
                  color: 0x4a8a3e, img: "growth/56" },
         // ── Рост, третья партия (глаза юзера): 57–60 ────────────────────────
         grw17: { type: "spell", cost: 1,
                  spell: { target: "anyUnitDmg", purge: true },
+                 kind: "control", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "growth",
                  color: 0x4a8a3e, img: "growth/57" },
         grw18: { type: "spell", cost: 1,
                  spell: { target: "none", stealEnergy: 2 },
+                 kind: "control", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x4a8a3e, img: "growth/58" },
         grw19: { type: "spell", cost: 1,
                  spell: { target: "anyUnitDmg", cocoon: 1 },
+                 kind: "protect", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "growth",
                  color: 0x4a8a3e, img: "growth/59" },
         grw20: { type: "unit", cost: 4, atk: 2, hp: 3, speed: 1,
                  creature: "goblin", ability: "flyOver", sisterDraw: true,
+                 subtype: "elf", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "growth",
                  color: 0x3f6d3a, img: "growth/60" },
         // ── Рост, четвёртая партия (глаза юзера): 61–62 ─────────────────────
@@ -249,6 +311,7 @@
         // Животных на поле (включая его самого); тип существа — Животное
         grw22: { type: "unit", cost: 4, atk: 1, hp: 1, speed: 1,
                  creature: "animal", keeperScale: true,
+                 subtype: "animal", // подтип — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x3f6d3a, img: "growth/62" },
         // ── Рост, пятая партия (глаза юзера): 63–64 ─────────────────────────
@@ -256,12 +319,14 @@
         // (после розыгрыша карта удаляется из боя, в сброс не попадает)
         grw23: { type: "spell", cost: 1,
                  spell: { target: "none", discardPick: true },
+                 kind: "draw", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x4a8a3e, img: "growth/63" },
         // «Друид глубокой чащи»: пережив урон (выжил), призывает Волка 2/4
         // (grw2) на пустую соседнюю клетку; тип существа — Эльф
         grw24: { type: "unit", cost: 5, atk: 1, hp: 5, speed: 1,
                  creature: "elf", wolfSummon: true,
+                 subtype: "elf", // подтип — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x3f6d3a, img: "growth/64" },
         // ── Рост, шестая партия (глаза юзера): 65–66 ─────────────────────────
@@ -269,6 +334,7 @@
         // к моменту эффекта карта уже покидает руку)
         grw25: { type: "spell", cost: 2,
                  spell: { target: "none", energyPerHand: true },
+                 kind: "resource", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "growth",
                  color: 0x4a8a3e, img: "growth/65" },
         // «Три монолита»: призыв СВОЕГО существа по соседству — поиск в
@@ -282,12 +348,14 @@
         // существо получает столько урона и жизней
         grw27: { type: "unit", cost: 0, atk: 0, hp: 0, speed: 1,
                  creature: "elf", energyToStats: true,
+                 subtype: "elf", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "growth",
                  color: 0x3f6d3a, img: "growth/67" },
         // «Старейший древоброд»: Сокрушение — после удара лишний урон
         // (урон атаки минус жизни цели) переходит в базу противника
         grw28: { type: "unit", cost: 6, atk: 6, hp: 6, speed: 1,
                  creature: "goblin", sheet: "ent", crush: true, plant: true,
+                 subtype: "plant", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "growth",
                  color: 0x3f6d3a, img: "growth/68" },
         // «Отравленные лезвия»: существо получает «Ядовитость 1» — при
@@ -295,11 +363,13 @@
         // теряет 1 жизнь в начале своего хода перед перемещением
         grw29: { type: "spell", cost: 1,
                  spell: { target: "anyUnit", venom: 1 },
+                 kind: "buff", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "growth",
                  color: 0x4a8a3e, img: "growth/69" },
         // «Рой светлячков»: урон цели = числу СВОИХ существ на поле
         grw30: { type: "spell", cost: 4,
                  spell: { target: "anyUnitDmg", fireflies: true },
+                 kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x4a8a3e, img: "growth/70" },
         // «Древоброд глухой чащи»: при атаке урон атаки получают и ВСЕ
@@ -307,6 +377,7 @@
         // страдает от собственного всплеска)
         grw31: { type: "unit", cost: 7, atk: 8, hp: 8, speed: 1,
                  creature: "goblin", sheet: "ent", thicket: true, plant: true,
+                 subtype: "plant", // подтип — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x3f6d3a, img: "growth/71" },
         // ── Рост, восьмая партия (глаза юзера): 72–75 ────────────────────────
@@ -314,6 +385,7 @@
         // (сама карта в момент расчёта ещё в руке — не считается)
         grw32: { type: "spell", cost: 3,
                  spell: { target: "anyUnitDmg", growthHand: true },
+                 kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "growth",
                  color: 0x4a8a3e, img: "growth/72" },
         // «Атака духами волков»: своё существо делает Выстрел — урон
@@ -321,12 +393,14 @@
         // база противника); на пустых клетках пути являются Волки 2/4
         grw33: { type: "spell", cost: 5,
                  spell: { target: "ownUnit", wolfVolley: true },
+                 kind: "summon", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x4a8a3e, img: "growth/73" },
         // «Круговая атака»: цель наносит 1 урон каждому соседу
         // (верт/гориз) — существам и постройкам обеих сторон
         grw34: { type: "spell", cost: 2,
                  spell: { target: "anyUnit", nova: true },
+                 kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "growth",
                  color: 0x4a8a3e, img: "growth/74" },
         // «Опутывание корнями»: ловушка на любой клетке (можно сразу
@@ -334,18 +408,21 @@
         // «Опутывание 2»: два хода пропускает перемещение, счётчик тает
         grw35: { type: "trap", cost: 1,
                  trap: { event: "onCell", effect: "entangle", entangle: 2 },
+                 kind: "control", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "growth",
                  color: 0x4a8a3e, img: "growth/75" },
         // ── Рост, девятая партия (глаза юзера): 76–80 ────────────────────────
         // «Озверевший шатун»: −1 энергию за каждое СВОЁ Животное на поле
         grw36: { type: "unit", cost: 5, atk: 5, hp: 6, speed: 1,
                  creature: "animal", sheet: "bear", animalCost: true,
+                 subtype: "animal", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "growth",
                  color: 0x3f6d3a, img: "growth/76" },
         // «Заклятый древоброд»: заклинания, выбравшие его целью, — на 1
         // энергию дешевле (для любого кастующего, просил юзер)
         grw37: { type: "unit", cost: 5, atk: 5, hp: 5, speed: 1,
                  creature: "goblin", sheet: "ent", plant: true, targetDiscount: true,
+                 subtype: "plant", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "growth",
                  color: 0x3f6d3a, img: "growth/77" },
         // «Дома на деревьях»: урон базе стороны целиком уходит в эту
@@ -357,28 +434,33 @@
         // сброса — в клетку убранной (панель выбора, как у «Варки зелий»)
         grw39: { type: "spell", cost: 2,
                  spell: { target: "ownBuilding", excavate: true },
+                 kind: "summonBuilding", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "growth",
                  color: 0x4a8a3e, img: "growth/79" },
         // «Пастух росянок»: способности Растений (метка plant) его стороны
         // срабатывают на 1 раз больше
         grw40: { type: "unit", cost: 4, atk: 1, hp: 1, speed: 1,
                  creature: "elf", plantEcho: true,
+                 subtype: "elf", // подтип — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x3f6d3a, img: "growth/80" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
         gobA: { type: "unit", cost: 2, atk: 2, hp: 2, speed: 1,
+                subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                 creature: "goblin", rarity: "common", elem: "strength",
                 color: 0x9c4a3a },
         // Медведь из «Духа предка» (grw12) — служебная карта без лица,
         // как gobA/gobC: спавнится только ловушкой.
         ancBear: { type: "unit", cost: 3, atk: 3, hp: 5, speed: 1,
+                   subtype: "animal", // подтип — по спеке юзера (cards.txt)
                    creature: "animal", sheet: "bear", rarity: "common", elem: "growth",
                    color: 0x2e5a2e },
         // Гоблин из «Культа кочерыжки» (str40) — служебная карта без лица,
         // как gobA: ряд выбранной клетки заполняется Гоблинами 3/4.
         gobC: { type: "unit", cost: 3, atk: 3, hp: 4, speed: 1,
+                subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                 creature: "goblin", rarity: "common", elem: "strength",
                 color: 0x9c4a3a },
     };

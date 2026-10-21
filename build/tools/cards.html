@@ -195,6 +195,7 @@
         <span class="lbl" id="lblType"></span><span id="typeBtns"></span>
         <span class="lbl" id="lblRarity"></span><span id="rarityBtns"></span>
         <span class="lbl" id="lblSub"></span><span id="subBtns"></span>
+        <span class="lbl" id="lblKind"></span><span id="kindBtns"></span>
         <span class="lbl" id="lblCost"></span>
         <select id="costSel"></select>
         <select id="sortSel"></select>
@@ -267,6 +268,15 @@
             sub: "Подтип:", tokens: "токены (без лица)",
             subNone: "без подтипа",
             subNames: { goblin: "Гоблин", animal: "Животное", elf: "Эльф", plant: "Растение" },
+            kind: "Тип эффекта:",
+            kindNames: {
+                damage: "Нанесение урона", buff: "Усиление",
+                debuff: "Уменьшение параметров", search: "Поиск",
+                copy: "Копирование", control: "Контроль", protect: "Защита",
+                draw: "Добор карт", resource: "Получение ресурсов",
+                summon: "Появление существ", summonBuilding: "Появление построек",
+                castSpell: "Розыгрыш заклинаний",
+            },
             all: "все", sort: "Сортировка:", reset: "Сброс",
             sortId: "по каталогу", sortCostAsc: "цена ↑", sortCostDesc: "цена ↓", sortName: "имя",
             sortHpAsc: "жизни ↑", sortHpDesc: "жизни ↓",
@@ -290,6 +300,14 @@
             sub: "Subtype:", tokens: "tokens (no face)",
             subNone: "no subtype",
             subNames: { goblin: "Goblin", animal: "Animal", elf: "Elf", plant: "Plant" },
+            kind: "Effect:",
+            kindNames: {
+                damage: "Damage", buff: "Buff", debuff: "Stat reduction",
+                search: "Search", copy: "Copy", control: "Control",
+                protect: "Protection", draw: "Card draw",
+                resource: "Resource gain", summon: "Creature summoning",
+                summonBuilding: "Building summoning", castSpell: "Spell casting",
+            },
             all: "any", sort: "Sort:", reset: "Reset",
             sortId: "by catalog", sortCostAsc: "cost ↑", sortCostDesc: "cost ↓", sortName: "name",
             sortHpAsc: "health ↑", sortHpDesc: "health ↓",
@@ -320,6 +338,9 @@
         // токены (карты без лица/призыва: gobA/gobC/ancBear) в общем каталоге
         // и конструкторе скрыты — включаются галочкой (просил юзер, w25)
         includeTokens: false, subtype: "all",
+        // тип эффекта заклинания/ловушки (Нанесение урона, Усиление, …) —
+        // поле kind из cardsData.js, по спеке юзера (просил юзер, w26)
+        kind: "all",
         // вкладка «Персонажи»: свои фильтры (стихия/редкость) и сортировка
         // по макс. жизням базы (просил юзер, w25)
         heroElem: "all", heroRarity: "all", heroSort: "id",
@@ -345,12 +366,19 @@
     const hex = (n) => "#" + Number(n).toString(16).padStart(6, "0");
 
     // ── фильтрация и сортировка каталога ────────────────────────────────
-    function subtypeMatch(d) { // подтипы: creature (гоблин/животное/эльф) +
-        // растения (метка plant, бывает у существ и строения)
+    function cardSubtypes(d) { // подтип — ТОЛЬКО явное поле subtype из спеки
+        // юзера (for_work/cards.txt): creature в данных — лист поля боя
+        // (у ростовских карт плейсхолдер «goblin»), типом существа не является
+        return d.subtype ? [d.subtype] : [];
+    }
+    function subtypeMatch(d) {
         if (state.subtype === "all") return true;
-        if (state.subtype === "none") return !d.creature && !d.plant;
-        if (state.subtype === "plant") return !!d.plant;
-        return d.creature === state.subtype;
+        if (state.subtype === "none") return cardSubtypes(d).length === 0;
+        return cardSubtypes(d).includes(state.subtype);
+    }
+    function kindsOf(d) { // типы эффекта: строка или список («Шипастые лозы» —
+        // Нанесение урона + Уменьшение параметров)
+        return Array.isArray(d.kind) ? d.kind : d.kind ? [d.kind] : [];
     }
     function filteredIds() {
         const q = state.q.trim().toLowerCase();
@@ -358,6 +386,7 @@
             const d = CARDS[id];
             if (!state.includeTokens && !d.img) return false; // токены — по галочке
             if (!subtypeMatch(d)) return false;
+            if (state.kind !== "all" && !kindsOf(d).includes(state.kind)) return false;
             if (state.elem !== "all" && d.elem !== state.elem) return false;
             if (state.type !== "all" && d.type !== state.type) return false;
             if (state.rarity !== "all" && d.rarity !== state.rarity) return false;
@@ -659,8 +688,8 @@
             badgeLine("id: " + id),
         );
         if (!d.img) badges.appendChild(badgeLine(T("noFace")));
-        if (d.creature) badges.appendChild(badgeLine(T("subNames")[d.creature] || d.creature));
-        if (d.plant) badges.appendChild(badgeLine(T("subNames").plant));
+        cardSubtypes(d).forEach((s) => badges.appendChild(badgeLine(T("subNames")[s] || s)));
+        kindsOf(d).forEach((k) => badges.appendChild(badgeLine(T("kindNames")[k] || k)));
         info.appendChild(badges);
         const stats = document.createElement("div");
         stats.className = "stats";
@@ -790,6 +819,13 @@
             chip(sBtns, s === "all" ? T("all")
                 : s === "none" ? T("subNone") : T("subNames")[s], state.subtype === s,
                 () => { state.subtype = s; }));
+        const kBtns = $("kindBtns");
+        kBtns.textContent = "";
+        ["all", "damage", "buff", "debuff", "search", "copy", "control",
+         "protect", "draw", "resource", "summon", "summonBuilding", "castSpell"]
+            .forEach((k) =>
+                chip(kBtns, k === "all" ? T("all") : T("kindNames")[k], state.kind === k,
+                    () => { state.kind = k; }));
         $("tokChk").checked = state.includeTokens;
         $("q").value = state.q;
         $("costSel").value = state.cost;
@@ -864,6 +900,7 @@
         $("lblType").textContent = T("type");
         $("lblRarity").textContent = T("rarity");
         $("lblSub").textContent = T("sub");
+        $("lblKind").textContent = T("kind");
         $("tokTxt").textContent = T("tokens");
         $("lblCost").textContent = T("cost");
         $("lblHeroElem").textContent = T("elem");
@@ -903,7 +940,8 @@
         renderHeroesView();
     });
     $("resetBtn").addEventListener("click", () => {
-        Object.assign(state, { q: "", elem: "all", type: "all", rarity: "all", cost: "all" });
+        Object.assign(state, { q: "", elem: "all", type: "all", rarity: "all",
+            cost: "all", subtype: "all", kind: "all" });
         renderFilters(); renderGrid();
     });
     $("deckName").addEventListener("input", () => {
@@ -947,7 +985,8 @@
         state: () => ({ view: state.view, lang: loc.lang,
             filter: { q: state.q, elem: state.elem, type: state.type,
                 rarity: state.rarity, cost: state.cost, sort: state.sort,
-                subtype: state.subtype, includeTokens: state.includeTokens,
+                subtype: state.subtype, kind: state.kind,
+                includeTokens: state.includeTokens,
                 heroElem: state.heroElem, heroRarity: state.heroRarity,
                 heroSort: state.heroSort },
             shown: filteredIds().length, total: Object.keys(CARDS).length,
