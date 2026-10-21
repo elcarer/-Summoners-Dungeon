@@ -106,7 +106,9 @@ frontline, как в Stormbound. Первая стихия «Сила» (кра�
 ## Структура
 
 - `build/` — билд: движок + `scripts/game/` (loc, meta, dataCards, uiKit,
-  world, dungeon, arena, deckScene, rewardScene, draftScene, settingsScene,
+  world, dungeon, arenaCore + модули арены (Cards/Board/Combat/Hand/Panels/
+  Hud/Flow/AI/Actions/Scene/Api) + arena (сборка), deckScene, rewardScene,
+  draftScene, settingsScene,
   main) + арт (`images/ui`, `images/scenes` — арены, `images/sprites` —
   листы существ, `images/cards` — лица карт, `images/dungeon_tiles` —
   тайлы этажей подземелья — свой набор на данж (goblins_lair, growth_lair),

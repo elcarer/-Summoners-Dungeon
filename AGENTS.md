@@ -47,9 +47,10 @@
   забег), `cardsData` (ЧИСТЫЕ ДАННЫЕ карт/героев → `GAME_CARD_DATA`; его же
   читает cards.html), `dataCards` (логика: архетипы врагов, enemyDeck, пулы
   наград/добора, магазин → `GAME_DATA`), `uiKit`, `world` (открытый мир),
-  `dungeon` (этажи, генератор, объекты), `arena` (бой — все механики),
-  `deckScene`/`rewardScene`/`draftScene`/`settingsScene`, `main` (бут, меню,
-  выбор героя, сцены).
+  `dungeon` (этажи, генератор, объекты), `arenaCore` + модули `arena*`
+  (бой: Cards/Board/Combat/Hand/Panels/Hud/Flow/AI/Actions/Scene/Api;
+  `arena.js` — только сборка), `deckScene`/`rewardScene`/`draftScene`/
+  `settingsScene`, `main` (бут, меню, выбор героя, сцены).
 - Сцены — через `createScenes`; UI-координаты — дизайн 1920×1080 (letterbox);
   для кликов переводить `__GAME.toScreen(x,y)`, в сценах карт — `worldToScreen`.
 - Смена геометрии/раскладки этажа → поднять `MAP_V` (`GAME_DUNGEON.MAP_V`):

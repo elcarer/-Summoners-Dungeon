@@ -1,0 +1,321 @@
+// СЦЕНА «АРЕНА»: тестовый API арены.
+// Модуль только вешает функции/состояние на общий контекст A (см. arenaCore.js);
+// внутри установщика — with (A), поэтому тела видят общие имена как раньше.
+(function () {
+    globalThis.GAME_ARENA.installApi = function installApi(A) {
+        with (A) {
+            A.api = {
+                endTurn() {
+                    if (!B || B.phase !== "player" || B.discarding || B.picking) return;
+                    cancelJourneySummon(); // незавершённый призыв — карта в руку
+                    // шкала применяется автоматически: слева карты, справа энергия
+                    const total = spheresTotal();
+                    const cards = Math.max(0, Math.min(B.split, total));
+                    const energy = total - cards;
+                    if (cards > 0) { drawCards(cards); sfx("chpoc"); }
+                    if (energy > 0) { B.energy += energy; sfx("aqua"); } // на следующий ход
+                    layoutHand();
+                    refreshHud();
+                    if (B.hand.length > HAND_MAX) buildDiscardPanel(); // лимит — на конце хода
+                    else enemyTurn();
+                },
+                // шкала «карты↔энергия»: total сфер (3 + ход−1), split — доля в карты
+                sliderGet: () => (B ? { total: spheresTotal(), split: B.split } : null),
+                // длительности текущих глиссад (тесты скорости анимаций)
+                movesInfo: () => moves.map((m) => Math.round(m.total * 1000) / 1000),
+                sliderSet(n) {
+                    if (!B) return null;
+                    const total = spheresTotal();
+                    B.split = Math.max(0, Math.min(total, n | 0));
+                    refreshSlider();
+                    return B.split;
+                },
+                // плавное состояние шкалы (тесты): бегунок на доле курсора,
+                // идёт ли доскок к засечке
+                sliderGeom: () => (root && root.hud
+                    ? { thumbX: Math.round(root.hud.userData.slider.thumb.position.x * 100) / 100,
+                        vis: sliderVis !== null ? Math.round(sliderVis * 1000) / 1000 : null,
+                        gliding: !!sliderGlide }
+                    : null),
+                // тексты открытого оверлея (тесты: кнопки панели настроек)
+                panelTexts: () => {
+                    if (!overlay) return null;
+                    const out = [];
+                    (function walk(n) { if (n.text) out.push(n.text); n.children.forEach(walk); })(overlay.node);
+                    return out;
+                },
+                // панель сброса лишних карт (конец хода, рука > 7)
+                discardPick(idx) { pickDiscard(idx); },
+                discardNeeded: () => (B ? Math.max(0, B.hand.length - HAND_MAX) : 0),
+                playCardAt(handIdx, col, row) {
+                    B.selected = handIdx;
+                    B.spellTarget = false;
+                    onCellTap(col, row);
+                },
+                // клик по клетке как есть (бесплатный призыв «Глубокого путешествия»)
+                cellTap(col, row) { onCellTap(col, row); },
+                select(handIdx) { onCardTap(handIdx); },
+                castSpell,
+                playTrap(handIdx, col, row) { // мина — выбрать карту и пустую клетку
+                    B.selected = handIdx;
+                    B.spellTarget = false;
+                    onCellTap(col, row);
+                },
+                deployRows,
+                // оверлеи боя (настройки / колода-остаток / сброс)
+                openPanel(name) { if (B && root && B.phase !== "over") openOverlay(name); },
+                closePanel() { closeOverlay(); },
+                panel: () => (overlay && overlay.name) || null,
+                // карта-подсказка на жетон (тесты): что показано + наведение по клетке
+                unitCardState: () => (unitCard
+                    ? { id: cardIdOf(unitCard.unit.def), side: unitCard.unit.side,
+                        col: unitCard.unit.col, row: unitCard.unit.row }
+                    : null),
+                // карта, разыгранная врагом (тесты): что показано слева + свечение
+                enemyCardState: () => (enemyCard
+                    ? (() => {
+                        const f = enemyCard.node.getChildByName("glowFrame");
+                        return { id: enemyCard.id, x: enemyCard.node.x, y: enemyCard.node.y,
+                            glow: f ? { w: Math.round(f.width), h: Math.round(f.height) } : null };
+                    })()
+                    : null),
+                // ловушки (тесты): у руны видно существо, на котором она висит
+                trapList: () => ({
+                    p: B.traps.p.map((tr) => ({ eff: tr.def.trap.effect,
+                        col: tr.unit ? null : tr.col, row: tr.unit ? null : tr.row,
+                        unit: tr.unit ? cardIdOf(tr.unit.def) : null,
+                        on: tr.unit ? B.units.includes(tr.unit) : null })),
+                    e: B.traps.e.map((tr) => ({ eff: tr.def.trap.effect,
+                        col: tr.unit ? null : tr.col, row: tr.unit ? null : tr.row,
+                        unit: tr.unit ? cardIdOf(tr.unit.def) : null,
+                        on: tr.unit ? B.units.includes(tr.unit) : null })),
+                }),
+                hoverCell(col, row) { const p = cellXY(col, row); unitHoverAt(p.x, p.y); },
+                hoverOff: () => unitCardHide(),
+                // drag&drop (режим «Перетаскивание»): состояние для тестов
+                dragState() {
+                    return drag ? { idx: drag.idx, moved: drag.moved, over: drag.over } : null;
+                },
+                // геометрия первой карты руки (дизайн-координаты) — тесты «не закрывает поле»
+                handGeom() {
+                    if (!root || !B || !root.cardsLayer.children.length) return null;
+                    const b = root.cardsLayer.children[0].getBounds();
+                    const wt = ctx.ui.worldTransform; // полная цепочка letterbox × бокс
+                    return {
+                        x: (b.x - wt.tx) / wt.a, top: (b.y - wt.ty) / wt.d,
+                        w: b.width / wt.a, h: b.height / wt.d,
+                    };
+                },
+                state() {
+                    return {
+                        phase: B.phase, result: B.result,
+                        pBase: B.playerBase, eBase: B.enemyBase,
+                        energy: B.energy, eEnergy: B.eEnergy,
+                        spheres: { total: spheresTotal(), split: B.split },
+                        hand: [...B.hand],
+                        discarding: !!B.discarding,
+                        picking: !!B.picking,
+                        lastSpell: B.lastSpell.p,
+                        journeySummon: B.journeySummon,
+                        eDeck: B.eDeck.length,
+                        units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0, venom: u.venom || 0, poison: u.poison || 0, entangle: u.entangle || 0 })),
+                        traps: { p: B.traps.p.length, e: B.traps.e.length },
+                        firewalls: B.firewalls.map((f) => ({ side: f.side, row: f.row, left: f.left })),
+                    };
+                },
+                // «Стена костров» (тесты): касты + сколько спрайтов огня на поле
+                firewalls: () => ({ list: B.firewalls.map((f) => ({ ...f })),
+                    sprites: root.fireLayer.children.length }),
+                // тест-хук: тик стены костров (как в конце хода стороны)
+                _fwTick(side) { firewallTick(side); return B.firewalls.map((f) => ({ ...f })); },
+                // тест-хук: тик ростков — конец хода стороны (+1 жизни постройкам)
+                _sproutTick(side) { sproutTick(side); return true; },
+                // «Поиск рун» (тесты): состав панели и выбор карты
+                runesState: () => ({ picking: !!B.picking, top: [...runesTop], want: runesWant }),
+                runesPick(idx) { pickRune(idx); },
+                // «Пень обряда» (тесты): панель и нажатия её кнопок
+                stumpState: () => ({ open: !!stumpPanel, picking: !!(B && B.picking),
+                    side: stumpSide, top: stumpTop }),
+                stumpChoose(side) { stumpShow(side); },
+                stumpKeep() { closeStumpPanel(); },
+                stumpBurn() { stumpBurn(); },
+                // «Глубокое путешествие» (тесты): панель, выбор призыва, режим
+                // бесплатной постановки
+                journeyState: () => ({ picking: !!journeyPanel, top: [...journeyTop] }),
+                journeyPick(idx) { pickJourney(idx); },
+                journeySummon: () => (B ? B.journeySummon : null),
+                // «Варка зелий» (тесты): панель, заклинания сбросов, «Сожжение»
+                brewState: () => ({ open: !!brewPanel, picking: !!(B && B.picking),
+                    pile: brewPile,
+                    own: spellsInDiscard("p"), foe: spellsInDiscard("e") }),
+                brewChoose(side) { brewShow(side); },
+                brewPick(idx) { pickBrew(idx); },
+                scorch: () => ({ p: [...B.scorch.p], e: [...B.scorch.e] }),
+                // «Три монолита» (тесты): панель поиска, совпадения, выбор
+                monolithState: () => ({ open: !!monolithPanel, picking: !!(B && B.picking),
+                    queue: monolithQueue.slice(), cost: monolithCost,
+                    matches: monolithPanel ? monolithMatches(monolithCost ?? -1)
+                        .map((m) => m.id) : [] }),
+                monolithPick(cardIdx) {
+                    if (!monolithPanel) return false;
+                    const m = monolithMatches(monolithCost ?? -1)[cardIdx];
+                    if (!m) return false;
+                    monolithTake(m);
+                    closeMonolithPanel();
+                    return true;
+                },
+                // «Раскопки» (тесты): панель обмена и выбор постройки из сброса
+                excavateState: () => ({ open: !!excavatePanel, picking: !!(B && B.picking),
+                    cell: excavateCell, blds: excavatePanel ? buildingsInDiscard() : [] }),
+                excavatePick(idx) { pickExcavate(idx); },
+                // тест-хуки поправок: свечение выбранной карты (п2) и сетка
+                // оверлея-просмотра (п3)
+                selGlow() {
+                    if (!root || !B || B.selected === null) return null;
+                    const n = root.cardsLayer.children[B.selected];
+                    if (!n) return null;
+                    const f = n.getChildByName("selframe");
+                    if (!f) return null; // фолбэк-карта без свечения
+                    return { visible: !!f.visible, blurred: !!(f.filters && f.filters.length),
+                        behind: n.getChildIndex(f) === 0 };
+                },
+                overlayCards() {
+                    if (!overlay || !overlay.grid) return null;
+                    return overlay.grid.children
+                        .filter((ch) => ch.scale && ch.scale.x === 0.75) // cardFace (не тексты ×N)
+                        .map((ch) => ({ x: Math.round(ch.x), y: Math.round(ch.y) }));
+                },
+                // ховер-зум карт оверлея (тесты): анимация 0.75 ↔ 1
+                ovZoomState: () => (ovZoom
+                    ? { id: ovZoom.id, scale: Math.round(ovZoom.cur * 1000) / 1000, target: ovZoom.tgt }
+                    : null),
+                // узел карточки сетки оверлея (тесты: эмит pointerover/out)
+                overlayCardNode: (i) => ovCards[i] || null,
+                // геометрия полоски базы врага (тесты: не вылезает за плашку;
+                // локальные границы = дизайн-координаты, без letterbox-масштаба)
+                eBarGeom: () => {
+                    if (!root || !root.hud) return null;
+                    const b = root.hud.userData.eBar.getLocalBounds();
+                    return { x: Math.round(b.x), w: Math.round(b.width) };
+                },
+                // бейдж «×N» на картах варева в руке + текст жизней базы героя
+                // (тесты: счётчик разыгрываний, число у полоски базы)
+                brewBadge: () => {
+                    if (!root || !B) return null;
+                    for (const node of root.cardsLayer.children) {
+                        const b = node.getChildByName("brewBadge");
+                        if (b) return { n: B.brewCasts || 0, visible: !!b.visible };
+                    }
+                    return null;
+                },
+                hudTexts: () => (root && root.hud
+                    ? { pBase: root.hud.userData.pBaseT.text,
+                        eBase: root.hud.userData.eBaseT.text,
+                        pEnergy: root.hud.userData.pEnergyT.text,
+                        pEnergyGain: root.hud.userData.pEnergyGainT.text,
+                        pEnergyCost: root.hud.userData.pEnergyCostT.text,
+                        pEnergyCostVisible: !!root.hud.userData.pEnergyCostT.visible,
+                        pCards: root.hud.userData.pCardsT.text,
+                        eEnergy: root.hud.userData.eEnergyT.text,
+                        eCards: root.hud.userData.eCardsT.text }
+                    : null),
+                // узел карты руки (тесты: подсказка «−X» у энергии)
+                handCardNode: (idx) => (root && root.cardsLayer.children[idx]) || null,
+                // пересборка руки (тесты: свежие узлы после подмены B.hand)
+                relayoutHand: () => { if (root) { layoutHand(); return true; } return false; },
+                // перерисовка HUD (тесты: сбросы/счётчики после подмен B.*)
+                refreshHud: () => { if (B && root) { refreshHud(); return true; } return false; },
+                // геометрия/цвета HUD (тесты): иконки энергии, цвет карт врага
+                hudGeom: () => {
+                    if (!root || !root.hud) return null;
+                    const hex = (v) => { const c = v && v.color !== undefined ? v.color : v;
+                        try { return new PIXI.Color(c).toHex(); } catch (e) { return String(c); } };
+                    const ud = root.hud.userData;
+                    return { eEnergyX: ud.eEnergyIcon.x, pEnergyX: ud.pEnergyIcon.x,
+                        eCardsFill: hex(ud.eCardsT.style.fill), pCardsFill: hex(ud.pCardsT.style.fill) };
+                },
+                // общий z-order поля (тесты): сортировка включена, zIndex — ряды
+                zOrder: () => (root && root.unitsLayer
+                    ? { sortable: !!root.unitsLayer.sortableChildren,
+                        z: root.unitsLayer.children.map((n) => n.zIndex),
+                        dbg: root.unitsLayer.children.map((n) =>
+                            ({ z: n.zIndex, dead: !!n.destroyed, x: Math.round(n.x), y: Math.round(n.y),
+                               unit: B.units.findIndex((u) => u.node === n),
+                               a: Math.round(n.alpha * 100) / 100, rot: Math.round(n.rotation * 100) / 100,
+                               sc: Math.round(n.scale.x * 100) / 100 })) }
+                    : null),
+                punchesDump: () => ({ n: punches.length,
+                    list: punches.map((p) => ({ dying: !!p.dying,
+                        life: Math.round(p.life * 1000) / 1000, total: p.total,
+                        dead: !!p.node.destroyed, inLayer: !!(p.node.parent && p.node.parent === root.unitsLayer) })) }),
+                // лицо походки юнита на клетке (тесты: боковой шаг — walk_left/right)
+                walkFace: (col, row) => {
+                    const u = unitAt(col, row);
+                    if (!u || !u.node) return null;
+                    const body = u.node.getChildByName("body");
+                    return body ? (body.userData_face || null) : null;
+                },
+                // тест-хук: урон цели с указанным «убийцей» — через damageUnit,
+                // с хуками боя (очарование «Огненного дыхания» и пр.)
+                _dmg(col, row, amount, killerCol, killerRow) {
+                    const u = unitAt(col, row);
+                    if (!u) return false;
+                    const killer = (killerCol !== undefined && killerCol !== null) ? unitAt(killerCol, killerRow) : null;
+                    damageUnit(u, amount, killer, "sword");
+                    return true;
+                },
+                // тест-хук: убить юнита с указанным «убийцей» (для проверки ловушки)
+                _kill(col, row, killerCol, killerRow) {
+                    const u = unitAt(col, row);
+                    if (!u) return false;
+                    const killer = (killerCol !== undefined && killerCol !== null) ? unitAt(killerCol, killerRow) : null;
+                    killUnit(u, killer || null);
+                    return true;
+                },
+                // тест-хук: принудительный итог (бои с растущей шкалой длинные —
+                // смоук проверяет механики, а не ждёт органического финиша)
+                _finish(victory) {
+                    if (!B || B.phase === "over" || B.discarding) return false;
+                    if (victory) B.enemyBase = 0; else B.playerBase = 0;
+                    finish(!!victory);
+                    return true;
+                },
+                // тест-хук: разместить юнита любой стороны (героя не будит)
+                _spawn(side, cardId, col, row) {
+                    if (unitAt(col, row)) return false;
+                    return addUnit(side, cardId, col, row, { testSummon: true });
+                },
+                // тест-хук: взвести ловушку стороны (как розыгрыш карты ловушки)
+                _trap(side, cardId, col, row) { return armTrap(side, cardId, col, row); },
+                // тест-хук: upkeep стороны (начало её хода: грибницы, костры)
+                _upkeep(side) { upkeep(side); return true; },
+                // тест-хуки боевых хуков атаки: марш одной стороны и тик яда
+                // (проба сокрушения/чащи/ядовитости без полного хода ИИ)
+                async _march(side) { await marchSide(side); return true; },
+                _poisonTick(side) { poisonTick(side); return true; },
+                // установка ловушки стороной (проба опутывания без розыгрыша
+                // карты); существо на клетке — «нахождение», как у клика игрока
+                _armTrap(side, cardId, col, row) {
+                    armTrap(side, cardId, col, row);
+                    const u = unitAt(col, row);
+                    if (u) triggerCellTraps(u);
+                    return true;
+                },
+                // итоговая цена карты (проба скидок: Вождь, шатун, древоброд)
+                _effCost(cardId, side = "p", target = null) {
+                    return effCost(cardId, side, target);
+                },
+                // план добора ИИ по шкале (тесты мягкого правила): сколько карт
+                // возьмёт и какой доход всего
+                aiDrawPlan: () => (B
+                    ? { cards: enemyDrawPlan(), total: spheresTotal(),
+                        nextMana: B.eEnergy + spheresTotal() }
+                    : null),
+                // гейты ИИ по заклинанию (тесты): id карты → playable
+                aiSpellPlayable: (id) => !!CARDS[id] && aiSpellPlayable(CARDS[id]),
+                // группы приоритета ИИ (тесты связок): id карты → группа
+                _aiGroup: (id) => (B && CARDS[id] ? aiGroup(id, CARDS[id]) : null),
+            };
+        }
+    };
+})();

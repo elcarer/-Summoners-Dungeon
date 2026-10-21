@@ -1,0 +1,542 @@
+// СЦЕНА «АРЕНА»: панели: руны, монолит, пень, путешествие, варка, раскопки.
+// Модуль только вешает функции/состояние на общий контекст A (см. arenaCore.js);
+// внутри установщика — with (A), поэтому тела видят общие имена как раньше.
+(function () {
+    globalThis.GAME_ARENA.installPanels = function installPanels(A) {
+        with (A) {
+            // ── Панель «Поиск рун» (str23) / «Рунное гадание» (grw16): верхние
+            // карты колоды — выбрать заклинание (руны) или карту призыва
+            // (гадание). Неподходящие видны, но не кликабельны; «Оставить как
+            // было» (или Esc) отменяет — карты остаются в колоде в том же порядке.
+            A.runesPanel = null;
+            A.runesTop = [];
+            A.runesWant = "spell";
+            A.closeRunesPanel = function closeRunesPanel() {
+                if (!runesPanel) return;
+                runesPanel.destroy({ children: true });
+                runesPanel = null;
+                runesTop = [];
+                runesWant = "spell";
+                if (B) B.picking = false;
+            };
+            A.openRunesPanel = function openRunesPanel(n, want = "spell") {
+                closeRunesPanel();
+                B.picking = true;
+                runesWant = want;
+                const top = B.deck.slice(-Math.min(n, B.deck.length)); // верх колоды — конец массива
+                runesTop = top;
+                const L = want === "unit" ? "gadanie" : "runes";
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                const frame = new PIXI.Graphics();
+                frame.roundRect(285, 270, 1350, 540, 18);
+                frame.fill({ color: 0x171310, alpha: 0.96 });
+                frame.stroke({ width: 3, color: 0x6b5c40 });
+                node.addChild(frame);
+                const title = T(t(`${L}.title`), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t(`${L}.hint`, { n: top.length }), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const m = top.length;
+                const spread = Math.min(210, 1260 / Math.max(1, m));
+                top.forEach((cardId, idx) => {
+                    const ok = CARDS[cardId].type === want;
+                    const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                    c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                    if (!ok) c.alpha = 0.5; // не то — взять нельзя
+                    else { c.eventMode = "static"; c.on("pointertap", () => pickRune(idx, want)); }
+                    node.addChild(c);
+                });
+                if (!top.some((id) => CARDS[id].type === want)) {
+                    const empty = T(t(`${L}.empty`), 27, 0x8a7c5e);
+                    empty.anchor.set(0.5, 0);
+                    empty.position.set(960, 687);
+                    empty.eventMode = "none";
+                    node.addChild(empty);
+                }
+                node.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("runes.back"), x: 960, y: 762, scale: 1,
+                    onTap: closeRunesPanel,
+                }));
+                root.addChild(node);
+                runesPanel = node;
+            };
+            A.pickRune = function pickRune(idx, want = runesWant) { // idx — номер карты среди показанных верхних
+                if (!B || !B.picking || !runesPanel) return;
+                const deckIdx = B.deck.length - runesTop.length + idx;
+                const cardId = B.deck[deckIdx];
+                if (cardId === undefined || CARDS[cardId].type !== want) return;
+                B.deck.splice(deckIdx, 1);
+                B.hand.push(cardId);
+                sfx("chpoc");
+                closeRunesPanel();
+                layoutHand();
+                refreshHud();
+            };
+
+            // ── Панель «Трёх монолитов» (grw26): поиск по ВСЕЙ колоде существа
+            // заданной цены — одно в руку. Триггер — призыв своего существа по
+            // соседству с монолитом (см. summonUnit); если монолитов несколько,
+            // панели выстраиваются в очередь и открываются по очереди.
+            A.monolithPanel = null;
+            A.monolithQueue = [];
+            A.monolithCost = null; // цена поиска открытой панели (уже снята с очереди)
+            A.monolithMatches = function monolithMatches(cost) {
+                return B.deck.map((id, idx) => ({ id, idx }))
+                    .filter((m) => CARDS[m.id].type === "unit" && CARDS[m.id].cost === cost);
+            };
+            A.monolithTake = function monolithTake(m) { // из колоды — в руку
+                B.deck.splice(m.idx, 1);
+                B.hand.push(m.id);
+                sfx("chpoc");
+                layoutHand();
+                refreshHud();
+                floatText(960, 840, "+1 " + GAME_LOC.t("card.grw20.draw"), 0x9fd489);
+            };
+            A.closeMonolithPanel = function closeMonolithPanel() {
+                if (monolithPanel) {
+                    monolithPanel.destroy({ children: true });
+                    monolithPanel = null;
+                }
+                pumpMonolithQueue();
+            };
+            A.pumpMonolithQueue = function pumpMonolithQueue() {
+                if (!B || !root) return;
+                const cost = monolithQueue.shift();
+                monolithCost = cost ?? null;
+                if (cost === undefined) { B.picking = false; return; }
+                const matches = monolithMatches(cost);
+                if (!matches.length) { pumpMonolithQueue(); return; } // нет существа — пропускаем
+                if (matches.length === 1) { monolithTake(matches[0]); pumpMonolithQueue(); return; }
+                B.picking = true;
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                const frame = new PIXI.Graphics();
+                frame.roundRect(285, 270, 1350, 540, 18);
+                frame.fill({ color: 0x171310, alpha: 0.96 });
+                frame.stroke({ width: 3, color: 0x6b5c40 });
+                node.addChild(frame);
+                const title = T(t("monolith.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("monolith.hint", { cost }), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const m = matches.length;
+                const spread = Math.min(210, 1260 / m);
+                matches.forEach((mt, idx) => {
+                    const c = globalThis.GAME_UI.cardFace(ctx, mt.id, { scale: 0.66 });
+                    c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                    c.eventMode = "static";
+                    c.on("pointertap", () => { monolithTake(mt); closeMonolithPanel(); });
+                    node.addChild(c);
+                });
+                node.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("monolith.back"), x: 960, y: 762, scale: 1,
+                    onTap: closeMonolithPanel,
+                }));
+                root.addChild(node);
+                monolithPanel = node;
+            };
+            A.queueMonolithSearch = function queueMonolithSearch(cost) { monolithQueue.push(cost); pumpMonolithQueue(); };
+            // монолит врага: ИИ не выбирает — берёт первое попавшееся
+            A.monolithEnemyTake = function monolithEnemyTake(cost) {
+                const i = B.eDeck.findIndex((id) => CARDS[id].type === "unit" && CARDS[id].cost === cost);
+                if (i < 0) return;
+                B.eHand.push(B.eDeck.splice(i, 1)[0]);
+            };
+
+            // ── Панель «Пень обряда» (grw11): в начале хода владельца — взгляд
+            // на верхнюю карту своей или вражеской колоды; «Оставить наверху»
+            // закрывает, «Сбросить» отправляет карту в сброс. Esc = оставить.
+            A.stumpPanel = null;
+            A.stumpSide = null;
+            A.stumpTop = null;
+            A.closeStumpPanel = function closeStumpPanel() {
+                if (!stumpPanel) return;
+                stumpPanel.destroy({ children: true });
+                stumpPanel = null;
+                stumpSide = null;
+                stumpTop = null;
+                if (B) B.picking = false;
+            };
+            A.stumpShow = function stumpShow(side) { // выбор колоды → верхняя карта и решения
+                if (!stumpPanel) return;
+                const deck = side === "p" ? B.deck : B.eDeck;
+                if (!deck.length) return; // колода пуста — смотреть нечего
+                stumpSide = side;
+                stumpTop = deck[deck.length - 1];
+                const body = stumpPanel.getChildByName("body");
+                body.destroy({ children: true });
+                const fresh = new PIXI.Container();
+                fresh.name = "body";
+                const face = globalThis.GAME_UI.cardFace(ctx, stumpTop, { scale: 0.72 });
+                face.position.set(960, 545);
+                fresh.addChild(face);
+                fresh.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("stump.keep"), x: 710, y: 762, scale: 1,
+                    onTap: closeStumpPanel, // оставить наверху — панели конец
+                }));
+                fresh.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("stump.burn"), x: 1210, y: 762, scale: 1,
+                    onTap: () => stumpBurn(),
+                }));
+                stumpPanel.addChild(fresh);
+            };
+            A.stumpBurn = function stumpBurn() { // «Сбросить»: верхняя карта показанной колоды — в сброс
+                if (!stumpPanel || !stumpSide) return;
+                const deck = stumpSide === "p" ? B.deck : B.eDeck;
+                const disc = stumpSide === "p" ? B.discard : B.eDiscard;
+                if (!deck.length) return;
+                const id = deck.pop();
+                disc.push(id);
+                sfx("chpoc");
+                closeStumpPanel();
+                refreshHud();
+            };
+            A.openStumpPanel = function openStumpPanel() {
+                closeStumpPanel();
+                if (!B.deck.length && !B.eDeck.length) return; // смотреть нечего
+                B.picking = true;
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("stump.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("stump.hint"), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const body = new PIXI.Container(); // перезаполняется выбором колоды
+                body.name = "body";
+                node.addChild(body);
+                const deckBtn = (key, side, x) => {
+                    const deck = side === "p" ? B.deck : B.eDeck;
+                    const btn = globalThis.GAME_UI.button(ctx, {
+                        tex: "button_menu.png", label: t(key), x, y: 560, scale: 1,
+                        onTap: () => stumpShow(side),
+                    });
+                    btn.alpha = deck.length ? 1 : 0.45; // пустая колода — не смотреть
+                    return btn;
+                };
+                body.addChild(deckBtn("stump.own", "p", 660));
+                body.addChild(deckBtn("stump.foe", "e", 1260));
+                root.addChild(node);
+                stumpPanel = node;
+            };
+            A.stumpFrame = function stumpFrame() { // рамка панели — как у «Поиска рун»
+                const frame = new PIXI.Graphics();
+                frame.roundRect(285, 270, 1350, 540, 18);
+                frame.fill({ color: 0x171310, alpha: 0.96 });
+                frame.stroke({ width: 3, color: 0x6b5c40 });
+                return frame;
+            };
+
+            // ── Панель «Глубокое путешествие» (str26): верхние карты колоды ────
+            // (снимаются с колоды сразу при касте) — выбрать карту ПРИЗЫВА и
+            // сыграть её бесплатно. Из остальных: 1 случайная — в руку, прочие —
+            // в сброс (это происходит и без выбора, «Без призыва»/Esc). Если
+            // призыва среди верхних нет — панель не открывается вовсе.
+            // Выбранная карта ставится в режим journeySummon: игрок кликает
+            // клетку зоны призыва — существо выходит БЕЗ траты энергии (Esc или
+            // клик мимо — карта просто возвращается в руку).
+            A.journeyPanel = null;
+            A.journeyTop = [];
+            A.closeJourneyPanel = function closeJourneyPanel() {
+                if (!journeyPanel) return;
+                journeyPanel.destroy({ children: true });
+                journeyPanel = null;
+                journeyTop = [];
+                if (B) B.picking = false;
+            };
+            A.openJourneyPanel = function openJourneyPanel(n) {
+                closeJourneyPanel();
+                const k = Math.min(n, B.deck.length);
+                journeyTop = k ? B.deck.splice(B.deck.length - k, k) : []; // верх колоды — конец массива
+                if (!journeyTop.some((id) => CARDS[id].type === "unit")) {
+                    finishJourney(null); // призыва нет: случайная — в руку, прочие в сброс
+                    return;
+                }
+                B.picking = true;
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                const frame = new PIXI.Graphics();
+                frame.roundRect(285, 270, 1350, 540, 18);
+                frame.fill({ color: 0x171310, alpha: 0.96 });
+                frame.stroke({ width: 3, color: 0x6b5c40 });
+                node.addChild(frame);
+                const title = T(t("journey.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("journey.hint", { n: journeyTop.length }), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const m = journeyTop.length;
+                const spread = Math.min(210, 1260 / Math.max(1, m));
+                journeyTop.forEach((cardId, idx) => {
+                    const isUnit = CARDS[cardId].type === "unit";
+                    const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                    c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                    if (!isUnit) c.alpha = 0.5; // не призыв — сыграть нельзя
+                    else { c.eventMode = "static"; c.on("pointertap", () => pickJourney(idx)); }
+                    node.addChild(c);
+                });
+                node.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("journey.back"), x: 960, y: 762, scale: 1,
+                    onTap: () => finishJourney(null),
+                }));
+                root.addChild(node);
+                journeyPanel = node;
+            };
+            A.pickJourney = function pickJourney(idx) { // idx — номер карты среди показанных верхних
+                if (!B || !B.picking || !journeyPanel) return;
+                const cardId = journeyTop[idx];
+                if (!cardId || CARDS[cardId].type !== "unit") return;
+                finishJourney(cardId);
+            };
+            // раздача остатков и запуск бесплатного призыва (chosen может быть
+            // null — игрок отказался от призыва)
+            A.finishJourney = function finishJourney(chosen) {
+                const rest = journeyTop.filter((id) => id !== chosen);
+                if (rest.length) {
+                    const k = (Math.random() * rest.length) | 0;
+                    B.hand.push(rest[k]); // одна случайная — в руку
+                    for (let i = 0; i < rest.length; i++) if (i !== k) B.discard.push(rest[i]);
+                }
+                sfx("chpoc");
+                closeJourneyPanel();
+                if (chosen) {
+                    if (freeCells(deployRows("p")).length) { // есть куда поставить
+                        B.journeySummon = chosen;
+                        layoutHand();
+                        redrawHighlight();
+                        refreshHud();
+                        return;
+                    }
+                    B.hand.push(chosen); // поле забито — карта хотя бы в руку
+                }
+                layoutHand();
+                refreshHud();
+            };
+            // отказ от бесплатного призыва — карта возвращается в руку
+            A.cancelJourneySummon = function cancelJourneySummon() {
+                if (!B.journeySummon) return;
+                B.hand.push(B.journeySummon);
+                B.journeySummon = null;
+                layoutHand();
+                redrawHighlight();
+                refreshHud();
+            };
+
+            // ── Панель «Варки зелий» (grw23): заклинание из СВОЕГО сброса или
+            // сброса противника — себе в руку, карта получает «Сожжение»
+            // (после розыгрыша удаляется из боя, в сброс не попадает).
+            // Два шага, как у «Пня обряда»: выбор сброса → выбор заклинания;
+            // «Назад»/Esc закрывает (само заклинание уже потрачено — как у
+            // «Поиска рун»). Заклинаний ни в одном сбросе — панель не открывается.
+            A.brewPanel = null;
+            A.brewPile = null;
+            A.closeBrewPanel = function closeBrewPanel() {
+                if (!brewPanel) return;
+                brewPanel.destroy({ children: true });
+                brewPanel = null;
+                brewPile = null;
+                if (B) B.picking = false;
+            };
+            A.spellsInDiscard = function spellsInDiscard(side) {
+                const disc = side === "p" ? B.discard : B.eDiscard;
+                return disc.filter((id) => CARDS[id] && CARDS[id].type === "spell");
+            };
+            A.openBrewPanel = function openBrewPanel() {
+                closeBrewPanel();
+                B.picking = true;
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("brew.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("brew.hint"), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const body = new PIXI.Container(); // перезаполняется выбором сброса
+                body.name = "body";
+                node.addChild(body);
+                const pileBtn = (key, side, x) => {
+                    const n = spellsInDiscard(side).length;
+                    const btn = globalThis.GAME_UI.button(ctx, {
+                        tex: "button_menu.png", label: t(key), x, y: 560, scale: 1,
+                        onTap: () => brewShow(side),
+                    });
+                    btn.alpha = n ? 1 : 0.45; // пустой сброс — не смотреть
+                    return btn;
+                };
+                body.addChild(pileBtn("brew.own", "p", 660));
+                body.addChild(pileBtn("brew.foe", "e", 1260));
+                root.addChild(node);
+                brewPanel = node;
+            };
+            A.brewShow = function brewShow(side) { // заклинания выбранного сброса
+                if (!brewPanel) return;
+                const spells = spellsInDiscard(side);
+                if (!spells.length) return;
+                brewPile = side;
+                const body = brewPanel.getChildByName("body");
+                body.destroy({ children: true });
+                const fresh = new PIXI.Container();
+                fresh.name = "body";
+                const m = spells.length;
+                const spread = Math.min(210, 1260 / Math.max(1, m));
+                spells.forEach((cardId, idx) => {
+                    const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                    c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                    c.eventMode = "static";
+                    c.on("pointertap", () => pickBrew(idx));
+                    fresh.addChild(c);
+                });
+                fresh.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("brew.back"), x: 960, y: 762, scale: 1,
+                    onTap: closeBrewPanel,
+                }));
+                brewPanel.addChild(fresh);
+            };
+            A.pickBrew = function pickBrew(idx) { // idx — номер карты среди заклинаний сброса
+                if (!B || !B.picking || !brewPanel || !brewPile) return;
+                const disc = brewPile === "p" ? B.discard : B.eDiscard;
+                const spells = disc.filter((id) => CARDS[id] && CARDS[id].type === "spell");
+                const cardId = spells[idx];
+                if (!cardId) return;
+                disc.splice(disc.indexOf(cardId), 1);
+                B.hand.push(cardId);
+                B.scorch.p.add(cardId); // «Сожжение»: после розыгрыша — из боя
+                sfx("chpoc");
+                closeBrewPanel();
+                layoutHand();
+                refreshHud();
+            };
+
+            // ── Панель «Раскопок» (grw39): выбранная своя постройка убрана в
+            // сброс — теперь постройка ИЗ СВОЕГО сброса встаёт в её клетку.
+            // «Оставить»/Esc — обмен не завершён: клетка пустует, постройки
+            // остаются в сбросе. Построек в сбросе нет — панель не открывается.
+            A.excavatePanel = null;
+            A.excavateCell = null;
+            A.closeExcavatePanel = function closeExcavatePanel() {
+                if (!excavatePanel) return;
+                excavatePanel.destroy({ children: true });
+                excavatePanel = null;
+                excavateCell = null;
+                if (B) B.picking = false;
+                refreshHud();
+            };
+            A.buildingsInDiscard = function buildingsInDiscard() {
+                return B.discard.filter((id) => CARDS[id] && CARDS[id].type === "building");
+            };
+            A.openExcavatePanel = function openExcavatePanel(cell) {
+                closeExcavatePanel();
+                const blds = buildingsInDiscard();
+                if (!blds.length) { // в сбросе построек нет — поменять не на что
+                    floatText(cellXY(cell.col, cell.row).x,
+                        cellXY(cell.col, cell.row).y - 60, t("excavate.empty"), 0x8a7c5e);
+                    return;
+                }
+                B.picking = true;
+                excavateCell = cell;
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("excavate.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("excavate.hint"), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const m = blds.length;
+                const spread = Math.min(210, 1260 / m);
+                blds.forEach((cardId, idx) => {
+                    const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                    c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                    c.eventMode = "static";
+                    c.on("pointertap", () => pickExcavate(idx));
+                    node.addChild(c);
+                });
+                node.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("excavate.back"), x: 960, y: 762, scale: 1,
+                    onTap: closeExcavatePanel,
+                }));
+                root.addChild(node);
+                excavatePanel = node;
+            };
+            A.pickExcavate = function pickExcavate(idx) { // idx — номер карты среди построек сброса
+                if (!B || !B.picking || !excavatePanel || !excavateCell) return;
+                const blds = buildingsInDiscard();
+                const cardId = blds[idx];
+                if (!cardId) return;
+                const cell = excavateCell;
+                B.discard.splice(B.discard.indexOf(cardId), 1);
+                closeExcavatePanel();
+                addUnit("p", cardId, cell.col, cell.row); // ловушка на клетке сработает, как при призыве
+                layoutHand();
+                redrawHighlight();
+                refreshHud();
+                checkEnd();
+            };
+        }
+    };
+})();
