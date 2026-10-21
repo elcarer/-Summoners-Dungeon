@@ -3771,13 +3771,13 @@
             const enc = ENCOUNTERS[B.encId];
             const cave = G.dungeon && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
             const elem = (enc && enc.elem) || (cave && cave.elem);
-            return elem === "growth" ? "card_nature_back.png" : "card_goblin_back.png";
+            return globalThis.GAME_UI.backTexOf(elem);
         }
         // Рубашка колоды и сброса ИГРОКА — по его стихии забега (просил
         // юзер): у Горбага и прочих героев Силы — гоблинская, у героев
         // Роста — природная
         function playerBackTex() {
-            return G.elem === "growth" ? "card_nature_back.png" : "card_goblin_back.png";
+            return globalThis.GAME_UI.backTexOf(G.elem);
         }
         // Ловушка врага — РУБАШКОЙ (просил юзер): игрок видит, что противник
         // сыграл карту, но какая именно ловушка — неизвестно; на поле встанет
@@ -5198,8 +5198,12 @@
                 ? [...G.activeEnemy.deck]
                 : enemyDeck(encId, G.run ? G.run.floor : 1);
             // карта персонажа противника: её baseHp — жизни базы врага
-            // (10/11/12/13/14/18 по картам юзера); нет карты — как раньше
+            // (10/11/12/13/14/18 по картам юзера); нет карты — как раньше.
+            // Босс этажа крепчает с глубиной (просил юзер): +2 макс. жизни
+            // за номер этажа (2-й этаж — +4)
             const eHeroDef = enc.hero && HEROES[enc.hero] ? HEROES[enc.hero] : null;
+            const bossHp = G.activeEnemy && G.activeEnemy.boss
+                ? 2 * (G.run ? G.run.floor : 1) : 0;
             // драфт («Карта сокровищ»): колода игрока — 12 отобранных карт,
             // НЕ G.deck (настоящая колода в мини-игре не участвует)
             const pDeck = G.draftBattle && G.draft ? G.draft.picks : G.deck;
@@ -5224,8 +5228,8 @@
                     builtGuard: { p: false, e: false },
                     trapEcho: { p: false, e: false },
                     buildReplay: { p: false, e: false } },
-                enemyBase: eHeroDef ? eHeroDef.baseHp : enc.baseHp,
-                enemyBaseMax: eHeroDef ? eHeroDef.baseHp : enc.baseHp,
+                enemyBase: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
+                enemyBaseMax: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
                 deck: shuffle([...pDeck]), discard: [], hand: [],
                 eDeck: shuffle([...eBase]),
                 eDeckBase: eBase,

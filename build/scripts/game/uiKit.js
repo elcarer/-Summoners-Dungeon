@@ -65,6 +65,12 @@
         return c;
     }
 
+    // Рубашка колоды по стихии (просил юзер): Рост — природная
+    // (card_nature_back), прочие — гоблинская (card_goblin_back)
+    function backTexOf(elem) {
+        return elem === "growth" ? "card_nature_back.png" : "card_goblin_back.png";
+    }
+
     // Крупная карта (колода/награда). Если у карты есть img — это готовое
     // лицо-картинка (рамка/имя/тексты/редкость нарисованы); иначе —
     // процедурная сборка из рубашки и подписей.
@@ -83,7 +89,9 @@
             if (dim) c.alpha = 0.45;
             return c;
         }
-        const face = new PIXI.Sprite(ctx.uiTex("card_back_min.png"));
+        // служебные токены (gobA/gobC/ancBear) без лица — рубашка СВОЕЙ
+        // стихии (карточка-подсказка при наведении на поле, просил юзер)
+        const face = new PIXI.Sprite(ctx.uiTex(backTexOf(def.elem)));
         face.anchor.set(0.5);
         face.scale.set(1.5);
         if (def.type !== "unit") face.tint = def.color || 0xffffff;
@@ -248,5 +256,5 @@
         };
     }
 
-    globalThis.GAME_UI = { T, fit, button, chip, cardFace, dimBg, scrollPane };
+    globalThis.GAME_UI = { T, fit, button, chip, cardFace, backTexOf, dimBg, scrollPane };
 })();

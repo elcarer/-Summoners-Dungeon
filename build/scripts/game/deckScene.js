@@ -9,10 +9,13 @@
 (function () {
     function createDeckScene(ctx) {
         const { scenes, G, ui, uiTex } = ctx;
-        const { CARDS, DECK_MAX, DECK_MIN, DECK_COPIES, ELEM_LOGO, HEROES,
+        const { CARDS, DECK_MAX, DECK_MIN, deckMinFor, DECK_COPIES, ELEM_LOGO, HEROES,
             HERO_ORDER, HERO_FOE_ORDER } = globalThis.GAME_DATA;
         const { T, fit, button, chip, cardFace, dimBg, scrollPane } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
+        // минимум колоды поднимается с этажом забега (просил юзер):
+        // спуск требовал 12+N карт — на этаже N+1 минимум уже 12+N
+        const deckMinNow = () => deckMinFor(G.run && G.run.floor ? G.run.floor : 1);
         let root = null, leftPane = null, rightPane = null, heroesPane = null;
         let tab = "deck"; // вкладка сцены: «Колода» | «Герои» (просил юзер)
         const heroCards = []; // вкладка «Герои»: {id, node} (тесты)
@@ -81,7 +84,7 @@
                 const da = CARDS[a], db = CARDS[b];
                 return (da.cost - db.cost) || a.localeCompare(b);
             }).filter(passes);
-            const locked = G.deck.length <= DECK_MIN; // минимум — убирать нельзя
+            const locked = G.deck.length <= deckMinNow(); // минимум — убирать нельзя
             ids.forEach((id, i) => {
                 const col = i % 3, rowI = (i / 3) | 0;
                 const cx = 93 + col * 198, cy = 138 + rowI * 307.5;
@@ -174,19 +177,20 @@
         function headerText() {
             if (!headerRef) return;
             headerRef.deck.text = t("deck.current", { n: G.deck.length, max: DECK_MAX });
-            headerRef.min.text = t("deck.min", { min: DECK_MIN });
-            headerRef.min.style.fill = G.deck.length < DECK_MIN ? 0xff8f6e : 0x8a7c5e;
+            headerRef.min.text = t("deck.min", { min: deckMinNow() });
+            headerRef.min.style.fill = G.deck.length < deckMinNow() ? 0xff8f6e : 0x8a7c5e;
         }
 
         // Имя героя: стартовые — свои ключи, карты противников — названия
         // энкаунтеров («Банда гоблинов», …)
         const heroName = (id) => t(HERO_ORDER.includes(id)
             ? `hero.${id}.name` : `enc.${id}.title`);
-        // Все герои вкладки: свои (всегда есть) и завоёванные. Карты
-        // противников, которые ещё не взяты, не показываются вовсе —
-        // как неполученные карты коллекции (просил юзер)
+        // Все герои вкладки: выбранный при «Новой игре» стартовый герой
+        // (только он, просил юзер) и завоёванные. Карты противников,
+        // которые ещё не взяты, не показываются вовсе — как неполученные
+        // карты коллекции
         function heroesOwnedOrder() {
-            return [...HERO_ORDER,
+            return [...HERO_ORDER.filter((id) => id === G.heroId),
                 ...HERO_FOE_ORDER.filter((id) => G.captured.includes(id))];
         }
 
@@ -524,7 +528,7 @@
             },
             remove(id) {
                 const i = G.deck.lastIndexOf(id);
-                if (i < 0 || G.deck.length <= DECK_MIN) return false;
+                if (i < 0 || G.deck.length <= deckMinNow()) return false;
                 G.deck.splice(i, 1);
                 save();
                 rebuildPanes();

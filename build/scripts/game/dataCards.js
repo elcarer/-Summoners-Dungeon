@@ -408,6 +408,13 @@
     };
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     const DECK_MAX = 60, DECK_MIN = 12, TRAP_SLOTS = 2;
+
+    // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N
+    // достигнут спуском с этажа N−1, требовавшим 12+(N−1) карт, — минимум
+    // поднимается вместе с ним: этаж 1 — 12, этаж 2 — 13, … (база DECK_MIN)
+    function deckMinFor(floor) {
+        return Math.min(DECK_MAX, DECK_MIN + Math.max(0, (floor | 0) - 1));
+    }
     const DECK_COPIES = 3; // максимум одинаковых карт в колоде
 
     // ГЕРОИ — выбор при «Новой игре» (вместо стихии, просил юзер). Герой
@@ -537,8 +544,8 @@
     };
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
-    // Архетипы врагов: core — ядро колоды, всегда целиком; добор генерится
-    // по этажу (enemyDeck): чем глубже, тем больше карт и тем выше доля
+    // Архетипы врагов: core — ядро колоды, всегда целиком; добор — только
+    // у боссов (enemyDeck): чем глубже, тем больше карт и тем выше доля
     // редких и эпических. На каждом этаже — свои архетипы (FLOOR_MOBS).
     // Название — ключ локализации enc.<id>.title; scene — фон арены.
     // hero — карта персонажа противника (ключ HEROES): её baseHp — жизни
@@ -577,7 +584,7 @@
         // «Гоблин-вождь» — главарь этажа (B на карте). Ядро — 10 карт элиты
         // (составом просил юзер); с глубиной добавляются карты из grow
         // (2 за этаж; часть пересекается с ядром — дубликаты в колоде
-        // врага легальны), добор — как у обычных.
+        // врага легальны), плюс общий добор — только боссу (просил юзер)
         boss:     { scene: 2, baseHp: 18, hero: "boss",
                     core: ["str8", "str7", "str13", "str29", "str30", "str11",
                            "str16", "str31", "str18", "str5"],
@@ -618,7 +625,8 @@
                              "grw24"] },
         // «Хранитель рощи» — главарь этажа (B на карте). Ядро — 11 карт
         // (составом просил юзер); с глубиной добавляются карты из grow
-        // (2 за этаж; к 6-му забирает весь список), добор — как у обычных.
+        // (2 за этаж; к 6-му забирает весь список), плюс общий добор —
+        // только боссу (просил юзер).
         grwBoss:   { scene: 1, baseHp: 18, elem: "growth", hero: "grwBoss",
                      core: ["grw3", "grw3", "grw13", "grw12", "grw15", "grw18",
                             "grw9", "grw22", "grw36", "grw40", "grw1"],
@@ -680,22 +688,26 @@
                      "grw26", "grw30", "grw31", "grw33", "grw40"],
         },
     };
-    // Колода врага: ядро архетипа + 3..8 карт добора; с глубиной (floor ≥ 1)
-    // шанс эпических в доборе растёт от 0% (этаж 1) до 45%, редких — до ~85%.
+    // Колода врага: ядро архетипа; весь добор — только боссу (просил
+    // юзер): с глубиной (floor ≥ 1) +2 карты из grow за этаж и 3..8 карт
+    // общего добора, в котором шанс эпических растёт от 0% (этаж 1) до
+    // 45%, редких — до ~85%.
     function enemyDeck(encId, floor) {
         const enc = ENCOUNTERS[encId] || ENCOUNTERS.gob;
         const fills = ENEMY_FILLS[enc.elem] || ENEMY_FILL;
         const deck = [...enc.core];
         const f = Math.max(1, floor | 0);
+        // маркер босса — grow-список (обычные враги играют ядром как есть)
+        const boss = !!enc.grow;
         // рост босса: с каждым этажом +2 карты из grow (без повторов внутри
         // него) — на 1-м этаже он без них, к 6-му забирает весь список
-        if (enc.grow) {
+        if (boss) {
             const pool = [...enc.grow];
             const take = Math.min((f - 1) * 2, pool.length);
             for (let k = 0; k < take; k++)
                 deck.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
         }
-        const extra = Math.min(3 + (((f - 1) / 2) | 0), 8);
+        const extra = boss ? Math.min(3 + (((f - 1) / 2) | 0), 8) : 0;
         const epicP = Math.min(0.45, (f - 1) * 0.09);
         const rareP = Math.min(0.85, 0.25 + f * 0.12);
         // правило юзера: в колоде не больше 3 одинаковых карт — добор
@@ -749,7 +761,8 @@
     };
 
     globalThis.GAME_DATA = {
-        CARDS, RARITY_COLORS, DEFAULT_DECK, DEFAULT_COLLECTION, DECK_MAX, DECK_MIN, TRAP_SLOTS,
+        CARDS, RARITY_COLORS, DEFAULT_DECK, DEFAULT_COLLECTION, DECK_MAX, DECK_MIN,
+        deckMinFor, TRAP_SLOTS,
         DECK_COPIES, REWARD_POOL, REWARD_POOLS, ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH,
         MOB_TABLES, ENEMY_FILL, ENEMY_FILLS, CAVES,
         STARTER_DECKS, STARTER_COLLECTIONS, HEROES, HERO_ORDER, HERO_FOE_ORDER,

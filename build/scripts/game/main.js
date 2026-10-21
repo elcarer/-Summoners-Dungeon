@@ -573,39 +573,6 @@
             },
         });
 
-        // ── Сцена «Этаж пройден» ───────────────────────────────────────────
-        let fwRoot = null;
-        scenes.add("floorWin", {
-            enter() {
-                fwRoot = new PIXI.Container();
-                fwRoot.eventMode = "static";
-                const dim = new PIXI.Graphics();
-                dim.rect(-3000, -2000, 7920, 5080);
-                dim.fill({ color: 0x000000, alpha: 0.65 });
-                fwRoot.addChild(dim);
-                const panel = new PIXI.Sprite(uiTex("panel_allert.png"));
-                panel.anchor.set(0.5);
-                panel.scale.set(2.25);
-                panel.position.set(960, 435);
-                fwRoot.addChild(panel);
-                const ft = T(t("floorWin.title", { n: G.run.floor - 1 }), 54, 0xffe9b0, { stroke: { color: 0x1c1207, width: 10 } });
-                ft.anchor.set(0.5);
-                ft.position.set(960, 378);
-                ft.eventMode = "none";
-                fwRoot.addChild(ft);
-                fwRoot.addChild(menuButton("button_menu.png", t("floorWin.next"), 960, 579, 1,
-                    () => scenes.go("dungeon")));
-                // «В меню» больше НЕ сбрасывает забег: прогресс этажа сохранён
-                // (dungeon.exit пишет sd_run), «Продолжить» в меню его поднимет
-                fwRoot.addChild(menuButton("button_menu.png", t("floorWin.menu"), 960, 729, 1,
-                    () => scenes.go("menu")));
-                ui.addChild(fwRoot);
-            },
-            exit() {
-                if (fwRoot) { fwRoot.destroy({ children: true }); fwRoot = null; }
-            },
-        });
-
         // ── Сцена «Выбор героя» (новая игра) ──────────────────────────────
         // Герой задаёт жизни базы в бою, стихии колоды (и стартовую
         // колоду) и особую способность (просил юзер). Карточки — полные

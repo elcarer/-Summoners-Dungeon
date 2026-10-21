@@ -67,15 +67,21 @@
             root.addChild(sub);
 
             // карта персонажа побеждённого (просил юзер): слева от трофеев,
-            // с подписью — теперь она в коллекции героев
+            // с подписью — теперь она в коллекции героев. Наведение растит
+            // до натурального размера, как у всех карт персонажей
             if (wonHero && globalThis.GAME_DATA.HEROES[wonHero]) {
                 const h = globalThis.GAME_DATA.HEROES[wonHero];
+                const holder = new PIXI.Container();
+                holder.position.set(175, 420);
+                holder.hitArea = new PIXI.Rectangle(-98, 0, 196, 287); // исходное место
                 const face = new PIXI.Sprite(ctx.uiTex(`heroes/${h.img}.png`));
                 face.anchor.set(0.5, 0);
                 face.scale.set(0.85); // 230×338 → ~196×287
-                face.position.set(175, 420);
                 face.eventMode = "none";
-                root.addChild(face);
+                holder.addChild(face);
+                // большой вид на 42 вверх: не задевает подписи сверху и снизу
+                ctx.heroHover(holder, face, 0, -42);
+                root.addChild(holder);
                 const lbl = T(t("arena.wonHero"), 24, 0xffe2a8,
                     { stroke: { color: 0x1c1207, width: 6 },
                         wordWrap: true, wordWrapWidth: 300, align: "center" });

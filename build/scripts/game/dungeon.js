@@ -122,9 +122,10 @@
         });
     }
 
-    // Минимальный размер колоды для спуска: на этаже N нужно 11+N карт
-    // (этаж 1 — 12, спуск на 2-й — 13, …), рост +1 за этаж до капа 60
-    // (просил юзер).
+    // Требование колоды для спуска: с этажа N нужно 12+N карт
+    // (спуск на 2-й — 13, на 3-й — 14, …), рост +1 за этаж до капа 60
+    // (просил юзер). Минимум колоды НА этаже N — то же число минус 1
+    // (dataCards.deckMinFor)
     function deckNeed(floor) {
         return Math.min(globalThis.GAME_DATA.DECK_MAX, 12 + floor);
     }
@@ -1361,8 +1362,8 @@
                     else if (st.floor >= caveOf(st.cave).maxFloor) {
                         showToast(GAME_LOC.t("dungeon.exitBottom"));
                     }
-                    // спуск требует растущую колоду: на этаже N — минимум
-                    // 11+N карт (этаж 1 — 12, спуск на 2-й — 13, …) до капа 60
+                    // спуск требует растущую колоду: с этажа N — 12+N карт
+                    // (спуск на 2-й — 13, …) до капа 60
                     else if (G.deck.length < deckNeed(st.floor)) {
                         showToast(GAME_LOC.t("dungeon.exitDeck", { n: deckNeed(st.floor) }));
                     } else {
@@ -1376,7 +1377,9 @@
                         next.heroPos = { ...next.spawn };
                         next.exitCool = false;
                         G.dungeon = next;
-                        scenes.go("floorWin");
+                        // сразу на следующий этаж, без меню «этаж пройден»
+                        // (просил юзер); floorSwap — перезаход в ту же сцену
+                        scenes.go("floorSwap");
                         return;
                     }
                 }
