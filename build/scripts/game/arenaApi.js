@@ -315,6 +315,48 @@
                 aiSpellPlayable: (id) => !!CARDS[id] && aiSpellPlayable(CARDS[id]),
                 // группы приоритета ИИ (тесты связок): id карты → группа
                 _aiGroup: (id) => (B && CARDS[id] ? aiGroup(id, CARDS[id]) : null),
+                // ── тест-хуки «умного ИИ» (волна 2026-10-21) ────────────────
+                // клетка призыва/постройки и её оценка
+                _aiUnitSpot: (id) => (B && CARDS[id] ? aiUnitSpot(CARDS[id]) : null),
+                _aiBuildingSpot: (id) => (B && CARDS[id] ? aiBuildingSpot(CARDS[id]) : null),
+                _aiSpotScore: (id, col, row) => (B && CARDS[id]
+                    ? aiSpotScore(CARDS[id], col, row) : null),
+                _aiBuildingScore: (id, col, row) => (B && CARDS[id]
+                    ? aiBuildingSpotScore(CARDS[id], col, row,
+                        freeCells(deployRows("e"))) : null),
+                // выбор цели урона/усиления/стрелка/круговой/ловушки
+                _aiDmgPick: (id, free = false) => {
+                    if (!B || !CARDS[id] || !CARDS[id].spell) return null;
+                    const u = aiDmgTargetPick(CARDS[id], aiDmgTargets(CARDS[id]), !!free);
+                    return u ? { col: u.col, row: u.row, id: cardIdOf(u.def) } : null;
+                },
+                _aiBuffPick: (id) => {
+                    if (!B || !CARDS[id] || !CARDS[id].spell) return null;
+                    const u = aiBuffPick(CARDS[id]);
+                    return u ? { col: u.col, row: u.row, id: cardIdOf(u.def) } : null;
+                },
+                _aiWolfPick: () => {
+                    const u = B ? aiWolfPick() : null;
+                    return u ? { col: u.col, row: u.row, id: cardIdOf(u.def) } : null;
+                },
+                _aiNovaPick: () => {
+                    const u = B ? aiNovaPick() : null;
+                    return u ? { col: u.col, row: u.row, id: cardIdOf(u.def) } : null;
+                },
+                _aiTrapSpot: (id) => (B && CARDS[id] ? aiTrapSpot(CARDS[id]) : null),
+                // поиск/гадание/путешествие: какую карту выбрал ИИ
+                _aiSearchSpell: (n) => {
+                    const k = B ? aiSearchSpell(n) : null;
+                    return k ? { id: k.id, j: k.j } : null;
+                },
+                _aiSearchUnit: (n) => {
+                    const k = B ? aiSearchUnit(n) : null;
+                    return k ? { id: k.id, j: k.j } : null;
+                },
+                _aiSummonPick: (n) => {
+                    const k = B ? aiSummonPick(n) : null;
+                    return k ? { id: k.id, j: k.j } : null;
+                },
             };
         }
     };
