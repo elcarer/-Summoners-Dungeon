@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Картотека — Развернутый Мир</title>
+<link rel="icon" href="data:,">
+<!-- ОТДЕЛЬНАЯ ОТ ИГРЫ программка (открывается двойным кликом): читает
+     чистые данные карт (scripts/game/cardsData.js) и локализацию (loc.js).
+     Просмотр всех карт по фильтрам + конструктор колод с сохранением
+     в файл и в память браузера. Никаких fetch — только <script>/img. -->
+<style>
+    @font-face {
+        font-family: "Kereru";
+        src: url("../font/Kereru.otf") format("opentype");
+    }
+    :root {
+        --bg: #16110c; --panel: #221b12; --panel2: #2b2216; --line: #453723;
+        --text: #d8c79d; --dim: #8a7c5e; --gold: #f0c96a; --red: #ff8f6e;
+        --green: #9ec46a;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; background: var(--bg); color: var(--text);
+        font: 15px/1.45 "Kereru", "Segoe UI", serif;
+    }
+    button {
+        font: inherit; color: var(--text); background: var(--panel2);
+        border: 1px solid var(--line); border-radius: 6px;
+        padding: 4px 10px; cursor: pointer;
+    }
+    button:hover { border-color: var(--gold); color: var(--gold); }
+    button.on { background: #3d2f1a; border-color: var(--gold); color: var(--gold); }
+    input, select {
+        font: inherit; color: var(--text); background: #1a140d;
+        border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--gold); }
+
+    header {
+        display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+        padding: 10px 16px 6px;
+    }
+    header h1 { margin: 0; font-size: 26px; color: var(--gold); letter-spacing: 1px; }
+    header .sub { color: var(--dim); font-size: 13px; }
+    header .spacer { flex: 1; }
+
+    #filters {
+        display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+        padding: 4px 16px 10px; border-bottom: 1px solid var(--line);
+    }
+    #filters .lbl { color: var(--dim); font-size: 13px; }
+    #statusLine { padding: 6px 16px 0; color: var(--dim); font-size: 13px; }
+
+    #main { display: flex; align-items: flex-start; }
+    #gridWrap { flex: 1; padding: 10px 16px 40px; }
+    #grid { display: flex; flex-wrap: wrap; gap: 12px; }
+
+    .tile {
+        position: relative; width: 146px; border-radius: 9px; cursor: pointer;
+        transition: transform .12s;
+    }
+    .tile:hover { transform: translateY(-3px); }
+    .tile img { width: 146px; display: block; border-radius: 9px; }
+    .tile .face {
+        width: 146px; height: 214px; border-radius: 9px; border: 1px solid var(--line);
+        background-size: cover; background-position: center; position: relative;
+    }
+    .tile .tokName {
+        position: absolute; left: 0; right: 0; bottom: 8px; text-align: center;
+        font-size: 12px; color: #ffe9c2; text-shadow: 0 1px 3px #000, 0 0 6px #000;
+        padding: 0 4px;
+    }
+    .tile .inDeck {
+        position: absolute; top: -7px; right: -7px; min-width: 22px; height: 22px;
+        background: var(--gold); color: #241505; border-radius: 11px;
+        font-size: 13px; line-height: 22px; text-align: center; padding: 0 5px;
+        box-shadow: 0 1px 4px #000;
+    }
+    .tile .addBtn {
+        position: absolute; top: 4px; right: 4px; display: none;
+        width: 26px; height: 26px; padding: 0; font-size: 17px; line-height: 1;
+        background: rgba(20, 14, 6, .85);
+    }
+    .tile:hover .addBtn { display: block; }
+
+    /* ── правая колонка: конструктор колод ─────────────────────────────── */
+    #deckPane {
+        width: 330px; flex-shrink: 0; margin: 10px 16px 40px 0;
+        background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+        padding: 12px 14px; position: sticky; top: 8px;
+    }
+    #deckPane h2 {
+        margin: 0 0 8px; font-size: 19px; color: var(--gold); letter-spacing: 1px;
+        display: flex; align-items: baseline; gap: 8px;
+    }
+    #deckTotal { font-size: 14px; color: var(--dim); }
+    #deckTotal.bad { color: var(--red); }
+    #deckTotal.few { color: var(--gold); }
+    #deckName { width: 100%; margin-bottom: 8px; }
+    #deckList {
+        max-height: 300px; overflow-y: auto; border: 1px solid var(--line);
+        border-radius: 8px; background: #1a140d; margin-bottom: 8px;
+    }
+    .drow {
+        display: flex; align-items: center; gap: 6px;
+        padding: 3px 8px; border-bottom: 1px solid #241c11; font-size: 14px;
+    }
+    .drow:last-child { border-bottom: none; }
+    .drow .cost { color: var(--dim); width: 26px; text-align: right; flex-shrink: 0; }
+    .drow .nm { flex: 1; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .drow .nm:hover { color: var(--gold); }
+    .drow .cnt { color: var(--gold); width: 30px; text-align: center; flex-shrink: 0; }
+    .drow button { padding: 0 8px; font-size: 14px; line-height: 20px; }
+    #deckEmpty { color: var(--dim); text-align: center; padding: 18px 8px; font-size: 13px; }
+    #curve { display: flex; align-items: flex-end; gap: 4px; height: 52px; margin: 6px 0 10px; }
+    #curve .bar { flex: 1; background: #3d2f1a; border-radius: 3px 3px 0 0; position: relative; min-height: 2px; }
+    #curve .bar i {
+        position: absolute; top: -16px; left: 0; right: 0; text-align: center;
+        font-style: normal; font-size: 11px; color: var(--dim);
+    }
+    #curve .bar b { position: absolute; bottom: -15px; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--dim); font-weight: normal; }
+    .btnRow { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .btnRow button { flex: 1; white-space: nowrap; }
+    #slots { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+    #slots h3 { margin: 0 0 6px; font-size: 15px; color: var(--dim); font-weight: normal; }
+    .slot { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 14px; }
+    .slot .nm { flex: 1; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .slot .nm:hover { color: var(--gold); }
+    .slot .info { color: var(--dim); font-size: 12px; flex-shrink: 0; }
+    .slot button { padding: 0 7px; font-size: 12px; }
+    #slotEmpty { color: var(--dim); font-size: 13px; }
+
+    /* ── вкладка персонажей ────────────────────────────────────────────── */
+    #heroGrid { display: flex; flex-wrap: wrap; gap: 14px; padding: 14px 16px 40px; }
+    .htile { width: 170px; cursor: pointer; transition: transform .12s; }
+    .htile:hover { transform: translateY(-3px); }
+    .htile img { width: 170px; border-radius: 10px; display: block; }
+    .htile .cap { text-align: center; margin-top: 4px; font-size: 14px; }
+    .htile .cap small { color: var(--dim); }
+
+    /* ── подробности о карте ───────────────────────────────────────────── */
+    #dim { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: none; z-index: 40; }
+    #detail {
+        position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%);
+        display: none; z-index: 50; background: var(--panel);
+        border: 1px solid var(--gold); border-radius: 12px; padding: 18px;
+        max-width: 760px; max-height: 92vh; overflow: auto;
+    }
+    #detail .cols { display: flex; gap: 18px; }
+    #detail img.face { width: 253px; border-radius: 12px; align-self: flex-start; }
+    #detail .info { max-width: 420px; }
+    #detail h3 { margin: 0 0 6px; color: var(--gold); font-size: 22px; }
+    #detail .badges { margin-bottom: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+    #detail .badge {
+        font-size: 12px; border: 1px solid var(--line); border-radius: 10px;
+        padding: 1px 8px; color: var(--dim);
+    }
+    #detail .stats { font-size: 16px; margin-bottom: 8px; }
+    #detail .stats b { color: var(--gold); font-weight: normal; }
+    #detail .desc { margin: 0 0 10px; }
+    #detail .raw {
+        font: 12px/1.5 Consolas, monospace; color: var(--dim);
+        border-top: 1px dashed var(--line); padding-top: 8px; white-space: pre-wrap;
+    }
+    #detailClose { position: absolute; top: 8px; right: 10px; font-size: 16px; }
+
+    #toast {
+        position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+        background: #3d2f1a; border: 1px solid var(--gold); color: var(--gold);
+        border-radius: 8px; padding: 7px 16px; font-size: 14px;
+        opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 60;
+    }
+</style>
+</head>
+<body>
+<header>
+    <h1>КАРТОТЕКА</h1>
+    <span class="sub">Развернутый Мир · данные: scripts/game/cardsData.js</span>
+    <span class="spacer"></span>
+    <button id="tabCards" class="on"></button>
+    <button id="tabHeroes"></button>
+    <button id="langBtn"></button>
+</header>
+
+<div id="cardsView">
+    <div id="filters">
+        <input id="q" type="search" style="width: 190px;">
+        <span class="lbl" id="lblElem"></span><span id="elemBtns"></span>
+        <span class="lbl" id="lblType"></span><span id="typeBtns"></span>
+        <span class="lbl" id="lblRarity"></span><span id="rarityBtns"></span>
+        <span class="lbl" id="lblCost"></span>
+        <select id="costSel"></select>
+        <select id="sortSel"></select>
+        <button id="resetBtn"></button>
+    </div>
+    <div id="statusLine"></div>
+    <div id="main">
+        <div id="gridWrap"><div id="grid"></div></div>
+        <div id="deckPane">
+            <h2><span id="lblDeck"></span><span id="deckTotal"></span></h2>
+            <input id="deckName" type="text">
+            <div id="deckList"></div>
+            <div id="curve"></div>
+            <div class="btnRow">
+                <button id="presetStr"></button>
+                <button id="presetGrw"></button>
+                <button id="clearBtn"></button>
+            </div>
+            <div class="btnRow">
+                <button id="saveFile"></button>
+                <button id="loadFile"></button>
+                <input id="fileInput" type="file" accept=".json,application/json" style="display:none">
+            </div>
+            <div id="slots">
+                <h3 id="lblSlots"></h3>
+                <div class="btnRow" style="margin-bottom:6px;">
+                    <input id="slotName" type="text" style="flex:1; min-width:100px;">
+                    <button id="slotSave"></button>
+                </div>
+                <div id="slotList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="heroView" style="display:none"><div id="heroGrid"></div></div>
+
+<div id="dim"></div>
+<div id="detail"><button id="detailClose">✕</button><div class="cols" id="detailCols"></div></div>
+<div id="toast"></div>
+
+<script src="../scripts/game/cardsData.js"></script>
+<script src="../scripts/game/loc.js"></script>
+<script>
+(function () {
+    "use strict";
+    const D = globalThis.GAME_CARD_DATA;
+    const CARDS = D.CARDS;
+    const loc = globalThis.GAME_LOC;
+    const t = (k, v) => loc.t(k, v);
+    const $ = (id) => document.getElementById(id);
+
+    // ── подписи интерфейса (карточные тексты — из loc.js игры) ──────────
+    const UI = {
+        ru: {
+            title: "Картотека", tabCards: "КАРТЫ", tabHeroes: "ПЕРСОНАЖИ",
+            elem: "Стихия:", type: "Тип:", rarity: "Редкость:", cost: "Цена:",
+            all: "все", sort: "Сортировка:", reset: "Сброс",
+            sortId: "по каталогу", sortCostAsc: "цена ↑", sortCostDesc: "цена ↓", sortName: "имя",
+            shown: "Показано: {n} из {m}", deck: "КОЛОДА", deckName: "Моя колода",
+            deckEmpty: "Колода пуста — кликните «+» на карте",
+            maxLine: "{n} / {max} карт", fewLine: "{n} / {max} · минимум {min}",
+            presetStr: "Старт: Сила", presetGrw: "Старт: Рост", clear: "Очистить",
+            saveFile: "⬇ файл", loadFile: "⬆ файл",
+            slots: "Мои колоды (память браузера)", slotSave: "Сохранить",
+            slotEmpty: "Пока ничего не сохранено",
+            errMax: "В колоде уже {max} карт", errCopies: "«{name}» — уже {n} копий (максимум {m})",
+            loaded: "Колода «{name}» загружена: {n} карт", saved: "Сохранено: «{name}»",
+            badFile: "Не удалось прочитать файл: {err}", unknownIds: "пропущены неизвестные карты: {ids}",
+            copied: "JSON колоды скопирован", heroHp: "♥ базы: {n}",
+            noFace: "без лица", stats: "⚡ {cost}  ·  ⚔ {atk}  ·  ♥ {hp}  ·  👟 {spd}",
+            statsSpell: "⚡ {cost}", rawTitle: "Параметры:",
+        },
+        en: {
+            title: "Card Files", tabCards: "CARDS", tabHeroes: "HEROES",
+            elem: "Element:", type: "Type:", rarity: "Rarity:", cost: "Cost:",
+            all: "any", sort: "Sort:", reset: "Reset",
+            sortId: "by catalog", sortCostAsc: "cost ↑", sortCostDesc: "cost ↓", sortName: "name",
+            shown: "Shown: {n} of {m}", deck: "DECK", deckName: "My deck",
+            deckEmpty: "Deck is empty — press «+» on a card",
+            maxLine: "{n} / {max} cards", fewLine: "{n} / {max} · min {min}",
+            presetStr: "Starter: Strength", presetGrw: "Starter: Growth", clear: "Clear",
+            saveFile: "⬇ file", loadFile: "⬆ file",
+            slots: "My decks (browser storage)", slotSave: "Save",
+            slotEmpty: "Nothing saved yet",
+            errMax: "Deck already has {max} cards", errCopies: "«{name}» — already {n} copies (max {m})",
+            loaded: "Deck «{name}» loaded: {n} cards", saved: "Saved: «{name}»",
+            badFile: "Could not read the file: {err}", unknownIds: "skipped unknown cards: {ids}",
+            copied: "Deck JSON copied", heroHp: "base ♥: {n}",
+            noFace: "no face", stats: "⚡ {cost}  ·  ⚔ {atk}  ·  ♥ {hp}  ·  👟 {spd}",
+            statsSpell: "⚡ {cost}", rawTitle: "Parameters:",
+        },
+    };
+    const L = () => UI[loc.lang] || UI.ru;
+    const T = (k, v) => { const s = L()[k] !== undefined ? L()[k] : k;
+        return v ? Object.keys(v).reduce((acc, key) => acc.split("{" + key + "}").join(v[key]), s) : s; };
+
+    // ── состояние ────────────────────────────────────────────────────────
+    const LS = { cur: "carddb.current", decks: "carddb.decks", lang: "carddb.lang" };
+    const state = {
+        view: "cards",
+        q: "", elem: "all", type: "all", rarity: "all", cost: "all", sort: "id",
+        deck: { name: "", cards: {} }, // id → число копий
+    };
+
+    function deckIds() { return Object.keys(state.deck.cards); }
+    function deckCount() { return deckIds().reduce((n, id) => n + state.deck.cards[id], 0); }
+    const byCostThenName = (a, b) =>
+        (CARDS[a].cost - CARDS[b].cost) || nameOf(a).localeCompare(nameOf(b)) || natKey(a).localeCompare(natKey(b));
+    function nameOf(id) {
+        return CARDS[id] ? t("card." + id + ".name") : id;
+    }
+    function heroName(id) { // у вражеских карт-героев нет hero.<id>.name — их
+        // имя = название энкаунтера (enc.<id>.title)
+        const nm = t("hero." + id + ".name");
+        return nm === "hero." + id + ".name" ? t("enc." + id + ".title") : nm;
+    }
+    function natKey(id) { // str2 < str10: каталог с числовым хвостом
+        const m = id.match(/^([a-z]+)(\d*)$/i);
+        return m ? m[1] + String(m[2] || 0).padStart(6, "0") : id;
+    }
+    const hex = (n) => "#" + Number(n).toString(16).padStart(6, "0");
+
+    // ── фильтрация и сортировка каталога ────────────────────────────────
+    function filteredIds() {
+        const q = state.q.trim().toLowerCase();
+        let ids = Object.keys(CARDS).filter((id) => {
+            const d = CARDS[id];
+            if (state.elem !== "all" && d.elem !== state.elem) return false;
+            if (state.type !== "all" && d.type !== state.type) return false;
+            if (state.rarity !== "all" && d.rarity !== state.rarity) return false;
+            if (state.cost !== "all") {
+                if (state.cost === "7+" ? d.cost < 7 : d.cost !== Number(state.cost)) return false;
+            }
+            if (q && (nameOf(id).toLowerCase().indexOf(q) < 0
+                && t("card." + id + ".desc").toLowerCase().indexOf(q) < 0
+                && id.toLowerCase().indexOf(q) < 0)) return false;
+            return true;
+        });
+        const sorts = {
+            id: (a, b) => natKey(a) < natKey(b) ? -1 : 1,
+            costAsc: byCostThenName,
+            costDesc: (a, b) => (CARDS[b].cost - CARDS[a].cost) || byCostThenName(a, b),
+            name: (a, b) => {
+                const c = nameOf(a).localeCompare(nameOf(b));
+                return c || (natKey(a) < natKey(b) ? -1 : 1);
+            },
+        };
+        return ids.sort(sorts[state.sort] || sorts.id);
+    }
+
+    // ── сетка карт ──────────────────────────────────────────────────────
+    function backOf(elem) { // рубашка токенов без лица — как backTexOf игры
+        return elem === "growth" ? "../images/ui/card_nature_back.png"
+                                 : "../images/ui/card_goblin_back.png";
+    }
+    function renderGrid() {
+        const ids = filteredIds();
+        const grid = $("grid");
+        grid.textContent = "";
+        ids.forEach((id) => {
+            const d = CARDS[id];
+            const tile = document.createElement("div");
+            tile.className = "tile";
+            tile.dataset.id = id; // для тестов и отладки
+            tile.title = nameOf(id);
+            if (d.img) {
+                const img = document.createElement("img");
+                img.src = "../images/cards/" + d.img + ".png";
+                img.loading = "lazy";
+                tile.appendChild(img);
+            } else { // служебные токены: рубашка стихии + имя
+                const face = document.createElement("div");
+                face.className = "face";
+                face.style.backgroundImage = "url(" + backOf(d.elem) + ")";
+                const nm = document.createElement("div");
+                nm.className = "tokName";
+                nm.textContent = nameOf(id);
+                face.appendChild(nm);
+                tile.appendChild(face);
+            }
+            const n = state.deck.cards[id] || 0;
+            if (n > 0) {
+                const b = document.createElement("div");
+                b.className = "inDeck";
+                b.textContent = "×" + n;
+                tile.appendChild(b);
+            }
+            const add = document.createElement("button");
+            add.className = "addBtn"; add.textContent = "+";
+            add.title = T("deck");
+            add.addEventListener("click", (e) => { e.stopPropagation(); addCard(id); });
+            tile.appendChild(add);
+            tile.addEventListener("click", () => showCard(id));
+            grid.appendChild(tile);
+        });
+        $("statusLine").textContent = T("shown", { n: ids.length, m: Object.keys(CARDS).length });
+    }
+
+    // ── конструктор колод ───────────────────────────────────────────────
+    function addCard(id) {
+        const have = state.deck.cards[id] || 0;
+        if (deckCount() >= D.DECK_MAX) return toast(T("errMax", { max: D.DECK_MAX }));
+        if (have >= D.DECK_COPIES)
+            return toast(T("errCopies", { name: nameOf(id), n: have, m: D.DECK_COPIES }));
+        state.deck.cards[id] = have + 1;
+        persist(); renderDeck(); renderGrid();
+    }
+    function removeCard(id) {
+        const have = state.deck.cards[id] || 0;
+        if (have <= 1) delete state.deck.cards[id];
+        else state.deck.cards[id] = have - 1;
+        persist(); renderDeck(); renderGrid();
+    }
+    function renderDeck() {
+        const total = deckCount();
+        const tot = $("deckTotal");
+        tot.textContent = total > D.DECK_MIN ? T("maxLine", { n: total, max: D.DECK_MAX })
+            : T("fewLine", { n: total, max: D.DECK_MAX, min: D.DECK_MIN });
+        tot.className = total > D.DECK_MAX ? "bad" : total < D.DECK_MIN ? "few" : "";
+
+        const list = $("deckList");
+        list.textContent = "";
+        const ids = deckIds().sort(byCostThenName);
+        if (!ids.length) {
+            const empty = document.createElement("div");
+            empty.id = "deckEmpty";
+            empty.textContent = T("deckEmpty");
+            list.appendChild(empty);
+        }
+        ids.forEach((id) => {
+            const row = document.createElement("div");
+            row.className = "drow";
+            const cost = document.createElement("span");
+            cost.className = "cost"; cost.textContent = CARDS[id].cost + "⚡";
+            const nm = document.createElement("span");
+            nm.className = "nm"; nm.textContent = nameOf(id);
+            nm.title = ""; nm.addEventListener("click", () => showCard(id));
+            const cnt = document.createElement("span");
+            cnt.className = "cnt"; cnt.textContent = "×" + state.deck.cards[id];
+            const minus = document.createElement("button"); minus.textContent = "−";
+            minus.addEventListener("click", () => removeCard(id));
+            const plus = document.createElement("button"); plus.textContent = "+";
+            plus.addEventListener("click", () => addCard(id));
+            row.append(cost, nm, cnt, minus, plus);
+            list.appendChild(row);
+        });
+        renderCurve();
+        $("deckName").value = state.deck.name;
+    }
+    function renderCurve() { // столбик цены 0..6, 7+
+        const counts = {};
+        deckIds().forEach((id) => {
+            const c = Math.min(CARDS[id].cost, 7);
+            counts[c] = (counts[c] || 0) + state.deck.cards[id];
+        });
+        const max = Math.max(1, ...Object.values(counts));
+        const curve = $("curve");
+        curve.textContent = "";
+        for (let c = 0; c <= 7; c++) {
+            const bar = document.createElement("div");
+            bar.className = "bar";
+            bar.style.height = Math.round((counts[c] || 0) / max * 34 + 2) + "px";
+            if (counts[c]) {
+                const i = document.createElement("i"); i.textContent = counts[c];
+                bar.appendChild(i);
+            }
+            const b = document.createElement("b"); b.textContent = c === 7 ? "7+" : c;
+            bar.appendChild(b);
+            curve.appendChild(bar);
+        }
+    }
+    function setDeckFrom(arr, name) { // массив с повторами → карта колоды
+        const cards = {};
+        for (const id of arr) if (CARDS[id]) cards[id] = (cards[id] || 0) + 1;
+        state.deck = { name: name || state.deck.name, cards };
+        persist(); renderDeck(); renderGrid();
+    }
+    function persist() {
+        try { localStorage.setItem(LS.cur, JSON.stringify(state.deck)); } catch (e) { /* приватный режим */ }
+    }
+    function restore() {
+        try {
+            const raw = localStorage.getItem(LS.cur);
+            if (raw) {
+                const d = JSON.parse(raw);
+                if (d && d.cards) state.deck = { name: d.name || T("deckName"), cards: sanitize(d.cards) };
+            }
+        } catch (e) { /* битая запись — начинаем с пустой */ }
+        if (!state.deck.name) state.deck.name = T("deckName");
+    }
+    function sanitize(cards) { // чужой JSON: только известные id, капы игры
+        const out = {};
+        let total = 0;
+        for (const id of Object.keys(cards || {})) {
+            if (!CARDS[id]) continue;
+            const n = Math.min(Number(cards[id]) || 0, D.DECK_COPIES);
+            for (let k = 0; k < n && total < D.DECK_MAX; k++, total++) out[id] = (out[id] || 0) + 1;
+        }
+        return out;
+    }
+
+    // ── сохранение/загрузка: файл и память браузера ─────────────────────
+    function exportText() {
+        return JSON.stringify({ game: "unfolded-world", kind: "deck", version: 1,
+            name: state.deck.name, cards: state.deck.cards,
+            saved: new Date().toISOString() }, null, 2);
+    }
+    function importText(text) { // понимает и {cards:{…}}, и плоский массив id
+        let data;
+        try { data = JSON.parse(text); } catch (e) { return { ok: false, err: String(e) }; }
+        const arr = Array.isArray(data) ? data
+            : Array.isArray(data && data.cards) ? data.cards
+            : data && data.cards && typeof data.cards === "object" ? null : data;
+        const skipped = [];
+        let cards;
+        if (arr) {
+            cards = {};
+            arr.forEach((id) => { if (CARDS[id]) cards[id] = (cards[id] || 0) + 1; else skipped.push(id); });
+            cards = sanitize(cards);
+        } else {
+            cards = sanitize(data.cards);
+            skipped.push.apply(skipped, Object.keys(data.cards).filter((id) => !CARDS[id]));
+        }
+        state.deck = { name: (data && data.name) || state.deck.name, cards };
+        persist(); renderDeck(); renderGrid();
+        if (skipped.length) toast(T("unknownIds", { ids: skipped.join(", ") }));
+        return { ok: true, skipped };
+    }
+    $("saveFile").addEventListener("click", () => {
+        const blob = new Blob([exportText()], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "deck-" + state.deck.name.replace(/[^\wа-яёА-ЯЁ\- ]+/gi, "").trim()
+            .replace(/\s+/g, "_") + ".json";
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    });
+    $("loadFile").addEventListener("click", () => $("fileInput").click());
+    $("fileInput").addEventListener("change", () => {
+        const f = $("fileInput").files[0];
+        $("fileInput").value = "";
+        if (!f) return;
+        const rd = new FileReader();
+        rd.onload = () => {
+            const res = importText(String(rd.result));
+            if (res.ok) toast(T("loaded", { name: state.deck.name, n: deckCount() }));
+            else toast(T("badFile", { err: res.err }));
+        };
+        rd.readAsText(f, "utf-8");
+    });
+
+    function slots() {
+        try { return JSON.parse(localStorage.getItem(LS.decks)) || {}; }
+        catch (e) { return {}; }
+    }
+    function renderSlots() {
+        const all = slots();
+        const names = Object.keys(all).sort((a, b) => (all[b].saved || "").localeCompare(all[a].saved || ""));
+        const list = $("slotList");
+        list.textContent = "";
+        if (!names.length) {
+            const e = document.createElement("div");
+            e.id = "slotEmpty"; e.textContent = T("slotEmpty");
+            list.appendChild(e);
+            return;
+        }
+        names.forEach((nm) => {
+            const row = document.createElement("div");
+            row.className = "slot";
+            const label = document.createElement("span");
+            label.className = "nm"; label.textContent = nm;
+            label.title = nm;
+            label.addEventListener("click", () => {
+                state.deck = { name: nm, cards: sanitize(all[nm].cards) };
+                persist(); renderDeck(); renderGrid();
+                toast(T("loaded", { name: nm, n: deckCount() }));
+            });
+            const info = document.createElement("span");
+            info.className = "info";
+            info.textContent = String(Object.values(all[nm].cards).reduce((a, b) => a + b, 0));
+            const del = document.createElement("button"); del.textContent = "✕";
+            del.addEventListener("click", () => {
+                const rest = slots(); delete rest[nm];
+                localStorage.setItem(LS.decks, JSON.stringify(rest));
+                renderSlots();
+            });
+            row.append(label, info, del);
+            list.appendChild(row);
+        });
+    }
+    $("slotSave").addEventListener("click", () => {
+        const nm = $("slotName").value.trim() || state.deck.name.trim() || T("deckName");
+        const all = slots();
+        all[nm] = { cards: state.deck.cards, saved: new Date().toISOString() };
+        localStorage.setItem(LS.decks, JSON.stringify(all));
+        state.deck.name = nm; persist();
+        renderSlots(); renderDeck();
+        toast(T("saved", { name: nm }));
+    });
+
+    // ── подробности о карте / герое ─────────────────────────────────────
+    function badgeLine(text) {
+        const b = document.createElement("span");
+        b.className = "badge"; b.textContent = text;
+        return b;
+    }
+    function showCard(id) {
+        const d = CARDS[id];
+        const cols = $("detailCols");
+        cols.textContent = "";
+        const face = document.createElement("img");
+        face.className = "face";
+        face.src = d.img ? "../images/cards/" + d.img + ".png" : backOf(d.elem);
+        cols.appendChild(face);
+        const info = document.createElement("div");
+        info.className = "info";
+        const h = document.createElement("h3");
+        h.textContent = nameOf(id);
+        info.appendChild(h);
+        const badges = document.createElement("div");
+        badges.className = "badges";
+        badges.append(
+            badgeLine(t("type." + d.type)),
+            badgeLine(t("rarity." + d.rarity) + " · " + hex(D.RARITY_COLORS[d.rarity] || 0)),
+            badgeLine(t("elem." + d.elem)),
+            badgeLine("id: " + id),
+        );
+        if (!d.img) badges.appendChild(badgeLine(T("noFace")));
+        info.appendChild(badges);
+        const stats = document.createElement("div");
+        stats.className = "stats";
+        stats.innerHTML = d.atk !== undefined
+            ? "<b>" + T("stats", { cost: d.cost, atk: d.atk, hp: d.hp, spd: d.speed || "—" }) + "</b>"
+            : "<b>" + T("statsSpell", { cost: d.cost }) + "</b>";
+        info.appendChild(stats);
+        const desc = document.createElement("p");
+        desc.className = "desc";
+        desc.textContent = t("card." + id + ".desc");
+        info.appendChild(desc);
+        const rest = Object.assign({}, d);
+        ["type", "cost", "atk", "hp", "speed", "rarity", "elem", "color", "img"]
+            .forEach((k) => delete rest[k]);
+        const raw = document.createElement("div");
+        raw.className = "raw";
+        raw.textContent = T("rawTitle") + "\n" + JSON.stringify(rest, (k, v) =>
+            v === undefined ? String(undefined) : v, 1);
+        info.appendChild(raw);
+        cols.appendChild(info);
+        $("detail").style.display = "block";
+        $("dim").style.display = "block";
+    }
+    function showHero(id) {
+        const d = D.HEROES[id];
+        const cols = $("detailCols");
+        cols.textContent = "";
+        const face = document.createElement("img");
+        face.className = "face";
+        face.src = "../images/heroes/" + d.img + ".png";
+        cols.appendChild(face);
+        const info = document.createElement("div");
+        info.className = "info";
+        const h = document.createElement("h3");
+        h.textContent = heroName(id);
+        info.appendChild(h);
+        const badges = document.createElement("div");
+        badges.className = "badges";
+        badges.append(badgeLine(t("rarity." + d.rarity)), badgeLine("id: " + id));
+        info.appendChild(badges);
+        const stats = document.createElement("div");
+        stats.className = "stats";
+        stats.innerHTML = "<b>" + T("heroHp", { n: d.baseHp }) + "</b>";
+        info.appendChild(stats);
+        const elems = document.createElement("p");
+        elems.className = "desc";
+        elems.textContent = d.elems.map((e) => t("elem." + e)).join(", ");
+        info.appendChild(elems);
+        const desc = document.createElement("p");
+        desc.className = "desc";
+        desc.textContent = t("hero." + id + ".ability");
+        info.appendChild(desc);
+        cols.appendChild(info);
+        $("detail").style.display = "block";
+        $("dim").style.display = "block";
+    }
+    function hideDetail() {
+        $("detail").style.display = "none";
+        $("dim").style.display = "none";
+    }
+    $("dim").addEventListener("click", hideDetail);
+    $("detailClose").addEventListener("click", hideDetail);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideDetail(); });
+
+    // ── вкладка персонажей ──────────────────────────────────────────────
+    function renderHeroes() {
+        const grid = $("heroGrid");
+        grid.textContent = "";
+        [...D.HERO_ORDER, ...D.HERO_FOE_ORDER].forEach((id) => {
+            const d = D.HEROES[id];
+            if (!d) return;
+            const tile = document.createElement("div");
+            tile.className = "htile";
+            const img = document.createElement("img");
+            img.src = "../images/heroes/" + d.img + ".png";
+            const cap = document.createElement("div");
+            cap.className = "cap";
+            const nm = document.createElement("div");
+            nm.textContent = heroName(id);
+            const sub = document.createElement("small");
+            sub.textContent = t("elem." + d.elems[0]) + " · ♥" + d.baseHp
+                + " · " + t("rarity." + d.rarity);
+            cap.append(nm, sub);
+            tile.append(img, cap);
+            tile.addEventListener("click", () => showHero(id));
+            grid.appendChild(tile);
+        });
+    }
+
+    // ── фильтры: сборка контролов ───────────────────────────────────────
+    function chip(parent, label, isOn, onPick) {
+        const b = document.createElement("button");
+        b.textContent = label;
+        if (isOn) b.className = "on";
+        b.addEventListener("click", () => { onPick(); renderFilters(); renderGrid(); });
+        parent.appendChild(b);
+        return b;
+    }
+    function renderFilters() {
+        const elems = ["all", ...Object.keys(CARDS).reduce((acc, id) => {
+            if (!acc.includes(CARDS[id].elem)) acc.push(CARDS[id].elem);
+            return acc; }, [])];
+        const eBtns = $("elemBtns");
+        eBtns.textContent = "";
+        elems.forEach((e) =>
+            chip(eBtns, e === "all" ? T("all") : t("elem." + e), state.elem === e,
+                () => { state.elem = e; }));
+        const tBtns = $("typeBtns");
+        tBtns.textContent = "";
+        ["all", "unit", "spell", "building", "trap"].forEach((tp) =>
+            chip(tBtns, tp === "all" ? T("all") : t("type." + tp), state.type === tp,
+                () => { state.type = tp; }));
+        const rBtns = $("rarityBtns");
+        rBtns.textContent = "";
+        ["all", "common", "rare", "epic"].forEach((r) =>
+            chip(rBtns, r === "all" ? T("all") : t("rarity." + r), state.rarity === r,
+                () => { state.rarity = r; }));
+        $("q").value = state.q;
+        $("costSel").value = state.cost;
+        $("sortSel").value = state.sort;
+        $("tabCards").className = state.view === "cards" ? "on" : "";
+        $("tabHeroes").className = state.view === "heroes" ? "on" : "";
+    }
+    function buildStatic() {
+        const costs = [...new Set(Object.keys(CARDS).map((id) => CARDS[id].cost))].sort((a, b) => a - b);
+        const sel = $("costSel");
+        sel.textContent = "";
+        const optAll = document.createElement("option");
+        optAll.value = "all"; optAll.textContent = T("cost") + " " + T("all");
+        sel.appendChild(optAll);
+        costs.forEach((c) => {
+            const o = document.createElement("option");
+            o.value = String(c); o.textContent = String(c);
+            sel.appendChild(o);
+        });
+        const o7 = document.createElement("option");
+        o7.value = "7+"; o7.textContent = "7+";
+        sel.appendChild(o7);
+        const srt = $("sortSel");
+        srt.textContent = "";
+        [["id", T("sortId")], ["costAsc", T("sortCostAsc")],
+         ["costDesc", T("sortCostDesc")], ["name", T("sortName")]].forEach(([v, label]) => {
+            const o = document.createElement("option");
+            o.value = v; o.textContent = label;
+            srt.appendChild(o);
+        });
+        $("q").placeholder = "…";
+        $("lblElem").textContent = T("elem");
+        $("lblType").textContent = T("type");
+        $("lblRarity").textContent = T("rarity");
+        $("lblCost").textContent = T("cost");
+        $("lblDeck").textContent = T("deck");
+        $("deckName").placeholder = T("deckName");
+        $("presetStr").textContent = T("presetStr");
+        $("presetGrw").textContent = T("presetGrw");
+        $("clearBtn").textContent = T("clear");
+        $("saveFile").textContent = T("saveFile");
+        $("loadFile").textContent = T("loadFile");
+        $("lblSlots").textContent = T("slots");
+        $("slotSave").textContent = T("slotSave");
+        $("resetBtn").textContent = T("reset");
+        $("tabCards").textContent = T("tabCards");
+        $("tabHeroes").textContent = T("tabHeroes");
+        document.title = T("title") + " — Развернутый Мир";
+    }
+    $("q").addEventListener("input", () => { state.q = $("q").value; renderGrid(); });
+    $("costSel").addEventListener("change", () => { state.cost = $("costSel").value; renderGrid(); });
+    $("sortSel").addEventListener("change", () => { state.sort = $("sortSel").value; renderGrid(); });
+    $("resetBtn").addEventListener("click", () => {
+        Object.assign(state, { q: "", elem: "all", type: "all", rarity: "all", cost: "all" });
+        renderFilters(); renderGrid();
+    });
+    $("deckName").addEventListener("input", () => {
+        state.deck.name = $("deckName").value; persist();
+    });
+    $("presetStr").addEventListener("click", () =>
+        setDeckFrom(D.STARTER_DECKS.strength, t("elem.strength")));
+    $("presetGrw").addEventListener("click", () =>
+        setDeckFrom(D.STARTER_DECKS.growth, t("elem.growth")));
+    $("clearBtn").addEventListener("click", () => {
+        state.deck.cards = {}; persist(); renderDeck(); renderGrid();
+    });
+    $("tabCards").addEventListener("click", () => setView("cards"));
+    $("tabHeroes").addEventListener("click", () => setView("heroes"));
+    function setView(v) {
+        state.view = v;
+        $("cardsView").style.display = v === "cards" ? "" : "none";
+        $("heroView").style.display = v === "heroes" ? "" : "none";
+        renderFilters();
+        if (v === "heroes") renderHeroes();
+    }
+    $("langBtn").addEventListener("click", () => {
+        const next = loc.lang === "ru" ? "en" : "ru";
+        loc.setLang(next);
+        try { localStorage.setItem(LS.lang, next); } catch (e) { /* приватный режим */ }
+        applyLang();
+    });
+
+    function applyLang() {
+        $("langBtn").textContent = loc.lang === "ru" ? "RU → EN" : "EN → RU";
+        buildStatic();
+        renderFilters();
+        renderGrid();
+        renderDeck();
+        renderSlots();
+        if (state.view === "heroes") renderHeroes();
+    }
+
+    // ── тестовый API (пробы через CDP) ──────────────────────────────────
+    globalThis.__CARDSDB = {
+        state: () => ({ view: state.view, lang: loc.lang,
+            filter: { q: state.q, elem: state.elem, type: state.type,
+                rarity: state.rarity, cost: state.cost, sort: state.sort },
+            shown: filteredIds().length, total: Object.keys(CARDS).length,
+            deck: { name: state.deck.name, count: deckCount(),
+                cards: JSON.parse(JSON.stringify(state.deck.cards)) },
+            slots: Object.keys(slots()) }),
+        setFilter: (patch) => { Object.assign(state, patch);
+            renderFilters(); renderGrid(); },
+        deckIds: () => filteredIds(),
+        add: addCard, remove: removeCard,
+        clear: () => { state.deck.cards = {}; persist(); renderDeck(); renderGrid(); },
+        preset: (k) => setDeckFrom(D.STARTER_DECKS[k], t("elem." + k)),
+        saveSlot: (nm) => { const all = slots();
+            all[nm] = { cards: state.deck.cards, saved: new Date().toISOString() };
+            localStorage.setItem(LS.decks, JSON.stringify(all)); renderSlots(); },
+        loadSlot: (nm) => { const s = slots()[nm]; if (!s) return false;
+            state.deck = { name: nm, cards: sanitize(s.cards) };
+            persist(); renderDeck(); renderGrid(); return true; },
+        exportText, importText,
+        setLang: (l) => { loc.setLang(l); applyLang(); },
+        show: showCard, hide: hideDetail,
+        toast,
+    };
+
+    // ── всплывающая подсказка ───────────────────────────────────────────
+    let toastTimer = 0;
+    function toast(msg) {
+        const el = $("toast");
+        el.textContent = msg;
+        el.style.opacity = "1";
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { el.style.opacity = "0"; }, 2600);
+    }
+
+    // ── старт ───────────────────────────────────────────────────────────
+    try {
+        const saved = localStorage.getItem(LS.lang);
+        if (saved && saved !== loc.lang) loc.setLang(saved);
+    } catch (e) { /* приватный режим */ }
+    restore();
+    applyLang();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,500 @@
+// ДАННЫЕ КАРТ — отдельный от логики файл (просил юзер): его читают и
+// игра (dataCards.js), и внешние инструменты (tools/cards.html).
+// Типы: unit (существо — марширует), spell (одноразовый эффект),
+// building (строение — стоит, эффект), trap (ловушка — триггер «?»).
+// Имена/описания — в loc.js (card.<id>.name / .desc).
+// Стихии идут волнами; id внутри стихии = номер карты он же спрайт:
+// images/cards/<elem>/<№>.png — готовое лицо карты (рамка/имя/тексты).
+(function () {
+    // ── Стихия «Сила» (красные) ──────────────────────────────────────────
+    // img — файл лица карты; creature — лист поля боя (creatureSheets).
+    const CARDS = {
+        str1: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1, ability: "dash1",
+                creature: "goblin", rarity: "common", elem: "strength",
+                color: 0x9c4a3a, img: "strength/1" },
+        str2: { type: "unit", cost: 2, atk: 1, hp: 5, speed: 1,
+                creature: "goblin", rarity: "common", elem: "strength",
+                color: 0x9c4a3a, img: "strength/2" },
+        str3: { type: "unit", cost: 3, atk: 4, hp: 4, speed: 1,
+                creature: "goblin", rarity: "common", elem: "strength",
+                color: 0x9c4a3a, img: "strength/3" },
+        str4: { type: "spell", cost: 1, spell: { target: "anyUnit", buffAtk: 2 },
+                rarity: "common", elem: "strength",
+                color: 0xb0402e, img: "strength/4" },
+        str5: { type: "building", cost: 3, atk: 0, hp: 2, campAura: 1,
+                rarity: "rare", elem: "strength",
+                color: 0x8a5a3e, img: "strength/5" },
+        str6: { type: "trap", cost: 2, trap: { event: "onEnemyCell", effect: "cellDmg", amount: 3, splash: 1 },
+                rarity: "epic", elem: "strength",
+                color: 0x6e4a2e, img: "strength/6" },
+        str7: { type: "unit", cost: 3, atk: 1, hp: 2, speed: 1,
+                creature: "goblin", ability: "shaman",
+                rarity: "rare", elem: "strength",
+                color: 0x9c4a3a, img: "strength/7" },
+        str8: { type: "unit", cost: 4, atk: 3, hp: 3, speed: 1,
+                creature: "goblin", leaderAura: 1,
+                rarity: "epic", elem: "strength",
+                color: 0x9c4a3a, img: "strength/8" },
+        str9: { type: "spell", cost: 2, spell: { target: "anyUnitDmg", dmg: 2 },
+                rarity: "common", elem: "strength",
+                color: 0xb0402e, img: "strength/9" },
+        str10: { type: "spell", cost: 5, spell: { target: "none", baseDmg: 5 },
+                rarity: "epic", elem: "strength",
+                color: 0xb0402e, img: "strength/10" },
+        str11: { type: "spell", cost: 1, spell: { target: "ownUnit", dmg: 3, sacrifice: true },
+                rarity: "rare", elem: "strength",
+                color: 0xb0402e, img: "strength/11" },
+        str12: { type: "trap", cost: 1, race: "goblin",
+                 trap: { event: "onEnemyMoveFromAdj", effect: "lure", dmg: 1 },
+                 rarity: "common", elem: "strength",
+                 color: 0x6e4a2e, img: "strength/12" },
+        str13: { type: "unit", cost: 2, atk: 2, hp: 1, speed: 1,
+                 creature: "goblin", ability: "archer",
+                 rarity: "rare", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/13" },
+        str14: { type: "unit", cost: 2, atk: 1, hp: 1, speed: 1,
+                 creature: "goblin", ability: "bombling",
+                 rarity: "rare", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/14" },
+        str15: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
+                 creature: "goblin", ability: "assassin",
+                 rarity: "common", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/15" },
+        str16: { type: "unit", cost: 4, atk: 5, hp: 5, speed: 1,
+                 creature: "goblin",
+                 rarity: "common", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/16" },
+        str17: { type: "spell", cost: 1,
+                 spell: { target: "anyUnitDmg", dmg: 1, noBuildings: true, brew: true },
+                 rarity: "rare", elem: "strength",
+                 color: 0xb0402e, img: "strength/17" },
+        str18: { type: "building", cost: 2, atk: 0, hp: 5, mycelium: 1,
+                 rarity: "epic", elem: "strength",
+                 color: 0x8a5a3e, img: "strength/18" },
+        str19: { type: "building", cost: 1, atk: 0, hp: 1, spellAura: 1,
+                 rarity: "rare", elem: "strength",
+                 color: 0x8a5a3e, img: "strength/19" },
+        str20: { type: "trap", cost: 2,
+                 trap: { event: "onEnemyCell", effect: "ambush", spawn: "gobA" },
+                 rarity: "rare", elem: "strength",
+                 color: 0x6e4a2e, img: "strength/20" },
+        str21: { type: "spell", cost: 3,
+                 spell: { target: "anyCell", firewall: 2, turns: 3 },
+                 rarity: "epic", elem: "strength",
+                 color: 0xb0402e, img: "strength/21" },
+        str22: { type: "spell", cost: 1,
+                 spell: { target: "anyUnit", enchantFire: true },
+                 rarity: "common", elem: "strength",
+                 color: 0xb0402e, img: "strength/22" },
+        str23: { type: "spell", cost: 1,
+                 spell: { target: "none", search: 6 },
+                 rarity: "common", elem: "strength",
+                 color: 0xb0402e, img: "strength/23" },
+        str24: { type: "spell", cost: 1,
+                 spell: { target: "anyUnitDmg", drainAll: true },
+                 rarity: "rare", elem: "strength",
+                 color: 0xb0402e, img: "strength/24" },
+        str25: { type: "spell", cost: 1,
+                 spell: { target: "none", copyLast: true },
+                 rarity: "epic", elem: "strength",
+                 color: 0xb0402e, img: "strength/25" },
+        str26: { type: "spell", cost: 3,
+                 spell: { target: "none", journey: 6 },
+                 rarity: "common", elem: "strength",
+                 color: 0xb0402e, img: "strength/26" },
+        str27: { type: "unit", cost: 3, atk: 2, hp: 1, speed: 1,
+                 creature: "goblin", spellBuffAura: 1,
+                 rarity: "rare", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/27" },
+        str28: { type: "spell", cost: 6,
+                 spell: { target: "none", aoeDmg: 3 },
+                 rarity: "epic", elem: "strength",
+                 color: 0xb0402e, img: "strength/28" },
+        str29: { type: "unit", cost: 0, atk: 0, hp: 1, speed: 1,
+                 creature: "goblin", ability: "coward",
+                 rarity: "common", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/29" },
+        str30: { type: "spell", cost: 1,
+                 spell: { target: "none", buffAllAtk: 1 },
+                 rarity: "common", elem: "strength",
+                 color: 0xb0402e, img: "strength/30" },
+        str31: { type: "building", cost: 1, atk: 0, hp: 6, runeMonolith: true,
+                 rarity: "common", elem: "strength",
+                 color: 0x8a5a3e, img: "strength/31" },
+        str32: { type: "trap", cost: 1,
+                 trap: { event: "onAttack", effect: "castRandom" },
+                 rarity: "common", elem: "strength",
+                 color: 0x6e4a2e, img: "strength/32" },
+        str33: { type: "spell", cost: 2,
+                 spell: { target: "anyUnit", berserk: 1 },
+                 rarity: "common", elem: "strength",
+                 color: 0xb0402e, img: "strength/33" },
+        str34: { type: "unit", cost: 3, atk: 1, hp: 4, speed: 1,
+                 creature: "goblin", berserkSummon: 2,
+                 rarity: "common", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/34" },
+        str35: { type: "spell", cost: 3,
+                 spell: { target: "ownUnit", baseHit: true },
+                 rarity: "common", elem: "strength",
+                 color: 0xb0402e, img: "strength/35" },
+        str36: { type: "trap", cost: 0,
+                 trap: { event: "onEnemyCell", effect: "cellDmgAll", amount: 1 },
+                 rarity: "common", elem: "strength",
+                 color: 0x6e4a2e, img: "strength/36" },
+        str37: { type: "unit", cost: 4, atk: 1, hp: 3, speed: 1,
+                 creature: "goblin", ability: "spiritSummoner",
+                 rarity: "rare", elem: "strength",
+                 color: 0x9c4a3a, img: "strength/37" },
+        str38: { type: "building", cost: 2, atk: 0, hp: 3, campfire: 1,
+                 rarity: "common", elem: "strength",
+                 color: 0x8a5a3e, img: "strength/38" },
+        str39: { type: "trap", cost: 3,
+                 trap: { event: "onEnemyCell", effect: "confuse", turns: 2 },
+                 rarity: "rare", elem: "strength",
+                 color: 0x6e4a2e, img: "strength/39" },
+        str40: { type: "spell", cost: 6,
+                 spell: { target: "emptyCell", cultRow: true },
+                 rarity: "epic", elem: "strength",
+                 color: 0xb0402e, img: "strength/40" },
+        // ── Стихия «Рост» (зелёные) — вторая стихия, лица growth/41..46 ─────
+        // (сквозная нумерация артов юзера: после 40 карт Силы).
+        grw1: { type: "unit", cost: 1, atk: 0, hp: 1, speed: 1,
+                creature: "goblin", sheet: "plant", ability: "predator", plant: true,
+                rarity: "common", elem: "growth",
+                color: 0x3f6d3a, img: "growth/41" },
+        grw2: { type: "unit", cost: 2, atk: 2, hp: 4, speed: 1,
+                creature: "animal", sheet: "wolf",
+                rarity: "common", elem: "growth",
+                color: 0x3f6d3a, img: "growth/42" },
+        grw3: { type: "unit", cost: 3, atk: 3, hp: 5, speed: 1,
+                creature: "animal", sheet: "bear",
+                rarity: "common", elem: "growth",
+                color: 0x3f6d3a, img: "growth/43" },
+        grw4: { type: "trap", cost: 1,
+                trap: { event: "onEnemyCell", effect: "cellDebuff", atk: 1, hp: 1 },
+                rarity: "common", elem: "growth",
+                color: 0x2e5a2e, img: "growth/44" },
+        grw5: { type: "spell", cost: 1,
+                spell: { target: "anyUnit", buffAtk: 1, buffHp: 1 },
+                rarity: "common", elem: "growth",
+                color: 0x4a8a3e, img: "growth/45" },
+        grw6: { type: "building", cost: 1, atk: 0, hp: 1, sprout: 1, plant: true,
+                rarity: "common", elem: "growth",
+                color: 0x2e5a3e, img: "growth/46" },
+        // ── Рост, вторая партия (глаза юзера): 47–56 ────────────────────────
+        grw7: { type: "spell", cost: 1,
+                spell: { target: "anyUnit", buffAtkByHp: true },
+                rarity: "common", elem: "growth",
+                color: 0x4a8a3e, img: "growth/47" },
+        grw8: { type: "unit", cost: 4, atk: 4, hp: 6, speed: 1,
+                creature: "goblin", sheet: "ent", plant: true,
+                rarity: "common", elem: "growth",
+                color: 0x3f6d3a, img: "growth/48" },
+        grw9: { type: "unit", cost: 2, atk: 1, hp: 1, speed: 1,
+                creature: "goblin", ability: "druidEnergy",
+                rarity: "rare", elem: "growth",
+                color: 0x3f6d3a, img: "growth/49" },
+        grw10: { type: "building", cost: 2, atk: 0, hp: 1, groveAura: 1,
+                 rarity: "common", elem: "growth",
+                 color: 0x2e5a3e, img: "growth/50" },
+        grw11: { type: "building", cost: 1, atk: 0, hp: 3, riteStump: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x2e5a3e, img: "growth/51" },
+        grw12: { type: "trap", cost: 1,
+                 trap: { event: "onEnemyCell", effect: "ancestor", spawn: "ancBear" },
+                 rarity: "rare", elem: "growth",
+                 color: 0x2e5a2e, img: "growth/52" },
+        grw13: { type: "unit", cost: 2, atk: 2, hp: 2, speed: 1,
+                 creature: "animal", sheet: "wolf", ability: "pushBack",
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/53" },
+        grw14: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
+                 creature: "goblin", ability: "flyOver",
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/54" },
+        grw15: { type: "trap", cost: 2,
+                 trap: { event: "onUnitDamage", effect: "sporeCurse" },
+                 rarity: "epic", elem: "growth",
+                 color: 0x2e5a2e, img: "growth/55" },
+        grw16: { type: "spell", cost: 1,
+                 spell: { target: "none", searchUnit: 6 },
+                 rarity: "common", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/56" },
+        // ── Рост, третья партия (глаза юзера): 57–60 ────────────────────────
+        grw17: { type: "spell", cost: 1,
+                 spell: { target: "anyUnitDmg", purge: true },
+                 rarity: "common", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/57" },
+        grw18: { type: "spell", cost: 1,
+                 spell: { target: "none", stealEnergy: 2 },
+                 rarity: "epic", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/58" },
+        grw19: { type: "spell", cost: 1,
+                 spell: { target: "anyUnitDmg", cocoon: 1 },
+                 rarity: "common", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/59" },
+        grw20: { type: "unit", cost: 4, atk: 2, hp: 3, speed: 1,
+                 creature: "goblin", ability: "flyOver", sisterDraw: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/60" },
+        // ── Рост, четвёртая партия (глаза юзера): 61–62 ─────────────────────
+        // «Зелёный портал»: существо, которое должно пройти на клетку
+        // портала или атаковать его, перепрыгивает на свободную клетку
+        // с противоположной стороны (как существа с полётом) и получает
+        // +1 к урону и +1 к жизням — любой стороне (просил юзер).
+        grw21: { type: "building", cost: 4, atk: 0, hp: 5, portalLeap: true,
+                 rarity: "epic", elem: "growth",
+                 color: 0x2e5a3e, img: "growth/61" },
+        // «Хранитель леса»: при призыве урон и жизни = числу СВОИХ
+        // Животных на поле (включая его самого); тип существа — Животное
+        grw22: { type: "unit", cost: 4, atk: 1, hp: 1, speed: 1,
+                 creature: "animal", keeperScale: true,
+                 rarity: "epic", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/62" },
+        // ── Рост, пятая партия (глаза юзера): 63–64 ─────────────────────────
+        // «Варка зелий»: заклинание из любого сброса — в руку, с «Сожжением»
+        // (после розыгрыша карта удаляется из боя, в сброс не попадает)
+        grw23: { type: "spell", cost: 1,
+                 spell: { target: "none", discardPick: true },
+                 rarity: "epic", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/63" },
+        // «Друид глубокой чащи»: пережив урон (выжил), призывает Волка 2/4
+        // (grw2) на пустую соседнюю клетку; тип существа — Эльф
+        grw24: { type: "unit", cost: 5, atk: 1, hp: 5, speed: 1,
+                 creature: "elf", wolfSummon: true,
+                 rarity: "epic", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/64" },
+        // ── Рост, шестая партия (глаза юзера): 65–66 ─────────────────────────
+        // «Цветение кристаллов»: +1⚡ за каждую карту в руке (кроме себя —
+        // к моменту эффекта карта уже покидает руку)
+        grw25: { type: "spell", cost: 2,
+                 spell: { target: "none", energyPerHand: true },
+                 rarity: "rare", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/65" },
+        // «Три монолита»: призыв СВОЕГО существа по соседству — поиск в
+        // колоде существа с ценой на 1 больше призванного и в руку;
+        // монолит при этом теряет 1 жизнь
+        grw26: { type: "building", cost: 3, atk: 0, hp: 3, monolith: true,
+                 rarity: "epic", elem: "growth",
+                 color: 0x2e5a3e, img: "growth/66" },
+        // ── Рост, седьмая партия (глаза юзера): 67–71 ────────────────────────
+        // «Отряд эльфов»: при призыве потратить ВСЮ оставшуюся энергию —
+        // существо получает столько урона и жизней
+        grw27: { type: "unit", cost: 0, atk: 0, hp: 0, speed: 1,
+                 creature: "elf", energyToStats: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/67" },
+        // «Старейший древоброд»: Сокрушение — после удара лишний урон
+        // (урон атаки минус жизни цели) переходит в базу противника
+        grw28: { type: "unit", cost: 6, atk: 6, hp: 6, speed: 1,
+                 creature: "goblin", sheet: "ent", crush: true, plant: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/68" },
+        // «Отравленные лезвия»: существо получает «Ядовитость 1» — при
+        // атаке вешает на атакованное существо противника «Яд 1», тот
+        // теряет 1 жизнь в начале своего хода перед перемещением
+        grw29: { type: "spell", cost: 1,
+                 spell: { target: "anyUnit", venom: 1 },
+                 rarity: "common", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/69" },
+        // «Рой светлячков»: урон цели = числу СВОИХ существ на поле
+        grw30: { type: "spell", cost: 4,
+                 spell: { target: "anyUnitDmg", fireflies: true },
+                 rarity: "epic", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/70" },
+        // «Древоброд глухой чащи»: при атаке урон атаки получают и ВСЕ
+        // существа и постройки по соседству с атакованным (сам он не
+        // страдает от собственного всплеска)
+        grw31: { type: "unit", cost: 7, atk: 8, hp: 8, speed: 1,
+                 creature: "goblin", sheet: "ent", thicket: true, plant: true,
+                 rarity: "epic", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/71" },
+        // ── Рост, восьмая партия (глаза юзера): 72–75 ────────────────────────
+        // «Выстрел стихией Роста»: урон цели = числу карт Роста в руке
+        // (сама карта в момент расчёта ещё в руке — не считается)
+        grw32: { type: "spell", cost: 3,
+                 spell: { target: "anyUnitDmg", growthHand: true },
+                 rarity: "rare", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/72" },
+        // «Атака духами волков»: своё существо делает Выстрел — урон
+        // атаки вперёд по вертикали (ближайшее существо/строение, иначе
+        // база противника); на пустых клетках пути являются Волки 2/4
+        grw33: { type: "spell", cost: 5,
+                 spell: { target: "ownUnit", wolfVolley: true },
+                 rarity: "epic", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/73" },
+        // «Круговая атака»: цель наносит 1 урон каждому соседу
+        // (верт/гориз) — существам и постройкам обеих сторон
+        grw34: { type: "spell", cost: 2,
+                 spell: { target: "anyUnit", nova: true },
+                 rarity: "common", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/74" },
+        // «Опутывание корнями»: ловушка на любой клетке (можно сразу
+        // под существом — «нахождение»); существо на клетке получает
+        // «Опутывание 2»: два хода пропускает перемещение, счётчик тает
+        grw35: { type: "trap", cost: 1,
+                 trap: { event: "onCell", effect: "entangle", entangle: 2 },
+                 rarity: "common", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/75" },
+        // ── Рост, девятая партия (глаза юзера): 76–80 ────────────────────────
+        // «Озверевший шатун»: −1 энергию за каждое СВОЁ Животное на поле
+        grw36: { type: "unit", cost: 5, atk: 5, hp: 6, speed: 1,
+                 creature: "animal", sheet: "bear", animalCost: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/76" },
+        // «Заклятый древоброд»: заклинания, выбравшие его целью, — на 1
+        // энергию дешевле (для любого кастующего, просил юзер)
+        grw37: { type: "unit", cost: 5, atk: 5, hp: 5, speed: 1,
+                 creature: "goblin", sheet: "ent", plant: true, targetDiscount: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/77" },
+        // «Дома на деревьях»: урон базе стороны целиком уходит в эту
+        // постройку (вместо базы)
+        grw38: { type: "building", cost: 3, atk: 0, hp: 7, treeHomes: true,
+                 rarity: "rare", elem: "growth",
+                 color: 0x2e5a3e, img: "growth/78" },
+        // «Раскопки»: свою постройку с поля — в сброс, затем постройку из
+        // сброса — в клетку убранной (панель выбора, как у «Варки зелий»)
+        grw39: { type: "spell", cost: 2,
+                 spell: { target: "ownBuilding", excavate: true },
+                 rarity: "rare", elem: "growth",
+                 color: 0x4a8a3e, img: "growth/79" },
+        // «Пастух росянок»: способности Растений (метка plant) его стороны
+        // срабатывают на 1 раз больше
+        grw40: { type: "unit", cost: 4, atk: 1, hp: 1, speed: 1,
+                 creature: "elf", plantEcho: true,
+                 rarity: "epic", elem: "growth",
+                 color: 0x3f6d3a, img: "growth/80" },
+        // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
+        // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
+        // (тот фильтрует по коллекции). Спавнится только ловушкой.
+        gobA: { type: "unit", cost: 2, atk: 2, hp: 2, speed: 1,
+                creature: "goblin", rarity: "common", elem: "strength",
+                color: 0x9c4a3a },
+        // Медведь из «Духа предка» (grw12) — служебная карта без лица,
+        // как gobA/gobC: спавнится только ловушкой.
+        ancBear: { type: "unit", cost: 3, atk: 3, hp: 5, speed: 1,
+                   creature: "animal", sheet: "bear", rarity: "common", elem: "growth",
+                   color: 0x2e5a2e },
+        // Гоблин из «Культа кочерыжки» (str40) — служебная карта без лица,
+        // как gobA: ряд выбранной клетки заполняется Гоблинами 3/4.
+        gobC: { type: "unit", cost: 3, atk: 3, hp: 4, speed: 1,
+                creature: "goblin", rarity: "common", elem: "strength",
+                color: 0x9c4a3a },
+    };
+    const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
+
+    // Базовая колода: 12 карт — по 2 копии шести основных (просил юзер).
+    const DEFAULT_DECK = [
+        "str1", "str1", "str2", "str2", "str3", "str3",
+        "str4", "str4", "str9", "str9", "str12", "str12",
+    ];
+    // Стартовые колоды по стихиям (выбор при «Новая игра»): Рост — карты
+    // 41–46 юзера по 2 копии (просил юзер).
+    const STARTER_DECKS = {
+        strength: DEFAULT_DECK,
+        growth: ["grw1", "grw1", "grw2", "grw2", "grw3", "grw3",
+                 "grw4", "grw4", "grw5", "grw5", "grw6", "grw6"],
+    };
+
+    const DECK_MAX = 60, DECK_MIN = 12, TRAP_SLOTS = 2;
+    const DECK_COPIES = 3; // максимум одинаковых карт в колоде
+
+    // ГЕРОИ — выбор при «Новой игре» (вместо стихии, просил юзер). Герой
+    // определяет: жизни базы в бою (baseHp), стихии, которые можно класть
+    // в колоду (elems), стартовую колоду (starter — ключ STARTER_DECKS,
+    // у каждого героя своя стихия) и особую способность (ability +
+    // abilityVal: firstSummonAtk / firstSummonHp — бонус первому
+    // призванному ИГРОКОМ существу). Изображение — полная карточка
+    // 230×338 юзера: images/heroes/<img>.png. Список будет расширяться.
+    //
+    // Карты персонажей противников (просил юзер, волна «Герои-враги»):
+    // ключ = id энкаунтера (ENCOUNTERS.<id>.hero ссылается сюда), defeat
+    // добавляет карту в коллекцию героев (G.captured). Способности работают
+    // у ОБЕИХ сторон: ИИ играет своим персонажем, игрок — захваченной
+    // картой. ability: startDrawGoblin / startDrawTrap — добор карты в
+    // начале боя; firstSpellDmg — первое уронное заклинание боя +1;
+    // strengthSpellDmg — заклинания Силы +1 существам; goblinChainSummon —
+    // гоблин призвал гоблина из колоды → +1⚔ призванному; goblinDeathReplay
+    // — первый погибший гоблин (не токен) возвращается картой в руку и
+    // сразу разыгрывается на место.
+    const HEROES = {
+        gorbag: {
+            id: "gorbag", rarity: "common",
+            baseHp: 15, elems: ["strength"], starter: "strength",
+            img: "0", ability: "firstSummonAtk", abilityVal: 2,
+        },
+        elmir: {
+            id: "elmir", rarity: "common",
+            baseHp: 15, elems: ["growth"], starter: "growth",
+            img: "1", ability: "firstSummonHp", abilityVal: 3,
+        },
+        gob: { id: "gob", rarity: "common", baseHp: 10,
+               elems: ["strength"], starter: "strength",
+               img: "2", ability: "startDrawGoblin" },
+        gobBig: { id: "gobBig", rarity: "common", baseHp: 11,
+                  elems: ["strength"], starter: "strength",
+                  img: "3", ability: "firstSpellDmg", abilityVal: 1 },
+        gobTrap: { id: "gobTrap", rarity: "common", baseHp: 12,
+                   elems: ["strength"], starter: "strength",
+                   img: "4", ability: "startDrawTrap" },
+        gobFire: { id: "gobFire", rarity: "rare", baseHp: 13,
+                   elems: ["strength"], starter: "strength",
+                   img: "5", ability: "strengthSpellDmg", abilityVal: 1 },
+        gobElite: { id: "gobElite", rarity: "rare", baseHp: 14,
+                    elems: ["strength"], starter: "strength",
+                    img: "6", ability: "goblinChainSummon", abilityVal: 1 },
+        gobMaster: { id: "gobMaster", rarity: "rare", baseHp: 15,
+                     elems: ["strength"], starter: "strength",
+                     img: "8", ability: "strengthSpellReplay" },
+        boss: { id: "boss", rarity: "epic", baseHp: 18,
+                elems: ["strength"], starter: "strength",
+                img: "7", ability: "goblinDeathReplay" },
+        // ── «Роща Роста»: карты персонажей её врагов (просил юзер) ────────
+        grwBeasts: { id: "grwBeasts", rarity: "common", baseHp: 10,
+                     elems: ["growth"], starter: "growth",
+                     img: "9", ability: "startDrawAnimal" },
+        grwGrove: { id: "grwGrove", rarity: "common", baseHp: 11,
+                    elems: ["growth"], starter: "growth",
+                    img: "10", ability: "trapEcho" },
+        grwWild: { id: "grwWild", rarity: "common", baseHp: 12,
+                   elems: ["growth"], starter: "growth",
+                   img: "11", ability: "startDrawPlant" },
+        grwMagic: { id: "grwMagic", rarity: "common", baseHp: 13,
+                    elems: ["growth"], starter: "growth",
+                    img: "12", ability: "growthSpellDmg", abilityVal: 1 },
+        grwCity: { id: "grwCity", rarity: "rare", baseHp: 14,
+                   elems: ["growth"], starter: "growth",
+                   img: "13", ability: "firstBuildingGuard" },
+        grwControl: { id: "grwControl", rarity: "rare", baseHp: 15,
+                      elems: ["growth"], starter: "growth",
+                      img: "14", ability: "firstTurnEnergyDown" },
+        grwBoss: { id: "grwBoss", rarity: "epic", baseHp: 18,
+                   elems: ["growth"], starter: "growth",
+                   img: "15", ability: "buildingDeathReplay" },
+    };
+    const HERO_ORDER = ["gorbag", "elmir"];
+    // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
+    // пещеры, затем Роща Роста (просил юзер)
+    const HERO_FOE_ORDER = ["gob", "gobBig", "gobTrap", "gobFire", "gobElite",
+        "gobMaster", "boss",
+        "grwBeasts", "grwGrove", "grwWild", "grwMagic", "grwCity",
+        "grwControl", "grwBoss"];
+
+    // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
+    // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.
+    const ELEM_LOGO = {
+        strength: "logo/strength_logo.png",
+        growth: "logo/growth.png",
+        decay: "logo/decay_logo.png",
+        honor: "logo/honor_logo.png",
+        time: "logo/time_logo.png",
+        wisdom: "logo/wisdom_logo.png",
+    };
+    // Единая точка данных для инструментов: каталог без логики.
+    globalThis.GAME_CARD_DATA = {
+        CARDS, RARITY_COLORS, DEFAULT_DECK, STARTER_DECKS,
+        DECK_MAX, DECK_MIN, DECK_COPIES, TRAP_SLOTS,
+        HEROES, HERO_ORDER, HERO_FOE_ORDER, ELEM_LOGO,
+    };
+})();
