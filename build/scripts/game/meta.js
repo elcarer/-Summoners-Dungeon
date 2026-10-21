@@ -33,13 +33,20 @@
                     heroDecks: raw.heroDecks || null,
                     captured: Array.isArray(raw.captured) ? raw.captured : null,
                     activeHeroId: raw.activeHeroId || null,
+                    // стартовый герой «Новой игры» — НЕ то же, что активный:
+                    // активного можно менять во вкладке «Герои», а стартовый
+                    // должен оставаться в коллекции (баг: исчезал после
+                    // переключения на завоёванного); у старых сейвов поля нет
+                    starterId: raw.starterId || null,
                 };
             }
         } catch (e) { /* дефолт ниже */ }
         return null;
     }
-    // extra — { heroDecks, captured, activeHeroId }: колода каждого героя
-    // своя (переключение героя в коллекции), захваченные карты персонажей
+    // extra — { heroDecks, captured, activeHeroId, starterId }: колода
+    // каждого героя своя (переключение героя в коллекции), захваченные
+    // карты персонажей, активный и стартовый (выбранный при «Новой игре»)
+    // герои
     function saveMeta(collection, deck, extra) {
         localStorage.setItem(LS_META, JSON.stringify({
             collection,
@@ -47,6 +54,7 @@
             heroDecks: (extra && extra.heroDecks) || undefined,
             captured: (extra && extra.captured) || undefined,
             activeHeroId: (extra && extra.activeHeroId) || undefined,
+            starterId: (extra && extra.starterId) || undefined,
         }));
     }
 

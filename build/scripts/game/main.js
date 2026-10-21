@@ -147,6 +147,27 @@
         const savedMeta = GAME_META.loadMeta();
         const { DEFAULT_DECK, DEFAULT_COLLECTION, HERO_ORDER } = GAME_DATA;
 
+        // Стартовый герой «Новой игры» — ОТДЕЛЬНО от активного: активного
+        // можно сменить во вкладке «Герои» на завоёванного, и тогда старый
+        // фильтр «id === G.heroId» терял стартера из коллекции (баг).
+        // У старых сейвов поля starterId нет — выводим его из колод по
+        // героям (после смены активного стартовый там остаётся).
+        function savedStarterId() {
+            if (savedMeta && HERO_ORDER.includes(savedMeta.starterId))
+                return savedMeta.starterId;
+            const decks = savedMeta && savedMeta.heroDecks;
+            if (decks && typeof decks === "object") {
+                const fromDecks = HERO_ORDER.find((id) => Array.isArray(decks[id]));
+                if (fromDecks) return fromDecks;
+            }
+            if (savedMeta && HERO_ORDER.includes(savedMeta.activeHeroId))
+                return savedMeta.activeHeroId;
+            return HERO_ORDER[0];
+        }
+        // активный герой тоже переживает перезапуск (его меняют в «Героях»)
+        const savedActiveId = savedMeta && GAME_DATA.HEROES[savedMeta.activeHeroId]
+            ? savedMeta.activeHeroId : "gorbag";
+
         // ── Звук: два канала движка — эффекты («звук») и музыка («музыка») ──
         const audio = createAudio();
         audio.setVolume(settings.sound / 10);
@@ -227,8 +248,14 @@
         });
 
         // Миграция сейва: карты прошлых версий (тестовые id) отфильтровываются;
-        // если после фильтра колода/коллекция пусты — новые базовые значения.
+        // если коллекция опустела или в старой НЕПУСТОЙ колоде не осталось
+        // валидных карт — новые базовые значения.
         const savedDeck = savedMeta ? savedMeta.deck.filter((id) => GAME_DATA.CARDS[id]) : [];
+        // Пустая колода — НОРМА для завоёванного героя (начинает без карт,
+        // просил юзер); стартовую подставляем только совсем старому сейву,
+        // где все id отфильтровались миграцией.
+        const deckNeedsDefault = !savedMeta
+            || (savedMeta.deck.length > 0 && savedDeck.length === 0);
         const savedColl = savedMeta
             ? Object.fromEntries(Object.entries(savedMeta.collection || {})
                 .filter(([id]) => GAME_DATA.CARDS[id]))
@@ -237,10 +264,11 @@
         const G = {
             hero: { hp: 10, maxHp: 10 }, gold: 0,
             run: { floor: 1, cave: "gob", floors: { gob: 1, grw: 1 } },
-            heroId: "gorbag", // герой забега (выбор при «Новой игре»)
+            heroId: savedActiveId, // активный герой забега (можно сменить в «Героях»)
+            starterId: savedStarterId(), // выбранный при «Новой игре» — не меняется
             elem: "strength", // стихия забега — из героя, задаёт стартовую колоду
             settings,
-            deck: savedDeck.length ? savedDeck : [...DEFAULT_DECK],
+            deck: deckNeedsDefault ? [...DEFAULT_DECK] : savedDeck,
             collection: Object.keys(savedColl).length ? savedColl : { ...DEFAULT_COLLECTION },
             // колода каждого героя своя (переключение во вкладке «Герои»);
             // heroDecks[heroId] всегда указывает на АКТИВНУЮ G.deck
@@ -270,6 +298,7 @@
                     heroDecks: this.heroDecksOf(),
                     captured: this.captured,
                     activeHeroId: this.heroId,
+                    starterId: this.starterId,
                 });
             },
             // смена активного героя (вкладка «Герои», просил юзер): колода
@@ -306,6 +335,7 @@
                 const HEROES = globalThis.GAME_DATA.HEROES;
                 const h = HEROES[heroId] || HEROES.gorbag;
                 this.heroId = h.id;
+                this.starterId = h.id; // он же остаётся в «Героях» навсегда
                 this.elem = h.elems[0];
                 this.hero.hp = this.hero.maxHp;
                 this.gold = 0;
@@ -334,6 +364,7 @@
                     cave: this.run.cave,
                     floors: { ...this.run.floors },
                     heroId: this.heroId,
+                    starterId: this.starterId, // стартовый герой не теряется
                     elem: this.elem,
                     hero: { hp: this.hero.hp, maxHp: this.hero.maxHp },
                     gold: this.gold,
@@ -355,8 +386,6 @@
                 return id;
             },
         };
-        if (!G.deck.length) G.deck = [...DEFAULT_DECK];
-
         // ── Ховер-увеличение карточки героя в HUD (просил юзер) ────────────
         // Зона наведения — исходное место карточки (hitArea держателя не
         // едет, нет дребезга на границе), сам спрайт плавно растёт до
@@ -493,6 +522,9 @@
                     G.heroId = globalThis.GAME_DATA.HEROES[r.heroId]
                         ? r.heroId
                         : (G.elem === "growth" ? "elmir" : "gorbag");
+                    // у старых сейвов забега поля нет — стартовый остаётся
+                    // из sd_meta (с миграцией)
+                    if (HERO_ORDER.includes(r.starterId)) G.starterId = r.starterId;
                     // поднимаются только этажи текущей геометрии (MAP_V —
                     // теперь тайлы 64px goblins_lair): сейвы волн с другой
                     // сеткой пересоберутся. Архив адресуется «данж:этаж»;

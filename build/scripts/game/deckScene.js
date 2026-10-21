@@ -200,10 +200,13 @@
         // Все герои вкладки: выбранный при «Новой игре» стартовый герой
         // (только он, просил юзер) и завоёванные. Карты противников,
         // которые ещё не взяты, не показываются вовсе — как неполученные
-        // карты коллекции
+        // карты коллекции. Стартовый берём из G.starterId, а НЕ из G.heroId:
+        // активного можно сменить на завоёванного, и тогда старый стартер
+        // пропадал из коллекции (баг)
         function heroesOwnedOrder() {
-            return [...HERO_ORDER.filter((id) => id === G.heroId),
-                ...HERO_FOE_ORDER.filter((id) => G.captured.includes(id))];
+            const starter = HERO_ORDER.includes(G.starterId) ? G.starterId
+                : (HERO_ORDER.includes(G.heroId) ? G.heroId : HERO_ORDER[0]);
+            return [starter, ...HERO_FOE_ORDER.filter((id) => G.captured.includes(id))];
         }
 
         // ── вкладка «Герои»: слева активный герой, справа все карты ────────
@@ -629,6 +632,7 @@
             heroesState: () => ({
                 tab,
                 active: G.heroId,
+                starter: G.starterId,
                 captured: [...G.captured],
                 owned: heroesOwnedOrder(),
                 decks: Object.fromEntries(Object.entries(G.heroDecksOf())

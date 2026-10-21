@@ -11,14 +11,15 @@ Git-правило: `build/`, `PLAN.md`, `README.md`, этот файл — ко
 
 ```bash
 cd build && python dev_server.py 8147     # http://127.0.0.1:8147/index.html
-bash for_work/smoke.sh                    # полный смоук: 707 проверок (сейчас 707/707)
+bash for_work/smoke.sh                    # полный смоук: 711 проверок (сейчас 711/711)
 ```
 
 `smoke.sh` поднимает сервер 8147 + headless Chrome (порт 9333, --mute-audio,
 свой профиль `for_work/.chrome_profile`) и гонит `for_work/smoke_test.mjs`
 под watchdog-ом `for_work/runtest.sh`. Отдельные пробы: `probe_visual.mjs`
 (подсветка арены), `probe_deck.mjs` (редактор колоды),
-`probe_ai_smart.mjs` (эвристики умного ИИ, раннер `probe_ai_smart.sh`).
+`probe_ai_smart.mjs` (эвристики умного ИИ, раннер `probe_ai_smart.sh`),
+`probe_hero_switch.mjs` (смена героя, раннер `probe_hero_switch.sh`).
 CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 
 **Картотека карт** (w24, просил юзер) — отдельная от игры программка
@@ -44,7 +45,7 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 | файл | роль |
 |---|---|
 | `loc.js` | локализация RU/EN: `GAME_LOC.t(key, vars)`, `setLang`. Все тексты игры |
-| `meta.js` | localStorage: настройки (`sd_settings`: sound/music/animSpeed 0..10, lang, dragSummon), коллекция+колода (`sd_meta`), сейв забега (`sd_run`: floor/hero/gold/dungeon) |
+| `meta.js` | localStorage: настройки (`sd_settings`: sound/music/animSpeed 0..10, lang, dragSummon), коллекция+колода+герои (`sd_meta`: deck/collection, heroDecks, captured, activeHeroId, starterId), сейв забега (`sd_run`: floor/hero/gold/dungeon) |
 | `cardsData.js` | **ЧИСТЫЕ ДАННЫЕ КАРТ** (w24, просил юзер: внешний инструмент читает карты отсюда): каталог CARDS (`str1..40` «Сила», `grw1..40` «Рост» + служебные gobA/gobC/ancBear, id = № спрайта `images/cards/<elem>/<№>.png`), RARITY_COLORS, лимиты колоды (DECK_MAX/MIN, DECK_COPIES, TRAP_SLOTS), STARTER_DECKS, карты персонажей (HEROES + HERO_ORDER/HERO_FOE_ORDER), ELEM_LOGO → `globalThis.GAME_CARD_DATA`. Этот же файл (`<script>`-глобаль, без зависимостей) читает картотека `tools/cards.html` |
 | `dataCards.js` | ЛОГИКА поверх данных (каталог — в cardsData.js): стартовые реестры коллекции (STARTER_COLLECTIONS/DEFAULT_COLLECTION), deckMinFor (минимум колоды растёт с этажом), архетипы врагов ОБЕИХ стихий (ENCOUNTERS + MOB_TABLES по данжам) + генератор enemyDeck(encId, floor) (пулы добора по elem архетипа; добор — только боссу), пулы наград ПО СТИХИИ данжа (REWARD_POOLS, rollLootCard(elem)), CAVES — реестр подземелий (стихия/глубина/босс), магазин (SHOP_BUY/SELL); всё это экспортирует в `globalThis.GAME_DATA` (формат прежний — игра не заметила разрез) |
 | `uiKit.js` | T (текст), **fit()** (вписать текст), button/chip (button_menu — натуральные 274×77 при базе 1920×1080), cardFace (эталон 495), dimBg, **scrollPane** (колесо/ползунок/трек) |
@@ -3049,5 +3050,50 @@ GameMaker/StackExchange: оценка состояний + ограниченн�
 - Проба держит свои порты (8164/9347) и профиль
   `for_work/.chrome_profile_probe_ai`; перед запуском убить зависшие
   headless-хромы, иначе профиль занят («Device or resource busy»).
+
+## Волна «Смена героя не теряет стартового» (2026-10-22, проба hero_switch 25/25, смоук 711/711)
+
+**Баг юзера.** Поменял карту персонажа в меню колоды/коллекции на новую —
+предыдущая карта персонажа исчезла из коллекции.
+
+**Причина.** В w23 «во вкладке только выбранный при „Новой игре“ герой»
+`heroesOwnedOrder()` фильтровал стартеров по `id === G.heroId`. Но
+`G.heroId` — АКТИВНЫЙ герой, его меняет `setHero()`: после переключения на
+завоёванного ни один `HERO_ORDER`-герой не совпадал с активным, и стартовая
+карта пропадала из сетки (и из `heroesState().owned`) до конца сессии.
+
+**Что сделано.**
+- Стартовый герой теперь отдельное поле `G.starterId` (не меняется в
+  `setHero`): пишется в `sd_meta.starterId` (`meta.js`: load/save) и в
+  `sd_run.starterId`; `resetRun()` ставит его при «Новой игре», «Продолжить»
+  поднимает из сейва забега.
+- Миграция старых сейвов (`savedStarterId()` в main.js): `starterId` →
+  первый `HERO_ORDER`-ключ в `heroDecks` (после смены активного стартовый
+  там остаётся) → `activeHeroId` → `HERO_ORDER[0]` (Горбаг).
+- `deckScene.heroesOwnedOrder()` берёт стартера из `G.starterId` (фолбэк:
+  активный → первый); `heroesState()` теперь отдаёт `starter` (тест-хук).
+- Попутно, тот же сценарий: при загрузке активный герой восстанавливается из
+  `sd_meta.activeHeroId` (раньше из меню всегда открывался Горбаг), а пустая
+  колода завоёванного героя больше не подменяется стартовой: дефолт
+  `DEFAULT_DECK` — только для старого НЕПУСТОГО сейва, где все id
+  отфильтровались миграцией (удалён `if (!G.deck.length) … = DEFAULT_DECK`).
+
+**Проверка.** `for_work/probe_hero_switch.mjs` (раннер
+`probe_hero_switch.sh`, сервер 8165, Chrome 9348): **25/25** — до/после
+смены стартовый и завоёванный на месте, возврат назад, `sd_meta` хранит
+`starterId` и `activeHeroId` раздельно, reload + «Продолжить» (активный gob,
+колода пустая, Горбаг в коллекции), старт Эльмиром, миграция старого сейва
+без `starterId`. В `smoke_test.mjs` добавлен блок «смена героя» (4 проверки):
+смоук **711/711** (было 707/707).
+
+**Ловушки.**
+- `starterId` и `activeHeroId` — РАЗНЫЕ вещи: активного меняют в «Героях»,
+  стартовый выбирается один раз при «Новой игре» и остаётся в коллекции.
+- Пустая колода (`deck: []`) — легальное состояние завоёванного героя;
+  не путать со старым сейвом, где все id отфильтровались (для него —
+  стартовая колода Силы).
+- `GAME_META.saveMeta` пишет только переданные `extra`-поля: новые поля
+  (`starterId`) нужно добавлять и в `persistMeta()` main.js, иначе молча
+  потеряются при следующем сохранении.
 
 
