@@ -196,8 +196,7 @@
         <span class="lbl" id="lblRarity"></span><span id="rarityBtns"></span>
         <span class="lbl" id="lblSub"></span><span id="subBtns"></span>
         <span class="lbl" id="lblKind"></span><span id="kindBtns"></span>
-        <span class="lbl" id="lblCost"></span>
-        <select id="costSel"></select>
+        <span class="lbl" id="lblCost"></span><span id="costBtns"></span>
         <select id="sortSel"></select>
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
             <input type="checkbox" id="tokChk" style="cursor:pointer;">
@@ -332,20 +331,43 @@
 
     // ── состояние ────────────────────────────────────────────────────────
     const LS = { cur: "carddb.current", decks: "carddb.decks", lang: "carddb.lang" };
+    // Фильтры-наборы (w29, просил юзер): пустой набор = «Все», клик по опции
+    // включает/выключает её; внутри оси опции складываются (ИЛИ), оси
+    // перемножаются (И). Раньше были строки-радио («Обычная» → «Редкая»).
     const state = {
         view: "cards",
-        q: "", elem: "all", type: "all", rarity: "all", cost: "all", sort: "id",
+        q: "", elem: new Set(), type: new Set(), rarity: new Set(), cost: new Set(), sort: "id",
         // токены (карты без лица/призыва: gobA/gobC/ancBear) в общем каталоге
         // и конструкторе скрыты — включаются галочкой (просил юзер, w25)
-        includeTokens: false, subtype: "all",
+        includeTokens: false, subtype: new Set(),
         // тип эффекта заклинания/ловушки (Нанесение урона, Усиление, …) —
         // поле kind из cardsData.js, по спеке юзера (просил юзер, w26)
-        kind: "all",
+        kind: new Set(),
         // вкладка «Персонажи»: свои фильтры (стихия/редкость) и сортировка
         // по макс. жизням базы (просил юзер, w25)
-        heroElem: "all", heroRarity: "all", heroSort: "id",
+        heroElem: new Set(), heroRarity: new Set(), heroSort: "id",
         deck: { name: "", cards: {} }, // id → число копий
     };
+    const FILTER_AXES = ["elem", "type", "rarity", "cost", "subtype", "kind",
+        "heroElem", "heroRarity"];
+    function resetFilterAxes() {
+        FILTER_AXES.forEach((k) => state[k].clear());
+    }
+    function applyFilter(key, value) { // API/совместимость: заменить ось
+        if (!FILTER_AXES.includes(key)) { state[key] = value; return; }
+        state[key].clear();
+        if (value === "all" || value === null || value === undefined) return;
+        (Array.isArray(value) ? value : [value]).forEach((v) => {
+            // старый API цены «7» = вариант «7+» (в данных максимум 7)
+            state[key].add(key === "cost" && String(v) === "7" ? "7+" : v);
+        });
+    }
+    function toggleFilterValue(key, value) {
+        if (!FILTER_AXES.includes(key)) return false;
+        if (state[key].has(value)) state[key].delete(value);
+        else state[key].add(value);
+        return true;
+    }
 
     function deckIds() { return Object.keys(state.deck.cards); }
     function deckCount() { return deckIds().reduce((n, id) => n + state.deck.cards[id], 0); }
@@ -372,13 +394,21 @@
         return d.subtype ? [d.subtype] : [];
     }
     function subtypeMatch(d) {
-        if (state.subtype === "all") return true;
-        if (state.subtype === "none") return cardSubtypes(d).length === 0;
-        return cardSubtypes(d).includes(state.subtype);
+        if (!state.subtype.size) return true;
+        const subs = cardSubtypes(d);
+        if (!subs.length) return state.subtype.has("none");
+        return subs.some((s) => state.subtype.has(s));
     }
     function kindsOf(d) { // типы эффекта: строка или список («Шипастые лозы» —
         // Нанесение урона + Уменьшение параметров)
         return Array.isArray(d.kind) ? d.kind : d.kind ? [d.kind] : [];
+    }
+    function costMatch(cost) {
+        if (!state.cost.size) return true;
+        for (const c of state.cost) {
+            if (c === "7+" ? cost >= 7 : cost === Number(c)) return true;
+        }
+        return false;
     }
     function filteredIds() {
         const q = state.q.trim().toLowerCase();
@@ -386,13 +416,11 @@
             const d = CARDS[id];
             if (!state.includeTokens && !d.img) return false; // токены — по галочке
             if (!subtypeMatch(d)) return false;
-            if (state.kind !== "all" && !kindsOf(d).includes(state.kind)) return false;
-            if (state.elem !== "all" && d.elem !== state.elem) return false;
-            if (state.type !== "all" && d.type !== state.type) return false;
-            if (state.rarity !== "all" && d.rarity !== state.rarity) return false;
-            if (state.cost !== "all") {
-                if (state.cost === "7+" ? d.cost < 7 : d.cost !== Number(state.cost)) return false;
-            }
+            if (state.kind.size && !kindsOf(d).some((k) => state.kind.has(k))) return false;
+            if (state.elem.size && !state.elem.has(d.elem)) return false;
+            if (state.type.size && !state.type.has(d.type)) return false;
+            if (state.rarity.size && !state.rarity.has(d.rarity)) return false;
+            if (!costMatch(d.cost)) return false;
             if (q && (nameOf(id).toLowerCase().indexOf(q) < 0
                 && t("card." + id + ".desc").toLowerCase().indexOf(q) < 0
                 && id.toLowerCase().indexOf(q) < 0)) return false;
@@ -794,41 +822,39 @@
         parent.appendChild(b);
         return b;
     }
+    // Ось фильтра: «Все» = пустой набор, опции — независимые переключатели
+    function chipSet(parent, values, set, labelOf, redraw) {
+        parent.textContent = "";
+        const all = chip(parent, T("all"), set.size === 0, () => set.clear(), redraw);
+        all.dataset.filterValue = "all"; // для проб и отладки
+        values.forEach((v) => {
+            const b = chip(parent, labelOf(v), set.has(v), () => {
+                if (set.has(v)) set.delete(v);
+                else set.add(v);
+            }, redraw);
+            b.dataset.filterValue = String(v);
+        });
+    }
     function renderFilters() {
-        const elems = ["all", ...Object.keys(CARDS).reduce((acc, id) => {
+        const elems = Object.keys(CARDS).reduce((acc, id) => {
             if (!acc.includes(CARDS[id].elem)) acc.push(CARDS[id].elem);
-            return acc; }, [])];
-        const eBtns = $("elemBtns");
-        eBtns.textContent = "";
-        elems.forEach((e) =>
-            chip(eBtns, e === "all" ? T("all") : t("elem." + e), state.elem === e,
-                () => { state.elem = e; }));
-        const tBtns = $("typeBtns");
-        tBtns.textContent = "";
-        ["all", "unit", "spell", "building", "trap"].forEach((tp) =>
-            chip(tBtns, tp === "all" ? T("all") : t("type." + tp), state.type === tp,
-                () => { state.type = tp; }));
-        const rBtns = $("rarityBtns");
-        rBtns.textContent = "";
-        ["all", "common", "rare", "epic"].forEach((r) =>
-            chip(rBtns, r === "all" ? T("all") : t("rarity." + r), state.rarity === r,
-                () => { state.rarity = r; }));
-        const sBtns = $("subBtns");
-        sBtns.textContent = "";
-        ["all", "goblin", "animal", "elf", "plant", "none"].forEach((s) =>
-            chip(sBtns, s === "all" ? T("all")
-                : s === "none" ? T("subNone") : T("subNames")[s], state.subtype === s,
-                () => { state.subtype = s; }));
-        const kBtns = $("kindBtns");
-        kBtns.textContent = "";
-        ["all", "damage", "buff", "debuff", "search", "copy", "control",
-         "protect", "draw", "resource", "summon", "summonBuilding", "castSpell"]
-            .forEach((k) =>
-                chip(kBtns, k === "all" ? T("all") : T("kindNames")[k], state.kind === k,
-                    () => { state.kind = k; }));
+            return acc; }, []);
+        chipSet($("elemBtns"), elems, state.elem, (e) => t("elem." + e));
+        chipSet($("typeBtns"), ["unit", "spell", "building", "trap"],
+            state.type, (tp) => t("type." + tp));
+        chipSet($("rarityBtns"), ["common", "rare", "epic"],
+            state.rarity, (r) => t("rarity." + r));
+        chipSet($("subBtns"), ["goblin", "animal", "elf", "plant", "none"],
+            state.subtype, (s) => s === "none" ? T("subNone") : T("subNames")[s]);
+        chipSet($("kindBtns"), ["damage", "buff", "debuff", "search", "copy", "control",
+            "protect", "draw", "resource", "summon", "summonBuilding", "castSpell"],
+            state.kind, (k) => T("kindNames")[k]);
+        // цена: 0..6 + «7+» (в данных пока максимум 7); опции складываются
+        const costs = [...new Set(Object.keys(CARDS).map((id) => CARDS[id].cost))]
+            .sort((a, b) => a - b).filter((c) => c < 7).map(String);
+        chipSet($("costBtns"), [...costs, "7+"], state.cost, (c) => c);
         $("tokChk").checked = state.includeTokens;
         $("q").value = state.q;
-        $("costSel").value = state.cost;
         $("sortSel").value = state.sort;
         $("tabCards").className = state.view === "cards" ? "on" : "";
         $("tabHeroes").className = state.view === "heroes" ? "on" : "";
@@ -839,8 +865,8 @@
         const all = [...D.HERO_ORDER, ...D.HERO_FOE_ORDER].filter((id) => D.HEROES[id]);
         const f = all.filter((id) => {
             const d = D.HEROES[id];
-            if (state.heroElem !== "all" && !d.elems.includes(state.heroElem)) return false;
-            if (state.heroRarity !== "all" && d.rarity !== state.heroRarity) return false;
+            if (state.heroElem.size && !d.elems.some((e) => state.heroElem.has(e))) return false;
+            if (state.heroRarity.size && !state.heroRarity.has(d.rarity)) return false;
             return true;
         });
         const sorts = {
@@ -851,19 +877,13 @@
         return sorts[state.heroSort] ? f.sort(sorts[state.heroSort]) : f;
     }
     function renderHeroFilters() {
-        const elems = ["all", ...Object.keys(D.HEROES).reduce((acc, id) => {
+        const elems = Object.keys(D.HEROES).reduce((acc, id) => {
             D.HEROES[id].elems.forEach((e) => { if (!acc.includes(e)) acc.push(e); });
-            return acc; }, [])];
-        const eBtns = $("heroElemBtns");
-        eBtns.textContent = "";
-        elems.forEach((e) =>
-            chip(eBtns, e === "all" ? T("all") : t("elem." + e), state.heroElem === e,
-                () => { state.heroElem = e; }, renderHeroesView));
-        const rBtns = $("heroRarityBtns");
-        rBtns.textContent = "";
-        ["all", "common", "rare", "epic"].forEach((r) =>
-            chip(rBtns, r === "all" ? T("all") : t("rarity." + r), state.heroRarity === r,
-                () => { state.heroRarity = r; }, renderHeroesView));
+            return acc; }, []);
+        chipSet($("heroElemBtns"), elems, state.heroElem,
+            (e) => t("elem." + e), renderHeroesView);
+        chipSet($("heroRarityBtns"), ["common", "rare", "epic"], state.heroRarity,
+            (r) => t("rarity." + r), renderHeroesView);
         $("heroSortSel").value = state.heroSort;
         $("tabCards").className = state.view === "cards" ? "on" : "";
         $("tabHeroes").className = state.view === "heroes" ? "on" : "";
@@ -873,20 +893,6 @@
         renderHeroes();
     }
     function buildStatic() {
-        const costs = [...new Set(Object.keys(CARDS).map((id) => CARDS[id].cost))].sort((a, b) => a - b);
-        const sel = $("costSel");
-        sel.textContent = "";
-        const optAll = document.createElement("option");
-        optAll.value = "all"; optAll.textContent = T("cost") + " " + T("all");
-        sel.appendChild(optAll);
-        costs.forEach((c) => {
-            const o = document.createElement("option");
-            o.value = String(c); o.textContent = String(c);
-            sel.appendChild(o);
-        });
-        const o7 = document.createElement("option");
-        o7.value = "7+"; o7.textContent = "7+";
-        sel.appendChild(o7);
         const srt = $("sortSel");
         srt.textContent = "";
         [["id", T("sortId")], ["costAsc", T("sortCostAsc")],
@@ -928,7 +934,6 @@
         document.title = T("title") + " — Развернутый Мир";
     }
     $("q").addEventListener("input", () => { state.q = $("q").value; renderGrid(); });
-    $("costSel").addEventListener("change", () => { state.cost = $("costSel").value; renderGrid(); });
     $("sortSel").addEventListener("change", () => { state.sort = $("sortSel").value; renderGrid(); });
     $("tokChk").addEventListener("change", () => {
         state.includeTokens = $("tokChk").checked;
@@ -940,9 +945,10 @@
         renderHeroesView();
     });
     $("resetBtn").addEventListener("click", () => {
-        Object.assign(state, { q: "", elem: "all", type: "all", rarity: "all",
-            cost: "all", subtype: "all", kind: "all" });
+        state.q = "";
+        resetFilterAxes(); // все оси, включая вкладку «Персонажи»
         renderFilters(); renderGrid();
+        if (state.view === "heroes") renderHeroesView();
     });
     $("deckName").addEventListener("input", () => {
         state.deck.name = $("deckName").value; persist();
@@ -983,20 +989,35 @@
     // ── тестовый API (пробы через CDP) ──────────────────────────────────
     globalThis.__CARDSDB = {
         state: () => ({ view: state.view, lang: loc.lang,
-            filter: { q: state.q, elem: state.elem, type: state.type,
-                rarity: state.rarity, cost: state.cost, sort: state.sort,
-                subtype: state.subtype, kind: state.kind,
+            filter: { q: state.q, elem: [...state.elem], type: [...state.type],
+                rarity: [...state.rarity], cost: [...state.cost], sort: state.sort,
+                subtype: [...state.subtype], kind: [...state.kind],
                 includeTokens: state.includeTokens,
-                heroElem: state.heroElem, heroRarity: state.heroRarity,
+                heroElem: [...state.heroElem], heroRarity: [...state.heroRarity],
                 heroSort: state.heroSort },
             shown: filteredIds().length, total: Object.keys(CARDS).length,
             heroesShown: state.view === "heroes" ? heroIds().length : undefined,
             deck: { name: state.deck.name, count: deckCount(),
                 cards: JSON.parse(JSON.stringify(state.deck.cards)) },
             slots: Object.keys(slots()) }),
-        setFilter: (patch) => { Object.assign(state, patch);
+        // совместимость со старыми пробами: строка заменяет ось, «all» —
+        // сброс; массив задаёт несколько значений сразу
+        setFilter: (patch) => {
+            Object.entries(patch).forEach(([k, v]) => applyFilter(k, v));
             if (state.view === "heroes") renderHeroesView();
-            else { renderFilters(); renderGrid(); } },
+            else { renderFilters(); renderGrid(); }
+        },
+        toggleFilter: (key, value) => {
+            if (!toggleFilterValue(key, value)) return false;
+            if (state.view === "heroes") renderHeroesView();
+            else { renderFilters(); renderGrid(); }
+            return true;
+        },
+        clearFilters: () => {
+            resetFilterAxes();
+            if (state.view === "heroes") renderHeroesView();
+            else { renderFilters(); renderGrid(); }
+        },
         heroIds: () => heroIds(),
         deckIds: () => filteredIds(),
         add: addCard, remove: removeCard,

@@ -110,7 +110,7 @@ frontline, как в Stormbound. Первая стихия «Сила» (кра�
   main) + арт (`images/ui`, `images/scenes` — арены, `images/sprites` —
   листы существ, `images/cards` — лица карт, `images/dungeon_tiles` —
   тайлы этажей подземелья — свой набор на данж (goblins_lair, growth_lair),
-  `sound`)
+  `sound`, `tools/cards.html` — картотека и конструктор колод)
 - `for_work/` — рабочие материалы (арт-исходники, тесты) — в git не входят
 - `PLAN.md` — план разработки и правила боя
 - `HANDOFF.md` — сводка для продолжения работы (устройство, ловушки,
