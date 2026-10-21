@@ -4,7 +4,9 @@
 // есть у игрока. Наведение на карту плавно
 // увеличивает её до полного размера (копия поверх панели, маска не режет).
 // Фильтры по типу/цене/редкости; стихии — рядом из 6 лого в правой части
-// экрана (повторный клик по активному лого снимает фильтр). Оба окна —
+// экрана. Фильтры — наборы-переключатели (просил юзер): клик по опции
+// добавляет её к выбору, повторный — убирает; внутри оси опции объединяются
+// по «ИЛИ», разные оси — по «И». «Все» сбрасывает ось. Оба окна —
 // скролл-панели (колесо мыши, ползунок, клик по треку). Сохранение сразу.
 (function () {
     function createDeckScene(ctx) {
@@ -19,7 +21,17 @@
         let root = null, leftPane = null, rightPane = null, heroesPane = null;
         let tab = "deck"; // вкладка сцены: «Колода» | «Герои» (просил юзер)
         const heroCards = []; // вкладка «Герои»: {id, node} (тесты)
-        const filters = { type: null, cost: null, rarity: null, elem: null };
+        // Фильтры-наборы: пустой набор = «Все»; несколько значений в оси
+        // расширяют выдачу (ИЛИ), разные оси сужают (И)
+        const filters = { type: new Set(), cost: new Set(), rarity: new Set(), elem: new Set() };
+        const filterOn = (key, value) => filters[key].has(value);
+        function toggleFilterOpt(key, value) {
+            if (!filters[key]) return false;
+            if (filters[key].has(value)) filters[key].delete(value);
+            else filters[key].add(value);
+            return true;
+        }
+        function clearFilter(key) { if (filters[key]) filters[key].clear(); }
         const ELEM_KEYS = Object.keys(ELEM_LOGO);
         const PANE_POS = { left: { x: 90, y: 222 }, right: { x: 780, y: 279 } };
         // ряд лого стихий (общие константы: использует и rebuildChips, и api)
@@ -68,10 +80,10 @@
         function passes(id) {
             const def = CARDS[id];
             if (!def) return false;
-            if (filters.type && def.type !== filters.type) return false;
-            if (filters.cost && def.cost !== filters.cost) return false;
-            if (filters.rarity && def.rarity !== filters.rarity) return false;
-            if (filters.elem && def.elem !== filters.elem) return false;
+            if (filters.type.size && !filters.type.has(def.type)) return false;
+            if (filters.cost.size && !filters.cost.has(def.cost)) return false;
+            if (filters.rarity.size && !filters.rarity.has(def.rarity)) return false;
+            if (filters.elem.size && !filters.elem.has(def.elem)) return false;
             return true;
         }
         function save() { G.persistMeta(); } // колода героя — она же G.deck
@@ -466,24 +478,36 @@
                 label.eventMode = "none";
                 root.addChild(label);
                 cx += label.width + 15;
-                const opts = [{ value: null, label: t("filter.all") }, ...r.opts[0]];
-                for (const o of opts) {
-                    const active = filters[r.key] === o.value;
+                // «Все» — сброс оси; опции — независимые переключатели
+                const allCh = chip(ctx, {
+                    label: t("filter.all"), x: cx, y: r.y, active: filters[r.key].size === 0,
+                    onTap: () => { clearFilter(r.key); rebuildPanes(); },
+                });
+                allCh.userData.isChip = true;
+                allCh.userData.filterKey = r.key;
+                allCh.userData.filterValue = null;
+                root.addChild(allCh);
+                cx += allCh.userData.w + 9;
+                for (const o of r.opts[0]) {
+                    const active = filterOn(r.key, o.value);
                     const ch = chip(ctx, {
                         label: o.label, x: cx, y: r.y, active,
-                        onTap: () => { filters[r.key] = o.value; rebuildPanes(); },
+                        onTap: () => { toggleFilterOpt(r.key, o.value); rebuildPanes(); },
                     });
                     ch.userData.isChip = true;
+                    ch.userData.filterKey = r.key;
+                    ch.userData.filterValue = o.value;
                     root.addChild(ch);
                     cx += ch.userData.w + 9;
                 }
             }
             // ── фильтр стихий: ряд из 6 лого в ПРАВОЙ части экрана, на
-            // свободном месте над панелью коллекции (просил юзер). Повторный
-            // клик по активному лого снимает фильтр (= «Все»).
+            // свободном месте над панелью коллекции (просил юзер). Лого —
+            // такие же переключатели, как чипы: клик добавляет стихию к
+            // выбору, повторный — убирает; ни одной выбранной = «Все».
             for (let i = 0; i < ELEM_KEYS.length; i++) {
                 const value = ELEM_KEYS[i];
-                const active = filters.elem === value;
+                const active = filterOn("elem", value);
                 const c2 = new PIXI.Container();
                 const g = new PIXI.Graphics();
                 g.circle(28.5, 28.5, 28.5);
@@ -492,7 +516,7 @@
                 g.eventMode = "static";
                 g.on("pointertap", () => {
                     if (ctx.sfx) ctx.sfx();
-                    filters.elem = filters.elem === value ? null : value;
+                    toggleFilterOpt("elem", value);
                     rebuildPanes();
                 });
                 const sp = new PIXI.Sprite(uiTex(ELEM_LOGO[value]));
@@ -534,8 +558,32 @@
                 rebuildPanes();
                 return true;
             },
-            setFilter(key, value) { filters[key] = value; rebuildPanes(); },
-            filters: () => ({ ...filters }),
+            // совместимость с тестами/старыми вызовами: заменить ось одним
+            // значением (null/undefined — сброс). Клики в сцене идут через
+            // переключатель — независимое включение/выключение опций.
+            setFilter(key, value) {
+                if (!filters[key]) return;
+                filters[key].clear();
+                if (value !== null && value !== undefined) filters[key].add(value);
+                rebuildPanes();
+            },
+            toggleFilter(key, value) {
+                if (!toggleFilterOpt(key, value)) return false;
+                rebuildPanes();
+                return true;
+            },
+            filters: () => Object.fromEntries(Object.entries(filters)
+                .map(([k, set]) => [k, [...set]])),
+            // клик по чипу фильтра как мышью (тесты); value=null — «Все»
+            filterChipTap(key, value) {
+                if (!root) return false;
+                const ch = root.children.find((n) => n.userData && n.userData.isChip
+                    && n.userData.filterKey === key && n.userData.filterValue === value);
+                if (!ch) return false;
+                // обработчик чипа висит на его графике-фоне (первый ребёнок)
+                (ch.children[0] || ch).emit("pointertap");
+                return true;
+            },
             visibleIds: () => Object.keys(CARDS)
                 .filter((id) => (G.collection[id] || 0) > 0 && passes(id)),
             deckListIds: () => [...new Set(G.deck)].filter(passes),
@@ -557,7 +605,12 @@
             // ряд лого стихий (тесты): число, активный фильтр, левый край,
             // фактическая позиция первого лого (должна совпадать с центром круга)
             elemInfo: () => ({
-                count: ELEM_KEYS.length, active: filters.elem, x0: ELEM_X0,
+                count: ELEM_KEYS.length,
+                // старые тесты ждут строку/ null: одна выбранная стихия = она,
+                // иначе null; полный набор — в activeList
+                active: filters.elem.size === 1 ? [...filters.elem][0] : null,
+                activeList: [...filters.elem],
+                x0: ELEM_X0,
                 logo: elemSprites[0] ? { x: elemSprites[0].x, y: elemSprites[0].y } : null,
             }),
             elemTap(i) { const g = elemBtns[i]; if (g) g.emit("pointertap"); },
