@@ -464,6 +464,7 @@
                 if (def.spell.brew) { B.brewCasts = (B.brewCasts || 0) + 1; refreshBrewBadges(); }
                 if (def.spell.search) openRunesPanel(def.spell.search); // выбор поверх боя
                 if (def.spell.searchUnit) openRunesPanel(def.spell.searchUnit, "unit"); // «Рунное гадание»
+                if (def.spell.seek) openSeekPanel(def.spell.seek, def.spell.seekPicks || 1); // «Поиск знаний»
                 if (def.spell.journey) openJourneyPanel(def.spell.journey);
                 if (def.spell.discardPick) openBrewPanel(); // «Варка зелий»: выбор из сбросов
                 return true;

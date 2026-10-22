@@ -144,6 +144,24 @@
                 // «Поиск рун» (тесты): состав панели и выбор карты
                 runesState: () => ({ picking: !!B.picking, top: [...runesTop], want: runesWant }),
                 runesPick(idx) { pickRune(idx); },
+                // «Поиск знаний» (wis94, тесты): верхние карты, что взято, сколько осталось
+                seekState: () => ({ open: !!seekPanel, picking: !!(B && B.picking),
+                    top: [...seekTop], taken: [...seekTaken], left: seekPicks }),
+                seekPick(idx) { pickSeek(idx); },
+                seekDone() { finishSeek(); },
+                // «Старший ледовик»/«Выросшие духи» (тесты): способности напрямую
+                _frostNeighbors(col, row, tCol, tRow) {
+                    const a = unitAt(col, row), t = unitAt(tCol, tRow);
+                    if (!a || !t) return false;
+                    frostNeighbors(a, t);
+                    return true;
+                },
+                _trapOnMove(col, row) {
+                    const u = unitAt(col, row);
+                    if (!u) return false;
+                    trapOnMoveAct(u);
+                    return true;
+                },
                 // «Пень обряда» (тесты): панель и нажатия её кнопок
                 stumpState: () => ({ open: !!stumpPanel, picking: !!(B && B.picking),
                     side: stumpSide, top: stumpTop }),

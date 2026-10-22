@@ -79,6 +79,52 @@
                 sfx("aqua");
             };
 
+            // «Старший ледовик» (wis95): после атаки — «Заморожен 1» существам
+            // СЛЕВА И СПРАВА от цели (соседи по горизонтали, верт/гориз-логика
+            // поля). Замораживаются любые существа — в тексте карты нет «ваших»
+            // или «противника»; постройки и база соседей не имеют.
+            A.frostNeighbors = function frostNeighbors(attacker, target) {
+                if (!attacker || !attacker.def || !attacker.def.frostNeighbors
+                    || !B.units.includes(attacker)) return;
+                // цель могла погибнуть от удара — клетку берём у неё как есть
+                if (!target || target.col === undefined || target.row === undefined) return;
+                for (const dc of [-1, 1]) {
+                    const v = unitAt(target.col + dc, target.row);
+                    if (v && v !== attacker) addFrozen(v, 1);
+                }
+            };
+
+            // «Выросшие духи» (wis96): после перемещения разыгрывает ловушку
+            // из руки владельца на пустую соседнюю (верт/гориз) клетку БЕЗ
+            // траты энергии. Берётся первая подходящая ловушка руки: руна и
+            // «Призрачные споры» вешаются на существо — им нужна не пустая
+            // клетка, поэтому они пропускаются. Клетка — без существа и без
+            // своей ловушки (веер «?» не плодим); приоритет — клетка впереди
+            // по маршу, затем бока, затем тыл.
+            A.trapOnMoveAct = function trapOnMoveAct(u) {
+                if (!u || !B.units.includes(u) || !u.def.trapOnMove) return;
+                const hand = u.side === "p" ? B.hand : B.eHand;
+                const discard = u.side === "p" ? B.discard : B.eDiscard;
+                const traps = u.side === "p" ? B.traps.p : B.traps.e;
+                const fwd = u.side === "p" ? -1 : 1;
+                const cells = [[0, fwd], [-1, 0], [1, 0], [0, -fwd]]
+                    .map(([dc, dr]) => [u.col + dc, u.row + dr])
+                    .filter(([c2, r2]) => c2 >= 0 && c2 < GRID && r2 >= 0 && r2 < GRID
+                        && !unitAt(c2, r2)
+                        && !traps.some((tr) => !tr.unit && tr.col === c2 && tr.row === r2));
+                if (!cells.length) return;
+                const i = hand.findIndex((id) => CARDS[id] && CARDS[id].type === "trap"
+                    && CARDS[id].trap.effect !== "castRandom"
+                    && CARDS[id].trap.effect !== "sporeCurse");
+                if (i < 0) return;
+                const cardId = hand.splice(i, 1)[0];
+                const [col, row] = cells[0];
+                discard.push(cardId);
+                armTrap(u.side, cardId, col, row);
+                const p = cellXY(col, row);
+                floatText(p.x, p.y - 60, GAME_LOC.t(`card.${cardId}.name`), 0xb7d0ef);
+            };
+
             // «Заморожен N» (wis91/wis92): существо пропускает перемещение
             // И атаку в свой следующий ход, затем счётчик тает на 1; на нуле
             // эффект снимается. Счётчик складывается, метка — над головой.
@@ -146,6 +192,7 @@
                     thicketSplash(attacker, victim); // «Древоброд глухой чащи»
                     venomApply(attacker, victim); // «Ядовитость»
                     frostAttack(attacker, victim); // «Снежный элементаль»
+                    frostNeighbors(attacker, victim); // «Старший ледовик»
                     // «Проросший кабан» толкает только цель впереди по маршу
                     if (victim.col === attacker.col
                         && victim.row === attacker.row + (attacker.side === "p" ? -1 : 1)) {
@@ -316,6 +363,7 @@
                 if (!B.units.includes(u) || u.def.type !== "unit") return;
                 triggerCellTraps(u);
                 archerShot(u);
+                trapOnMoveAct(u); // «Выросшие духи»: ловушка из руки на соседнюю клетку
                 // руна/споры на существе ездят вместе с ним: маркер «?» и его
                 // точка наведения (tr.__mx/__my) должны переехать на новую клетку
                 if (B.traps.p.some((tr) => tr.unit === u)
@@ -1202,7 +1250,8 @@
                 floatText(fp.x, fp.y - 90, GAME_LOC.t(`card.${pick.id}.name`), 0xffd98c);
                 // панельные заклинания (выбор из карт / призыв) авто-розыгрыша
                 // не имеют — уходят в руку владельца, разыграет сам за энергию
-                if (def.spell.search || def.spell.journey || def.spell.searchUnit) {
+                if (def.spell.search || def.spell.journey || def.spell.searchUnit
+                    || def.spell.seek) {
                     hand.push(pick.id);
                     return;
                 }

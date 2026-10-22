@@ -165,6 +165,8 @@
                 if (d.ability === "archer") v += 0.4;
                 if (d.ability === "assassin") v += 0.4;
                 if (d.ability === "pushBack") v += 0.3;
+                if (d.frostNeighbors) v += 0.6; // «Старший ледовик»: лёд соседям цели
+                if (d.trapOnMove) v += 0.3; // «Выросшие духи»: ловушка с руки
                 if (d.leaderAura || d.plantEcho || d.druidEnergy
                     || d.sisterDraw || d.spellAura || d.campAura) v += 0.8;
                 if (u.venom) v += 0.4;
@@ -184,6 +186,7 @@
                 if (d.ability === "pushBack") s += 0.6;
                 if (d.ability === "flyOver") s += 0.5;
                 if (d.ability === "dash1") s += 0.4;
+                if (d.frostNeighbors) s += 0.8;
                 if (d.leaderAura || d.plantEcho || d.druidEnergy || d.sisterDraw
                     || d.spellAura || d.campAura || d.monolith) s += 0.9;
                 if (u.venom) s += 0.8;
@@ -292,7 +295,7 @@
                     if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk
                         || s.enchantFire || s.cocoon || s.venom) return 4;
                     if (s.baseHit || s.wolfVolley) return 4.5; // бьёт СВОИМ существом
-                    return 6; // поиск рун / гадание / глубокое путешествие
+                    return 6; // поиск рун / гадание / поиск знаний / глубокое путешествие
                 }
                 // «Три монолита» — без спешки (просил юзер: не в приоритете):
                 // движок добора, играется, когда важное уже разыграно
@@ -907,6 +910,8 @@
                 // «Рунное гадание»: в верхних картах колоды должен быть призыв
                 if (s.searchUnit && !B.eDeck.slice(-s.searchUnit)
                     .some((id) => CARDS[id] && CARDS[id].type === "unit")) return false;
+                // «Поиск знаний»: брать нечего, если колода пуста
+                if (s.seek && !B.eDeck.length) return false;
                 // «Природная мощь»: есть свой крепыш (3+ жизни) — иначе +1 урона
                 // за энергию и карту не окупается
                 if (s.buffAtkByHp && !B.units.some((v) => v.side === "e"
@@ -975,6 +980,10 @@
                     if (d.energyToStats) s += 0.4;
                     if (d.trapGrow) s += 0.4 + Math.min(3, B && B.traps ? B.traps.e.length : 0) * 0.15;
                     if (d.frostAttack) s += 0.4;
+                    if (d.frostNeighbors) s += 0.8;
+                    // «Выросшие духи»: ценнее, когда в руке есть ловушка под него
+                    if (d.trapOnMove) s += 0.4 + (B && B.eHand && B.eHand.some((id) =>
+                        CARDS[id] && CARDS[id].type === "trap") ? 0.5 : 0);
                     if (d.ability === "archer" || d.ability === "assassin") s += 0.3;
                     if (d.ability === "dash1") s += 0.2;
                     return s;
@@ -1012,6 +1021,7 @@
                     if (s.debuffEnemyAtkAll) v += 0.7 + Math.min(4, B.units.filter(
                         (u) => u.side === "p" && u.def.type === "unit" && u.curAtk > 0).length) * 0.25;
                     if (s.search || s.searchUnit || s.journey || s.discardPick) v += 0.5;
+                    if (s.seek) v += 0.6 + Math.min(4, B ? B.eDeck.length : 0) * 0.05;
                     if (s.copyLast) v += 1.0;
                     if (s.wolfVolley) v += 2.0;
                     if (s.baseHit) v += 1.6;
@@ -1394,6 +1404,17 @@
                 if (s.searchUnit) { // «Рунное гадание»: из верхних N призывов — лучший
                     const k = aiSearchUnit(s.searchUnit);
                     if (k) { B.eDeck.splice(k.j, 1); B.eHand.push(k.id); }
+                }
+                if (s.seek) { // «Поиск знаний»: лучшие `seekPicks` из верхних N — в руку
+                    const k = Math.min(s.seek, B.eDeck.length);
+                    const top = k ? B.eDeck.splice(B.eDeck.length - k, k) : [];
+                    const want = Math.min(s.seekPicks || 1, top.length);
+                    const ranked = top.map((id, i) => ({ id, i, sc: aiCardPower(CARDS[id]) }))
+                        .sort((a, b) => (b.sc - a.sc) || (b.i - a.i));
+                    const take = new Set();
+                    for (const x of ranked.slice(0, want)) { take.add(x.i); B.eHand.push(x.id); }
+                    for (let i = 0; i < top.length; i++) if (!take.has(i)) B.eDeck.push(top[i]);
+                    if (want) sfx("chpoc");
                 }
                 if (s.discardPick) { // «Варка зелий»: лучшее заклинание сбросов — в руку
                     const pick = (disc) => disc

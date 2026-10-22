@@ -558,6 +558,7 @@
                         thicketSplash(u, occ); // «Древоброд глухой чащи»
                         venomApply(u, occ); // «Ядовитость»
                         frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
+                        frostNeighbors(u, occ); // «Старший ледовик»: лёд соседям цели
                         afterAttackPush(u, occ); // «Проросший кабан»
                         refreshHud();
                         checkEnd();

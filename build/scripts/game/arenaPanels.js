@@ -85,6 +85,96 @@
                 refreshHud();
             };
 
+            // ── Панель «Поиск знаний» (wis94): верхние N карт колоды — взять
+            // ЛЮБЫЕ `picks` карт в руку. Выбранные уходят в руку, остальные
+            // возвращаются наверх колоды в прежнем порядке (как «Поиск рун»:
+            // непросмотренное не пропадает). «Закончить»/Esc — взять меньше.
+            A.seekPanel = null;
+            A.seekTop = [];
+            A.seekTaken = [];
+            A.seekPicks = 0;
+            A.closeSeekPanel = function closeSeekPanel() {
+                if (seekPanel) {
+                    seekPanel.destroy({ children: true });
+                    seekPanel = null;
+                }
+                if (B) B.picking = false;
+            };
+            A.finishSeek = function finishSeek() { // подобранное — в руку, остаток — в колоду
+                const taken = seekTaken.slice();
+                const rest = seekTop.slice();
+                seekTaken = [];
+                seekTop = [];
+                seekPicks = 0;
+                closeSeekPanel();
+                if (!B) return;
+                for (const id of taken) B.hand.push(id);
+                if (rest.length) B.deck.push(...rest);
+                sfx("chpoc");
+                layoutHand();
+                refreshHud();
+            };
+            A.openSeekPanel = function openSeekPanel(n, picks) {
+                closeSeekPanel();
+                const k = Math.min(n, B.deck.length);
+                seekTop = k ? B.deck.splice(B.deck.length - k, k) : []; // верх колоды — конец массива
+                seekTaken = [];
+                seekPicks = Math.min(Math.max(1, picks | 0 || 1), seekTop.length);
+                if (!seekTop.length) return; // в колоде пусто — смотреть нечего
+                B.picking = true;
+                drawSeekPanel();
+            };
+            A.drawSeekPanel = function drawSeekPanel() {
+                if (seekPanel) {
+                    seekPanel.destroy({ children: true });
+                    seekPanel = null;
+                }
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("seek.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("seek.hint", { n: seekTop.length, left: seekPicks }), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const m = seekTop.length;
+                const spread = Math.min(210, 1260 / Math.max(1, m));
+                seekTop.forEach((cardId, idx) => {
+                    const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                    c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                    c.eventMode = "static";
+                    c.on("pointertap", () => pickSeek(idx));
+                    node.addChild(c);
+                });
+                node.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("seek.done"), x: 960, y: 762, scale: 1,
+                    onTap: () => finishSeek(),
+                }));
+                root.addChild(node);
+                seekPanel = node;
+            };
+            A.pickSeek = function pickSeek(idx) { // idx — номер карты среди показанных
+                if (!B || !B.picking || !seekPanel) return;
+                const cardId = seekTop[idx];
+                if (!cardId) return;
+                seekTop.splice(idx, 1);
+                seekTaken.push(cardId);
+                seekPicks -= 1;
+                sfx("chpoc");
+                if (seekPicks <= 0 || !seekTop.length) { finishSeek(); return; }
+                drawSeekPanel(); // карт осталось меньше — перерисовать
+            };
+
             // ── Панель «Трёх монолитов» (grw26): поиск по ВСЕЙ колоде существа
             // заданной цены — одно в руку. Триггер — призыв своего существа по
             // соседству с монолитом (см. summonUnit); если монолитов несколько,

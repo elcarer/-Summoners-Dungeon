@@ -130,6 +130,7 @@
                     floatText(p.x, p.y - 60, "⚔", 0xb07ad5);
                     damageUnit(occ, u.curAtk, u, "sword");
                     frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
+                    frostNeighbors(u, occ); // «Старший ледовик»: лёд соседям цели
                     triggerAttackTraps(u);
                     refreshHud();
                     checkEnd();
@@ -217,6 +218,7 @@
                             thicketSplash(u, occ); // «Древоброд глухой чащи»
                             venomApply(u, occ); // «Ядовитость»
                             frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
+                            frostNeighbors(u, occ); // «Старший ледовик»: лёд соседям цели
                             afterAttackPush(u, occ); // «Проросший кабан»
                             triggerAttackTraps(u); // руна: существо атаковало
                             refreshHud();
@@ -266,6 +268,7 @@
                                 thicketSplash(u, occ); // «Древоброд глухой чащи»
                                 venomApply(u, occ); // «Ядовитость»
                                 frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
+                                frostNeighbors(u, occ); // «Старший ледовик»: лёд соседям цели
                                 afterAttackPush(u, occ); // «Проросший кабан»
                                 triggerAttackTraps(u); // руна: существо атаковало
                                 refreshHud();
@@ -311,6 +314,7 @@
                             thicketSplash(u, occ); // «Древоброд глухой чащи»
                             venomApply(u, occ); // «Ядовитость»
                             frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
+                            frostNeighbors(u, occ); // «Старший ледовик»: лёд соседям цели
                             afterAttackPush(u, occ); // «Проросший кабан»
                             triggerAttackTraps(u);
                         }

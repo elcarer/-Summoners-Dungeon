@@ -257,6 +257,7 @@
                     if (journeyPanel) finishJourney(null); // «Глубокое путешествие» — без призыва
                     else if (stumpPanel) closeStumpPanel(); // «Пень обряда» — оставить как было
                     else if (brewPanel) closeBrewPanel(); // «Варка зелий» — без выбора
+                    else if (seekPanel) finishSeek(); // «Поиск знаний» — взять, что выбрано
                     else closeRunesPanel(); // «Поиск рун» — отмена выбора
                     return;
                 }
