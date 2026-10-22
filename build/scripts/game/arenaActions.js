@@ -382,6 +382,24 @@
                     punch(root.hud);
                     sfx("aqua");
                 }
+                if (def.spell.target === "none" && def.spell.energyPerTrap) { // «Поток маны»: +1⚡ за свою ловушку
+                    const got = B.traps.p.length;
+                    B.energy += got;
+                    floatText(960, 840, `+${got}⚡`, 0xffd98c);
+                    if (got) punch(root.hud);
+                    sfx("aqua");
+                }
+                if (def.spell.debuffEnemyAtkAll) { // «Нехватка воздуха»: −N урона всем существам врага
+                    const n = def.spell.debuffEnemyAtkAll;
+                    for (const v of B.units) if (v.side !== "p" && v.def.type === "unit") {
+                        v.bonusAtk = (v.bonusAtk || 0) - n;
+                        punch(v.node);
+                        const p = cellXY(v.col, v.row);
+                        floatText(p.x, p.y - 39, `−${n}⚔`, 0x8cd0ef);
+                    }
+                    recalcAuras();
+                    sfx("acid");
+                }
                 if (def.spell.aoeDmg) { // «Раскалённые обломки»: всем вражеским существам и постройкам
                     const dmg = def.spell.aoeDmg + altarBonus("p");
                     // первое уронное заклинание — +1 ко ВСЕМ ударам этого каста;

@@ -444,7 +444,7 @@
                  subtype: "elf", // подтип — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x3f6d3a, img: "growth/80" },
-        // ── Стихия «Мудрость» (синие) — третья стихия, лица wisdom/81–86 ────
+        // ── Стихия «Мудрость» (синие) — третья стихия, лица wisdom/81–90 ────
         // (нумерация артов юзера — сквозная с 81). Герой этой стихии — Мира
         // (первое призванное существо получает «Защиту от заклинаний»);
         // подземелья у стихии пока нет, карты живут в стартере Миры
@@ -482,6 +482,35 @@
                  kind: "control", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "common", elem: "wisdom",
                  color: 0x4a7ac0, img: "wisdom/86" },
+        // «Поток маны»: 1⚡ за каждую свою ловушку на поле боя (ловушки —
+        // записи B.traps.p: мины, руны, отмены; споры-проклятие живут на
+        // существе и в счёт не входят)
+        wis87: { type: "spell", cost: 0,
+                 spell: { target: "none", energyPerTrap: true },
+                 kind: "resource", // тип эффекта — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "wisdom",
+                 color: 0x4a7ac0, img: "wisdom/87" },
+        // «Нехватка воздуха»: −1 к урону ВСЕМ существам противника (постройки
+        // не существа; урон не ниже нуля — клампит recalcAuras)
+        wis88: { type: "spell", cost: 1,
+                 spell: { target: "none", debuffEnemyAtkAll: 1 },
+                 kind: "debuff", // тип эффекта — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "wisdom",
+                 color: 0x4a7ac0, img: "wisdom/88" },
+        // «Зимние духи»: когда срабатывает любая ловушка (клеточная, отмена,
+        // руна, приманка, ряд), получает +1 к урону навсегда (bonusAtk)
+        wis89: { type: "unit", cost: 1, atk: 0, hp: 1, speed: 1,
+                 creature: "goblin", trapGrow: true,
+                 subtype: "elemental", // подтип — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "wisdom",
+                 color: 0x3a6ea8, img: "wisdom/89" },
+        // «Снежный элементаль»: при атаке по существу противника цель
+        // получает −1 к урону (постоянно, как «Слабость»)
+        wis90: { type: "unit", cost: 1, atk: 0, hp: 1, speed: 1,
+                 creature: "goblin", frostAttack: true,
+                 subtype: "elemental", // подтип — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "wisdom",
+                 color: 0x3a6ea8, img: "wisdom/90" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.

@@ -324,6 +324,14 @@
                     : null),
                 // гейты ИИ по заклинанию (тесты): id карты → playable
                 aiSpellPlayable: (id) => !!CARDS[id] && aiSpellPlayable(CARDS[id]),
+                // тест-хук: применить эффект заклинания стороны врага напрямую
+                _aiSpell(id) {
+                    if (!B || !CARDS[id] || CARDS[id].type !== "spell") return false;
+                    enemyCastSpellEffect(CARDS[id], true);
+                    refreshHud();
+                    checkEnd();
+                    return true;
+                },
                 // группы приоритета ИИ (тесты связок): id карты → группа
                 _aiGroup: (id) => (B && CARDS[id] ? aiGroup(id, CARDS[id]) : null),
                 // ── тест-хуки «умного ИИ» (волна 2026-10-21) ────────────────

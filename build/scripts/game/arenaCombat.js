@@ -61,6 +61,41 @@
                 addPoison(target, attacker.venom);
             };
 
+            // «Снежный элементаль» (wis90): после его атаки по существу
+            // противника цель получает −1 к урону навсегда (bonusAtk, как
+            // «Слабость»; recalcAuras клампит урон в 0). Постройки не
+            // трогаем — у них нет урона, а «существо противника» в тексте.
+            A.frostAttack = function frostAttack(attacker, target) {
+                if (!attacker || !attacker.def || !attacker.def.frostAttack
+                    || !B.units.includes(attacker)) return;
+                if (!target || target.def.type !== "unit" || target.side === attacker.side
+                    || !B.units.includes(target)) return;
+                target.bonusAtk = (target.bonusAtk || 0) - 1;
+                recalcAuras();
+                const p = cellXY(target.col, target.row);
+                floatText(p.x, p.y - 39, "−1⚔", 0x8cd0ef);
+                punch(target.node);
+                sfx("aqua");
+            };
+
+            // «Зимние духи» (wis89): когда срабатывает ЛЮБАЯ ловушка (клеточная,
+            // отмена, руна, приманка, ряд), каждое живое существо с меткой
+            // trapGrow получает +1 к урону навсегда. Зовётся в точках, где
+            // ловушка снимается/тратится, — один раз на срабатывание, без
+            // повторов «Рощи лоз» (это тот же триггер).
+            A.trapTriggered = function trapTriggered() {
+                if (!B || !B.units) return;
+                for (const u of B.units.slice()) {
+                    if (!u.def || !u.def.trapGrow || !B.units.includes(u)) continue;
+                    u.bonusAtk = (u.bonusAtk || 0) + 1;
+                    recalcAuras();
+                    const p = cellXY(u.col, u.row);
+                    floatText(p.x, p.y - 39, "+1⚔", 0x9fd489);
+                    punch(u.node);
+                    sfx("up");
+                }
+            };
+
             // «Проросший кабан» (grw13): после атаки по существу отталкивает
             // его на клетку дальше от себя, если та свободна (постройки не
             // оттолкнуть, умирающая цель не толкается). Втолкнули на чужую
@@ -167,6 +202,7 @@
                 if (i < 0) return [toCol, toRow];
                 const trap = B.traps[foe].splice(i, 1)[0];
                 redrawTraps();
+                trapTriggered(); // «Зимние духи»: сработала приманка
                 const p = cellXY(trap.col, trap.row);
                 floatText(p.x, p.y - 60, "?!", 0xe08cd0);
                 damageUnit(u, trap.def.trap.dmg + altarBonus(foe), null, "acid");
@@ -213,6 +249,7 @@
                 if (i < 0) return null;
                 const trap = B.traps[side].splice(i, 1)[0];
                 redrawTraps();
+                trapTriggered(); // «Зимние духи»: сработала отмена
                 const p = cellXY(trap.col, trap.row);
                 floatText(p.x, p.y - 60, "?!", 0xe08cd0);
                 sfx("mine");
@@ -244,6 +281,7 @@
                 if (i < 0) return;
                 const trap = B.traps[side].splice(i, 1)[0];
                 redrawTraps();
+                trapTriggered(); // «Зимние духи»: сработала клеточная ловушка
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, "?!", 0xe08cd0);
                 const echo = trapEchoOnce(side); // первая ловушка боя — флаг потрачен
@@ -960,6 +998,7 @@
                 if (!B.traps[side].length) return;
                 const trap = B.traps[side].shift();
                 redrawTraps();
+                trapTriggered(); // «Зимние духи»: сработала ловушка «при гибели»
                 const k = cellXY(killer.col, killer.row);
                 floatText(k.x, k.y - 60, "?!", 0xe08cd0);
                 if (trap.def.trap.effect === "rowDmg") {
@@ -988,6 +1027,7 @@
                     if (i < 0) continue;
                     B.traps[side].splice(i, 1);
                     redrawTraps();
+                    trapTriggered(); // «Зимние духи»: сработала руна
                     const p = cellXY(attacker.col, attacker.row);
                     floatText(p.x, p.y - 60, "?!", 0xe08cd0);
                     sfx("mine");

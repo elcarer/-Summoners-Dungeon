@@ -282,11 +282,11 @@
                     if (s.wolfVolley && aiWolfLethal()) return 0; // волки добивают базу
                     // «Цветение кристаллов» — ускоритель: энергия за размер руки,
                     // разыгрывается первым, чтобы хватило и на остальные карты
-                    if (s.energyPerHand) return 1;
+                    if (s.energyPerHand || s.energyPerTrap) return 1;
                     if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
                         || s.sacrifice || s.copyLast
                         || s.purge || s.stealEnergy || s.fireflies
-                        || s.growthHand || s.nova) return 2;
+                        || s.growthHand || s.nova || s.debuffEnemyAtkAll) return 2;
                     if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk
                         || s.enchantFire || s.cocoon || s.venom) return 4;
                     if (s.baseHit || s.wolfVolley) return 4.5; // бьёт СВОИМ существом
@@ -859,6 +859,11 @@
                 if (s.growthHand && spellHitDmg(def, "e") < 1) return false;
                 // «Цветение кристаллов» — разгон: играется при 4+ картах в руке
                 if (s.energyPerHand && B.eHand.length < 4) return false;
+                // «Поток маны» — без своих ловушек энергии не даёт
+                if (s.energyPerTrap && !B.traps.e.length) return false;
+                // «Нехватка воздуха» — нужен хоть один урон у существ игрока
+                if (s.debuffEnemyAtkAll && !B.units.some((v) =>
+                    v.side === "p" && v.def.type === "unit" && v.curAtk > 0)) return false;
                 // «Атака духами волков» — нужен стрелок, чья линия не бьёт своих
                 if (s.wolfVolley && !aiWolfPick()) return false;
                 // «Круговая атака» — своё существо впритык к врагу, и урон по
@@ -956,6 +961,8 @@
                         || d.sisterDraw || d.spellBuffAura) s += 0.9;
                     if (d.keeperScale) s += 0.6;
                     if (d.energyToStats) s += 0.4;
+                    if (d.trapGrow) s += 0.4 + Math.min(3, B && B.traps ? B.traps.e.length : 0) * 0.15;
+                    if (d.frostAttack) s += 0.4;
                     if (d.ability === "archer" || d.ability === "assassin") s += 0.3;
                     if (d.ability === "dash1") s += 0.2;
                     return s;
@@ -989,6 +996,9 @@
                     if (s.purge) v += 1.1;
                     if (s.stealEnergy) v += 1.2;
                     if (s.energyPerHand) v += 0.8;
+                    if (s.energyPerTrap) v += 0.6 + Math.min(4, B.traps.e.length) * 0.15;
+                    if (s.debuffEnemyAtkAll) v += 0.7 + Math.min(4, B.units.filter(
+                        (u) => u.side === "p" && u.def.type === "unit" && u.curAtk > 0).length) * 0.25;
                     if (s.search || s.searchUnit || s.journey || s.discardPick) v += 0.5;
                     if (s.copyLast) v += 1.0;
                     if (s.wolfVolley) v += 2.0;
@@ -1280,6 +1290,24 @@
                     floatText(960, 60, `+${got}⚡`, 0xffd98c);
                     punch(root.hud);
                     sfx("aqua");
+                }
+                if (s.energyPerTrap) { // «Поток маны»: +1⚡ за свою ловушку
+                    const got = B.traps.e.length;
+                    B.eEnergy += got;
+                    floatText(960, 60, `+${got}⚡`, 0xffd98c);
+                    if (got) punch(root.hud);
+                    sfx("aqua");
+                }
+                if (s.debuffEnemyAtkAll) { // «Нехватка воздуха»: −N урона всем существам игрока
+                    const n = s.debuffEnemyAtkAll;
+                    for (const v of B.units) if (v.side !== "e" && v.def.type === "unit") {
+                        v.bonusAtk = (v.bonusAtk || 0) - n;
+                        punch(v.node);
+                        const p = cellXY(v.col, v.row);
+                        floatText(p.x, p.y - 39, `−${n}⚔`, 0xef9f8c);
+                    }
+                    recalcAuras();
+                    sfx("acid");
                 }
                 if (s.aoeDmg) { // «Раскалённые обломки»: всем существам и постройкам игрока
                     const dmg = s.aoeDmg + altarBonus("e");

@@ -128,6 +128,7 @@
                     const p = cellXY(u.col, u.row);
                     floatText(p.x, p.y - 60, "⚔", 0xb07ad5);
                     damageUnit(occ, u.curAtk, u, "sword");
+                    frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
                     triggerAttackTraps(u);
                     refreshHud();
                     checkEnd();
@@ -201,6 +202,7 @@
                             crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
                             thicketSplash(u, occ); // «Древоброд глухой чащи»
                             venomApply(u, occ); // «Ядовитость»
+                            frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
                             afterAttackPush(u, occ); // «Проросший кабан»
                             triggerAttackTraps(u); // руна: существо атаковало
                             refreshHud();
@@ -249,6 +251,7 @@
                                 crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
                                 thicketSplash(u, occ); // «Древоброд глухой чащи»
                                 venomApply(u, occ); // «Ядовитость»
+                                frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
                                 afterAttackPush(u, occ); // «Проросший кабан»
                                 triggerAttackTraps(u); // руна: существо атаковало
                                 refreshHud();
@@ -293,6 +296,7 @@
                             crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
                             thicketSplash(u, occ); // «Древоброд глухой чащи»
                             venomApply(u, occ); // «Ядовитость»
+                            frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
                             afterAttackPush(u, occ); // «Проросший кабан»
                             triggerAttackTraps(u);
                         }
