@@ -38,7 +38,7 @@
             "icon_gold", "icon_map", "icon_rune", "icon_setting", "icon_shop",
             "panel_1", "panel_2", "panel_allert", "panel_buff", "panel_buff_circle",
             "panel_down", "panel_label", "panel_minimap", "panel_skill", "panel_top",
-            "portrate_hero", "sign_mana", "sign_shield",
+            "portrate_hero", "sign_mana", "sign_shield", "start_back",
             "UI_cards_hand", "UI_energy",
         ];
         say("арт интерфейса…");
@@ -630,14 +630,17 @@
                 gameMusic("menu");
                 epRoot = new PIXI.Container();
                 epRoot.eventMode = "static";
-                const bg = new PIXI.Sprite(uiTex("bg_corridor_2.png"));
+                // фон выбора героя — картинка юзера images/ui/start_back.png
+                // (1920×1080, карта мира); лёгкое затемнение — только чтобы
+                // карточки героев и заголовок читались
+                const bg = new PIXI.Sprite(uiTex("start_back.png"));
                 const s = Math.max(1920 / bg.texture.width, 1080 / bg.texture.height);
                 bg.scale.set(s);
                 bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);
                 epRoot.addChild(bg);
                 const dim = new PIXI.Graphics();
                 dim.rect(-3000, -2000, 7920, 5080);
-                dim.fill({ color: 0x000000, alpha: 0.5 });
+                dim.fill({ color: 0x000000, alpha: 0.22 });
                 epRoot.addChild(dim);
 
                 const title = T(t("menu.pickHero"), 96, 0xf0c96a,

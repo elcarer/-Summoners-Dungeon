@@ -91,7 +91,14 @@
                         on: tr.unit ? B.units.includes(tr.unit) : null })),
                 }),
                 hoverCell(col, row) { const p = cellXY(col, row); unitHoverAt(p.x, p.y); },
-                hoverOff: () => unitCardHide(),
+                hoverPoint(x, y) { unitHoverAt(x, y); }, // тест: точное наведение (значок ловушки)
+                hoverOff: () => hoverHideAll(),
+                // карта-подсказка СВОЕЙ ловушки (тесты): что показано + наведение
+                trapCardState: () => (trapCard
+                    ? { id: trapCard.id, effect: trapCard.trap.def.trap.effect,
+                        col: trapCard.trap.col, row: trapCard.trap.row,
+                        unit: trapCard.trap.unit ? cardIdOf(trapCard.trap.unit.def) : null }
+                    : null),
                 // drag&drop (режим «Перетаскивание»): состояние для тестов
                 dragState() {
                     return drag ? { idx: drag.idx, moved: drag.moved, over: drag.over } : null;
@@ -121,7 +128,7 @@
                         units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0, venom: u.venom || 0, poison: u.poison || 0, entangle: u.entangle || 0, ward: !!u.spellWard, token: !!u.token })),
                         traps: { p: B.traps.p.length, e: B.traps.e.length },
                         // эффекты висящих ловушек (тесты: «Отмена заклинания/
-                        // призыва» и др. — какая ловушка занимает слот)
+                        // призыва» и др. — какие ловушки на поле)
                         trapFx: { p: B.traps.p.map((t) => t.def.trap.effect),
                             e: B.traps.e.map((t) => t.def.trap.effect) },
                         firewalls: B.firewalls.map((f) => ({ side: f.side, row: f.row, left: f.left })),

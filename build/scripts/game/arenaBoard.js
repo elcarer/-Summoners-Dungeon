@@ -66,7 +66,7 @@
                     const p = zone.toLocal(e.global);
                     unitHoverAt(p.x, p.y);
                 });
-                zone.on("pointerout", () => unitCardHide());
+                zone.on("pointerout", () => hoverHideAll());
                 c.addChild(zone);
 
                 // зона клика по базе врага (для заклинаний с прицелом)

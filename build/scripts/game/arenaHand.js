@@ -15,8 +15,59 @@
                 unitCard.node.destroy({ children: true });
                 unitCard = null;
             };
+            // Подсказка СВОЕЙ ловушки (просил юзер): наведение на «?» показывает
+            // карту, которая её поставила, — игрок видит, где какая ловушка.
+            // Вражеские ловушки не раскрываем (они и задуманы загадкой).
+            A.trapCard = null; // { trap, id, node }
+            A.trapCardHide = function trapCardHide() {
+                if (!trapCard) return;
+                trapCard.node.destroy({ children: true });
+                trapCard = null;
+            };
+            A.hoverHideAll = function hoverHideAll() {
+                unitCardHide();
+                trapCardHide();
+            };
+            // Позиция «?» записана redrawTraps (__mx/__my); радиус чуть больше
+            // самого значка — попасть курсором легко.
+            A.playerTrapAtPoint = function playerTrapAtPoint(x, y) {
+                if (!B || !B.traps) return null;
+                let best = null, bestD = 29 * 29;
+                for (const tr of B.traps.p) {
+                    if (!tr.def || !tr.def.trap) continue;
+                    let px = tr.__mx, py = tr.__my;
+                    if (px === undefined || py === undefined) { // страховка до отрисовки
+                        if (tr.unit) {
+                            if (!B.units.includes(tr.unit)) continue;
+                            const p = cellXY(tr.unit.col, tr.unit.row);
+                            px = p.x; py = p.y - 44;
+                        } else {
+                            const p = cellXY(tr.col, tr.row);
+                            px = p.x; py = p.y;
+                        }
+                    }
+                    const d = (x - px) * (x - px) + (y - py) * (y - py);
+                    if (d <= bestD) { bestD = d; best = tr; }
+                }
+                return best;
+            };
+            A.showTrapCard = function showTrapCard(tr) {
+                if (trapCard && trapCard.trap === tr) return;
+                unitCardHide();
+                trapCardHide();
+                const id = cardIdOf(tr.def);
+                if (!id) return;
+                const node = globalThis.GAME_UI.cardFace(ctx, id, { scale: 0.75 });
+                node.eventMode = "none";
+                node.position.set(430, 420);
+                root.addChild(node);
+                trapCard = { trap: tr, id, node };
+            };
             A.unitHoverAt = function unitHoverAt(x, y) {
                 if (!root || !B) return;
+                const tr = playerTrapAtPoint(x, y);
+                if (tr) { showTrapCard(tr); return; }
+                trapCardHide();
                 const hit = cellAt(x, y);
                 const u = hit ? unitAt(hit[0], hit[1]) : null;
                 if (!u) { unitCardHide(); return; }

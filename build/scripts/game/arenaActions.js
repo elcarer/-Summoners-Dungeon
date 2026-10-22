@@ -66,11 +66,9 @@
                     return;
                 }
                 if (def.type === "trap") {
-                    // руна и споры вешаются на существо — слоты ловушек не занимают
-                    const unitTrap = def.trap.effect === "castRandom"
-                        || def.trap.effect === "sporeCurse";
-                    if (effCost(B.hand[idx]) > B.energy
-                        || (!unitTrap && B.traps.p.length >= TRAP_SLOTS)) return;
+                    // руна и споры вешаются на существо; лимита ловушек нет
+                    // (просил юзер) — можно ставить сколько угодно
+                    if (effCost(B.hand[idx]) > B.energy) return;
                     // мина ставится на выбранную пустую клетку — выбор как у юнитов
                     B.selected = B.selected === idx ? null : idx;
                     B.spellTarget = false;

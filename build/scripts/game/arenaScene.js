@@ -158,6 +158,7 @@
                 monolithCost = null;
                 hideEnemyCard(); // узел умер бы вместе с root — снимаем ссылку
                 unitCard = null; // узел подсказки умер вместе с root
+                trapCard = null; // подсказка ловушки тоже
                 if (root) { root.destroy({ children: true }); root = null; }
                 overlay = null;
                 ovZoom = null; // узел умер вместе с root — снимаем ссылку

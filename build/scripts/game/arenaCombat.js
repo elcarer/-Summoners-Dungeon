@@ -82,8 +82,8 @@
             // «Шаман гоблинов»: после призыва бесплатно разыгрывает случайного
             // Гоблина (цена ≤ 2) из колоды своей стороны на пустую соседнюю
             // (верт/гориз) клетку — карта уходит из колоды прямо на поле.
-            // Гоблин-ловушка (приманка) ставится как ловушка: нужен свободный
-            // слот и клетка без своей ловушки.
+            // Гоблин-ловушка (приманка) ставится как ловушка: клетка без
+            // своей ловушки (лимита ловушек нет).
             A.summonShaman = function summonShaman(u) {
                 if (!B.units.includes(u)) return; // мог умереть от мины при призыве
                 const deck = u.side === "p" ? B.deck : B.eDeck;
@@ -96,7 +96,6 @@
                 const goblins = deck
                     .map((id, i) => ({ id, i, def: CARDS[id] }))
                     .filter((x) => isGoblin(x.def) && x.def.cost <= 2
-                        && (x.def.type !== "trap" || traps.length < TRAP_SLOTS)
                         && near.some(([c2, r2]) => cellOk(x.def, c2, r2)));
                 if (!goblins.length) return;
                 const pick = goblins[(Math.random() * goblins.length) | 0];
@@ -113,7 +112,7 @@
             // Гоблина из СБРОСА своей стороны (цена ≤ 3) на пустую соседнюю
             // (верт/гориз) клетку — энергия не тратится (просил юзер). Карта
             // уходит из сброса прямо на поле. Ловушка-гоблин (приманка) ставится
-            // как ловушка: нужен свободный слот и клетка без своей ловушки.
+            // как ловушка: клетка без своей ловушки (лимита ловушек нет).
             A.summonSpiritCaller = function summonSpiritCaller(u) {
                 if (!B.units.includes(u)) return; // мог умереть от мины при призыве
                 const discard = u.side === "p" ? B.discard : B.eDiscard;
@@ -126,7 +125,6 @@
                 const goblins = discard
                     .map((id, i) => ({ id, i, def: CARDS[id] }))
                     .filter((x) => CARDS[x.id] && isGoblin(x.def) && x.def.cost <= 3
-                        && (x.def.type !== "trap" || traps.length < TRAP_SLOTS)
                         && near.some(([c2, r2]) => cellOk(x.def, c2, r2)));
                 if (!goblins.length) return;
                 const pick = goblins[(Math.random() * goblins.length) | 0];
@@ -181,6 +179,10 @@
                 if (!B.units.includes(u) || u.def.type !== "unit") return;
                 triggerCellTraps(u);
                 archerShot(u);
+                // руна/споры на существе ездят вместе с ним: маркер «?» и его
+                // точка наведения (tr.__mx/__my) должны переехать на новую клетку
+                if (B.traps.p.some((tr) => tr.unit === u)
+                    || B.traps.e.some((tr) => tr.unit === u)) redrawTraps();
             };
             // Ловушки на клетке: «Гоблинская мина» (взрыв 3+1 по соседям),
             // «Гоблинская засада» (выход гоблинов стороны-хозяйки), «Дух
@@ -947,9 +949,8 @@
 
             // ── Ловушки ─────────────────────────────────────────────────────────
             // Мины хранят клетку (col/row); руна («Наскальная рунопись») —
-            // само существо (unit) и ездит с ним.
+            // само существо (unit) и ездит с ним. Лимита ловушек нет (просил юзер).
             A.armTrap = function armTrap(side, cardId, col, row, unit = null) {
-                if (B.traps[side].length >= TRAP_SLOTS) return false;
                 B.traps[side].push({ def: CARDS[cardId], col, row, unit });
                 redrawTraps();
                 sfx("mine");
@@ -1115,28 +1116,43 @@
                 const layer = root.trapLayer;
                 layer.removeChildren().forEach((n) => n.destroy({ children: true }));
                     for (const side of ["p", "e"]) {
-                        B.traps[side].forEach((tr) => {
-                            // мина — «?» прямо на заминированной клетке; руна —
-                            // над существом, на котором висит
+                        // Несколько ловушек в одной точке (одна клетка/существо)
+                        // рисуем веером, иначе «?» полностью перекрывают друг
+                        // друга и не видно, сколько их. Точки запоминаем в
+                        // tr.__mx/__my — по ним работает наведение (подсказка
+                        // «какая карта поставила ловушку», просил юзер).
+                        const groups = new Map();
+                        for (const tr of B.traps[side]) {
                             let p = null;
                             if (tr.unit) {
-                                if (!B.units.includes(tr.unit)) return; // снимут в removeUnit
+                                if (!B.units.includes(tr.unit)) continue; // снимут в removeUnit
                                 p = cellXY(tr.unit.col, tr.unit.row);
                                 p.y -= 44;
                             } else p = cellXY(tr.col, tr.row);
-                            const c = new PIXI.Container();
-                            c.eventMode = "none"; // маркер не ест клики клетки
-                            const g = new PIXI.Graphics();
-                            g.circle(0, 0, 21);
-                            g.fill({ color: side === "p" ? 0x3f5f8a : 0x7a3f3f, alpha: 0.62 });
-                            g.stroke({ width: 3, color: 0xd8c79d });
-                            c.addChild(g);
-                            const q = T("?", 27, 0xffe9b0);
-                            q.anchor.set(0.5);
-                            c.addChild(q);
-                            c.position.set(p.x, p.y);
-                            layer.addChild(c);
-                        });
+                            const key = `${Math.round(p.x)}:${Math.round(p.y)}`;
+                            if (!groups.has(key)) groups.set(key, []);
+                            groups.get(key).push({ tr, p });
+                        }
+                        for (const list of groups.values()) {
+                            const n = list.length;
+                            list.forEach(({ tr, p }, i) => {
+                                const dx = (i - (n - 1) / 2) * 40; // веер влево/вправо
+                                const c = new PIXI.Container();
+                                c.eventMode = "none"; // маркер не ест клики клетки
+                                const g = new PIXI.Graphics();
+                                g.circle(0, 0, 21);
+                                g.fill({ color: side === "p" ? 0x3f5f8a : 0x7a3f3f, alpha: 0.62 });
+                                g.stroke({ width: 3, color: 0xd8c79d });
+                                c.addChild(g);
+                                const q = T("?", 27, 0xffe9b0);
+                                q.anchor.set(0.5);
+                                c.addChild(q);
+                                c.position.set(p.x + dx, p.y);
+                                tr.__mx = p.x + dx; // для наведения на значок
+                                tr.__my = p.y;
+                                layer.addChild(c);
+                            });
+                        }
                     }
             };
 
