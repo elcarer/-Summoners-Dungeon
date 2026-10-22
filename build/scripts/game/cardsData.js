@@ -504,9 +504,9 @@
                  subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "wisdom",
                  color: 0x3a6ea8, img: "wisdom/89" },
-        // «Снежный элементаль»: при атаке по существу противника цель
+        // «Снежный элементаль»: 2/2, при атаке по существу противника цель
         // получает −1 к урону (постоянно, как «Слабость»)
-        wis90: { type: "unit", cost: 1, atk: 0, hp: 1, speed: 1,
+        wis90: { type: "unit", cost: 2, atk: 2, hp: 2, speed: 1,
                  creature: "goblin", frostAttack: true,
                  subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "wisdom",
