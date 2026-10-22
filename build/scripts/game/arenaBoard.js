@@ -555,10 +555,10 @@
                         const hpBefore = occ.hp;
                         damageUnit(occ, u.curAtk, u, "sword");
                         crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
-                        thicketSplash(u, occ); // «Древоброд глухой чащи»
+                        thicketSplash(u, occ); // «Древоброд глухой чащи»: всплеск вокруг себя
                         venomApply(u, occ); // «Ядовитость»
                         frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
-                        frostNeighbors(u, occ); // «Старший ледовик»: лёд соседям цели
+                        frostNeighbors(u); // «Старший ледовик»: лёд соседям-существам
                         afterAttackPush(u, occ); // «Проросший кабан»
                         refreshHud();
                         checkEnd();

@@ -165,7 +165,7 @@
                 if (d.ability === "archer") v += 0.4;
                 if (d.ability === "assassin") v += 0.4;
                 if (d.ability === "pushBack") v += 0.3;
-                if (d.frostNeighbors) v += 0.6; // «Старший ледовик»: лёд соседям цели
+                if (d.frostNeighbors) v += 0.6; // «Старший ледовик»: лёд своим бокам
                 if (d.trapOnMove) v += 0.3; // «Выросшие духи»: ловушка с руки
                 if (d.leaderAura || d.plantEcho || d.druidEnergy
                     || d.sisterDraw || d.spellAura || d.campAura) v += 0.8;

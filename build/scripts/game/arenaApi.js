@@ -150,10 +150,10 @@
                 seekPick(idx) { pickSeek(idx); },
                 seekDone() { finishSeek(); },
                 // «Старший ледовик»/«Выросшие духи» (тесты): способности напрямую
-                _frostNeighbors(col, row, tCol, tRow) {
-                    const a = unitAt(col, row), t = unitAt(tCol, tRow);
-                    if (!a || !t) return false;
-                    frostNeighbors(a, t);
+                _frostNeighbors(col, row) {
+                    const a = unitAt(col, row);
+                    if (!a) return false;
+                    frostNeighbors(a);
                     return true;
                 },
                 _trapOnMove(col, row) {

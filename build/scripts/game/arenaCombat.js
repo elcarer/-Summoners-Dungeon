@@ -23,8 +23,9 @@
                 sfx("crash");
             };
             // «Древоброд глухой чащи» (grw31): при атаке урон атаки получают
-            // и ВСЕ существа и постройки по соседству (верт/гориз) с целью —
-            // сам древоброд от собственного всплеска не страдает
+            // ВСЕ существа и постройки по соседству (верт/гориз) с САМИМ
+            // древобродом. Атакованная цель исключена — ей уже достался удар;
+            // сам древоброд от собственного всплеска не страдает.
             A.thicketSplash = function thicketSplash(attacker, target) {
                 if (!attacker || !attacker.def || !attacker.def.thicket
                     || !B.units.includes(attacker)) return;
@@ -32,8 +33,8 @@
                 const times = 1 + (attacker.def.plant ? plantEcho(attacker.side) : 0);
                 for (let t = 0; t < times; t++) {
                     for (const v of B.units.slice()) {
-                        if (v === attacker || !B.units.includes(v)) continue;
-                        if (Math.abs(v.col - target.col) + Math.abs(v.row - target.row) !== 1) continue;
+                        if (v === attacker || v === target || !B.units.includes(v)) continue;
+                        if (Math.abs(v.col - attacker.col) + Math.abs(v.row - attacker.row) !== 1) continue;
                         damageUnit(v, attacker.curAtk, attacker, "sword");
                     }
                 }
@@ -80,16 +81,15 @@
             };
 
             // «Старший ледовик» (wis95): после атаки — «Заморожен 1» существам
-            // СЛЕВА И СПРАВА от цели (соседи по горизонтали, верт/гориз-логика
-            // поля). Замораживаются любые существа — в тексте карты нет «ваших»
-            // или «противника»; постройки и база соседей не имеют.
-            A.frostNeighbors = function frostNeighbors(attacker, target) {
+            // СЛЕВА И СПРАВА от САМОГО ЛЕДОВИКА (только клетки его ряда).
+            // Позиция цели роли не играет. Замораживаются любые существа —
+            // в тексте карты нет «ваших» или «противника»; постройки не
+            // морозятся (addFrozen их пропускает).
+            A.frostNeighbors = function frostNeighbors(attacker) {
                 if (!attacker || !attacker.def || !attacker.def.frostNeighbors
                     || !B.units.includes(attacker)) return;
-                // цель могла погибнуть от удара — клетку берём у неё как есть
-                if (!target || target.col === undefined || target.row === undefined) return;
                 for (const dc of [-1, 1]) {
-                    const v = unitAt(target.col + dc, target.row);
+                    const v = unitAt(attacker.col + dc, attacker.row);
                     if (v && v !== attacker) addFrozen(v, 1);
                 }
             };
@@ -189,10 +189,10 @@
                     const hpBefore = victim.hp;
                     damageUnit(victim, attacker.curAtk, attacker, "sword");
                     crushHit(attacker, attacker.curAtk, hpBefore); // «Сокрушение»
-                    thicketSplash(attacker, victim); // «Древоброд глухой чащи»
+                    thicketSplash(attacker, victim); // «Древоброд глухой чащи»: всплеск вокруг себя
                     venomApply(attacker, victim); // «Ядовитость»
                     frostAttack(attacker, victim); // «Снежный элементаль»
-                    frostNeighbors(attacker, victim); // «Старший ледовик»
+                    frostNeighbors(attacker); // «Старший ледовик»
                     // «Проросший кабан» толкает только цель впереди по маршу
                     if (victim.col === attacker.col
                         && victim.row === attacker.row + (attacker.side === "p" ? -1 : 1)) {
