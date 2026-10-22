@@ -63,11 +63,13 @@
             const rc = A.cellRect(col, row);
             return { x: rc.x + rc.w / 2, y: rc.y + rc.h / 2 };
         };
-        // Листы существ поля боя — по стихии карты: Рост — эльф, Сила (и
-        // прочие) — гоблин. Отдельный лист — полем def.sheet у карты.
+        // Листы существ поля боя — по стихии карты: Рост — эльф, Мудрость —
+        // сорка (плейсхолдер до арта элементалей), Сила (и прочие) — гоблин.
+        // Отдельный лист — полем def.sheet у карты.
         A.sheetOf = (u) => ctx.creatureSheets
             && (ctx.creatureSheets[u.def.sheet]
-                || ctx.creatureSheets[u.def.elem === "growth" ? "elf" : "goblin"]);
+                || ctx.creatureSheets[u.def.elem === "growth" ? "elf"
+                    : u.def.elem === "wisdom" ? "wisdom" : "goblin"]);
         A.T = (text, size, fill, opts = {}) => new PIXI.Text({
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
         });

@@ -160,6 +160,8 @@
             // с ловушкой, сходит на клетку приманки вместо намеченной — и получает
             // 1 урона. Приманка одноразовая; занятая клетка приманки не манит.
             A.lureRedirect = function lureRedirect(u, fromCol, fromRow, toCol, toRow) {
+                // «Водный элементаль» (wis82) на приманку не ведётся
+                if (u.def.ability === "noTraps") return [toCol, toRow];
                 const foe = u.side === "p" ? "e" : "p";
                 const i = B.traps[foe].findIndex((tr) => tr.def.trap.effect === "lure"
                     && Math.abs(tr.col - fromCol) + Math.abs(tr.row - fromRow) === 1
@@ -196,8 +198,32 @@
                 return true;
             };
 
+            // «Отмена заклинания» (wis83) / «Отмена призыва» (wis84): ловушки
+            // без клетки — срабатывают, когда ПРОТИВНИК разыгрывает заклинание
+            // или карту призыва, и отменяют это: эффект не происходит, существо
+            // не появляется, но карта и энергия противника потрачены (спека
+            // юзера). Ловушка одноразовая. Возвращает сработавшую ловушку или
+            // null. Вызывается в точках розыгрыша ДО эффекта (castSpell,
+            // aiPlay, castRandomSpell, постановка существ).
+            A.counterTrapConsume = function counterTrapConsume(side, effect) {
+                const i = B.traps[side].findIndex((t) =>
+                    t.def.trap && t.def.trap.effect === effect);
+                if (i < 0) return null;
+                const trap = B.traps[side].splice(i, 1)[0];
+                redrawTraps();
+                const p = cellXY(trap.col, trap.row);
+                floatText(p.x, p.y - 60, "?!", 0xe08cd0);
+                sfx("mine");
+                trapEchoOnce(side); // «Роща лоз»: флаг первого срабатывания
+                // тратится — повторять отмену нечего (зеркально клеточным)
+                return trap;
+            };
+
             A.triggerCellTraps = function triggerCellTraps(u) {
                 if (!B.units.includes(u)) return; // умер раньше (рывок+мина на шаге)
+                // «Водный элементаль» (wis82): не активирует ловушки — ни
+                // призываясь на клетку, ни шагая на неё
+                if (u.def.ability === "noTraps") return;
                 const foe = u.side === "p" ? "e" : "p";
                 let side = foe;
                 let i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
@@ -362,6 +388,31 @@
                     if (B.traps[s].length !== n) redrawTraps();
                 }
                 punches.push({ node: u.node, life: 0.25 / animK(), total: 0.25 / animK(), dying: true });
+            };
+
+            // «Смыв» (wis85): существо убирается с поля боя БЕЗ каскадов смерти
+            // (зеркально «Раскопкам» — хищник не кормится, ауры пересчитываются),
+            // его карта призыва возвращается в руку владельца из сброса. У
+            // токена (gobA/gobC/волк друида) карты призыва нет — просто убирается.
+            // Рука не резиновая: не влезло (HAND_MAX) — карта остаётся в сбросе.
+            A.bounceUnit = function bounceUnit(u) {
+                if (!B.units.includes(u)) return;
+                const p = cellXY(u.col, u.row);
+                const id = cardIdOf(u.def);
+                removeUnit(u);
+                recalcAuras();
+                if (u.token) return;
+                const discard = u.side === "p" ? B.discard : B.eDiscard;
+                const hand = u.side === "p" ? B.hand : B.eHand;
+                const i = discard.indexOf(id);
+                if (i < 0) return; // карты призыва нет (повтор/сожжение) — просто убрали
+                discard.splice(i, 1);
+                if (hand.length < HAND_MAX) {
+                    hand.push(id);
+                    floatText(p.x, p.y - 66, "↩ " + GAME_LOC.t(`card.${id}.name`), 0x8cd0ef);
+                } else {
+                    discard.push(id); // рука полна — карта возвращается в сброс
+                }
             };
 
             A.killUnit = function killUnit(u, killer) {
@@ -626,6 +677,29 @@
                 const mark = u.node && u.node.getChildByName("entangleMark");
                 if (mark) mark.destroy({ children: true });
             };
+            // «Защита от заклинаний» (способность Миры, u.spellWard): метка
+            // синим знаком на жетоне — зеркально меткам очарования/берсерка
+            A.addWardMark = function addWardMark(u) {
+                if (u.node.getChildByName("wardMark")) return;
+                const mark = new PIXI.Container();
+                mark.name = "wardMark";
+                mark.eventMode = "none";
+                const g = new PIXI.Graphics();
+                g.circle(0, 0, 13.5);
+                g.fill({ color: 0x1e3a5f });
+                g.stroke({ width: 3, color: 0x8cd0ef });
+                mark.addChild(g);
+                const tx = T("✦", 18, 0x8cd0ef);
+                tx.anchor.set(0.5);
+                mark.addChild(tx);
+                mark.position.set(36, -54);
+                u.node.addChild(mark);
+            };
+            A.removeWardMark = function removeWardMark(u) {
+                const mark = u.node && u.node.getChildByName("wardMark");
+                if (mark) mark.destroy({ children: true });
+            };
+
             A.countProps = function countProps(u) {
                 let n = PURGE_DEF_KEYS.filter((k) => u.def[k] !== undefined).length;
                 if (u.bonusAtk) n++; // перманентные бонусы (лагерь, «Природная мощь»)
@@ -637,6 +711,7 @@
                 if (u.venom) n++;
                 if (u.poison) n++;
                 if (u.entangle) n++;
+                if (u.spellWard) n++;
                 return n;
             };
             // Снять ВСЕ свойства/эффекты цели; возвращает, сколько снято, —
@@ -657,6 +732,7 @@
                 if (u.venom) { u.venom = 0; n++; }
                 if (u.poison) { u.poison = 0; n++; }
                 if (u.entangle) { u.entangle = 0; n++; }
+                if (u.spellWard) { u.spellWard = false; n++; removeWardMark(u); }
                 for (const m of ["sporeMark", "enchMark", "protectMark", "berserkMark", "confuseMark",
                     "venomMark", "poisonMark", "entangleMark"]) {
                     const node = u.node.getChildByName(m);
@@ -673,6 +749,17 @@
             // snd — звук удара: "sword" (атака существом), "acid" (ловушка),
             // "rocket" (заклинание), по умолчанию "dam"
             A.damageUnit = function damageUnit(target, amount, killer = null, snd = "dam") {
+                // «Защита от заклинаний» (u.spellWard): пока идёт разрешение
+                // заклинания (A.spellCasting ставят applySpellP /
+                // enemyCastSpellEffect / тик «Стены костров»), урон заклинания
+                // по такому существу не проходит вовсе (просил юзер)
+                if (amount > 0 && target.spellWard && A.spellCasting) {
+                    const wp = cellXY(target.col, target.row);
+                    floatText(wp.x, wp.y - 66,
+                        "✦ " + GAME_LOC.t("spell.ward.name"), 0x8cd0ef);
+                    sfx("aqua");
+                    return;
+                }
                 // «Защита N» («Защитный кокон») режет входящий урон до нуля;
                 // споры/огненное дыхание реагируют на ФАКТИЧЕСКИ прошедший урон
                 let amt = amount;
@@ -931,6 +1018,14 @@
                     hand.push(pick.id);
                     return;
                 }
+                // «Отмена заклинания» противника: свободный каст руны — тоже
+                // розыгрыш заклинания, отменяется (карта руны уходит в сброс)
+                if (counterTrapConsume(side === "p" ? "e" : "p", "counterSpell")) {
+                    floatText(fp.x, fp.y - 60,
+                        "✕ " + GAME_LOC.t(`card.${pick.id}.name`), 0x8cd0ef);
+                    discard.push(pick.id);
+                    return;
+                }
                 if (def.spell.copyLast) { // «Горящие руны»: повтор последнего
                     const last = side === "p" ? B.lastSpell.p : B.lastSpell.e;
                     const ok = last && last !== "str25" && CARDS[last]
@@ -962,9 +1057,13 @@
                 if (s.target === "anyCell" || s.target === "none")
                     return autoTargetFor(cardId);
                 if (!focus || !B.units.includes(focus)) return autoTargetFor(cardId);
-                const ok = s.target === "anyUnit" ? focus.side === "p" && focus.def.type === "unit"
-                    : s.target === "ownUnit" ? focus.side === "p" && focus.def.type === "unit"
-                    : s.target === "anyUnitDmg" ? focus.def.type === "unit"
+                // «Защита от заклинаний»: на такое существо заклинание не целится
+                const ok = s.target === "anyUnit" ? focus.side === "p"
+                        && focus.def.type === "unit" && !focus.spellWard
+                    : s.target === "ownUnit" ? focus.side === "p"
+                        && focus.def.type === "unit" && !focus.spellWard
+                    : s.target === "anyUnitDmg" ? (focus.def.type === "unit"
+                            && !focus.spellWard)
                         || (focus.def.type === "building" && !s.noBuildings)
                     : s.target === "enemyAny" ? focus.side !== "p"
                     : false;
@@ -1061,12 +1160,15 @@
             };
             A.firewallTick = function firewallTick(side) {
                 if (!B.firewalls || !B.firewalls.length) return;
+                // стена — эффект заклинания: «Защита от заклинаний» бережёт
                 for (const f of B.firewalls) {
                     if (f.side !== side) continue;
+                    A.spellCasting = true;
                     for (const v of B.units.slice()) {
                         if (v.row !== f.row || !B.units.includes(v)) continue;
                         damageUnit(v, f.dmg + altarBonus(side), null, "rocket");
                     }
+                    A.spellCasting = false;
                     f.left -= 1;
                 }
                 const keep = B.firewalls.filter((f) => f.left > 0);

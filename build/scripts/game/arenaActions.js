@@ -93,7 +93,16 @@
                     if (!deployRows("p").includes(row) || unitAt(col, row)) return;
                     const cardId = B.journeySummon;
                     B.journeySummon = null;
-                    addUnit("p", cardId, col, row); // энергия не тратится
+                    // «Отмена призыва» (wis84) врага: бесплатный призыв — тоже
+                    // призыв; карта уходит в сброс, существо не появляется
+                    if (counterTrapConsume("e", "counterSummon")) {
+                        B.discard.push(cardId);
+                        const jp = cellXY(col, row);
+                        floatText(jp.x, jp.y - 60,
+                            "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                    } else {
+                        addUnit("p", cardId, col, row); // энергия не тратится
+                    }
                     layoutHand();
                     redrawHighlight();
                     refreshHud();
@@ -115,11 +124,12 @@
                         else deselect();
                         return;
                     }
-                    const typeOk = u && (tg === "anyUnitDmg"
-                        ? (u.def.type === "unit"
-                            || (u.def.type === "building" && !sdef.spell.noBuildings))
-                        : tg === "ownBuilding" ? u.def.type === "building"
-                        : u.def.type === "unit");
+                    const typeOk = u && !u.spellWard // «Защита от заклинаний» — целью заклинаний не выбирается
+                        && (tg === "anyUnitDmg"
+                            ? (u.def.type === "unit"
+                                || (u.def.type === "building" && !sdef.spell.noBuildings))
+                            : tg === "ownBuilding" ? u.def.type === "building"
+                            : u.def.type === "unit");
                     const sideOk = !u || !(tg === "ownUnit" || tg === "ownBuilding")
                         || u.side === "p";
                     const known = tg === "anyUnit" || tg === "anyUnitDmg"
@@ -172,7 +182,17 @@
                 }
                 B.energy -= effCost(B.hand[B.selected]);
                 const cardId = spendCard(B.selected);
-                addUnit("p", cardId, col, row);
+                // «Отмена призыва» (wis84) врага: существо не появляется,
+                // карта и энергия потрачены (строения отмену не триггерят —
+                // спека говорит о существах)
+                if (CARDS[cardId].type === "unit"
+                    && counterTrapConsume("e", "counterSummon")) {
+                    const sp = cellXY(col, row);
+                    floatText(sp.x, sp.y - 60,
+                        "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                } else {
+                    addUnit("p", cardId, col, row);
+                }
                 if (ctx.sfx) ctx.sfx();
                 layoutHand();
                 redrawHighlight();
@@ -197,13 +217,37 @@
             // годится, тогда и оплаты/сброса/панелей не будет). Отделено от
             // оплаты карты, чтобы «Горящие руны» могли повторить эффект
             // бесплатно. free — повтор (дренаж энергии идёт без вычета цены).
+            // Флаг spellCasting на всё разрешение: damageUnit в это время не
+            // наносит урон существам с «Защитой от заклинаний» (u.spellWard).
             A.applySpellP = function applySpellP(cardId, target, free = false) {
+                A.spellCasting = true;
+                try {
+                    return applySpellPInner(cardId, target, free);
+                } finally { A.spellCasting = false; }
+            };
+            A.applySpellPInner = function applySpellPInner(cardId, target, free = false) {
                 const def = CARDS[cardId];
-                if (def.spell.target === "anyUnit") { // усиление: любое существо
+                if (def.spell.target === "anyUnit") { // усиление/Смыв/Слабость
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
-                    if (!u || u.def.type !== "unit") return false;
+                    // «Защита от заклинаний» (u.spellWard): целью заклинаний
+                    // не выбирается — даже своими (просил юзер)
+                    if (!u || u.def.type !== "unit" || u.spellWard) return false;
                     const p = cellXY(u.col, u.row);
+                    if (def.spell.bounce) { // «Смыв»: существо — в руку владельца
+                        punch(u.node);
+                        bounceUnit(u);
+                        sfx("aqua");
+                        return true;
+                    }
+                    if (def.spell.debuffAtk) { // «Слабость»: −N к урону (не ниже нуля)
+                        u.bonusAtk = (u.bonusAtk || 0) - def.spell.debuffAtk;
+                        recalcAuras();
+                        floatText(p.x, p.y - 39, `−${def.spell.debuffAtk}⚔`, 0xef9f8c);
+                        punch(u.node);
+                        sfx("acid");
+                        return true;
+                    }
                     if (def.spell.enchantFire) { // «Огненное дыхание» — метка-очарование
                         u.enchantFire = true;
                         const mark = new PIXI.Graphics();
@@ -242,7 +286,9 @@
                 if (def.spell.target === "anyUnitDmg") { // дротик: существо или строение; варево — только существо
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
-                    if (!u || (u.def.type !== "unit"
+                    // «Защита от заклинаний» (u.spellWard): целью заклинаний
+                    // не выбирается (урон, пурж, кокон — всё мимо)
+                    if (!u || u.spellWard || (u.def.type !== "unit"
                         && (u.def.type !== "building" || def.spell.noBuildings))) return false;
                     if (def.spell.purge) { // «Извлечение духа»: снять все свойства, база лечится за каждое
                         const n = purgeUnit(u);
@@ -279,20 +325,20 @@
                 if (def.spell.target === "ownUnit" && def.spell.baseHit) { // «Бросок валуна»: своё существо бьёт базу врага — это его атака
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
-                    if (!u || u.side !== "p" || u.def.type !== "unit") return false;
+                    if (!u || u.side !== "p" || u.def.type !== "unit" || u.spellWard) return false;
                     baseHit("p", u);
                     triggerAttackTraps(u);
                 }
                 if (def.spell.target === "ownUnit" && def.spell.wolfVolley) { // «Атака духами волков»: Выстрел + волки на пути
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
-                    if (!u || u.side !== "p" || u.def.type !== "unit") return false;
+                    if (!u || u.side !== "p" || u.def.type !== "unit" || u.spellWard) return false;
                     wolfVolley(u);
                 }
                 if (def.spell.target === "ownUnit" && def.spell.sacrifice) { // жертва: убить своё, ударить соседей
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
-                    if (!u || u.side !== "p" || u.def.type !== "unit") return false;
+                    if (!u || u.side !== "p" || u.def.type !== "unit" || u.spellWard) return false;
                     const p = cellXY(u.col, u.row);
                     killUnit(u, null);
                     floatText(p.x, p.y - 45, "☠", 0xef9f8c);
@@ -367,7 +413,8 @@
                         sfx("rocket");
                     } else if (target.col !== undefined) {
                         const u = unitAt(target.col, target.row);
-                        if (!u || u.side === "p") return false;
+                        // «Защита от заклинаний»: целью заклинаний не выбирается
+                        if (!u || u.side === "p" || u.spellWard) return false;
                         damageUnit(u, def.spell.dmg + heroSpellBonus(def, "p",
                             u.def.type === "unit", true), null, "rocket");
                     } else return false;
@@ -387,20 +434,21 @@
                 const def = CARDS[cardId];
                 const tg = def.spell.target;
                 if (tg === "anyUnit" || tg === "ownUnit") {
-                    const own = B.units.filter((u) => u.side === "p" && u.def.type === "unit");
+                    const own = B.units.filter((u) => u.side === "p" && u.def.type === "unit"
+                        && !u.spellWard); // «Защита от заклинаний» не выбирается
                     const best = own.slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row))[0];
                     return best ? { col: best.col, row: best.row } : null;
                 }
                 if (tg === "anyUnitDmg") {
                     if (def.spell.cocoon) { // кокон — своему крепышу
-                        const own = B.units.filter((u) => u.side === "p");
+                        const own = B.units.filter((u) => u.side === "p" && !u.spellWard);
                         const best = own.slice().sort((a, b) => (b.hp - a.hp) || (b.curAtk - a.curAtk))[0];
                         return best ? { col: best.col, row: best.row } : null;
                     }
                     if (def.spell.purge) { // дух — чужой самый «заряженный» объект
                         let best = null, bestN = 0;
                         for (const u of B.units) {
-                            if (u.side === "p") continue;
+                            if (u.side === "p" || u.spellWard) continue;
                             const n = countProps(u);
                             if (n > bestN) { bestN = n; best = u; }
                         }
@@ -409,7 +457,7 @@
                     const dmg = def.spell.drainAll
                         ? Math.max(0, B.energy) + altarBonus("p") // повтор — цена не вычитается
                         : spellHitDmg(def);
-                    const targets = B.units.filter((u) => u.side !== "p"
+                    const targets = B.units.filter((u) => u.side !== "p" && !u.spellWard
                         && (u.def.type === "unit"
                             || (u.def.type === "building" && !def.spell.noBuildings)));
                     if (!targets.length) return null;
@@ -474,6 +522,20 @@
                 const def = CARDS[cardId];
                 if (!def || def.type !== "spell"
                     || effCost(cardId, "p", target) > B.energy) return false;
+                // «Отмена заклинания» (wis83) врага: заклинание отменяется —
+                // карта и энергия потрачены, эффект не срабатывает (спека юзера)
+                const cTrap = counterTrapConsume("e", "counterSpell");
+                if (cTrap) {
+                    B.energy -= effCost(cardId, "p", target);
+                    spendCard(handIdx);
+                    const p = cellXY(cTrap.col, cTrap.row);
+                    floatText(p.x, p.y + 66, "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                    layoutHand();
+                    redrawHighlight();
+                    refreshHud();
+                    checkEnd();
+                    return true;
+                }
                 if (def.spell.copyLast) { // «Горящие руны»: повтор последнего бесплатно
                     const last = B.lastSpell.p;
                     if (!last || last === "str25" || !CARDS[last]

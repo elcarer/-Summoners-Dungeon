@@ -40,7 +40,8 @@
                     // способность героя «первое призванное существо…» — ещё
                     // не сработала в этом бою
                     heroFirstSummon: heroDef.ability !== "firstSummonAtk"
-                        && heroDef.ability !== "firstSummonHp",
+                        && heroDef.ability !== "firstSummonHp"
+                        && heroDef.ability !== "firstSummonWard",
                     // флаги способностей карт персонажей: первое уронное
                     // заклинание боя; возврат первого погибшего гоблина;
                     // возврат первого Силового заклинания («Мастера огня»);

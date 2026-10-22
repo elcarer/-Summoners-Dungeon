@@ -441,6 +441,14 @@
                             if (hn) hn.text = String(u.hp);
                             floatText(hp2.x, hp2.y - 75, `+${hd.abilityVal}♥`, 0x9fd489);
                             sfx("up");
+                        } else if (hd.ability === "firstSummonWard") {
+                            // Мира: первое призванное существо получает
+                            // «Защиту от заклинаний» (u.spellWard)
+                            u.spellWard = true;
+                            addWardMark(u);
+                            floatText(hp2.x, hp2.y - 75,
+                                "✦ " + GAME_LOC.t("spell.ward.name"), 0x8cd0ef);
+                            sfx("up");
                         }
                     }
                     // «Свита вождя» (goblinChainSummon, просил юзер): гоблин

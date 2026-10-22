@@ -295,7 +295,13 @@
                 // «Три монолита» — без спешки (просил юзер: не в приоритете):
                 // движок добора, играется, когда важное уже разыграно
                 if (def.type === "building") return def.monolith ? 5.5 : 1;
-                if (def.type === "trap") return 5;
+                if (def.type === "trap") {
+                    // «Отмена заклинания»/«Отмена призыва» (wis83/wis84):
+                    // реактивные ловушки — чем раньше висят, тем больше шансов
+                    // поймать розыгрыш (просил юзер: контроль)
+                    return def.trap.effect === "counterSpell"
+                        || def.trap.effect === "counterSummon" ? 1.2 : 5;
+                }
                 // вождь / заклинатель клинков / пастух / друид / сестра — двигатели
                 // связок: ставим до существ, чьи способности они усилят/оплатят
                 if (def.leaderAura || def.spellBuffAura || def.plantEcho
@@ -648,6 +654,7 @@
             A.aiBuffPick = function aiBuffPick(def) {
                 const s = def.spell;
                 const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
+                    && !v.spellWard // «Защита от заклинаний»: целью заклинаний не выбирается
                     && (!s.enchantFire || !v.enchantFire));
                 if (!own.length) return null;
                 let best = null, bestScore = -Infinity;
@@ -683,7 +690,8 @@
             // «Защитный кокон» — на своего под удар игрока (игрок ходит первым):
             // ценнее всего существо, которое вот-вот умрёт/движок.
             A.aiCocoonPick = function aiCocoonPick() {
-                const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
+                const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
+                    && !v.spellWard);
                 let best = null, bestScore = -Infinity;
                 for (const v of own) {
                     const att = unitAt(v.col, v.row + 1);
@@ -711,7 +719,9 @@
             };
             A.aiDmgTargets = function aiDmgTargets(def) {
                 const s = def.spell;
-                return B.units.filter((v) => v.side === "p"
+                // «Защита от заклинаний» (u.spellWard): целью заклинаний
+                // не выбирается и урона от заклинаний не получает
+                return B.units.filter((v) => v.side === "p" && !v.spellWard
                     && (v.def.type === "unit"
                         || (v.def.type === "building" && !s.noBuildings)));
             };
@@ -916,9 +926,17 @@
                 // «Глубокое путешествие»: в верхних картах колоды должен быть призыв
                 if (s.journey && !B.eDeck.slice(-Math.min(s.journey, B.eDeck.length))
                     .some((id) => CARDS[id] && CARDS[id].type === "unit")) return false;
+                // «Смыв» — есть существо игрока (желательно не токен)
+                if (s.bounce && !B.units.some((v) => v.side === "p"
+                    && v.def.type === "unit")) return false;
+                // «Слабость» — есть чей-то урон, который стоит снять
+                if (s.debuffAtk && !B.units.some((v) => v.side === "p"
+                    && v.def.type === "unit" && !v.spellWard && v.curAtk > 0)) return false;
                 // усиление/очарование — только если есть своё существо под него
-                // (огонь не дублируем; яд складывается — его можно докинуть)
-                if (s.target === "anyUnit" && !B.units.some((v) => v.side === "e"
+                // (огонь не дублируем; яд складывается — его можно докинуть);
+                // «Смыв»/«Слабость» целятся в ИГРОКА — этот гейт их не касается
+                if (s.target === "anyUnit" && !s.bounce && !s.debuffAtk
+                    && !B.units.some((v) => v.side === "e"
                     && v.def.type === "unit" && (!s.enchantFire || !v.enchantFire))) return false;
                 // дротик/варево/огнешар — только если есть цель
                 if (s.target === "anyUnitDmg" && !aiDmgTargets(def).length) return false;
@@ -1062,7 +1080,16 @@
             // Скидка «Заклятого древоброда» (grw37): если целью вышел он,
             // aiPlay платит на 1 энергию меньше (флаг ставится здесь).
             A.castTargetOff = 0;
+            // Флаг spellCasting на всё разрешение заклинания: damageUnit в
+            // это время не наносит урон существам с «Защитой от заклинаний»
+            // (u.spellWard, просил юзер)
             A.enemyCastSpellEffect = function enemyCastSpellEffect(def, free = false, focus = null) {
+                A.spellCasting = true;
+                try {
+                    enemyCastSpellEffectInner(def, free, focus);
+                } finally { A.spellCasting = false; }
+            };
+            A.enemyCastSpellEffectInner = function enemyCastSpellEffectInner(def, free = false, focus = null) {
                 const s = def.spell;
                 castTargetOff = 0;
                 const aimOff = (u) => { if (u && u.def.targetDiscount) castTargetOff = 1; };
@@ -1080,7 +1107,40 @@
                     if (best) wolfVolley(best);
                 }
                 if (s.target === "anyUnit" && !s.nova) { // усиление/очарование — лучшему
+                    // «Смыв» (wis85): существо игрока — в его руку; цель —
+                    // самая опасная не-токенная единица (токены — крайний случай)
+                    if (s.bounce) {
+                        const foes = B.units.filter((v) => v.side === "p"
+                            && v.def.type === "unit");
+                        const real = foes.filter((v) => !v.token);
+                        const pool = real.length ? real : foes;
+                        const best = pool.slice()
+                            .sort((a, b) => aiThreat(b) - aiThreat(a) || b.row - a.row)[0];
+                        if (!best) return;
+                        aimOff(best);
+                        punch(best.node);
+                        bounceUnit(best);
+                        sfx("aqua");
+                        return;
+                    }
+                    // «Слабость» (wis86): −2 урона сильнейшему существу игрока
+                    if (s.debuffAtk) {
+                        const best = B.units
+                            .filter((v) => v.side === "p" && v.def.type === "unit"
+                                && !v.spellWard) // защитой от заклинаний не выбирается
+                            .sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                        if (!best) return;
+                        aimOff(best);
+                        best.bonusAtk = (best.bonusAtk || 0) - s.debuffAtk;
+                        recalcAuras();
+                        const p = cellXY(best.col, best.row);
+                        floatText(p.x, p.y - 39, `−${s.debuffAtk}⚔`, 0xef9f8c);
+                        punch(best.node);
+                        sfx("acid");
+                        return;
+                    }
                     const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
+                        && !v.spellWard // «Защита от заклинаний»: не выбирается
                         && (!s.enchantFire || !v.enchantFire)
                         && (!s.venom || !v.venom));
                     // очарование «Огненного дыхания» вешается на крепкого атакующего
@@ -1373,6 +1433,19 @@
                             await delay(enemyPlayDelay());
                             const [col, row] = spot;
                             const cardId = B.eHand[pick.i];
+                            // «Отмена призыва» (wis84) игрока: существо не
+                            // появляется, карта и энергия врага потрачены
+                            if (def.type === "unit"
+                                && counterTrapConsume("p", "counterSummon")) {
+                                B.eHand.splice(B.eHand.indexOf(cardId), 1);
+                                B.eEnergy -= effCost(cardId, "e");
+                                B.eDiscard.push(cardId);
+                                floatText(960, 500,
+                                    "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                                hideEnemyCard();
+                                played = true;
+                                break;
+                            }
                             B.eHand.splice(pick.i, 1);
                             B.eEnergy -= effCost(cardId, "e");
                             addUnit("e", cardId, col, row);
@@ -1430,6 +1503,18 @@
                             showEnemyCard(pick.id);
                             await delay(enemyPlayDelay());
                             const cardId = B.eHand[pick.i];
+                            // «Отмена заклинания» (wis83) игрока: эффект не
+                            // срабатывает, карта и энергия врага потрачены
+                            if (counterTrapConsume("p", "counterSpell")) {
+                                B.eHand.splice(B.eHand.indexOf(cardId), 1);
+                                B.eDiscard.push(cardId);
+                                B.eEnergy -= effCost(cardId, "e");
+                                floatText(960, 500,
+                                    "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                                hideEnemyCard();
+                                played = true;
+                                break;
+                            }
                             if (def.spell.copyLast) {
                                 // «Горящие руны»: повтор ПОСЛЕДНЕГО заклинания тем
                                 // же кодом эффектов (бесплатно для его цены)

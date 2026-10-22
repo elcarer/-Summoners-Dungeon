@@ -17,6 +17,7 @@
     const STARTER_COLLECTIONS = {
         strength: starterCollection(DEFAULT_DECK),
         growth: starterCollection(STARTER_DECKS.growth),
+        wisdom: starterCollection(STARTER_DECKS.wisdom), // стартер Миры
     };
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N

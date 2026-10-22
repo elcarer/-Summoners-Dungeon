@@ -66,9 +66,12 @@
     }
 
     // Рубашка колоды по стихии (просил юзер): Рост — природная
-    // (card_nature_back), прочие — гоблинская (card_goblin_back)
+    // (card_nature_back), Мудрость — синяя (card_wisdom_back),
+    // прочие — гоблинская (card_goblin_back)
     function backTexOf(elem) {
-        return elem === "growth" ? "card_nature_back.png" : "card_goblin_back.png";
+        return elem === "growth" ? "card_nature_back.png"
+            : elem === "wisdom" ? "card_wisdom_back.png"
+            : "card_goblin_back.png";
     }
 
     // Крупная карта (колода/награда). Если у карты есть img — это готовое

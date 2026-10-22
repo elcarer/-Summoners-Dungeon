@@ -118,8 +118,12 @@
                         lastSpell: B.lastSpell.p,
                         journeySummon: B.journeySummon,
                         eDeck: B.eDeck.length,
-                        units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0, venom: u.venom || 0, poison: u.poison || 0, entangle: u.entangle || 0 })),
+                        units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0, venom: u.venom || 0, poison: u.poison || 0, entangle: u.entangle || 0, ward: !!u.spellWard, token: !!u.token })),
                         traps: { p: B.traps.p.length, e: B.traps.e.length },
+                        // эффекты висящих ловушек (тесты: «Отмена заклинания/
+                        // призыва» и др. — какая ловушка занимает слот)
+                        trapFx: { p: B.traps.p.map((t) => t.def.trap.effect),
+                            e: B.traps.e.map((t) => t.def.trap.effect) },
                         firewalls: B.firewalls.map((f) => ({ side: f.side, row: f.row, left: f.left })),
                     };
                 },

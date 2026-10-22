@@ -444,6 +444,44 @@
                  subtype: "elf", // подтип — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x3f6d3a, img: "growth/80" },
+        // ── Стихия «Мудрость» (синие) — третья стихия, лица wisdom/81–86 ────
+        // (нумерация артов юзера — сквозная с 81). Герой этой стихии — Мира
+        // (первое призванное существо получает «Защиту от заклинаний»);
+        // подземелья у стихии пока нет, карты живут в стартере Миры
+        // (просил юзер).
+        // «Воздушный элементаль»: Полёт — как у «Мини-феи» (grw14)
+        wis81: { type: "unit", cost: 3, atk: 3, hp: 4, speed: 1,
+                 creature: "goblin", ability: "flyOver",
+                 subtype: "elemental", // подтип — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "wisdom",
+                 color: 0x3a6ea8, img: "wisdom/81" },
+        // «Водный элементаль»: не активирует ловушки — ни наступая, ни
+        // призываясь на клетку с ловушкой, ни идя на приманку
+        wis82: { type: "unit", cost: 2, atk: 2, hp: 3, speed: 1,
+                 creature: "goblin", ability: "noTraps",
+                 subtype: "elemental", // подтип — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "wisdom",
+                 color: 0x3a6ea8, img: "wisdom/82" },
+        wis83: { type: "trap", cost: 2,
+                 trap: { event: "onEnemySpell", effect: "counterSpell" },
+                 kind: "control", // тип эффекта — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "wisdom",
+                 color: 0x2e4a72, img: "wisdom/83" },
+        wis84: { type: "trap", cost: 2,
+                 trap: { event: "onEnemySummon", effect: "counterSummon" },
+                 kind: "control", // тип эффекта — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "wisdom",
+                 color: 0x2e4a72, img: "wisdom/84" },
+        wis85: { type: "spell", cost: 1,
+                 spell: { target: "anyUnit", bounce: true },
+                 kind: "control", // тип эффекта — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "wisdom",
+                 color: 0x4a7ac0, img: "wisdom/85" },
+        wis86: { type: "spell", cost: 1,
+                 spell: { target: "anyUnit", debuffAtk: 2 },
+                 kind: "control", // тип эффекта — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "wisdom",
+                 color: 0x4a7ac0, img: "wisdom/86" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -472,11 +510,14 @@
         "str4", "str4", "str9", "str9", "str12", "str12",
     ];
     // Стартовые колоды по стихиям (выбор при «Новая игра»): Рост — карты
-    // 41–46 юзера по 2 копии (просил юзер).
+    // 41–46 юзера по 2 копии; Мудрость — карты 81–86 по 2 копии, стартер
+    // Миры (просил юзер).
     const STARTER_DECKS = {
         strength: DEFAULT_DECK,
         growth: ["grw1", "grw1", "grw2", "grw2", "grw3", "grw3",
                  "grw4", "grw4", "grw5", "grw5", "grw6", "grw6"],
+        wisdom: ["wis81", "wis81", "wis82", "wis82", "wis83", "wis83",
+                 "wis84", "wis84", "wis85", "wis85", "wis86", "wis86"],
     };
 
     const DECK_MAX = 60, DECK_MIN = 12, TRAP_SLOTS = 2;
@@ -510,6 +551,14 @@
             id: "elmir", rarity: "common",
             baseHp: 15, elems: ["growth"], starter: "growth",
             img: "1", ability: "firstSummonHp", abilityVal: 3,
+        },
+        // Мира (просил юзер): мудрость, «Защита от заклинаний» первому
+        // призванному существу (firstSummonWard) — не выбирается целью
+        // заклинаний и не получает урона от заклинаний
+        mira: {
+            id: "mira", rarity: "common",
+            baseHp: 15, elems: ["wisdom"], starter: "wisdom",
+            img: "16", ability: "firstSummonWard",
         },
         gob: { id: "gob", rarity: "common", baseHp: 10,
                elems: ["strength"], starter: "strength",
@@ -555,7 +604,7 @@
                    elems: ["growth"], starter: "growth",
                    img: "15", ability: "buildingDeathReplay" },
     };
-    const HERO_ORDER = ["gorbag", "elmir"];
+    const HERO_ORDER = ["gorbag", "elmir", "mira"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
     // пещеры, затем Роща Роста (просил юзер)
     const HERO_FOE_ORDER = ["gob", "gobBig", "gobTrap", "gobFire", "gobElite",

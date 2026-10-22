@@ -50,10 +50,12 @@
         // фоны арен с нарисованной сеткой поля
         uiTextures["scenes/1.png"] = await assets.loadTexture("./images/scenes/1.png");
         uiTextures["scenes/2.png"] = await assets.loadTexture("./images/scenes/2.png");
-        // эффект поля «Стена костров» и рубашка колоды врага (гоблины/природа)
+        // эффект поля «Стена костров» и рубашки колод по стихиям
+        // (гоблины/природа/мудрость)
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
         uiTextures["card_goblin_back.png"] = await assets.loadTexture("./images/ui/card_goblin_back.png");
         uiTextures["card_nature_back.png"] = await assets.loadTexture("./images/ui/card_nature_back.png");
+        uiTextures["card_wisdom_back.png"] = await assets.loadTexture("./images/ui/card_wisdom_back.png");
         // тайлы подземелий юзера: images/dungeon_tiles/<данж>/<…>.png —
         // полы 64×64 (floor/0-9) и стены walls/* по маске соседей.
         // Свой набор на каждый данж: goblins_lair (Сила), growth_lair (Рост)
@@ -109,6 +111,7 @@
         const heroSheets = {
             strength: await assets.loadCharacter("./images/sprites/goblin_256"),
             growth: await assets.loadCharacter("./images/sprites/elf_256"),
+            wisdom: await assets.loadCharacter("./images/sprites/sorca_256"), // Мира
         };
         // Листы существ поля боя. Стандарт: <имя>_256.png — сетка 256×256,
         // 4 ряда анимаций (спереди/сзади/справа/слева) по 6 кадров + json-манифест.
@@ -120,6 +123,7 @@
         const creatureSheets = {
             goblin: heroSheets.strength,
             elf: heroSheets.growth,
+            wisdom: heroSheets.wisdom, // существа Мудрости — сорка (плейсхолдер)
             wolf: await assets.loadCharacter("./images/sprites/wolf_256"),
             bear: { ...(await assets.loadCharacter("./images/sprites/bear_256")), scale: 1.1 },
             ent: { ...(await assets.loadCharacter("./images/sprites/ent_256")), scale: 1.3 },
@@ -309,6 +313,14 @@
                 if (!HEROES[id]) return false;
                 const owned = HERO_ORDER.includes(id) || this.captured.includes(id);
                 if (!owned) return false;
+                if (!this.heroDecks) this.heroDecks = { [this.heroId]: this.deck };
+                // у стартового героя без своей колоды (Мира добавлена позже —
+                // старые сейвы её не знают) колода = стартовая колода ЕГО
+                // стихии, а не колода прошлого активного героя (миграция
+                // heroDecksOf отдала бы её при смене — просил юзер)
+                if (HERO_ORDER.includes(id) && !this.heroDecks[id]) {
+                    this.heroDecks[id] = [...globalThis.GAME_DATA.STARTER_DECKS[HEROES[id].starter]];
+                }
                 this.heroId = id;
                 this.elem = HEROES[id].elems[0];
                 this.heroDecksOf();
@@ -641,9 +653,12 @@
                 epRoot.addChild(sub);
 
                 const cards = [];
+                // раскладка в 1 ряд: 2 героя — как раньше, 3+ — плотнее, чтобы
+                // панель (480px) влезала в экран (Мира — третий, просил юзер)
+                const gap = Math.min(720, 1400 / Math.max(1, GAME_DATA.HERO_ORDER.length - 1));
                 GAME_DATA.HERO_ORDER.forEach((id, k) => {
                     const h = GAME_DATA.HEROES[id];
-                    const cx = 600 + k * 720;
+                    const cx = 960 + (k - (GAME_DATA.HERO_ORDER.length - 1) / 2) * gap;
                     const c = new PIXI.Container();
                     c.position.set(cx, 610);
                     const panel = new PIXI.Graphics();
