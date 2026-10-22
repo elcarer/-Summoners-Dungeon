@@ -286,7 +286,8 @@
                     if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
                         || s.sacrifice || s.copyLast
                         || s.purge || s.stealEnergy || s.fireflies
-                        || s.growthHand || s.nova || s.debuffEnemyAtkAll) return 2;
+                        || s.growthHand || s.nova || s.debuffEnemyAtkAll
+                        || s.iceStrike) return 2;
                     if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk
                         || s.enchantFire || s.cocoon || s.venom) return 4;
                     if (s.baseHit || s.wolfVolley) return 4.5; // бьёт СВОИМ существом
@@ -837,6 +838,13 @@
                 }
                 return best[(Math.random() * best.length) | 0];
             };
+            // Цель «Ледяного удара» для ИИ: существо (своё или игрока), чей
+            // случайный сосед получит урон/«Заморожен» в нашу пользу. Если
+            // все варианты бьют по своим — карту не играем.
+            A.aiIceStrikeTarget = function aiIceStrikeTarget() {
+                const pick = iceStrikePick("e");
+                return pick && pick.score > 0 ? pick.unit : null;
+            };
             // Играбельность заклинания для ИИ (общие проверки цели/эффекта).
             // forReplay — проверка ПОВТОРА «Горящими рунами»: карта уже не в руке.
             A.aiSpellPlayable = function aiSpellPlayable(def, forReplay = false) {
@@ -869,6 +877,8 @@
                 // «Круговая атака» — своё существо впритык к врагу, и урон по
                 // чужим должен окупать урон по своим (просил юзер: аккуратно)
                 if (s.nova && !aiNovaPick()) return false;
+                // «Ледяной удар» — нужен сосед-существо и выгодный размен
+                if (s.iceStrike && !aiIceStrikeTarget()) return false;
                 // «Культ кочерыжки» — нужна хоть одна пустая клетка под гоблинов
                 if (s.cultRow && B.units.length >= GRID * GRID) return false;
                 // «Поднять стяги!» — окупается при двух и более своих существах
@@ -939,8 +949,9 @@
                     && v.def.type === "unit" && !v.spellWard && v.curAtk > 0)) return false;
                 // усиление/очарование — только если есть своё существо под него
                 // (огонь не дублируем; яд складывается — его можно докинуть);
-                // «Смыв»/«Слабость» целятся в ИГРОКА — этот гейт их не касается
-                if (s.target === "anyUnit" && !s.bounce && !s.debuffAtk
+                // «Смыв»/«Слабость»/«Ледяной удар» целятся в ИГРОКА — этот
+                // гейт их не касается
+                if (s.target === "anyUnit" && !s.bounce && !s.debuffAtk && !s.iceStrike
                     && !B.units.some((v) => v.side === "e"
                     && v.def.type === "unit" && (!s.enchantFire || !v.enchantFire))) return false;
                 // дротик/варево/огнешар — только если есть цель
@@ -1003,6 +1014,8 @@
                     if (s.copyLast) v += 1.0;
                     if (s.wolfVolley) v += 2.0;
                     if (s.baseHit) v += 1.6;
+                    if (s.freeze) v += 1.0;
+                    if (s.iceStrike) v += 2.0;
                     return v;
                 }
                 if (d.type === "trap") return 2.0 + (d.cost || 0) * 0.2;
@@ -1070,7 +1083,7 @@
                 if (!s) return false;
                 return !!(s.aoeDmg || s.baseDmg || s.firewall || s.sacrifice
                     || s.drainAll || s.fireflies || s.growthHand
-                    || s.wolfVolley || s.nova || s.baseHit
+                    || s.wolfVolley || s.nova || s.baseHit || s.iceStrike
                     || (s.dmg || 0) + altarBonus("e") >= 2);
             };
             // Есть ли смысл повторять последнее заклинание («Горящие руны»):
@@ -1147,6 +1160,24 @@
                         floatText(p.x, p.y - 39, `−${s.debuffAtk}⚔`, 0xef9f8c);
                         punch(best.node);
                         sfx("acid");
+                        return;
+                    }
+                    // «Ледяной удар» (wis92): цель бьёт случайного соседа-
+                    // существо; урон считает сама цель, поэтому важна не её
+                    // сторона, а чей сосед попадёт под удар (iceStrikePick)
+                    if (s.iceStrike) {
+                        const focusOk = focus && B.units.includes(focus)
+                            && focus.def.type === "unit" && !focus.spellWard
+                            && iceStrikeVictims(focus).length > 0;
+                        const target = focusOk ? focus : aiIceStrikeTarget();
+                        if (!target) return;
+                        const victim = iceStrikeVictim(target);
+                        if (!victim) return;
+                        aimOff(target); // скидка «Заклятого древоброда»
+                        iceStrikeAttack(target, victim);
+                        if (B.units.includes(victim)) addFrozen(victim, s.freeze || 1);
+                        punch(target.node);
+                        sfx("aqua");
                         return;
                     }
                     const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
@@ -1233,6 +1264,8 @@
                         aimOff(best); // скидка «Заклятого древоброда»
                         const dmg = aiDmgFor(def, best, free, true);
                         damageUnit(best, dmg, null, "rocket");
+                        // «Ядро кометы»: выжившее существо — «Заморожен N»
+                        if (s.freeze && B.units.includes(best)) addFrozen(best, s.freeze);
                     }
                 }
                 if (s.target === "anyCell") { // стена костров — ряд, где огонь окупается

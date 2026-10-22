@@ -132,7 +132,10 @@
                         || u.side === "p";
                     const known = tg === "anyUnit" || tg === "anyUnitDmg"
                         || tg === "ownUnit" || tg === "ownBuilding";
-                    if (u && typeOk && sideOk && known) castSpell(B.selected, { col, row });
+                    // «Ледяной удар»: у цели должен быть хотя бы один сосед-
+                    // существо, иначе заклинание не разыгрывается
+                    const effectOk = !sdef.spell.iceStrike || !!iceStrikeVictim(u);
+                    if (u && typeOk && sideOk && known && effectOk) castSpell(B.selected, { col, row });
                     else deselect(); // мимо цели — снять выбор
                     return;
                 }
@@ -232,6 +235,15 @@
                     // не выбирается — даже своими (просил юзер)
                     if (!u || u.def.type !== "unit" || u.spellWard) return false;
                     const p = cellXY(u.col, u.row);
+                    if (def.spell.iceStrike) { // «Ледяной удар»: цель бьёт соседа
+                        const victim = iceStrikeVictim(u);
+                        if (!victim) return false; // соседей-существ нет — не кастуем
+                        iceStrikeAttack(u, victim);
+                        if (B.units.includes(victim)) addFrozen(victim, def.spell.freeze || 1);
+                        punch(u.node);
+                        sfx("aqua");
+                        return true;
+                    }
                     if (def.spell.bounce) { // «Смыв»: существо — в руку владельца
                         punch(u.node);
                         bounceUnit(u);
@@ -307,6 +319,8 @@
                     } else {
                         damageUnit(u, spellDmg(def, "p", u.def.type === "unit", true), null, "rocket");
                     }
+                    // «Ядро кометы»: выжившее существо получает «Заморожен N»
+                    if (def.spell.freeze && B.units.includes(u)) addFrozen(u, def.spell.freeze);
                 }
                 if (def.spell.target === "emptyCell") { // культ кочерыжки: ряд в гоблинах
                     if (!target || target.col === undefined) return false;
@@ -449,6 +463,10 @@
             A.autoTargetFor = function autoTargetFor(cardId) {
                 const def = CARDS[cardId];
                 const tg = def.spell.target;
+                if (tg === "anyUnit" && def.spell.iceStrike) { // «Ледяной удар»
+                    const pick = iceStrikePick("p");
+                    return pick ? { col: pick.unit.col, row: pick.unit.row } : null;
+                }
                 if (tg === "anyUnit" || tg === "ownUnit") {
                     const own = B.units.filter((u) => u.side === "p" && u.def.type === "unit"
                         && !u.spellWard); // «Защита от заклинаний» не выбирается

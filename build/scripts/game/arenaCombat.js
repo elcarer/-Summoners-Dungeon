@@ -78,6 +78,105 @@
                 sfx("aqua");
             };
 
+            // «Заморожен N» (wis91/wis92): существо пропускает перемещение
+            // И атаку в свой следующий ход, затем счётчик тает на 1; на нуле
+            // эффект снимается. Счётчик складывается, метка — над головой.
+            A.addFrozen = function addFrozen(u, n = 1) {
+                if (!u || !B.units.includes(u) || u.def.type !== "unit") return;
+                u.frozen = (u.frozen || 0) + Math.max(1, n | 0);
+                let mark = u.node.getChildByName("frozenMark");
+                if (!mark) {
+                    mark = new PIXI.Container();
+                    mark.name = "frozenMark";
+                    mark.eventMode = "none";
+                    const g = new PIXI.Graphics();
+                    g.circle(0, 0, 13.5);
+                    g.fill({ color: 0x1e4a6f });
+                    g.stroke({ width: 3, color: 0x8cd0ef });
+                    mark.addChild(g);
+                    const tx = T("", 17, 0xe6f7ff);
+                    tx.anchor.set(0.5);
+                    mark.addChild(tx);
+                    mark.position.set(0, -88); // над остальными метками
+                    u.node.addChild(mark);
+                }
+                updateFrozenMark(u);
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 88, `❄ ${u.frozen}`, 0x8cd0ef);
+                punch(u.node);
+                sfx("aqua");
+            };
+            A.updateFrozenMark = function updateFrozenMark(u) {
+                const mark = u.node && u.node.getChildByName("frozenMark");
+                if (!mark) return;
+                const tx = mark.getChildAt(1);
+                if (tx) tx.text = u.frozen > 1 ? String(u.frozen) : "❄";
+            };
+            A.removeFrozenMark = function removeFrozenMark(u) {
+                const mark = u.node && u.node.getChildByName("frozenMark");
+                if (mark) mark.destroy({ children: true });
+            };
+
+            // «Ледяной удар» (wis92): соседи выбранного существа-цели —
+            // только существа (постройки не «существа»), верт/гориз.
+            A.iceStrikeVictims = function iceStrikeVictims(u) {
+                if (!u || !B || !B.units.includes(u) || u.def.type !== "unit") return [];
+                return B.units.filter((v) => v !== u && v.def.type === "unit"
+                    && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
+            };
+            A.iceStrikeVictim = function iceStrikeVictim(u) {
+                const near = iceStrikeVictims(u);
+                return near.length ? near[(Math.random() * near.length) | 0] : null;
+            };
+            // Принудительная атака заклинанием: урон атаки и все хуки атаки
+            // (сокрушение, чаща, яд, «Снежный элементаль», руна). Урон атаки
+            // НЕ считается уроном заклинания — «Защита от заклинаний» его не
+            // гасит (в отличие от самого выбора цели заклинанием).
+            A.iceStrikeAttack = function iceStrikeAttack(attacker, victim) {
+                if (!attacker || !victim || !B.units.includes(attacker)
+                    || !B.units.includes(victim)) return;
+                const wasCasting = A.spellCasting;
+                A.spellCasting = false;
+                try {
+                    const hpBefore = victim.hp;
+                    damageUnit(victim, attacker.curAtk, attacker, "sword");
+                    crushHit(attacker, attacker.curAtk, hpBefore); // «Сокрушение»
+                    thicketSplash(attacker, victim); // «Древоброд глухой чащи»
+                    venomApply(attacker, victim); // «Ядовитость»
+                    frostAttack(attacker, victim); // «Снежный элементаль»
+                    // «Проросший кабан» толкает только цель впереди по маршу
+                    if (victim.col === attacker.col
+                        && victim.row === attacker.row + (attacker.side === "p" ? -1 : 1)) {
+                        afterAttackPush(attacker, victim);
+                    }
+                    triggerAttackTraps(attacker); // руна: существо атаковало
+                } finally {
+                    A.spellCasting = wasCasting;
+                }
+            };
+            // Оценка цели «Ледяного удара» с точки зрения стороны side:
+            // выбираем существо, чей случайный сосед вероятнее получит урон
+            // и «Заморожен» от НАС (чужой сосед — плюс, свой — минус).
+            A.iceStrikePick = function iceStrikePick(side) {
+                if (!B || !B.units) return null;
+                let best = null, bestScore = -Infinity;
+                for (const u of B.units) {
+                    if (u.def.type !== "unit" || u.spellWard) continue;
+                    const near = iceStrikeVictims(u);
+                    if (!near.length) continue;
+                    let score = 0;
+                    for (const v of near) {
+                        const hit = Math.min(Math.max(0, u.curAtk), Math.max(0, v.hp));
+                        const kill = hit >= v.hp;
+                        const val = hit * 1.1 + (kill ? 2.5 : 0) + (kill ? 0 : 1.2);
+                        score += v.side === side ? -val : val;
+                    }
+                    score /= near.length; // цель выбирает случайного соседа
+                    if (score > bestScore) { bestScore = score; best = u; }
+                }
+                return best ? { unit: best, score: bestScore } : null;
+            };
+
             // «Зимние духи» (wis89): когда срабатывает ЛЮБАЯ ловушка (клеточная,
             // отмена, руна, приманка, ряд), каждое живое существо с меткой
             // trapGrow получает +1 к урону навсегда. Зовётся в точках, где
@@ -751,6 +850,7 @@
                 if (u.venom) n++;
                 if (u.poison) n++;
                 if (u.entangle) n++;
+                if (u.frozen) n++;
                 if (u.spellWard) n++;
                 return n;
             };
@@ -772,9 +872,10 @@
                 if (u.venom) { u.venom = 0; n++; }
                 if (u.poison) { u.poison = 0; n++; }
                 if (u.entangle) { u.entangle = 0; n++; }
+                if (u.frozen) { u.frozen = 0; n++; }
                 if (u.spellWard) { u.spellWard = false; n++; removeWardMark(u); }
                 for (const m of ["sporeMark", "enchMark", "protectMark", "berserkMark", "confuseMark",
-                    "venomMark", "poisonMark", "entangleMark"]) {
+                    "venomMark", "poisonMark", "entangleMark", "frozenMark"]) {
                     const node = u.node.getChildByName(m);
                     if (node) node.destroy({ children: true });
                 }

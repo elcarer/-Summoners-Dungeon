@@ -180,6 +180,15 @@
                     .sort((a, b) => (side === "p" ? a.row - b.row : b.row - a.row));
                 for (const u of order) {
                     if (B.stopped || !B.units.includes(u)) continue;
+                    if (u.frozen > 0) { // «Заморожен N»: пропускает весь марш и атаку
+                        u.frozen -= 1;
+                        const p = cellXY(u.col, u.row);
+                        floatText(p.x, p.y - 88, "❄", 0x8cd0ef);
+                        if (u.frozen <= 0) { u.frozen = 0; removeFrozenMark(u); }
+                        else updateFrozenMark(u);
+                        refreshHud();
+                        continue; // берсерк/запутанность/опутывание тоже пропущены
+                    }
                     if (u.confused > 0) { // «Запутанность»: марш заменён пятанием назад
                         await confusedAct(u);
                         if (B.stopped || B.phase === "over") return;
