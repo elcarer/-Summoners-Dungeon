@@ -24,10 +24,11 @@
     const TILE_SETS = { gob: "goblins_lair", grw: "growth_lair",
                         wis: "water_lair" };
     const tileSetOf = (cave) => TILE_SETS[cave] || TILE_SETS.gob;
-    // Версия раскладки этажа: тайлы 64px данжа (v5 — этажи
-    // генерируются, см. genMap). Сейвы другой геометрии (координаты в
-    // других клетках) не поднимаются — этаж пересобирается заново.
-    const MAP_V = 5;
+    // Версия раскладки этажа: тайлы 64px данжа (v6 — у 1-го этажа
+    // «Подземных ключей» появился спуск на 2-й, старые сейвы без него
+    // пересобираются). Сейвы другой геометрии (координаты в других клетках)
+    // не поднимаются — этаж пересобирается заново.
+    const MAP_V = 6;
     // Ключ архива этажей — «данж:этаж» (gob:1, grw:2…): у каждого
     // подземелья своя история подъёмов/спусков
     const stKey = (cave, floor) => (caveOf(cave) && cave !== undefined ? cave : "gob") + ":" + floor;
@@ -219,7 +220,7 @@
         }, 0);
         const [bx, by] = center(rooms[far]);
         g[sy][sx] = "H";
-        // главарь есть не у каждого данжа («Подземные ключи» пока без него)
+        // главарь есть не у каждого данжа («Подземные ключи» пока без главаря)
         if (caveOf(cave).boss) g[by][bx] = "B";
         // спуск ставится только если есть куда: на последнем этаже данжа
         // выхода вниз нет вовсе (просил юзер)
@@ -282,7 +283,7 @@
             v: MAP_V,
             cave: caveId,
             floor, heroPos: null, spawn: null, ladder: null, enemies: [],
-            exit: null, exitCool: false, bossDead: false,
+            exit: null, exitCool: false, bossDead: !caveOf(caveId).boss,
             toast: null, toastT: 0, win: null,
             rows: map.rows, roomCenters: map.roomCenters,
             lootCenters: map.lootCenters,
@@ -1367,7 +1368,7 @@
                     if (st.exitCool) {
                         // поднялись и стоим на спуске: уйдём на клетку-другую —
                         // выход «остынет» и снова заработает
-                    } else if (!st.bossDead) showToast(GAME_LOC.t("dungeon.exitSealed"));
+                    } else if (!st.bossDead && caveOf(st.cave).boss) showToast(GAME_LOC.t("dungeon.exitSealed"));
                     // дно подземелья: глубже его капа спуска нет (просил юзер)
                     else if (st.floor >= caveOf(st.cave).maxFloor) {
                         showToast(GAME_LOC.t("dungeon.exitBottom"));

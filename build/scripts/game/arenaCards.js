@@ -114,6 +114,21 @@
                 floatText(960, side === "p" ? 640 : 300, `+${n}⚡`, 0x8cd0ef);
                 sfx("aqua");
             };
+            // «Путь воды» (firstTrapEnergy): первое срабатывание ЛЮБОЙ своей
+            // ловушки в бою (клеточная, отмена, приманка, руна, «при гибели»)
+            // даёт владельцу +1⚡. Зовётся из trapTriggered вместе с «Зимними
+            // духами» — один раз за бой, флаг тратится на первом срабатывании.
+            A.heroFirstTrapEnergy = function heroFirstTrapEnergy(side) {
+                if (!B || B.heroFlags.trapEnergy[side]) return;
+                const hd = heroDefOf(side);
+                if (!hd || hd.ability !== "firstTrapEnergy") return;
+                B.heroFlags.trapEnergy[side] = true;
+                const n = hd.abilityVal || 1;
+                if (side === "p") B.energy += n; else B.eEnergy += n;
+                floatText(960, side === "p" ? 640 : 300, `+${n}⚡`, 0x8cd0ef);
+                sfx("aqua");
+                refreshHud();
+            };
             // Итоговый урон заклинания по цели: у «Роя светлячков» (grw30) он
             // равен числу СВОИХ существ на поле (+ аура алтаря), у «Выстрела
             // стихией» (grw32) — числу карт Роста в руке, у прочих — spellDmg

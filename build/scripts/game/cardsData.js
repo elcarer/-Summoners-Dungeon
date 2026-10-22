@@ -680,12 +680,18 @@
         grwBoss: { id: "grwBoss", rarity: "epic", baseHp: 18,
                    elems: ["growth"], starter: "growth",
                    img: "15", ability: "buildingDeathReplay" },
-        // ── «Подземные ключи»: карта персонажа первого врага (просил юзер;
-        // арт heroes/17.png): Мудрость, 10♥, первое заклинание боя даёт
-        // владельцу 1 энергию (способность работает у обеих сторон)
+        // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
+        // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
+        // боя даёт владельцу 1 энергию (firstSpellEnergy);
+        // 2-й этаж (арт heroes/18.png): Мудрость, 11♥, первое срабатывание
+        // своей ловушки в бою даёт владельцу 1 энергию (firstTrapEnergy).
+        // Способности работают у обеих сторон.
         wisBreeze: { id: "wisBreeze", rarity: "common", baseHp: 10,
                      elems: ["wisdom"], starter: "wisdom",
                      img: "17", ability: "firstSpellEnergy", abilityVal: 1 },
+        wisWater: { id: "wisWater", rarity: "common", baseHp: 11,
+                    elems: ["wisdom"], starter: "wisdom",
+                    img: "18", ability: "firstTrapEnergy", abilityVal: 1 },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -694,7 +700,7 @@
         "gobMaster", "boss",
         "grwBeasts", "grwGrove", "grwWild", "grwMagic", "grwCity",
         "grwControl", "grwBoss",
-        "wisBreeze"];
+        "wisBreeze", "wisWater"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

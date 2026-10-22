@@ -344,6 +344,7 @@
             "hero.grwControl.ability": "На первый ход в бою противник получает на 1 энергию меньше",
             "hero.grwBoss.ability": "Когда ваша постройка умирает первый раз за бой, её карта возвращается в руку, а после этого эта карта сразу разыгрывается в ту же клетку поля боя без траты энергии",
             "hero.wisBreeze.ability": "Первое сыгранное в игре ваше заклинание даёт 1 энергию",
+            "hero.wisWater.ability": "Первое в игре ваше срабатывание ловушки даёт 1 энергию",
             // вкладка «Герои» в коллекции (просил юзер)
             "deck.tabDeck": "Колода",
             "deck.tabHeroes": "Герои",
@@ -423,6 +424,7 @@
             "enc.grwControl.title": "Контроль природы",
             "enc.grwBoss.title": "Хранитель рощи",
             "enc.wisBreeze.title": "Дуновение опасности",
+            "enc.wisWater.title": "Путь воды",
             "common.units": "сущ.",
         },
         en: {
@@ -765,6 +767,7 @@
             "hero.grwControl.ability": "On the first turn of the battle, the opponent gets 1 less energy",
             "hero.grwBoss.ability": "The first time your building dies in a battle, its card returns to your hand and is then instantly replayed on the same cell for free",
             "hero.wisBreeze.ability": "The first spell you play in a battle gives 1 energy",
+            "hero.wisWater.ability": "The first trap of yours that triggers in a battle gives you 1 energy",
             "deck.tabDeck": "Deck",
             "deck.tabHeroes": "Heroes",
             "heroes.title": "HEROES",
@@ -843,6 +846,7 @@
             "enc.grwControl.title": "Nature Control",
             "enc.grwBoss.title": "Grove Keeper",
             "enc.wisBreeze.title": "Breath of Danger",
+            "enc.wisWater.title": "Path of Water",
             "common.units": "units",
         },
     };

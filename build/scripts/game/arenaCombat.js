@@ -228,11 +228,13 @@
 
             // «Зимние духи» (wis89): когда срабатывает ЛЮБАЯ ловушка (клеточная,
             // отмена, руна, приманка, ряд), каждое живое существо с меткой
-            // trapGrow получает +1 к урону навсегда. Зовётся в точках, где
-            // ловушка снимается/тратится, — один раз на срабатывание, без
-            // повторов «Рощи лоз» (это тот же триггер).
-            A.trapTriggered = function trapTriggered() {
+            // trapGrow получает +1 к урону навсегда. side — ХОЗЯИН ловушки:
+            // по нему же «Путь воды» (firstTrapEnergy) даёт +1⚡ за первое
+            // срабатывание. Зовётся в точках, где ловушка снимается/тратится,
+            // — один раз на срабатывание, без повторов «Рощи лоз».
+            A.trapTriggered = function trapTriggered(side) {
                 if (!B || !B.units) return;
+                if (side) A.heroFirstTrapEnergy(side);
                 for (const u of B.units.slice()) {
                     if (!u.def || !u.def.trapGrow || !B.units.includes(u)) continue;
                     u.bonusAtk = (u.bonusAtk || 0) + 1;
@@ -350,7 +352,7 @@
                 if (i < 0) return [toCol, toRow];
                 const trap = B.traps[foe].splice(i, 1)[0];
                 redrawTraps();
-                trapTriggered(); // «Зимние духи»: сработала приманка
+                trapTriggered(foe); // «Зимние духи»/«Путь воды»: сработала приманка
                 const p = cellXY(trap.col, trap.row);
                 floatText(p.x, p.y - 60, "?!", 0xe08cd0);
                 damageUnit(u, trap.def.trap.dmg + altarBonus(foe), null, "acid");
@@ -398,7 +400,7 @@
                 if (i < 0) return null;
                 const trap = B.traps[side].splice(i, 1)[0];
                 redrawTraps();
-                trapTriggered(); // «Зимние духи»: сработала отмена
+                trapTriggered(side); // «Зимние духи»/«Путь воды»: сработала отмена
                 const p = cellXY(trap.col, trap.row);
                 floatText(p.x, p.y - 60, "?!", 0xe08cd0);
                 fxEvent("trap", { x: p.x, y: p.y - 8 });
@@ -431,7 +433,7 @@
                 if (i < 0) return;
                 const trap = B.traps[side].splice(i, 1)[0];
                 redrawTraps();
-                trapTriggered(); // «Зимние духи»: сработала клеточная ловушка
+                trapTriggered(side); // «Зимние духи»/«Путь воды»: сработала клеточная ловушка
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, "?!", 0xe08cd0);
                 fxEvent("trap", { x: p.x, y: p.y - 8, scale: 0.9 });
@@ -1191,7 +1193,7 @@
                 if (!B.traps[side].length) return;
                 const trap = B.traps[side].shift();
                 redrawTraps();
-                trapTriggered(); // «Зимние духи»: сработала ловушка «при гибели»
+                trapTriggered(side); // «Зимние духи»/«Путь воды»: сработала ловушка «при гибели»
                 const k = cellXY(killer.col, killer.row);
                 floatText(k.x, k.y - 60, "?!", 0xe08cd0);
                 fxEvent("trap", { x: k.x, y: k.y - 8, scale: 0.9 });
@@ -1221,7 +1223,7 @@
                     if (i < 0) continue;
                     B.traps[side].splice(i, 1);
                     redrawTraps();
-                    trapTriggered(); // «Зимние духи»: сработала руна
+                    trapTriggered(side); // «Зимние духи»/«Путь воды»: сработала руна
                     const p = cellXY(attacker.col, attacker.row);
                     floatText(p.x, p.y - 60, "?!", 0xe08cd0);
                     fxEvent("trap", { x: p.x, y: p.y - 8, scale: 0.9 });
