@@ -170,14 +170,26 @@
                             "grw9", "grw22", "grw36", "grw40", "grw1"],
                      grow: ["grw24", "grw28", "grw31", "grw2", "grw26", "grw25",
                             "grw21", "grw38", "grw33", "grw30"] },
+        // ── «Подземные ключи» (третье подземелье, стихия «Мудрость») ──────
+        // Пока только первый этаж (просил юзер): «Дуновение опасности» —
+        // база 10♥, ядро 11 карт по спеке (81×3, 85×3, 86×3, 88, 94).
+        // Арена — scenes/3.png (подводная пещера, уже лежала в арте).
+        wisBreeze: { scene: 3, baseHp: 10, elem: "wisdom", hero: "wisBreeze",
+                     core: ["wis81", "wis81", "wis81", "wis85", "wis85",
+                            "wis85", "wis86", "wis86", "wis86", "wis88",
+                            "wis94"] },
     };
-    // Подземелья открытого мира: стихия (пул наград/драфта) и кап глубины
+    // Подземелья открытого мира: стихия (пул наград/драфта) и кап глубины.
+    // У «Подземных ключей» пока один этаж и нет главаря (B на карте не
+    // ставится) — юзер пришлёт следующие этажи/босса отдельно.
     const CAVES = {
         gob: { elem: "strength", maxFloor: 6, boss: "boss" },      // Гоблинские пещеры
         grw: { elem: "growth", maxFloor: 6, boss: "grwBoss" },     // Роща Роста
+        wis: { elem: "wisdom", maxFloor: 1 },                      // Подземные ключи
     };
     // Этаж → какие обычные враги на нём водятся; после конца списка — набор
-    // для самых глубоких этажей. Босс (B) есть на каждом этаже.
+    // для самых глубоких этажей. Босс (B) есть на каждом этаже данжа,
+    // у которого в CAVES задан `boss`.
     const FLOOR_MOBS = [
         ["gob", "gob"],                       // 1
         ["gob", "gobBig"],                    // 2
@@ -196,7 +208,12 @@
         ["grwMagic", "grwCity"],                // 5
         ["grwCity", "grwControl"],              // 6+ (просил юзер)
     ];
-    const MOB_TABLES = { gob: FLOOR_MOBS, grw: FLOOR_MOBS_GROWTH };
+    // «Подземные ключи»: пока один этаж с одним архетипом (просил юзер)
+    const FLOOR_MOBS_WISDOM = [
+        ["wisBreeze", "wisBreeze"],             // 1
+    ];
+    const MOB_TABLES = { gob: FLOOR_MOBS, grw: FLOOR_MOBS_GROWTH,
+                         wis: FLOOR_MOBS_WISDOM };
     // Пул добора колоды врага по редкости. Панельные карты (str11 жертва,
     // str25 руны, str26 путешествие) ИИ теперь разыгрывает сам — цель он
     // выбирает по своим приоритетам, без экрана (просил юзер).
@@ -224,6 +241,14 @@
                      "grw38", "grw39"],
             epic:   ["grw15", "grw18", "grw21", "grw22", "grw23", "grw24",
                      "grw26", "grw30", "grw31", "grw33", "grw40"],
+        },
+        // Мудрость: обычные 81–90, редкие 91–95, эпическая 96 — добор
+        // будущих боссов «Подземных ключей» (ядро уже синее)
+        wisdom: {
+            common: ["wis81", "wis82", "wis83", "wis84", "wis85", "wis86",
+                     "wis87", "wis88", "wis89", "wis90"],
+            rare:   ["wis91", "wis92", "wis93", "wis94", "wis95"],
+            epic:   ["wis96"],
         },
     };
     // Колода врага: ядро архетипа; весь добор — только боссу (просил
@@ -266,10 +291,10 @@
         return deck;
     }
     // Обычный враг для этажа подземелья: случайный архетип из таблицы
-    // этажа СВОЕГО данжа (гоблинские пещеры / роща Роста).
+    // этажа СВОЕГО данжа (пещеры / Роща Роста / Подземные ключи).
     function mobForFloor(cave, floor) {
-        const table = MOB_TABLES[CAVES[cave] ? cave : "gob"]
-            [Math.min(Math.max(1, floor | 0) - 1, FLOOR_MOBS.length - 1)];
+        const rows = MOB_TABLES[CAVES[cave] ? cave : "gob"];
+        const table = rows[Math.min(Math.max(1, floor | 0) - 1, rows.length - 1)];
         return table[(Math.random() * table.length) | 0];
     }
 
@@ -290,7 +315,8 @@
     globalThis.GAME_DATA = {
         CARDS, RARITY_COLORS, DEFAULT_DECK, DEFAULT_COLLECTION, DECK_MAX, DECK_MIN,
         deckMinFor, TRAP_SLOTS,
-        DECK_COPIES, REWARD_POOL, REWARD_POOLS, ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH,
+        DECK_COPIES, REWARD_POOL, REWARD_POOLS, ENCOUNTERS, FLOOR_MOBS,
+        FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM,
         MOB_TABLES, ENEMY_FILL, ENEMY_FILLS, CAVES,
         STARTER_DECKS, STARTER_COLLECTIONS, HEROES, HERO_ORDER, HERO_FOE_ORDER,
         enemyDeck, mobForFloor, ELEM_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,

@@ -27,6 +27,7 @@
             "world.hint": "WASD/стрелки — движение  ·  клик по земле — идти  ·  вход в пещеру — подземелье",
             "world.cave": "Гоблинские пещеры",
             "world.caveGrowth": "Роща Роста",
+            "world.caveWisdom": "Подземные ключи",
             "dungeon.toastFloor": "Этаж {n} пройден!",
             "dungeon.tipDeck": "Колода",
             "dungeon.tipBase": "HP базы: {n}",
@@ -342,6 +343,7 @@
             "hero.grwCity.ability": "Первое ваше сыгранное строение в бою получает «Защита 1»",
             "hero.grwControl.ability": "На первый ход в бою противник получает на 1 энергию меньше",
             "hero.grwBoss.ability": "Когда ваша постройка умирает первый раз за бой, её карта возвращается в руку, а после этого эта карта сразу разыгрывается в ту же клетку поля боя без траты энергии",
+            "hero.wisBreeze.ability": "Первое сыгранное в игре ваше заклинание даёт 1 энергию",
             // вкладка «Герои» в коллекции (просил юзер)
             "deck.tabDeck": "Колода",
             "deck.tabHeroes": "Герои",
@@ -420,6 +422,7 @@
             "enc.grwCity.title": "Лесной город",
             "enc.grwControl.title": "Контроль природы",
             "enc.grwBoss.title": "Хранитель рощи",
+            "enc.wisBreeze.title": "Дуновение опасности",
             "common.units": "сущ.",
         },
         en: {
@@ -446,6 +449,7 @@
             "world.hint": "WASD/arrows — move  ·  click the ground to walk  ·  enter the cave to descend",
             "world.cave": "Goblin Caves",
             "world.caveGrowth": "Growth Grove",
+            "world.caveWisdom": "Underground Keys",
             "dungeon.toastFloor": "Floor {n} cleared!",
             "dungeon.tipDeck": "Deck",
             "dungeon.tipBase": "Base HP: {n}",
@@ -760,6 +764,7 @@
             "hero.grwCity.ability": "The first building you play in a battle gains Protection 1",
             "hero.grwControl.ability": "On the first turn of the battle, the opponent gets 1 less energy",
             "hero.grwBoss.ability": "The first time your building dies in a battle, its card returns to your hand and is then instantly replayed on the same cell for free",
+            "hero.wisBreeze.ability": "The first spell you play in a battle gives 1 energy",
             "deck.tabDeck": "Deck",
             "deck.tabHeroes": "Heroes",
             "heroes.title": "HEROES",
@@ -837,6 +842,7 @@
             "enc.grwCity.title": "Forest City",
             "enc.grwControl.title": "Nature Control",
             "enc.grwBoss.title": "Grove Keeper",
+            "enc.wisBreeze.title": "Breath of Danger",
             "common.units": "units",
         },
     };

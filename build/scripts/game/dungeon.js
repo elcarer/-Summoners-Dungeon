@@ -3,7 +3,7 @@
 // клетка 64px): пол — плиты с вариациями, стены — спрайты по маске соседей
 // (низ 64×64 — лицо с коллизией, верх 64×128-спрайтов нависает на клетку
 // выше и на движение не влияет). Набор тайлов — свой у каждого данжа:
-// goblins_lair (Сила), growth_lair (Рост).
+// goblins_lair (Сила), growth_lair (Рост), water_lair (Мудрость).
 // Состояние живёт в G.dungeon (переживает уход в арену и обратно);
 // состояния пройденных этажей — в G.dungeonStates: по лестнице у старта
 // герой поднимается на этаж выше (на 1-м — выходит в открытый мир),
@@ -19,8 +19,10 @@
     const caveOf = (id) => CAVES()[id] || CAVES().gob;
     const MAX_FLOOR = 6;
     // Набор тайлов по данжу — папка images/dungeon_tiles/<имя> (просил юзер:
-    // у Рощи Роста свой арт): Сила — goblins_lair, Рост — growth_lair
-    const TILE_SETS = { gob: "goblins_lair", grw: "growth_lair" };
+    // у Рощи Роста свой арт): Сила — goblins_lair, Рост — growth_lair,
+    // Мудрость — water_lair («Подземные ключи»)
+    const TILE_SETS = { gob: "goblins_lair", grw: "growth_lair",
+                        wis: "water_lair" };
     const tileSetOf = (cave) => TILE_SETS[cave] || TILE_SETS.gob;
     // Версия раскладки этажа: тайлы 64px данжа (v5 — этажи
     // генерируются, см. genMap). Сейвы другой геометрии (координаты в
@@ -217,7 +219,8 @@
         }, 0);
         const [bx, by] = center(rooms[far]);
         g[sy][sx] = "H";
-        g[by][bx] = "B";
+        // главарь есть не у каждого данжа («Подземные ключи» пока без него)
+        if (caveOf(cave).boss) g[by][bx] = "B";
         // спуск ставится только если есть куда: на последнем этаже данжа
         // выхода вниз нет вовсе (просил юзер)
         if (floor < caveOf(cave).maxFloor) {
@@ -297,7 +300,7 @@
                 const enc = mobForFloor(caveId, floor);
                 st.enemies.push({ x, y, enc, deck: enemyDeck(enc, floor), alive: true, boss: false });
             }
-            else if (ch === "B") st.enemies.push({ x, y, enc: bossId, deck: enemyDeck(bossId, floor), alive: true, boss: true });
+            else if (ch === "B" && bossId) st.enemies.push({ x, y, enc: bossId, deck: enemyDeck(bossId, floor), alive: true, boss: true });
             else if (ch === "X") st.exit = { x, y };
         }
         // лестница наверх — в стартовой комнате, клеткой выше героя:

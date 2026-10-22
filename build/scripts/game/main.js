@@ -50,6 +50,8 @@
         // фоны арен с нарисованной сеткой поля
         uiTextures["scenes/1.png"] = await assets.loadTexture("./images/scenes/1.png");
         uiTextures["scenes/2.png"] = await assets.loadTexture("./images/scenes/2.png");
+        // подводная арена «Подземных ключей» (стихия Мудрость)
+        uiTextures["scenes/3.png"] = await assets.loadTexture("./images/scenes/3.png");
         // эффект поля «Стена костров» и рубашки колод по стихиям
         // (гоблины/природа/мудрость)
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
@@ -58,7 +60,8 @@
         uiTextures["card_wisdom_back.png"] = await assets.loadTexture("./images/ui/card_wisdom_back.png");
         // тайлы подземелий юзера: images/dungeon_tiles/<данж>/<…>.png —
         // полы 64×64 (floor/0-9) и стены walls/* по маске соседей.
-        // Свой набор на каждый данж: goblins_lair (Сила), growth_lair (Рост)
+        // Свой набор на каждый данж: goblins_lair (Сила), growth_lair (Рост),
+        // water_lair (Мудрость)
         say("тайлы подземелья…");
         await frame();
         const TILE_FILES = ["floor/0", "floor/1", "floor/2", "floor/3",
@@ -69,7 +72,7 @@
             "walls/wall_cor2", "walls/wall_cor3", "walls/wall_cor4",
             "walls/wall_end1", "walls/wall_end2", "walls/wall_end3",
             "walls/wall_end4"];
-        for (const lair of ["goblins_lair", "growth_lair"]) {
+        for (const lair of ["goblins_lair", "growth_lair", "water_lair"]) {
             for (const f of TILE_FILES) {
                 uiTextures[`dungeon_tiles/${lair}/${f}.png`] =
                     await assets.loadTexture(`./images/dungeon_tiles/${lair}/${f}.png`);
@@ -267,7 +270,7 @@
 
         const G = {
             hero: { hp: 10, maxHp: 10 }, gold: 0,
-            run: { floor: 1, cave: "gob", floors: { gob: 1, grw: 1 } },
+            run: { floor: 1, cave: "gob", floors: { gob: 1, grw: 1, wis: 1 } },
             heroId: savedActiveId, // активный герой забега (можно сменить в «Героях»)
             starterId: savedStarterId(), // выбранный при «Новой игре» — не меняется
             elem: "strength", // стихия забега — из героя, задаёт стартовую колоду
@@ -351,7 +354,7 @@
                 this.elem = h.elems[0];
                 this.hero.hp = this.hero.maxHp;
                 this.gold = 0;
-                this.run = { floor: 1, cave: "gob", floors: { gob: 1, grw: 1 } };
+                this.run = { floor: 1, cave: "gob", floors: { gob: 1, grw: 1, wis: 1 } };
                 this.dungeon = null;
                 this.world = { heroPos: null, out: false };
                 this.dungeonStates = {};
@@ -558,9 +561,12 @@
                     // глубина у каждого подземелья своя; активное — где герой
                     G.run.floor = r.floor;
                     G.run.cave = G.dungeon ? G.dungeon.cave : (r.cave || "gob");
+                    // глубины всех данжей каталога (gob/grw/wis): новые
+                    // подземелья не должны терять прогресс при «Продолжить»
+                    const caveIds = Object.keys(globalThis.GAME_DATA.CAVES);
                     G.run.floors = r.floors && typeof r.floors === "object"
-                        ? { gob: r.floors.gob || 1, grw: r.floors.grw || 1 }
-                        : { gob: r.floor, grw: 1 };
+                        ? Object.fromEntries(caveIds.map((c) => [c, r.floors[c] || 1]))
+                        : { gob: r.floor, grw: 1, wis: 1 };
                     G.world = { heroPos: r.worldPos || null, out: !!r.worldOut };
                     // продолжение с середины этажа — в подземелье, иначе —
                     // в открытый мир (герой вышел из пещер или только начал);

@@ -590,6 +590,7 @@
                         || CARDS[last].type !== "spell") return false;
                     B.energy -= effCost(cardId, "p", target);
                     spendCard(handIdx);
+                    heroFirstSpellEnergy("p"); // «Дуновение опасности»
                     heroStrReplay("p", cardId, def); // «Мастера огня»
                     B.lastSpell.p = "str25"; // повтор самой себя — бесконечная цепочка
                     replaySpell(last);
@@ -604,6 +605,7 @@
                 fxSpellCast(cardId, target, "p");
                 B.energy = def.spell.drainAll ? 0 : B.energy - effCost(cardId, "p", target);
                 spendCard(handIdx);
+                heroFirstSpellEnergy("p"); // «Дуновение опасности»: +1⚡ за 1-е заклинание
                 heroStrReplay("p", cardId, def); // «Мастера огня»
                 B.lastSpell.p = cardId;
                 afterSpellPlayed(); // «Заклинатель клинков» и его соседи

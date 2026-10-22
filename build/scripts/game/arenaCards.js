@@ -101,6 +101,19 @@
                     `↩ ${GAME_LOC.t(`card.${cardId}.name`)}`, 0x9fd489);
                 sfx("up");
             };
+            // «Дуновение опасности» (firstSpellEnergy): первое заклинание
+            // стороны в бою даёт её владельцу +1⚡. Зовётся после оплаты
+            // карты из руки (касты рун и повторы бесплатные — не в счёт).
+            A.heroFirstSpellEnergy = function heroFirstSpellEnergy(side) {
+                if (!B || B.heroFlags.spellEnergy[side]) return;
+                const hd = heroDefOf(side);
+                if (!hd || hd.ability !== "firstSpellEnergy") return;
+                B.heroFlags.spellEnergy[side] = true;
+                const n = hd.abilityVal || 1;
+                if (side === "p") B.energy += n; else B.eEnergy += n;
+                floatText(960, side === "p" ? 640 : 300, `+${n}⚡`, 0x8cd0ef);
+                sfx("aqua");
+            };
             // Итоговый урон заклинания по цели: у «Роя светлячков» (grw30) он
             // равен числу СВОИХ существ на поле (+ аура алтаря), у «Выстрела
             // стихией» (grw32) — числу карт Роста в руке, у прочих — spellDmg

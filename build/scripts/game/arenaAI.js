@@ -1621,6 +1621,7 @@
                             castTargetOff = 0;
                             B.eEnergy = def.spell.drainAll
                                 ? 0 : B.eEnergy - Math.max(0, effCost(cardId, "e") - tOff);
+                            heroFirstSpellEnergy("e"); // «Дуновение опасности»
                             // рука ИИ тоже не больше 7 — излишек панельных доборов
                             // сбрасывается случайно (как панель сброса у игрока)
                             while (B.eHand.length > HAND_MAX) {

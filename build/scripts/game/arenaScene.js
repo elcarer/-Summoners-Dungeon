@@ -12,8 +12,9 @@
                 const heroDef = globalThis.GAME_DATA.HEROES[G.heroId]
                     || globalThis.GAME_DATA.HEROES.gorbag;
                 // фон и сетка поля — по подземелью: гоблинские пещеры —
-                // scenes/1.png, Роща Роста — scenes/2.png (просил юзер)
-                curScene = enc.elem === "growth" ? 2 : 1;
+                // scenes/1.png, Роща Роста — scenes/2.png (просил юзер),
+                // Мудрость/«Подземные ключи» — scenes/3.png (подводная пещера)
+                curScene = enc.elem === "growth" ? 2 : enc.elem === "wisdom" ? 3 : 1;
                 if (ctx.music) ctx.music("battle");
                 // колода врага хранится в враге подземелья (кидается при
                 // генерации этажа по глубине); для старых сейвов — генерим.
@@ -49,6 +50,7 @@
                     // эффект первой сработавшей ловушки («Роща лоз»); возврат
                     // первой погибшей постройки («Хранитель рощи»)
                     heroFlags: { firstSpell: { p: false, e: false },
+                        spellEnergy: { p: false, e: false },
                         deathReplay: { p: false, e: false },
                         strReplay: { p: false, e: false },
                         builtGuard: { p: false, e: false },
