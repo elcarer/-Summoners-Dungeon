@@ -314,6 +314,11 @@
                 node.scale.set(0.2);
                 punches.push({ node, life: 0.3 / animK(), total: 0.3 / animK() });
                 root.unitsLayer.addChild(node);
+                const sp = cellXY(col, row);
+                fxEvent("summon", {
+                    x: sp.x, y: sp.y + 24, color: fxColorOf(def.elem),
+                    scale: opts.token ? 0.72 : 1,
+                });
                 sfx("use"); // призыв (обе стороны)
                 B.units.push(u);
                 recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда

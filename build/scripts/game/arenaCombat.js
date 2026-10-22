@@ -74,6 +74,7 @@
                 recalcAuras();
                 const p = cellXY(target.col, target.row);
                 floatText(p.x, p.y - 39, "−1⚔", 0x8cd0ef);
+                fxEvent("ice", { x: p.x, y: p.y - 12, scale: 0.72 });
                 punch(target.node);
                 sfx("aqua");
             };
@@ -103,6 +104,7 @@
                 updateFrozenMark(u);
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 88, `❄ ${u.frozen}`, 0x8cd0ef);
+                fxEvent("ice", { x: p.x, y: p.y - 10, scale: 1.05 });
                 punch(u.node);
                 sfx("aqua");
             };
@@ -351,6 +353,7 @@
                 trapTriggered(); // «Зимние духи»: сработала отмена
                 const p = cellXY(trap.col, trap.row);
                 floatText(p.x, p.y - 60, "?!", 0xe08cd0);
+                fxEvent("trap", { x: p.x, y: p.y - 8 });
                 sfx("mine");
                 trapEchoOnce(side); // «Роща лоз»: флаг первого срабатывания
                 // тратится — повторять отмену нечего (зеркально клеточным)
@@ -383,6 +386,7 @@
                 trapTriggered(); // «Зимние духи»: сработала клеточная ловушка
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, "?!", 0xe08cd0);
+                fxEvent("trap", { x: p.x, y: p.y - 8, scale: 0.9 });
                 const echo = trapEchoOnce(side); // первая ловушка боя — флаг потрачен
                 applyCellTrap(trap, side, u);
                 if (echo && B.units.includes(u)) applyCellTrap(trap, side, u);
@@ -555,6 +559,13 @@
             };
 
             A.killUnit = function killUnit(u, killer) {
+                if (u && B.units.includes(u)) {
+                    const dp = cellXY(u.col, u.row);
+                    fxEvent("death", {
+                        x: dp.x, y: dp.y - 8, color: fxColorOf(u.def.elem),
+                        scale: u.def.type === "building" ? 1.2 : 1,
+                    });
+                }
                 removeUnit(u);
                 sfx("die");
                 if (u.def.type === "building") recalcAuras();
@@ -681,6 +692,7 @@
                 u.node.addChild(mark);
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, "☣", 0xb7d178);
+                fxEvent("poison", { x: p.x, y: p.y - 10, scale: 0.75 });
                 sfx("acid");
             };
             // Отклик спор на урон: база стороны проклятого существа получает
@@ -718,6 +730,7 @@
                 mark.getChildAt(1).text = String(u.protect);
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, GAME_LOC.t("card.grw19.name"), 0x8cd0ef);
+                fxEvent("ward", { x: p.x, y: p.y - 14, scale: 0.7 });
                 punch(u.node);
                 sfx("up");
             };
@@ -746,6 +759,7 @@
                 mark.getChildAt(1).text = String(u.venom);
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 66, `☠ ${u.venom}`, 0x9fd489);
+                fxEvent("poison", { x: p.x, y: p.y - 10, scale: 0.64 });
                 punch(u.node);
                 sfx("acid");
             };
@@ -771,6 +785,7 @@
                 mark.getChildAt(1).text = String(u.poison);
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, "☠", 0xb7d178);
+                fxEvent("poison", { x: p.x, y: p.y - 10, scale: 0.72 });
                 sfx("acid");
             };
             // Начало хода стороны, ДО марша: каждое отравленное её существо
@@ -810,6 +825,7 @@
                 mark.getChildAt(1).text = String(u.entangle);
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, "≡", 0xc9a06a);
+                fxEvent("seal", { x: p.x, y: p.y + 8, color: 0xc9a06a, scale: 0.8 });
                 sfx("acid");
             };
             A.removeEntangleMark = function removeEntangleMark(u) {
@@ -833,6 +849,8 @@
                 mark.addChild(tx);
                 mark.position.set(36, -54);
                 u.node.addChild(mark);
+                const p = cellXY(u.col, u.row);
+                fxEvent("ward", { x: p.x, y: p.y - 14, scale: 0.72 });
             };
             A.removeWardMark = function removeWardMark(u) {
                 const mark = u.node && u.node.getChildByName("wardMark");
@@ -882,6 +900,7 @@
                 recalcAuras(); // снесённая аура больше не действует соседям
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, GAME_LOC.t("card.grw17.name"), 0xd0b0ef);
+                fxEvent("debuff", { x: p.x, y: p.y - 12, scale: 0.85 });
                 punch(u.node);
                 sfx("chpoc");
                 return n;
@@ -898,17 +917,23 @@
                     const wp = cellXY(target.col, target.row);
                     floatText(wp.x, wp.y - 66,
                         "✦ " + GAME_LOC.t("spell.ward.name"), 0x8cd0ef);
+                    fxEvent("ward", { x: wp.x, y: wp.y - 14, scale: 0.72 });
                     sfx("aqua");
                     return;
                 }
                 // «Защита N» («Защитный кокон») режет входящий урон до нуля;
                 // споры/огненное дыхание реагируют на ФАКТИЧЕСКИ прошедший урон
                 let amt = amount;
+                let blocked = 0;
                 if (target.protect && amt > 0) {
-                    const blocked = Math.min(target.protect, amt);
+                    blocked = Math.min(target.protect, amt);
                     amt -= blocked;
                     const bp = cellXY(target.col, target.row);
                     floatText(bp.x, bp.y - 72, `Защита −${blocked}`, 0x8cd0ef);
+                    if (amt <= 0) {
+                        // весь урон съеден бронёй — показать, что удар «погас»
+                        fxEvent("ward", { x: bp.x, y: bp.y - 12, scale: 0.62 });
+                    }
                 }
                 target.hp -= amt;
                 procEnchantFire(killer);
@@ -917,6 +942,17 @@
                 if (n) n.text = String(Math.max(0, target.hp));
                 const p = cellXY(target.col, target.row);
                 floatText(p.x, p.y - 36, `−${amt}`, 0xffb26e);
+                if (amt > 0) {
+                    fxEvent("impact", {
+                        x: p.x, y: p.y - 16,
+                        color: snd === "acid" ? 0x9fd46a
+                            : snd === "rocket" ? 0xffa45e
+                            : snd === "monolith" ? 0xd0b0ef : 0xffb26e,
+                        power: Math.min(1.8, 0.72 + amt * 0.12),
+                        scale: target.def.type === "building" ? 1.12 : 0.9,
+                        slash: snd === "sword",
+                    });
+                }
                 punch(target.node);
                 sfx(snd);
                 if (target.hp <= 0) { killUnit(target, killer); return; }
@@ -959,6 +995,7 @@
                 if (node) node.text = String(u.hp);
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 36, `+${n}`, 0x9fd489);
+                fxEvent("heal", { x: p.x, y: p.y - 10, scale: 0.78 });
                 punch(u.node);
                 sfx("up");
             };
@@ -979,6 +1016,11 @@
                 }
                 if (side === "p") B.playerBase -= amount; else B.enemyBase -= amount;
                 if (where) floatText(where.x, where.y, `−${amount}`, where.fill);
+                fxEvent("base", {
+                    x: where ? where.x : 960,
+                    y: where ? where.y : (side === "p" ? 840 : 240),
+                    color: side === "p" ? 0xff7a5e : 0xffb26e,
+                });
                 punch(root.hud);
             };
 
@@ -1092,6 +1134,8 @@
             A.armTrap = function armTrap(side, cardId, col, row, unit = null) {
                 B.traps[side].push({ def: CARDS[cardId], col, row, unit });
                 redrawTraps();
+                const p = unit ? cellXY(unit.col, unit.row) : cellXY(col, row);
+                fxEvent("seal", { x: p.x, y: p.y + 8, color: 0xb07ad5, scale: 0.85 });
                 sfx("mine");
                 return true;
             };
@@ -1102,6 +1146,7 @@
                 trapTriggered(); // «Зимние духи»: сработала ловушка «при гибели»
                 const k = cellXY(killer.col, killer.row);
                 floatText(k.x, k.y - 60, "?!", 0xe08cd0);
+                fxEvent("trap", { x: k.x, y: k.y - 8, scale: 0.9 });
                 if (trap.def.trap.effect === "rowDmg") {
                     const echo = trapEchoOnce(side);
                     for (let n = 0; n < (echo ? 2 : 1); n++) {
@@ -1131,6 +1176,7 @@
                     trapTriggered(); // «Зимние духи»: сработала руна
                     const p = cellXY(attacker.col, attacker.row);
                     floatText(p.x, p.y - 60, "?!", 0xe08cd0);
+                    fxEvent("trap", { x: p.x, y: p.y - 8, scale: 0.9 });
                     sfx("mine");
                     const echo = trapEchoOnce(side);
                     castRandomSpell(side, attacker);
@@ -1180,7 +1226,9 @@
                     return;
                 }
                 if (side === "p") {
-                    applySpellP(pick.id, runeTargetP(pick.id, focus), true);
+                    const rt = runeTargetP(pick.id, focus);
+                    applySpellP(pick.id, rt, true);
+                    fxSpellCast(pick.id, rt, "p");
                     if (def.spell.drainAll) B.energy = 0; // огнешар и бесплатно его сжигает
                     B.lastSpell.p = pick.id;
                 } else {
@@ -1251,6 +1299,7 @@
                 mark.getChildAt(1).text = `×${u.berserk + 1}`;
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 66, `⚔×${u.berserk + 1}`, 0xffb26e);
+                fxEvent("buff", { x: p.x, y: p.y - 12, color: 0xff8a5e, scale: 0.72 });
             };
 
             A.redrawTraps = function redrawTraps() {

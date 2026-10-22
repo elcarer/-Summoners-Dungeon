@@ -83,6 +83,7 @@
                 drawCards(4);
                 drawEnemy(4); // у врага раньше было 0 карт — добор только на его ходу
                 moves.length = 0; floats.length = 0; punches.length = 0; // хвосты прошлого боя
+                fxClear(); // эффекты прошлого боя жили в уничтоженном root
                 overlay = null;
                 drag = null;
                 dragFx = null; // прошлого боя Graphics уничтожен вместе с root
@@ -159,6 +160,7 @@
                 hideEnemyCard(); // узел умер бы вместе с root — снимаем ссылку
                 unitCard = null; // узел подсказки умер вместе с root
                 trapCard = null; // подсказка ловушки тоже
+                fxClear(); // снять ссылки на Graphics до уничтожения root
                 if (root) { root.destroy({ children: true }); root = null; }
                 overlay = null;
                 ovZoom = null; // узел умер вместе с root — снимаем ссылку
@@ -170,6 +172,7 @@
             A.update = function update(ticker) {
                 if (!root || !B) return;
                 const dt = ticker.deltaMS / 1000;
+                fxTick(dt); // процедурные эффекты боя (искры, кольца, дым)
                 // доскок бегунка шкалы к засечке (после отпускания мыши)
                 if (sliderGlide) {
                     if (performance.now() - sliderGlide.t0 >= SLIDER_GLIDE_MS) sliderGlide = null;

@@ -14,6 +14,7 @@
                 sproutTick("e");   // ростки врага подросли — конец его хода
                 if (B.stopped || B.phase === "over") return;
                 banner(t("arena.yourTurn"));
+                fxEvent("turn", { side: "p", color: 0xffd98c });
                 await delay(0.4 / animK());
                 if (B.stopped) return;
                 upkeep("p"); // грибницы игрока
@@ -254,6 +255,7 @@
                         u.bonusAtk = (u.bonusAtk || 0) - def.spell.debuffAtk;
                         recalcAuras();
                         floatText(p.x, p.y - 39, `−${def.spell.debuffAtk}⚔`, 0xef9f8c);
+                        fxEvent("debuff", { x: p.x, y: p.y - 12, scale: 0.72 });
                         punch(u.node);
                         sfx("acid");
                         return true;
@@ -289,6 +291,12 @@
                         if (def.spell.berserk) addBerserk(u, def.spell.berserk);
                         if (def.spell.venom) addVenom(u, def.spell.venom); // «Отравленные лезвия»
                         if (def.spell.nova) novaSplash(u); // «Круговая атака»
+                        if (def.spell.buffAtk || def.spell.buffHp
+                            || def.spell.buffAtkByHp || def.spell.enchantFire) {
+                            fxEvent("buff", { x: p.x, y: p.y - 12,
+                                color: def.spell.enchantFire ? 0xff8a5e : 0xffd98c,
+                                scale: 0.82 });
+                        }
                     }
                     punch(u.node);
                     sfx("up");
@@ -304,6 +312,7 @@
                         const n = purgeUnit(u);
                         B.playerBase = Math.min(B.playerBaseMax, B.playerBase + n);
                         floatText(960, 840, `+${n}`, 0x9fd489);
+                        fxEvent("heal", { x: 960, y: 830, scale: 1.15 });
                         punch(root.hud);
                         sfx("up");
                     } else if (def.spell.cocoon) { // «Защитный кокон»: «Защита 1» цели
@@ -410,6 +419,7 @@
                         punch(v.node);
                         const p = cellXY(v.col, v.row);
                         floatText(p.x, p.y - 39, `−${n}⚔`, 0x8cd0ef);
+                        fxEvent("debuff", { x: p.x, y: p.y - 12, scale: 0.62 });
                     }
                     recalcAuras();
                     sfx("acid");
@@ -431,6 +441,7 @@
                         punch(v.node);
                         const p = cellXY(v.col, v.row);
                         floatText(p.x, p.y - 39, `+${def.spell.buffAllAtk}⚔`, 0x9fd489);
+                        fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.6 });
                     }
                     recalcAuras();
                     sfx("up");
@@ -535,7 +546,9 @@
             A.replaySpell = function replaySpell(cardId) {
                 const def = CARDS[cardId];
                 if (!def || def.type !== "spell") return;
-                applySpellP(cardId, autoTargetFor(cardId), true);
+                const target = autoTargetFor(cardId);
+                applySpellP(cardId, target, true);
+                fxSpellCast(cardId, target, "p");
                 if (def.spell.drainAll) B.energy = 0; // огнешар и в повторе сжигает энергию
                 const hi = B.hand.indexOf(cardId);
                 if (hi >= 0) B.hand.splice(hi, 1);
@@ -587,6 +600,7 @@
                     return true;
                 }
                 if (!applySpellP(cardId, target)) return false;
+                fxSpellCast(cardId, target, "p");
                 B.energy = def.spell.drainAll ? 0 : B.energy - effCost(cardId, "p", target);
                 spendCard(handIdx);
                 heroStrReplay("p", cardId, def); // «Мастера огня»

@@ -17,6 +17,7 @@
 //   arenaFlow.js    — добор, замешательство, марш и итог боя;
 //   arenaAI.js      — ИИ противника;
 //   arenaActions.js — действия игрока: выбор, призыв, заклинания;
+//   arenaFx.js      — процедурные эффекты боя (частицы на Graphics);
 //   arenaScene.js   — enter/exit/update;
 //   arenaApi.js     — тестовый API арены.
 // Модули вешают функции и состояние на A; их установщики работают внутри
@@ -35,6 +36,7 @@
         NS.installFlow(A);
         NS.installAI(A);
         NS.installActions(A);
+        NS.installFx(A);
         NS.installScene(A);
         NS.installApi(A);
         return { enter: A.enter, exit: A.exit, update: A.update, api: A.api };

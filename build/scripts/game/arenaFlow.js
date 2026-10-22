@@ -92,6 +92,7 @@
                 mark.getChildAt(1).text = String(u.confused);
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 66, "✧", 0xb07ad5);
+                fxEvent("debuff", { x: p.x, y: p.y - 12, scale: 0.78 });
                 sfx("aqua");
             };
             A.removeConfuseMark = function removeConfuseMark(u) {
@@ -184,6 +185,7 @@
                         u.frozen -= 1;
                         const p = cellXY(u.col, u.row);
                         floatText(p.x, p.y - 88, "❄", 0x8cd0ef);
+                        fxEvent("ice", { x: p.x, y: p.y - 10, scale: 0.55 });
                         if (u.frozen <= 0) { u.frozen = 0; removeFrozenMark(u); }
                         else updateFrozenMark(u);
                         refreshHud();
@@ -202,6 +204,9 @@
                         // счётчик тает на 1; атака по стоящему впереди врагу
                         // остаётся (до базы опутанный не достаёт), берсерк не страдает
                         u.entangle -= 1;
+                        const ep = cellXY(u.col, u.row);
+                        fxEvent("seal", { x: ep.x, y: ep.y + 8, color: 0xc9a06a,
+                            scale: 0.55 });
                         if (u.entangle <= 0) { u.entangle = 0; removeEntangleMark(u); refreshHud(); }
                         const ahead = u.row + dir;
                         const occ = ahead >= 0 && ahead < GRID ? unitAt(u.col, ahead) : null;
@@ -358,6 +363,7 @@
                 B.spellTarget = false;
                 const draft = !!(G.draftBattle && G.draft);
                 sfx(victory ? "lvlUp" : "die");
+                fxEvent(victory ? "victory" : "defeat", { x: 960, y: 430 });
                 refreshHud();
                 const ov = new PIXI.Container();
                 const dim = new PIXI.Graphics();

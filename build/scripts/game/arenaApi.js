@@ -259,6 +259,22 @@
                     list: punches.map((p) => ({ dying: !!p.dying,
                         life: Math.round(p.life * 1000) / 1000, total: p.total,
                         dead: !!p.node.destroyed, inLayer: !!(p.node.parent && p.node.parent === root.unitsLayer) })) }),
+                // процедурные эффекты (тесты): сколько живёт, какие события
+                // звучали и сколько узлов реально висит в слое root.fx
+                fxState: () => ({
+                    enabled: !!fxEnabled,
+                    count: fxList.length,
+                    seq: fxSeq,
+                    kinds: fxList.map((e) => e.kind),
+                    parts: fxList.reduce((n, e) => n + e.parts.length, 0),
+                    nodes: root && root.fx ? root.fx.children.length : 0,
+                }),
+                // тест-хук: точечный эффект в координатах дизайна
+                _fx(kind, x = 960, y = 540, color = null) {
+                    if (!root || !root.fx) return false;
+                    return !!fxEvent(kind, { x, y, color: color || undefined });
+                },
+                _fxClear() { fxClear(); return true; },
                 // лицо походки юнита на клетке (тесты: боковой шаг — walk_left/right)
                 walkFace: (col, row) => {
                     const u = unitAt(col, row);

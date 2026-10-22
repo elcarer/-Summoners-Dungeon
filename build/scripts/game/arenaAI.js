@@ -58,6 +58,7 @@
                 sproutTick("p");   // ростки игрока подросли — конец его хода
                 if (B.stopped || B.phase === "over") return;
                 banner(t("arena.enemyTurn"));
+                fxEvent("turn", { side: "e", color: 0xff8a5e });
                 await delay(0.5 / animK());
                 if (B.stopped) return;
                 upkeep("e"); // грибницы врага
@@ -1108,6 +1109,7 @@
             // (u.spellWard, просил юзер)
             A.enemyCastSpellEffect = function enemyCastSpellEffect(def, free = false, focus = null) {
                 A.spellCasting = true;
+                fxSpellCast(def, focus, "e");
                 try {
                     enemyCastSpellEffectInner(def, free, focus);
                 } finally { A.spellCasting = false; }
@@ -1158,6 +1160,7 @@
                         recalcAuras();
                         const p = cellXY(best.col, best.row);
                         floatText(p.x, p.y - 39, `−${s.debuffAtk}⚔`, 0xef9f8c);
+                        fxEvent("debuff", { x: p.x, y: p.y - 12, scale: 0.72 });
                         punch(best.node);
                         sfx("acid");
                         return;
@@ -1227,6 +1230,11 @@
                         if (s.venom) addVenom(best, s.venom); // «Отравленные лезвия»
                     }
                     punch(best.node);
+                    if (s.buffAtk || s.buffHp || s.buffAtkByHp || s.enchantFire) {
+                        const bp = cellXY(best.col, best.row);
+                        fxEvent("buff", { x: bp.x, y: bp.y - 12,
+                            color: s.enchantFire ? 0xff8a5e : 0xffd98c, scale: 0.82 });
+                    }
                     sfx("up");
                 }
                 if (s.target === "anyUnitDmg") {
@@ -1244,6 +1252,7 @@
                             const n = purgeUnit(best);
                             B.enemyBase = Math.min(B.enemyBaseMax, B.enemyBase + n);
                             floatText(960, 60, `+${n}`, 0x9fd489);
+                            fxEvent("heal", { x: 960, y: 70, scale: 1.15 });
                             punch(root.hud);
                             sfx("up");
                         }
