@@ -29,7 +29,7 @@
     // спуска пересобираются; cap глубины — 6 этажей). Сейвы другой
     // геометрии (координаты в других клетках) не поднимаются — этаж
     // пересобирается заново.
-    const MAP_V = 9;
+    const MAP_V = 10;
     // Ключ архива этажей — «данж:этаж» (gob:1, grw:2…): у каждого
     // подземелья своя история подъёмов/спусков
     const stKey = (cave, floor) => (caveOf(cave) && cave !== undefined ? cave : "gob") + ":" + floor;
@@ -221,7 +221,8 @@
         }, 0);
         const [bx, by] = center(rooms[far]);
         g[sy][sx] = "H";
-        // главарь есть не у каждого данжа («Подземные ключи» пока без главаря)
+        // главарь есть у каждого данжа (у «Подземных ключей» — «Безумный
+        // маг» на каждом этаже, как у пещер и Рощи)
         if (caveOf(cave).boss) g[by][bx] = "B";
         // спуск ставится только если есть куда: на последнем этаже данжа
         // выхода вниз нет вовсе (просил юзер)
@@ -290,7 +291,7 @@
             lootCenters: map.lootCenters,
             objects: genObjects(floor, caveId, map.lootCenters),
         };
-        const bossId = caveOf(caveId).boss; // главарь данжа (boss / grwBoss)
+        const bossId = caveOf(caveId).boss; // главарь данжа (boss / grwBoss / wisBoss)
         const rows = st.rows;
         for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
             const ch = rows[j][i];

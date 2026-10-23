@@ -167,6 +167,24 @@
                 sfx("chpoc");
                 refreshHud();
             };
+            // «Безумный маг» (wisMad, firstMageDouble): ПЕРВАЯ за бой
+            // реально сработавшая способность Мага стороны разрешается
+            // дважды. fn возвращает false, если эффект не разрешился
+            // (нет цели/ловушки/клетки) — тогда флаг не тратится.
+            A.heroMageDouble = function heroMageDouble(u, fn) {
+                if (!B || !u || !B.units.includes(u)) return false;
+                const first = fn();
+                if (first === false) return false;
+                const hd = heroDefOf(u.side);
+                if (!hd || hd.ability !== "firstMageDouble"
+                    || B.heroFlags.mageDouble[u.side]) return true;
+                B.heroFlags.mageDouble[u.side] = true;
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 96, "×2", 0xffd98c);
+                sfx("up");
+                fn();
+                return true;
+            };
             // Итоговый урон заклинания по цели: у «Роя светлячков» (grw30) он
             // равен числу СВОИХ существ на поле (+ аура алтаря), у «Выстрела
             // стихией» (grw32) — числу карт Роста в руке, у прочих — spellDmg

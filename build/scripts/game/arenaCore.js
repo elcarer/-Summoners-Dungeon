@@ -22,10 +22,13 @@
     const HAND_MAX = 7;
     // «Извлечение духа» (grw17): снимаемые свойства КАРТЫ (способности, ауры,
     // особости построек); активные состояния считаются отдельно (см. countProps).
-    const PURGE_DEF_KEYS = ["ability", "aura", "altarSword", "campAura", "campfire",
-        "cloudSpire", "groveAura", "illusion", "leaderAura", "monolith", "mycelium",
+    const PURGE_DEF_KEYS = ["ability", "animalCost", "aura", "altarSword",
+        "campAura", "campfire", "cloudSpire", "crush", "energyToStats",
+        "frostAttack", "frostNeighbors", "groveAura", "illusion", "keeperScale",
+        "lakeMaid", "leaderAura", "monolith", "mycelium", "plantEcho",
         "riteStump", "sandDecay", "spellBuffAura", "sprout", "sisterDraw",
-        "starTower", "berserkSummon", "portalLeap"];
+        "starTower", "stormer", "berserkSummon", "portalLeap", "targetDiscount",
+        "thicket", "trapGrow", "trapOnMove", "waterMage", "wolfSummon"];
 
     NS.createContext = function createContext(ctx) {
         const { scenes, G, uiTex, scheduler } = ctx;

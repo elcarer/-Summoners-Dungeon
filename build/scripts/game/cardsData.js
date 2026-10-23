@@ -644,6 +644,23 @@
                   subtype: "elemental", // подтип — по спеке юзера (чат)
                   rarity: "epic", elem: "wisdom",
                   color: 0x3a6ea8, img: "wisdom/109" },
+        // «Весёлый штормовик»: в начале хода владельца разыгрывает случайное
+        // заклинание из случайной колоды (одной из двух — игрока или врага)
+        // без траты энергии. Каст идёт от хозяина выбранной колоды, поэтому
+        // «чужая» половина эффекта может ударить и по владельцу штормовика.
+        wis110: { type: "unit", cost: 6, atk: 6, hp: 6, speed: 1,
+                  creature: "goblin", stormer: true,
+                  subtype: "elemental", // подтип — по спеке юзера (чат)
+                  rarity: "epic", elem: "wisdom",
+                  color: 0x3a6ea8, img: "wisdom/110" },
+        // «Озёрная дева»: после призыва получает способность другого
+        // случайного существа по соседству (верт/гориз, любая сторона).
+        // Копируются именно способности/перки, а не статы/подтип/арт.
+        wis111: { type: "unit", cost: 4, atk: 2, hp: 6, speed: 1,
+                  creature: "goblin", lakeMaid: true,
+                  subtype: "mage", // подтип — по спеке юзера (чат)
+                  rarity: "epic", elem: "wisdom",
+                  color: 0x3a6ea8, img: "wisdom/111" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -810,6 +827,13 @@
         wisCity: { id: "wisCity", rarity: "rare", baseHp: 15,
                    elems: ["wisdom"], starter: "wisdom",
                    img: "22", ability: "firstBuildingDiscount", abilityVal: 2 },
+        // Главарь «Подземных ключей» (арт heroes/23.png): Эпическая,
+        // Мудрость, 18♥, первая сработавшая за бой способность вашего Мага
+        // срабатывает дважды (firstMageDouble). В бою босс получает ещё
+        // +2♥ за этаж — как главари других подземелий.
+        wisMad: { id: "wisMad", rarity: "epic", baseHp: 18,
+                  elems: ["wisdom"], starter: "wisdom",
+                  img: "23", ability: "firstMageDouble", abilityVal: 1 },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -819,7 +843,7 @@
         "grwBeasts", "grwGrove", "grwWild", "grwMagic", "grwCity",
         "grwControl", "grwBoss",
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
-        "wisCity"];
+        "wisCity", "wisMad"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

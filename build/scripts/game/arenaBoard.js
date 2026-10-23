@@ -466,8 +466,9 @@
                     else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
                     else if (def.ability === "spiritSummoner") summonSpiritCaller(u); // призыватель духов
                     else if (def.ability === "bombling") summonBombling(u); // бомблинг
-                    else if (def.waterMage) summonWaterMage(u); // водный маг: ловушка из колоды
-                    else if (def.illusion) summonIllusion(u); // иллюзия: X/X от соседа
+                    else if (def.waterMage) heroMageDouble(u, () => summonWaterMage(u)); // водный маг
+                    else if (def.illusion) heroMageDouble(u, () => summonIllusion(u)); // иллюзия
+                    else if (def.lakeMaid) heroMageDouble(u, () => summonLakeMaid(u)); // озёрная дева
                     if (def.berserkSummon) addBerserk(u, def.berserkSummon); // «Берсерк» — уже при призыве
                     // Способность героя (просил юзер): ПЕРВОЕ призванное игроком
                     // существо получает бонус — Горбаг +2 к урону, Эльмир +3 к

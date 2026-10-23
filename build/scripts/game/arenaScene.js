@@ -52,12 +52,14 @@
                     // первое срабатывание своей ловушки («Путь воды»); добор
                     // за первую способность элементаля («Сонм духов»);
                     // усиление первого «Заморожен» («Ледяная суета»);
-                    // скидка первой постройке («Город мудрости»)
+                    // скидка первой постройке («Город мудрости»); первая
+                    // способность Мага дважды («Безумный маг»)
                     heroFlags: { firstSpell: { p: false, e: false },
                         spellEnergy: { p: false, e: false },
                         trapEnergy: { p: false, e: false },
                         elementalDraw: { p: false, e: false },
                         frozenExtra: { p: false, e: false },
+                        mageDouble: { p: false, e: false },
                         deathReplay: { p: false, e: false },
                         strReplay: { p: false, e: false },
                         builtGuard: { p: false, e: false },

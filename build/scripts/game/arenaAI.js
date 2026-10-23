@@ -173,6 +173,8 @@
                 if (d.starTower) v += 1.2;
                 if (d.cloudSpire) v += 1.8;
                 if (d.waterMage) v += 0.6;
+                if (d.stormer) v += 0.8; // «Весёлый штормовик»: каст каждый ход
+                if (d.lakeMaid) v += 0.5; // «Озёрная дева»: чужая способность
                 if (u.venom) v += 0.4;
                 if (u.berserk) v += 0.3 * u.berserk;
                 return v;
@@ -197,6 +199,8 @@
                 if (d.starTower) s += 0.8;
                 if (d.cloudSpire) s += 1.4;
                 if (d.waterMage) s += 0.5;
+                if (d.stormer) s += 0.7;
+                if (d.lakeMaid) s += 0.3;
                 if (u.venom) s += 0.8;
                 if (u.enchantFire) s += 0.8;
                 if (u.berserk) s += 0.5 * u.berserk;
@@ -467,6 +471,17 @@
                     }
                     if (best > 0) score += 0.8 + best * 0.22;
                     else score -= 1.6;
+                }
+                // «Озёрная дева» (wis111) копирует способность соседа —
+                // ставим рядом с ценным СВОИМ существом
+                if (def.lakeMaid) {
+                    let best = 0;
+                    for (const v of B.units) {
+                        if (v.side !== "e" || v.def.type !== "unit") continue;
+                        if (Math.abs(v.col - col) + Math.abs(v.row - row) !== 1) continue;
+                        best = Math.max(best, aiVal(v));
+                    }
+                    if (best > 0) score += 0.5 + best * 0.14;
                 }
                 // бой в клетке: игрок ходит первым — наш новичок сначала получает
                 if (ahead && ahead.side === "p") {
@@ -1083,6 +1098,8 @@
                         return t && t.type === "trap" && t.cost <= 2;
                     }) ? 0.6 : 0);
                     if (d.illusion) s += 1.2; // X/X от соседа — ценность выше 0/0
+                    if (d.stormer) s += 0.9;
+                    if (d.lakeMaid) s += 0.7;
                     if (d.sandDecay) s -= 1.0; // 9/9 за 7⚡, но тает каждый ход
                     if (d.ability === "archer" || d.ability === "assassin") s += 0.3;
                     if (d.ability === "dash1") s += 0.2;

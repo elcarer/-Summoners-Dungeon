@@ -367,7 +367,7 @@
             // уходит из колоды в сброс. Руны/споры вешаются на существо — им
             // нужна не пустая клетка, поэтому в выбор не попадают.
             A.summonWaterMage = function summonWaterMage(u) {
-                if (!B.units.includes(u)) return; // мог умереть от мины при призыве
+                if (!B.units.includes(u)) return false; // мог умереть от мины при призыве
                 const deck = u.side === "p" ? B.deck : B.eDeck;
                 const discard = u.side === "p" ? B.discard : B.eDiscard;
                 const traps = u.side === "p" ? B.traps.p : B.traps.e;
@@ -376,12 +376,12 @@
                     .filter(([c2, r2]) => c2 >= 0 && c2 < GRID && r2 >= 0 && r2 < GRID
                         && !unitAt(c2, r2)
                         && !traps.some((tr) => tr.col === c2 && tr.row === r2));
-                if (!near.length) return;
+                if (!near.length) return false;
                 const picks = deck.map((id, i) => ({ id, i, def: CARDS[id] }))
                     .filter((x) => x.def && x.def.type === "trap" && x.def.cost <= 2
                         && x.def.trap.effect !== "castRandom"
                         && x.def.trap.effect !== "sporeCurse");
-                if (!picks.length) return;
+                if (!picks.length) return false;
                 const pick = picks[(Math.random() * picks.length) | 0];
                 const [col, row] = near[(Math.random() * near.length) | 0];
                 deck.splice(pick.i, 1);
@@ -389,6 +389,7 @@
                 armTrap(u.side, pick.id, col, row);
                 const p = cellXY(col, row);
                 floatText(p.x, p.y - 66, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
+                return true;
             };
 
             // «Иллюзия» (wis108): после призыва берёт урон и жизни СЛУЧАЙНОГО
@@ -396,10 +397,10 @@
             // запоминаются на момент призыва; u.illusionOf — связь с
             // источником: его смерть убивает Иллюзию (см. killUnit).
             A.summonIllusion = function summonIllusion(u) {
-                if (!B.units.includes(u)) return; // мог умереть от мины при призыве
+                if (!B.units.includes(u)) return false; // мог умереть от мины при призыве
                 const near = B.units.filter((v) => v !== u && v.def.type === "unit"
                     && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
-                if (!near.length) return; // некого копировать — остаётся 0/0
+                if (!near.length) return false; // некого копировать — остаётся 0/0
                 const src = near[(Math.random() * near.length) | 0];
                 u.illusionOf = src;
                 u.bonusAtk = (u.bonusAtk || 0) + src.curAtk;
@@ -412,6 +413,62 @@
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 75, `${u.curAtk}⚔/${u.hp}♥`, 0x8cd0ef);
                 sfx("up");
+                return true;
+            };
+
+            // Способности, которые «Озёрная дева» (wis111) может скопировать
+            // у соседнего существа. Статы/подтип/арт/лист не копируются —
+            // «способность», а не превращение в другое существо.
+            const COPY_UNIT_ABILITY_KEYS = [
+                "ability", "waterMage", "illusion", "lakeMaid", "stormer",
+                "trapGrow", "trapOnMove", "frostAttack", "frostNeighbors",
+                "crush", "thicket", "sandDecay", "leaderAura", "berserkSummon",
+                "keeperScale", "energyToStats", "animalCost", "targetDiscount",
+                "spellBuffAura", "sisterDraw", "plantEcho", "wolfSummon",
+            ];
+            // Копирование способностей в per-unit копию def (как purgeUnit):
+            // исходная карта каталога не меняется, cardIdOf узнаёт карту по
+            // __base, «Извлечение духа» снимает скопированное через
+            // PURGE_DEF_KEYS. Повторное копирование (двойная способность
+            // «Безумного мага») добавляет недостающие перки, не затирая
+            // первую активную ability.
+            A.copyUnitAbilities = function copyUnitAbilities(u, src) {
+                if (!u || !src || !src.def || !B.units.includes(u)
+                    || !B.units.includes(src)) return false;
+                const def = Object.assign({}, u.def);
+                let got = false;
+                for (const k of COPY_UNIT_ABILITY_KEYS) {
+                    const v = src.def[k];
+                    if (v === undefined || v === null || v === false || v === 0) continue;
+                    if (k === "ability" && def.ability) continue; // первая важнее
+                    def[k] = v;
+                    got = true;
+                }
+                if (!got) return false;
+                def.__base = u.def.__base || u.def;
+                u.def = def;
+                u.abilitySource = cardIdOf(src.def) || null;
+                recalcAuras();
+                return true;
+            };
+            // «Озёрная дева»: после призыва — способность случайного
+            // соседнего существа (любая сторона, верт/гориз). Нет соседей
+            // или у соседа нет перков — эффект не разрешается (флаг
+            // «Безумного мага» не тратится).
+            A.summonLakeMaid = function summonLakeMaid(u) {
+                if (!B.units.includes(u)) return false;
+                const near = B.units.filter((v) => v !== u && v.def.type === "unit"
+                    && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
+                if (!near.length) return false;
+                const src = near[(Math.random() * near.length) | 0];
+                const ok = copyUnitAbilities(u, src);
+                const p = cellXY(u.col, u.row);
+                if (ok) {
+                    floatText(p.x, p.y - 84,
+                        GAME_LOC.t(`card.${cardIdOf(src.def)}.name`), 0x8cd0ef);
+                    sfx("up");
+                }
+                return ok;
             };
 
             // «Гоблинская приманка»: существо врага, шагающее С КЛЕТКИ, соседней
@@ -1308,6 +1365,30 @@
                 sfx("chpoc");
             };
 
+            // «Весёлый штормовик» (wis110): в начале хода владельца играет
+            // случайное заклинание из СЛУЧАЙНОЙ колоды (игрока или врага)
+            // без траты энергии. Каст идёт от хозяина выбранной колоды —
+            // «вражеская» половина эффекта может ударить по самому штормовику.
+            // Колода без заклинаний не выбирается (эпик не должен молча
+            // простаивать, если заклинания есть хотя бы у одной стороны).
+            A.stormerTick = function stormerTick(u) {
+                if (!u || !B.units.includes(u)) return false;
+                const decks = ["p", "e"].filter((side) => {
+                    const deck = side === "p" ? B.deck : B.eDeck;
+                    return deck.some((id) => CARDS[id] && CARDS[id].type === "spell");
+                });
+                if (!decks.length) return false;
+                const side = decks[(Math.random() * decks.length) | 0];
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 84,
+                    GAME_LOC.t(`card.${cardIdOf(u.def)}.name`), 0xffd98c);
+                // focus — «атакующий» для рунного выбора цели: годится только
+                // существо ПРОТИВОПОЛОЖНОЙ кастующему стороны. Свою колоду
+                // штормовик играет с автоцелью (иначе ударил бы себя).
+                castRandomSpell(side, side !== u.side ? u : null);
+                return true;
+            };
+
             // «Грибница»: в начало хода владельца даёт 1 энергию и теряет 1 жизнь
             // (энергия начисляется даже если грибница от этого урона погибает).
             // «Походный костёр»: соседние с ним существа (обе стороны) получают
@@ -1363,6 +1444,13 @@
                         damageUnit(b, 1, null, "dam");
                     }
                     if (b.def.elementalCircle) elementalCircleTick(b);
+                }
+                // «Весёлый штормовик» (wis110): в начале хода владельца —
+                // случайное заклинание из случайной колоды, без энергии.
+                for (const u of B.units.slice()) {
+                    if (u.side !== side || !u.def.stormer
+                        || !B.units.includes(u)) continue;
+                    stormerTick(u);
                 }
                 // «Песчаный дух» (wis109): в начале хода владельца теряет
                 // 1 урон и 1 жизнь. Урон — постоянная убыль (atkPenalty),
@@ -1507,7 +1595,7 @@
                 const def = CARDS[pick.id];
                 const hand = side === "p" ? B.hand : B.eHand;
                 const discard = side === "p" ? B.discard : B.eDiscard;
-                const fp = cellXY(focus.col, focus.row);
+                const fp = focus ? cellXY(focus.col, focus.row) : { x: 960, y: 540 };
                 floatText(fp.x, fp.y - 90, GAME_LOC.t(`card.${pick.id}.name`), 0xffd98c);
                 // панельные заклинания (выбор из карт / призыв) авто-розыгрыша
                 // не имеют — уходят в руку владельца, разыграет сам за энергию
