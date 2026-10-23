@@ -833,8 +833,11 @@
             // его карта призыва возвращается в руку владельца из любой зоны.
             // У токена (gobA/gobC/волк друида) карты призыва нет — просто
             // убирается. Полная рука возврат не блокирует.
+            // «Защита от заклинаний» (u.spellWard): «Смыв» — заклинание, такое
+            // существо не выбирается целью и не убирается (страховка на случай
+            // любого вызывающего, помимо валидации в applySpellPInner/ИИ).
             A.bounceUnit = function bounceUnit(u) {
-                if (!B.units.includes(u)) return;
+                if (!u || !B.units.includes(u) || u.spellWard) return;
                 const p = cellXY(u.col, u.row);
                 const id = cardIdOf(u.def);
                 removeUnit(u);

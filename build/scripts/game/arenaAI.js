@@ -1049,9 +1049,10 @@
                 // «Глубокое путешествие»: в верхних картах колоды должен быть призыв
                 if (s.journey && !B.eDeck.slice(-Math.min(s.journey, B.eDeck.length))
                     .some((id) => CARDS[id] && CARDS[id].type === "unit")) return false;
-                // «Смыв» — есть существо игрока (желательно не токен)
+                // «Смыв» — есть существо игрока (желательно не токен);
+                // «Защита от заклинаний» целью заклинаний не выбирается
                 if (s.bounce && !B.units.some((v) => v.side === "p"
-                    && v.def.type === "unit")) return false;
+                    && v.def.type === "unit" && !v.spellWard)) return false;
                 // «Рой ледо-пикси» — 4⚡ за 5 тел 1/1: держим, пока на поле
                 // есть хотя бы 3 свободные клетки (иначе призыв почти пуст)
                 if (s.iceSwarm && GRID * GRID - B.units.length < 3) return false;
@@ -1284,10 +1285,11 @@
                         return;
                     }
                     // «Смыв» (wis85): существо игрока — в его руку; цель —
-                    // самая опасная не-токенная единица (токены — крайний случай)
+                    // самая опасная не-токенная единица (токены — крайний случай).
+                    // «Защита от заклинаний» (u.spellWard): не выбирается целью.
                     if (s.bounce) {
                         const foes = B.units.filter((v) => v.side === "p"
-                            && v.def.type === "unit");
+                            && v.def.type === "unit" && !v.spellWard);
                         const real = foes.filter((v) => !v.token);
                         const pool = real.length ? real : foes;
                         const best = pool.slice()
