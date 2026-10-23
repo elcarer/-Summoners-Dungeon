@@ -456,6 +456,18 @@
                     // бесплатный призыв на соседнюю клетку — оставляем место
                     score += 0.6 * Math.min(2, aiFreeNear(col, row));
                 }
+                // «Иллюзия» (wis108) копирует статы соседа — ставим рядом с
+                // сильным СВОИМ существом и избегаем пустых клеток
+                if (def.illusion) {
+                    let best = 0;
+                    for (const v of B.units) {
+                        if (v.side !== "e" || v.def.type !== "unit") continue;
+                        if (Math.abs(v.col - col) + Math.abs(v.row - row) !== 1) continue;
+                        best = Math.max(best, aiVal(v));
+                    }
+                    if (best > 0) score += 0.8 + best * 0.22;
+                    else score -= 1.6;
+                }
                 // бой в клетке: игрок ходит первым — наш новичок сначала получает
                 if (ahead && ahead.side === "p") {
                     const incoming = ahead.def.type === "unit" ? ahead.curAtk : 0;
@@ -1070,6 +1082,8 @@
                         const t = CARDS[id];
                         return t && t.type === "trap" && t.cost <= 2;
                     }) ? 0.6 : 0);
+                    if (d.illusion) s += 1.2; // X/X от соседа — ценность выше 0/0
+                    if (d.sandDecay) s -= 1.0; // 9/9 за 7⚡, но тает каждый ход
                     if (d.ability === "archer" || d.ability === "assassin") s += 0.3;
                     if (d.ability === "dash1") s += 0.2;
                     return s;

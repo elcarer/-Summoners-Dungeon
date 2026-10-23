@@ -444,7 +444,7 @@
                  subtype: "elf", // подтип — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x3f6d3a, img: "growth/80" },
-        // ── Стихия «Мудрость» (синие) — третья стихия, лица wisdom/81–107 ────
+        // ── Стихия «Мудрость» (синие) — третья стихия, лица wisdom/81–109 ────
         // (нумерация артов юзера — сквозная с 81). Герой этой стихии — Мира
         // (первое призванное существо получает «Защиту от заклинаний»);
         // подземелье стихии — «Подземные ключи», карты также живут в стартере
@@ -629,6 +629,21 @@
                   subtype: "mage", // подтип — по спеке юзера (чат)
                   rarity: "rare", elem: "wisdom",
                   color: 0x3a6ea8, img: "wisdom/107" },
+        // «Иллюзия»: при призыве получает урон и жизни случайного существа
+        // по соседству (верт/гориз); если то существо умирает — Иллюзия
+        // погибает вместе с ним. База 0/0 — на карте урон/жизни «*».
+        wis108: { type: "unit", cost: 3, atk: 0, hp: 0, speed: 1,
+                  creature: "goblin", illusion: true,
+                  subtype: "mage", // подтип — по спеке юзера (чат)
+                  rarity: "rare", elem: "wisdom",
+                  color: 0x3a6ea8, img: "wisdom/108" },
+        // «Песчаный дух»: 9/9 за 7⚡, в начале каждого СВОЕГО хода теряет
+        // 1 урон и 1 жизнь (урон не ниже нуля; на 1♥ погибает от износа).
+        wis109: { type: "unit", cost: 7, atk: 9, hp: 9, speed: 1,
+                  creature: "goblin", sandDecay: true,
+                  subtype: "elemental", // подтип — по спеке юзера (чат)
+                  rarity: "epic", elem: "wisdom",
+                  color: 0x3a6ea8, img: "wisdom/109" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -698,7 +713,8 @@
     // гоблин призвал гоблина из колоды → +1⚔ призванному; goblinDeathReplay
     // — первый погибший гоблин (не токен) возвращается картой в руку и
     // сразу разыгрывается на место; firstSpellEnergy — первое заклинание
-    // боя даёт владельцу +1⚡ (герои «Подземных ключей» и игрок).
+    // боя даёт владельцу +1⚡; firstBuildingDiscount — первая постройка
+    // боя стоит на abilityVal дешевле (герои «Подземных ключей» и игрок).
     const HEROES = {
         gorbag: {
             id: "gorbag", rarity: "common",
@@ -773,6 +789,8 @@
         // «Заморожен» в бою применяет эффект ещё 2 раза (firstFrozenExtra).
         // 5-й этаж (арт heroes/21.png): Мудрость, 14♥, ваши заклинания
         // Мудрости ценой 4 стоят на 1 энергию меньше (wis4SpellDiscount).
+        // 6-й этаж (арт heroes/22.png): Мудрость, 15♥, первая ваша
+        // сыгранная постройка стоит на 2 энергии дешевле (firstBuildingDiscount).
         // Способности работают у обеих сторон.
         wisBreeze: { id: "wisBreeze", rarity: "common", baseHp: 10,
                      elems: ["wisdom"], starter: "wisdom",
@@ -789,6 +807,9 @@
         wisMaster: { id: "wisMaster", rarity: "rare", baseHp: 14,
                      elems: ["wisdom"], starter: "wisdom",
                      img: "21", ability: "wis4SpellDiscount", abilityVal: 1 },
+        wisCity: { id: "wisCity", rarity: "rare", baseHp: 15,
+                   elems: ["wisdom"], starter: "wisdom",
+                   img: "22", ability: "firstBuildingDiscount", abilityVal: 2 },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -797,7 +818,8 @@
         "gobMaster", "boss",
         "grwBeasts", "grwGrove", "grwWild", "grwMagic", "grwCity",
         "grwControl", "grwBoss",
-        "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster"];
+        "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
+        "wisCity"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

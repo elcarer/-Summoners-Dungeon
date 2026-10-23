@@ -391,6 +391,29 @@
                 floatText(p.x, p.y - 66, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
             };
 
+            // «Иллюзия» (wis108): после призыва берёт урон и жизни СЛУЧАЙНОГО
+            // существа по соседству (верт/гориз, любая сторона). Статы
+            // запоминаются на момент призыва; u.illusionOf — связь с
+            // источником: его смерть убивает Иллюзию (см. killUnit).
+            A.summonIllusion = function summonIllusion(u) {
+                if (!B.units.includes(u)) return; // мог умереть от мины при призыве
+                const near = B.units.filter((v) => v !== u && v.def.type === "unit"
+                    && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
+                if (!near.length) return; // некого копировать — остаётся 0/0
+                const src = near[(Math.random() * near.length) | 0];
+                u.illusionOf = src;
+                u.bonusAtk = (u.bonusAtk || 0) + src.curAtk;
+                u.hp += src.hp; // база 0/0 — итог = статы источника (+ бонусы призыва)
+                recalcAuras();
+                const an = u.node.getChildByName("atk");
+                if (an) an.text = String(u.curAtk);
+                const hn = u.node.getChildByName("hp");
+                if (hn) hn.text = String(u.hp);
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 75, `${u.curAtk}⚔/${u.hp}♥`, 0x8cd0ef);
+                sfx("up");
+            };
+
             // «Гоблинская приманка»: существо врага, шагающее С КЛЕТКИ, соседней
             // с ловушкой, сходит на клетку приманки вместо намеченной — и получает
             // 1 урона. Приманка одноразовая; занятая клетка приманки не манит.
@@ -760,6 +783,12 @@
                 }
                 removeUnit(u);
                 sfx("die");
+                // «Иллюзия» (wis108): погибает вместе с существом, чьи статы
+                // скопировала. Штатный killUnit — каскады смерти работают.
+                for (const v of B.units.slice()) {
+                    if (v.illusionOf === u && v.def.illusion && B.units.includes(v))
+                        killUnit(v, null);
+                }
                 if (u.def.type === "building") recalcAuras();
                 // «Рунный монолит»: на смерть существа постройка теряет 1 жизнь,
                 // а владелец берёт карту (просил юзер). Добор до урона — как у
@@ -1096,6 +1125,9 @@
                 if (u.entangle) { u.entangle = 0; n++; }
                 if (u.frozen) { u.frozen = 0; n++; }
                 if (u.spellWard) { u.spellWard = false; n++; removeWardMark(u); }
+                // «Иллюзия» (wis108): без способности связь с источником
+                // больше не действует — смерть источника её не убивает
+                if (u.illusionOf) u.illusionOf = null;
                 for (const m of ["sporeMark", "enchMark", "protectMark", "berserkMark", "confuseMark",
                     "venomMark", "poisonMark", "entangleMark", "frozenMark"]) {
                     const node = u.node.getChildByName(m);
@@ -1331,6 +1363,29 @@
                         damageUnit(b, 1, null, "dam");
                     }
                     if (b.def.elementalCircle) elementalCircleTick(b);
+                }
+                // «Песчаный дух» (wis109): в начале хода владельца теряет
+                // 1 урон и 1 жизнь. Урон — постоянная убыль (atkPenalty),
+                // жизнь снимается напрямую (не «входящий урон»: защита и
+                // прочие реакции на удар не срабатывают). На 0♥ погибает.
+                for (const u of B.units.slice()) {
+                    if (u.side !== side || !u.def.sandDecay || !B.units.includes(u)) continue;
+                    u.atkPenalty = (u.atkPenalty || 0) - 1;
+                    u.hp -= 1;
+                    recalcAuras();
+                    const an = u.node.getChildByName("atk");
+                    if (an) an.text = String(u.curAtk);
+                    const hn = u.node.getChildByName("hp");
+                    if (hn) hn.text = String(Math.max(0, u.hp));
+                    const p = cellXY(u.col, u.row);
+                    floatText(p.x, p.y - 60, "−1⚔ −1♥", 0xef9f8c);
+                    punch(u.node);
+                    sfx("dam");
+                    // убыль — способность Элементаля: «Сонм духов» (wisSpirits)
+                    // за первое её срабатывание в бою даёт владельцу карту
+                    // (даже если Дух погибает от этой же убыли)
+                    heroElementalDraw(u);
+                    if (u.hp <= 0) killUnit(u, null);
                 }
                 refreshHud();
             };

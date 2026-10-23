@@ -305,8 +305,10 @@
                         hp += (u.def.aura && u.def.aura.hp) || 0;
                     }
                     for (const u of B.units) if (u.side === side && u.def.type === "unit") {
-                        // «Шипастые лозы» уводят бонус в минус — урон не ниже нуля
-                        const newAtk = Math.max(0, u.def.atk + (u.bonusAtk || 0) + atk);
+                        // «Шипастые лозы» уводят бонус в минус — урон не ниже нуля;
+                        // atkPenalty — постоянная убыль «Песчаного духа» (wis109)
+                        const newAtk = Math.max(0, u.def.atk + (u.bonusAtk || 0)
+                            + (u.atkPenalty || 0) + atk);
                         if (u.curAtk !== newAtk) {
                             u.curAtk = newAtk;
                             const n = u.node.getChildByName("atk");
@@ -465,6 +467,7 @@
                     else if (def.ability === "spiritSummoner") summonSpiritCaller(u); // призыватель духов
                     else if (def.ability === "bombling") summonBombling(u); // бомблинг
                     else if (def.waterMage) summonWaterMage(u); // водный маг: ловушка из колоды
+                    else if (def.illusion) summonIllusion(u); // иллюзия: X/X от соседа
                     if (def.berserkSummon) addBerserk(u, def.berserkSummon); // «Берсерк» — уже при призыве
                     // Способность героя (просил юзер): ПЕРВОЕ призванное игроком
                     // существо получает бонус — Горбаг +2 к урону, Эльмир +3 к
@@ -532,9 +535,13 @@
                     }
                 }
                 // «Лесной город» (firstBuildingGuard, просил юзер): первое
-                // сыгранное стороной строение боя получает «Защита 1»
+                // сыгранное стороной строение боя получает «Защита 1».
+                // «Город мудрости» (firstBuildingDiscount): здесь же тратится
+                // флаг скидки — постройка уже на поле (энергия списана).
                 if (def.type === "building" && !u.token) {
                     const hd = heroDefOf(side);
+                    if (hd && hd.ability === "firstBuildingDiscount")
+                        B.heroFlags.firstBuilding[side] = true;
                     if (hd && hd.ability === "firstBuildingGuard"
                         && !B.heroFlags.builtGuard[side]) {
                         B.heroFlags.builtGuard[side] = true;

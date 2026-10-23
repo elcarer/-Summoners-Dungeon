@@ -51,7 +51,8 @@
                     // первой погибшей постройки («Хранитель рощи»); +1⚡ за
                     // первое срабатывание своей ловушки («Путь воды»); добор
                     // за первую способность элементаля («Сонм духов»);
-                    // усиление первого «Заморожен» («Ледяная суета»)
+                    // усиление первого «Заморожен» («Ледяная суета»);
+                    // скидка первой постройке («Город мудрости»)
                     heroFlags: { firstSpell: { p: false, e: false },
                         spellEnergy: { p: false, e: false },
                         trapEnergy: { p: false, e: false },
@@ -60,6 +61,7 @@
                         deathReplay: { p: false, e: false },
                         strReplay: { p: false, e: false },
                         builtGuard: { p: false, e: false },
+                        firstBuilding: { p: false, e: false },
                         trapEcho: { p: false, e: false },
                         buildReplay: { p: false, e: false } },
                     enemyBase: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,

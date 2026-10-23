@@ -17,6 +17,15 @@
                     const hd = heroDefOf(side);
                     if (hd && hd.ability === "wis4SpellDiscount") d += hd.abilityVal || 1;
                 }
+                // «Город мудрости» (wisCity): ПЕРВАЯ сыгранная постройка
+                // стороны стоит на 2 энергии дешевле. Флаг за бой тратится в
+                // addUnit (после реальной постановки), поэтому скидка видна
+                // и в тинте руки, и в расчётах ИИ.
+                if (def.type === "building" && B) {
+                    const hd = heroDefOf(side);
+                    if (hd && hd.ability === "firstBuildingDiscount"
+                        && !B.heroFlags.firstBuilding[side]) d += hd.abilityVal || 2;
+                }
                 // «Озверевший шатун» (grw36): −1 за каждое СВОЁ Животное на поле
                 if (def.animalCost && B)
                     d += B.units.filter((v) => v.side === side
