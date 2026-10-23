@@ -50,11 +50,13 @@
                     // эффект первой сработавшей ловушки («Роща лоз»); возврат
                     // первой погибшей постройки («Хранитель рощи»); +1⚡ за
                     // первое срабатывание своей ловушки («Путь воды»); добор
-                    // за первую способность элементаля («Сонм духов»)
+                    // за первую способность элементаля («Сонм духов»);
+                    // усиление первого «Заморожен» («Ледяная суета»)
                     heroFlags: { firstSpell: { p: false, e: false },
                         spellEnergy: { p: false, e: false },
                         trapEnergy: { p: false, e: false },
                         elementalDraw: { p: false, e: false },
+                        frozenExtra: { p: false, e: false },
                         deathReplay: { p: false, e: false },
                         strReplay: { p: false, e: false },
                         builtGuard: { p: false, e: false },

@@ -295,6 +295,7 @@
                     if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk
                         || s.enchantFire || s.cocoon || s.venom) return 4;
                     if (s.baseHit || s.wolfVolley) return 4.5; // бьёт СВОИМ существом
+                    if (s.iceSwarm) return 3; // тела — как обычный призыв
                     return 6; // поиск рун / гадание / поиск знаний / глубокое путешествие
                 }
                 // «Три монолита» — без спешки (просил юзер: не в приоритете):
@@ -1003,6 +1004,9 @@
                 // «Смыв» — есть существо игрока (желательно не токен)
                 if (s.bounce && !B.units.some((v) => v.side === "p"
                     && v.def.type === "unit")) return false;
+                // «Рой ледо-пикси» — 4⚡ за 5 тел 1/1: держим, пока на поле
+                // есть хотя бы 3 свободные клетки (иначе призыв почти пуст)
+                if (s.iceSwarm && GRID * GRID - B.units.length < 3) return false;
                 // «Слабость» — есть чей-то урон, который стоит снять
                 if (s.debuffAtk && !B.units.some((v) => v.side === "p"
                     && v.def.type === "unit" && !v.spellWard && v.curAtk > 0)) return false;
@@ -1086,6 +1090,7 @@
                     if (s.freeze) v += 1.0;
                     if (s.iceStrike) v += 2.0;
                     if (s.hydroPunch) v += 1.2; // урон 1 + полезный сдвиг назад
+                    if (s.iceSwarm) v += Math.min(5, s.iceSwarm) * 0.55; // 5 тел 1/1
                     if (s.discardHandDraw) v += 1.0
                         + 0.35 * Math.min(6, B.hand.length)
                         - 0.3 * Math.min(6, B.eHand.length);
@@ -1157,6 +1162,7 @@
                 return !!(s.aoeDmg || s.baseDmg || s.firewall || s.sacrifice
                     || s.drainAll || s.fireflies || s.growthHand
                     || s.wolfVolley || s.nova || s.baseHit || s.iceStrike
+                    || s.iceSwarm
                     || (s.dmg || 0) + altarBonus("e") >= 2);
             };
             // Есть ли смысл повторять последнее заклинание («Горящие руны»):
@@ -1265,7 +1271,7 @@
                         if (!victim) return;
                         aimOff(target); // скидка «Заклятого древоброда»
                         iceStrikeAttack(target, victim);
-                        if (B.units.includes(victim)) addFrozen(victim, s.freeze || 1);
+                        if (B.units.includes(victim)) addFrozen(victim, s.freeze || 1, "e");
                         punch(target.node);
                         sfx("aqua");
                         return;
@@ -1361,7 +1367,7 @@
                         const dmg = aiDmgFor(def, best, free, true);
                         damageUnit(best, dmg, null, "rocket");
                         // «Ядро кометы»: выжившее существо — «Заморожен N»
-                        if (s.freeze && B.units.includes(best)) addFrozen(best, s.freeze);
+                        if (s.freeze && B.units.includes(best)) addFrozen(best, s.freeze, "e");
                     }
                 }
                 if (s.target === "anyCell") { // стена костров — ряд, где огонь окупается
@@ -1437,6 +1443,10 @@
                     }
                     recalcAuras();
                     sfx("acid");
+                }
+                if (s.iceSwarm) { // «Рой ледо-пикси»: Элементали 1/1 на случайные пустые клетки
+                    iceSwarmSpawn("e", s.iceSwarm);
+                    sfx("use");
                 }
                 if (s.aoeDmg) { // «Раскалённые обломки»: всем существам и постройкам игрока
                     const dmg = s.aoeDmg + altarBonus("e");

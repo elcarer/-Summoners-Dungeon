@@ -597,6 +597,13 @@
         wis102: { type: "building", cost: 4, atk: 0, hp: 4, elementalCircle: true,
                   rarity: "epic", elem: "wisdom",
                   color: 0x2e4a72, img: "wisdom/102" },
+        // «Рой ледо-пикси»: на 5 случайных пустых клетках поля появляются
+        // Элементали 1/1 с «Полётом» (служебная карта icePixie)
+        wis103: { type: "spell", cost: 4,
+                  spell: { target: "none", iceSwarm: 5 },
+                  kind: "summon", // тип эффекта — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "wisdom",
+                  color: 0x4a7ac0, img: "wisdom/103" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -616,6 +623,13 @@
                 subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                 creature: "goblin", rarity: "common", elem: "strength",
                 color: 0x9c4a3a },
+        // Ледо-пикси из «Роя ледо-пикси» (wis103) — служебная карта без
+        // лица: Элементаль 1/1 с «Полётом», спавнится только заклинанием.
+        icePixie: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
+                    creature: "goblin", ability: "flyOver",
+                    subtype: "elemental", // подтип — по спеке юзера (cards.txt)
+                    rarity: "common", elem: "wisdom",
+                    color: 0x3a6ea8 },
     };
     const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
 
@@ -659,7 +673,7 @@
     // гоблин призвал гоблина из колоды → +1⚔ призванному; goblinDeathReplay
     // — первый погибший гоблин (не токен) возвращается картой в руку и
     // сразу разыгрывается на место; firstSpellEnergy — первое заклинание
-    // боя даёт владельцу +1⚡ (оба героя «Подземных ключей» и игрок).
+    // боя даёт владельцу +1⚡ (герои «Подземных ключей» и игрок).
     const HEROES = {
         gorbag: {
             id: "gorbag", rarity: "common",
@@ -730,6 +744,10 @@
         // 3-й этаж (арт heroes/19.png): Мудрость, 12♥, первое срабатывание
         // способности своего элементаля в бою — добор карты
         // (firstElementalDraw).
+        // 4-й этаж (арт heroes/20.png): Мудрость, 13♥, первое накладывание
+        // «Заморожен» в бою применяет эффект ещё 2 раза (firstFrozenExtra).
+        // 5-й этаж (арт heroes/21.png): Мудрость, 14♥, ваши заклинания
+        // Мудрости ценой 4 стоят на 1 энергию меньше (wis4SpellDiscount).
         // Способности работают у обеих сторон.
         wisBreeze: { id: "wisBreeze", rarity: "common", baseHp: 10,
                      elems: ["wisdom"], starter: "wisdom",
@@ -740,6 +758,12 @@
         wisSpirits: { id: "wisSpirits", rarity: "common", baseHp: 12,
                       elems: ["wisdom"], starter: "wisdom",
                       img: "19", ability: "firstElementalDraw", abilityVal: 1 },
+        wisFlurry: { id: "wisFlurry", rarity: "common", baseHp: 13,
+                     elems: ["wisdom"], starter: "wisdom",
+                     img: "20", ability: "firstFrozenExtra", abilityVal: 2 },
+        wisMaster: { id: "wisMaster", rarity: "rare", baseHp: 14,
+                     elems: ["wisdom"], starter: "wisdom",
+                     img: "21", ability: "wis4SpellDiscount", abilityVal: 1 },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -748,7 +772,7 @@
         "gobMaster", "boss",
         "grwBeasts", "grwGrove", "grwWild", "grwMagic", "grwCity",
         "grwControl", "grwBoss",
-        "wisBreeze", "wisWater", "wisSpirits"];
+        "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

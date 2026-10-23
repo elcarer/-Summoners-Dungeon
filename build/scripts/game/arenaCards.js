@@ -11,6 +11,12 @@
                 const def = CARDS[cardId];
                 if (!def) return 0;
                 let d = isGoblin(def) && B ? goblinDiscount(side) : 0;
+                // «Мастер холода» (wisMaster): заклинания стихии «Мудрость»
+                // ценой 4 стоят на 1 энергию меньше (способность обеих сторон)
+                if (def.type === "spell" && def.elem === "wisdom" && def.cost === 4) {
+                    const hd = heroDefOf(side);
+                    if (hd && hd.ability === "wis4SpellDiscount") d += hd.abilityVal || 1;
+                }
                 // «Озверевший шатун» (grw36): −1 за каждое СВОЁ Животное на поле
                 if (def.animalCost && B)
                     d += B.units.filter((v) => v.side === side

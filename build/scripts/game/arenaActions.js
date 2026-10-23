@@ -215,6 +215,24 @@
                 return n;
             };
 
+            // «Рой ледо-пикси» (wis103): на N СЛУЧАЙНЫХ ПУСТЫХ клетках поля
+            // (не только своей зоны призыва) появляются Элементали 1/1
+            // с «Полётом» (служебная карта icePixie). Клетки выбираются без
+            // повторов; если пустых меньше N — призываются сколько влезло.
+            // Возвращает число призванных.
+            A.iceSwarmSpawn = function iceSwarmSpawn(side, count) {
+                const empty = [];
+                for (let row = 0; row < GRID; row++)
+                    for (let col = 0; col < GRID; col++)
+                        if (!unitAt(col, row)) empty.push([col, row]);
+                const n = Math.min(Math.max(0, count | 0), empty.length);
+                for (let i = 0; i < n; i++) {
+                    const [col, row] = empty.splice((Math.random() * empty.length) | 0, 1)[0];
+                    addUnit(side, "icePixie", col, row, { token: true });
+                }
+                return n;
+            };
+
             // Эффекты заклинаний игрока, валидация цели внутри (false — цель не
             // годится, тогда и оплаты/сброса/панелей не будет). Отделено от
             // оплаты карты, чтобы «Горящие руны» могли повторить эффект
@@ -240,7 +258,7 @@
                         const victim = iceStrikeVictim(u);
                         if (!victim) return false; // соседей-существ нет — не кастуем
                         iceStrikeAttack(u, victim);
-                        if (B.units.includes(victim)) addFrozen(victim, def.spell.freeze || 1);
+                        if (B.units.includes(victim)) addFrozen(victim, def.spell.freeze || 1, "p");
                         punch(u.node);
                         sfx("aqua");
                         return true;
@@ -337,7 +355,7 @@
                         damageUnit(u, spellDmg(def, "p", u.def.type === "unit", true), null, "rocket");
                     }
                     // «Ядро кометы»: выжившее существо получает «Заморожен N»
-                    if (def.spell.freeze && B.units.includes(u)) addFrozen(u, def.spell.freeze);
+                    if (def.spell.freeze && B.units.includes(u)) addFrozen(u, def.spell.freeze, "p");
                 }
                 if (def.spell.target === "emptyCell") { // культ кочерыжки: ряд в гоблинах
                     if (!target || target.col === undefined) return false;
@@ -431,6 +449,10 @@
                     }
                     recalcAuras();
                     sfx("acid");
+                }
+                if (def.spell.iceSwarm) { // «Рой ледо-пикси»: Элементали 1/1 на случайные пустые клетки
+                    const n = iceSwarmSpawn("p", def.spell.iceSwarm);
+                    if (n) sfx("use");
                 }
                 if (def.spell.aoeDmg) { // «Раскалённые обломки»: всем вражеским существам и постройкам
                     const dmg = def.spell.aoeDmg + altarBonus("p");

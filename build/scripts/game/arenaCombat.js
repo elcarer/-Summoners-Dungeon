@@ -86,13 +86,14 @@
             // СЛЕВА И СПРАВА от САМОГО ЛЕДОВИКА (только клетки его ряда).
             // Позиция цели роли не играет. Замораживаются любые существа —
             // в тексте карты нет «ваших» или «противника»; постройки не
-            // морозятся (addFrozen их пропускает).
+            // морозятся (addFrozen их пропускает). Сторона атакующего —
+            // владелец эффекта для способности героя «Ледяная суета».
             A.frostNeighbors = function frostNeighbors(attacker) {
                 if (!attacker || !attacker.def || !attacker.def.frostNeighbors
                     || !B.units.includes(attacker)) return;
                 for (const dc of [-1, 1]) {
                     const v = unitAt(attacker.col + dc, attacker.row);
-                    if (v && v !== attacker) addFrozen(v, 1);
+                    if (v && v !== attacker) addFrozen(v, 1, attacker.side);
                 }
                 heroElementalDraw(attacker); // «Сонм духов»: способность элементаля
             };
@@ -132,9 +133,25 @@
             // «Заморожен N» (wis91/wis92): существо пропускает перемещение
             // И атаку в свой следующий ход, затем счётчик тает на 1; на нуле
             // эффект снимается. Счётчик складывается, метка — над головой.
-            A.addFrozen = function addFrozen(u, n = 1) {
+            // side — сторона, НАКЛАДЫВАЮЩАЯ эффект (нужна способности героя
+            // «Ледяная суета», firstFrozenExtra): при первом накладывании
+            // в бою она добавляет abilityVal (2) к счётчику. Без side
+            // (тест-хуки, старые вызовы) способность не срабатывает.
+            A.addFrozen = function addFrozen(u, n = 1, side = null) {
                 if (!u || !B.units.includes(u) || u.def.type !== "unit") return;
-                u.frozen = (u.frozen || 0) + Math.max(1, n | 0);
+                let stacks = Math.max(1, n | 0);
+                if (side && !B.heroFlags.frozenExtra[side]) {
+                    const hd = heroDefOf(side);
+                    if (hd && hd.ability === "firstFrozenExtra") {
+                        B.heroFlags.frozenExtra[side] = true;
+                        const extra = hd.abilityVal || 2;
+                        stacks += extra;
+                        floatText(960, side === "p" ? 640 : 300,
+                            `❄ +${extra}`, 0x8cd0ef);
+                        sfx("aqua");
+                    }
+                }
+                u.frozen = (u.frozen || 0) + stacks;
                 let mark = u.node.getChildByName("frozenMark");
                 if (!mark) {
                     mark = new PIXI.Container();
@@ -457,13 +474,15 @@
 
             // «Ледяные кандалы» (wis97): активировавшее существо и все
             // существа по соседству (верт/гориз) получают «Заморожен 1»;
-            // постройки addFrozen пропускает сам.
-            A.freezeSplash = function freezeSplash(u) {
+            // постройки addFrozen пропускает сам. side — хозяин ловушки:
+            // его способность героя «Ледяная суета» может усилить ПЕРВОЕ
+            // накладывание (жертва идёт первой в списке).
+            A.freezeSplash = function freezeSplash(u, side = null) {
                 if (!u || !B.units.includes(u)) return;
                 const victims = [u, ...B.units.filter((v) => v !== u
                     && v.def.type === "unit"
                     && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1)];
-                for (const v of victims) if (B.units.includes(v)) addFrozen(v, 1);
+                for (const v of victims) if (B.units.includes(v)) addFrozen(v, 1, side);
             };
 
             // «Снежный ком» (wis98): каждое существо в ВЕРТИКАЛЬНОМ ряду
@@ -528,7 +547,7 @@
             A.applyCellTrap = function applyCellTrap(trap, side, u) {
                 if (trap.def.trap.effect === "freezeSplash") {
                     // «Ледяные кандалы»: существо и соседи (верт/гориз)
-                    freezeSplash(u);
+                    freezeSplash(u, side);
                     refreshHud();
                     checkEnd();
                     return;
