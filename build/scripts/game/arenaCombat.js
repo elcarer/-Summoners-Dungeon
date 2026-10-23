@@ -805,11 +805,34 @@
                 punches.push({ node: u.node, life: 0.25 / animK(), total: 0.25 / animK(), dying: true });
             };
 
+            // Карта призыва — в руку владельца. Ищем во всех зонах: сброс мог
+            // быть уже перемешан в колоду при доборе, а карта — лежать в руке
+            // (возврат героем/панелью). Лимит 7 здесь НЕ действует: он только
+            // для панели сброса в конце хода. Если карты нет нигде (призыв
+            // напрямую из колоды/сброса, сожжение) — возвращаем новую копию,
+            // иначе карта пропала бы навсегда (просил юзер).
+            A.returnCardToHand = function returnCardToHand(side, id) {
+                if (!id) return false;
+                const hand = side === "p" ? B.hand : B.eHand;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const deck = side === "p" ? B.deck : B.eDeck;
+                let from = discard, i = discard.indexOf(id);
+                if (i < 0) { from = deck; i = deck.indexOf(id); }
+                if (i >= 0) {
+                    from.splice(i, 1);
+                    hand.push(id);
+                    return true;
+                }
+                if (hand.includes(id)) return false; // уже в руке — второй копии не надо
+                hand.push(id); // карты не было ни в одной зоне — возвращаем копию
+                return true;
+            };
+
             // «Смыв» (wis85): существо убирается с поля боя БЕЗ каскадов смерти
             // (зеркально «Раскопкам» — хищник не кормится, ауры пересчитываются),
-            // его карта призыва возвращается в руку владельца из сброса. У
-            // токена (gobA/gobC/волк друида) карты призыва нет — просто убирается.
-            // Рука не резиновая: не влезло (HAND_MAX) — карта остаётся в сбросе.
+            // его карта призыва возвращается в руку владельца из любой зоны.
+            // У токена (gobA/gobC/волк друида) карты призыва нет — просто
+            // убирается. Полная рука возврат не блокирует.
             A.bounceUnit = function bounceUnit(u) {
                 if (!B.units.includes(u)) return;
                 const p = cellXY(u.col, u.row);
@@ -817,17 +840,8 @@
                 removeUnit(u);
                 recalcAuras();
                 if (u.token) return;
-                const discard = u.side === "p" ? B.discard : B.eDiscard;
-                const hand = u.side === "p" ? B.hand : B.eHand;
-                const i = discard.indexOf(id);
-                if (i < 0) return; // карты призыва нет (повтор/сожжение) — просто убрали
-                discard.splice(i, 1);
-                if (hand.length < HAND_MAX) {
-                    hand.push(id);
+                if (returnCardToHand(u.side, id))
                     floatText(p.x, p.y - 66, "↩ " + GAME_LOC.t(`card.${id}.name`), 0x8cd0ef);
-                } else {
-                    discard.push(id); // рука полна — карта возвращается в сброс
-                }
             };
 
             A.killUnit = function killUnit(u, killer) {
