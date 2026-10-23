@@ -537,11 +537,17 @@
                     score += adjOwn.length * 1.1;
                     score += adjFree.length * 0.25;
                 }
+                if (def.elementalCircle) {
+                    // «Круг стихий»: нужна хотя бы одна свободная клетка рядом
+                    score += adjFree.length * 1.6;
+                    score += adjOwn.length * 0.2;
+                }
                 if (row === frontRow && rows.length > 1) score -= 0.7;
                 score -= adjFoe.length * 1.0;
                 // не замуровать ауру: без свободной соседней клетки призыв рядом
                 // больше не случится
-                if ((def.campAura || def.groveAura || def.monolith) && !adjFree.length)
+                if ((def.campAura || def.groveAura || def.monolith
+                    || def.elementalCircle) && !adjFree.length)
                     score -= 3;
                 return score;
             };
@@ -550,7 +556,7 @@
                 const free = freeCells(rows);
                 if (!free.length) return null;
                 if (def.campAura || def.campfire || def.sprout || def.groveAura
-                    || def.monolith) {
+                    || def.monolith || def.elementalCircle) {
                     let best = [], bestScore = -Infinity;
                     for (const [c, r] of free) {
                         const score = aiBuildingSpotScore(def, c, r, free);
@@ -944,6 +950,9 @@
                 // стоящего у базы врага (ряд 3+ — следующий марш в базу)
                 if (s.berserk && !B.units.some((v) => v.side === "e" && v.def.type === "unit"
                     && ((v.curAtk >= 3 && v.hp >= 3) || (v.row >= 3 && v.curAtk >= 2)))) return false;
+                // «Запутать руны» — сброс обеих рук: играем, только если у
+                // игрока карт больше, чем останется у нас после розыгрыша
+                if (s.discardHandDraw && B.hand.length <= B.eHand.length - 1) return false;
                 // добор-заклинание — тоже трата энергии; гасим только при полной руке
                 if (s.draw && B.eHand.length >= HAND_MAX) return false;
                 // огнешар при энергии 1..2 почти пуст (урон 0..1) — копим дальше
@@ -1041,7 +1050,8 @@
                         + (d.campAura ? 1.5 : 0) + (d.groveAura ? 1.4 : 0)
                         + (d.monolith ? 1.6 : 0) + (d.spellAura ? 1.2 : 0)
                         + (d.treeHomes ? 1.2 : 0) + (d.mycelium ? 0.8 : 0)
-                        + (d.sprout ? 0.8 : 0) + (d.campfire ? 0.8 : 0);
+                        + (d.sprout ? 0.8 : 0) + (d.campfire ? 0.8 : 0)
+                        + (d.elementalCircle ? 1.6 : 0);
                 }
                 if (d.type === "spell") {
                     const s = d.spell || {};
@@ -1076,6 +1086,9 @@
                     if (s.freeze) v += 1.0;
                     if (s.iceStrike) v += 2.0;
                     if (s.hydroPunch) v += 1.2; // урон 1 + полезный сдвиг назад
+                    if (s.discardHandDraw) v += 1.0
+                        + 0.35 * Math.min(6, B.hand.length)
+                        - 0.3 * Math.min(6, B.eHand.length);
                     return v;
                 }
                 if (d.type === "trap") return 2.0 + (d.cost || 0) * 0.2;
@@ -1166,14 +1179,14 @@
             // Флаг spellCasting на всё разрешение заклинания: damageUnit в
             // это время не наносит урон существам с «Защитой от заклинаний»
             // (u.spellWard, просил юзер)
-            A.enemyCastSpellEffect = function enemyCastSpellEffect(def, free = false, focus = null) {
+            A.enemyCastSpellEffect = function enemyCastSpellEffect(def, free = false, focus = null, fromHand = false) {
                 A.spellCasting = true;
                 fxSpellCast(def, focus, "e");
                 try {
-                    enemyCastSpellEffectInner(def, free, focus);
+                    enemyCastSpellEffectInner(def, free, focus, fromHand);
                 } finally { A.spellCasting = false; }
             };
-            A.enemyCastSpellEffectInner = function enemyCastSpellEffectInner(def, free = false, focus = null) {
+            A.enemyCastSpellEffectInner = function enemyCastSpellEffectInner(def, free = false, focus = null, fromHand = false) {
                 const s = def.spell;
                 castTargetOff = 0;
                 const aimOff = (u) => { if (u && u.def.targetDiscount) castTargetOff = 1; };
@@ -1461,6 +1474,12 @@
                     if (own[0]) { baseHit("e", own[0]); triggerAttackTraps(own[0]); }
                 }
                 if (s.draw) drawEnemy(s.draw);
+                // «Запутать руны»: обе руки в сброс, по 3 карты. При прямом
+                // розыгрыше карта ещё в руке — её оставляем, aiPlay уберёт её
+                // сам (fromHand); при повторе/руне карты в руке уже нет.
+                if (s.discardHandDraw)
+                    discardHandDraw("e", s.discardHandDraw,
+                        fromHand ? cardIdOf(def) : null);
                 if (s.search) { // «Поиск рун»: из ВЕРХНИХ N заклинаний — лучшее в руку
                     const k = aiSearchSpell(s.search);
                     if (k) { B.eDeck.splice(k.j, 1); B.eHand.push(k.id); }
@@ -1578,6 +1597,12 @@
                                     && CARDS[x].type === "unit"
                                     && CARDS[x].cost === d.cost + 1);
                             })) continue;
+                            // «Круг стихий»: без Элементаля в руке призыв пуст —
+                            // постройку держим до подходящей карты
+                            if (def.elementalCircle && !B.eHand.some((id) => {
+                                const d = CARDS[id];
+                                return d && d.type === "unit" && d.subtype === "elemental";
+                            })) continue;
                             // клетка — по правилам связок: строения-ауры соседства
                             // к существам и будущим призывам, прочие в тыл; существа —
                             // рядом с лагерем/костром/заклинателем клинков
@@ -1674,7 +1699,7 @@
                                 // же кодом эффектов (бесплатно для его цены)
                                 if (enemyReplayLast()) B.lastSpell.e = "str25"; // повтор самой себя — цепочка
                             } else {
-                                enemyCastSpellEffect(def);
+                                enemyCastSpellEffect(def, false, null, true);
                             }
                             // indexOf: панельные эффекты кладут карты в руку —
                             // индексы могли сместиться

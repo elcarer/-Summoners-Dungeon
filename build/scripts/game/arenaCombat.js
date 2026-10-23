@@ -1177,6 +1177,43 @@
                         : { x: cellXY(u.col, GRID - 1).x, y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff5f4e });
             };
 
+            // «Круг стихий» (wis102): в начале хода владельца разыгрывает
+            // случайного Элементаля из руки в случайную пустую соседнюю
+            // (верт/гориз) клетку без траты энергии. Карта уходит в сброс,
+            // «Отмена призыва» врага ловит этот призыв, как обычный.
+            A.elementalCircleTick = function elementalCircleTick(b) {
+                if (!B.units.includes(b)) return;
+                const side = b.side;
+                const hand = side === "p" ? B.hand : B.eHand;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const picks = [];
+                for (let i = 0; i < hand.length; i++) {
+                    const d = CARDS[hand[i]];
+                    if (d && d.type === "unit" && d.subtype === "elemental") picks.push(i);
+                }
+                if (!picks.length) return;
+                const near = [];
+                for (const [dc, dr] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                    const c = b.col + dc, r = b.row + dr;
+                    if (c < 0 || c >= GRID || r < 0 || r >= GRID) continue;
+                    if (!unitAt(c, r)) near.push([c, r]);
+                }
+                if (!near.length) return;
+                const cardId = hand.splice(picks[(Math.random() * picks.length) | 0], 1)[0];
+                const [col, row] = near[(Math.random() * near.length) | 0];
+                const p = cellXY(col, row);
+                if (counterTrapConsume(side === "p" ? "e" : "p", "counterSummon")) {
+                    discard.push(cardId);
+                    floatText(p.x, p.y - 60,
+                        "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                    return;
+                }
+                addUnit(side, cardId, col, row);
+                discard.push(cardId);
+                floatText(p.x, p.y - 78, GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                sfx("chpoc");
+            };
+
             // «Грибница»: в начало хода владельца даёт 1 энергию и теряет 1 жизнь
             // (энергия начисляется даже если грибница от этого урона погибает).
             // «Походный костёр»: соседние с ним существа (обе стороны) получают
@@ -1220,6 +1257,7 @@
                         sfx("chpoc");
                         removeUnit(b); // ушёл в руку — не смерть, каскадов нет
                     }
+                    if (b.def.elementalCircle) elementalCircleTick(b);
                 }
                 refreshHud();
             };

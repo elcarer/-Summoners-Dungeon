@@ -359,9 +359,9 @@
                 // гейты ИИ по заклинанию (тесты): id карты → playable
                 aiSpellPlayable: (id) => !!CARDS[id] && aiSpellPlayable(CARDS[id]),
                 // тест-хук: применить эффект заклинания стороны врага напрямую
-                _aiSpell(id) {
+                _aiSpell(id, fromHand = false) {
                     if (!B || !CARDS[id] || CARDS[id].type !== "spell") return false;
-                    enemyCastSpellEffect(CARDS[id], true);
+                    enemyCastSpellEffect(CARDS[id], true, null, !!fromHand);
                     refreshHud();
                     checkEnd();
                     return true;

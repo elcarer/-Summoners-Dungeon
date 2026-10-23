@@ -221,13 +221,13 @@
             // бесплатно. free — повтор (дренаж энергии идёт без вычета цены).
             // Флаг spellCasting на всё разрешение: damageUnit в это время не
             // наносит урон существам с «Защитой от заклинаний» (u.spellWard).
-            A.applySpellP = function applySpellP(cardId, target, free = false) {
+            A.applySpellP = function applySpellP(cardId, target, free = false, opts = null) {
                 A.spellCasting = true;
                 try {
-                    return applySpellPInner(cardId, target, free);
+                    return applySpellPInner(cardId, target, free, opts);
                 } finally { A.spellCasting = false; }
             };
-            A.applySpellPInner = function applySpellPInner(cardId, target, free = false) {
+            A.applySpellPInner = function applySpellPInner(cardId, target, free = false, opts = null) {
                 const def = CARDS[cardId];
                 if (def.spell.target === "anyUnit") { // усиление/Смыв/Слабость
                     if (!target || target.col === undefined) return false;
@@ -469,6 +469,11 @@
                     } else return false;
                 }
                 if (def.spell.draw) drawCards(def.spell.draw);
+                // «Запутать руны»: обе руки — в сброс, по 3 карты. При прямом
+                // розыгрыше карта ещё в руке — её сбросит/оплатит castSpell
+                // (skipHandReset), поэтому эффект зовётся оттуда после spendCard.
+                if (def.spell.discardHandDraw && !(opts && opts.skipHandReset))
+                    discardHandDraw("p", def.spell.discardHandDraw);
                 if (def.spell.brew) { B.brewCasts = (B.brewCasts || 0) + 1; refreshBrewBadges(); }
                 if (def.spell.search) openRunesPanel(def.spell.search); // выбор поверх боя
                 if (def.spell.searchUnit) openRunesPanel(def.spell.searchUnit, "unit"); // «Рунное гадание»
@@ -585,6 +590,7 @@
                 const def = CARDS[cardId];
                 if (!def || def.type !== "spell"
                     || effCost(cardId, "p", target) > B.energy) return false;
+                const resetHand = def.spell.discardHandDraw;
                 // «Отмена заклинания» (wis83) врага: заклинание отменяется —
                 // карта и энергия потрачены, эффект не срабатывает (спека юзера)
                 const cTrap = counterTrapConsume("e", "counterSpell");
@@ -616,10 +622,12 @@
                     checkEnd();
                     return true;
                 }
-                if (!applySpellP(cardId, target)) return false;
+                if (!applySpellP(cardId, target, false,
+                    resetHand ? { skipHandReset: true } : null)) return false;
                 fxSpellCast(cardId, target, "p");
                 B.energy = def.spell.drainAll ? 0 : B.energy - effCost(cardId, "p", target);
                 spendCard(handIdx);
+                if (resetHand) discardHandDraw("p", resetHand);
                 heroFirstSpellEnergy("p"); // «Дуновение опасности»: +1⚡ за 1-е заклинание
                 heroStrReplay("p", cardId, def); // «Мастера огня»
                 B.lastSpell.p = cardId;

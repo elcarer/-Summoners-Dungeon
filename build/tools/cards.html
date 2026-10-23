@@ -274,7 +274,8 @@
                 damage: "Нанесение урона", buff: "Усиление",
                 debuff: "Уменьшение параметров", search: "Поиск",
                 copy: "Копирование", control: "Контроль", protect: "Защита",
-                draw: "Добор карт", resource: "Получение ресурсов",
+                draw: "Добор карт", discard: "Сброс карт",
+                resource: "Получение ресурсов",
                 summon: "Появление существ", summonBuilding: "Появление построек",
                 castSpell: "Розыгрыш заклинаний",
             },
@@ -307,7 +308,7 @@
             kindNames: {
                 damage: "Damage", buff: "Buff", debuff: "Stat reduction",
                 search: "Search", copy: "Copy", control: "Control",
-                protect: "Protection", draw: "Card draw",
+                protect: "Protection", draw: "Card draw", discard: "Card discard",
                 resource: "Resource gain", summon: "Creature summoning",
                 summonBuilding: "Building summoning", castSpell: "Spell casting",
             },
@@ -853,7 +854,7 @@
         chipSet($("subBtns"), ["goblin", "animal", "elf", "plant", "elemental", "none"],
             state.subtype, (s) => s === "none" ? T("subNone") : T("subNames")[s]);
         chipSet($("kindBtns"), ["damage", "buff", "debuff", "search", "copy", "control",
-            "protect", "draw", "resource", "summon", "summonBuilding", "castSpell"],
+            "protect", "draw", "discard", "resource", "summon", "summonBuilding", "castSpell"],
             state.kind, (k) => T("kindNames")[k]);
         // цена: 0..6 + «7+» (в данных пока максимум 7); опции складываются
         const costs = [...new Set(Object.keys(CARDS).map((id) => CARDS[id].cost))]

@@ -33,6 +33,34 @@
                 }
             };
 
+            // «Запутать руны» (wis101): сторона сбрасывает ВСЮ руку и берёт N
+            // карт. keepId — карта, которая прямо сейчас разыгрывается из руки
+            // и уйдёт в сброс отдельно (само заклинание себя не сбрасывает).
+            // «Сожжение» (B.scorch) работает и здесь: меченые карты сгорают,
+            // а не попадают в сброс.
+            A.discardHandDraw = function discardHandDraw(side, count, keepId = null) {
+                const hand = side === "p" ? B.hand : B.eHand;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const scorch = B.scorch[side];
+                const old = hand.splice(0, hand.length);
+                let kept = false, burned = 0;
+                for (const id of old) {
+                    if (!kept && keepId && id === keepId) { kept = true; hand.push(id); continue; }
+                    if (scorch && scorch.has(id)) { scorch.delete(id); burned++; }
+                    else discard.push(id);
+                }
+                const n = count | 0;
+                if (side === "p") drawCards(n); else drawEnemy(n);
+                if (burned) {
+                    floatText(960, side === "p" ? 640 : 300,
+                        `🔥 ${GAME_LOC.t("burn.gone")} ×${burned}`, 0xff8f6e);
+                    sfx("rocket");
+                }
+                floatText(960, side === "p" ? 640 : 300, `✧ ${n}`, 0x8cd0ef);
+                sfx("chpoc");
+                if (side === "p") { layoutHand(); refreshHud(); }
+            };
+
             // ── Способность героя «начиная бой берёт дополнительную случайную
             // карту … из колоды» (просил юзер): «Банда гоблинов» — карту
             // гоблина, «Засада гоблинов» — карту ловушки, «Лесные звери» —
