@@ -245,6 +245,14 @@
                         sfx("aqua");
                         return true;
                     }
+                    if (def.spell.hydroPunch) { // «Гидроудар»: 1 урон + сдвиг к своей базе
+                        const dmg = spellDmg(def, "p", true, true);
+                        damageUnit(u, dmg, null, "rocket");
+                        if (B.units.includes(u)) pushTowardBase(u);
+                        punch(u.node);
+                        sfx("aqua");
+                        return true;
+                    }
                     if (def.spell.bounce) { // «Смыв»: существо — в руку владельца
                         punch(u.node);
                         bounceUnit(u);
@@ -475,6 +483,13 @@
             A.autoTargetFor = function autoTargetFor(cardId) {
                 const def = CARDS[cardId];
                 const tg = def.spell.target;
+                if (tg === "anyUnit" && def.spell.hydroPunch) { // «Гидроудар»
+                    const foes = B.units.filter((u) => u.side !== "p"
+                        && u.def.type === "unit" && !u.spellWard);
+                    const best = foes.slice().sort((a, b) =>
+                        (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                    return best ? { col: best.col, row: best.row } : null;
+                }
                 if (tg === "anyUnit" && def.spell.iceStrike) { // «Ледяной удар»
                     const pick = iceStrikePick("p");
                     return pick ? { col: pick.unit.col, row: pick.unit.row } : null;

@@ -252,6 +252,7 @@
                                 if (u.def.ability === "flyOver" && occ.def.type === "unit"
                                     && over >= 0 && over < GRID && !unitAt(u.col, over)) {
                                     u.row = over;
+                                    heroElementalDraw(u); // «Сонм духов»: способность элементаля (Полёт)
                                     const p = cellXY(u.col, u.row);
                                     glide(u, p.x, p.y);
                                     setWalk(u, true);

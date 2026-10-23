@@ -129,6 +129,29 @@
                 sfx("aqua");
                 refreshHud();
             };
+            // «Сонм духов» (firstElementalDraw): ПЕРВОЕ срабатывание
+            // способности СВОЕГО элементаля в бою даёт владельцу карту.
+            // Зовётся из точек, где реально срабатывает способность:
+            // «Зимние духи» (trapGrow), «Снежный элементаль» (frostAttack),
+            // «Ледяной элементаль» (crush), «Старший ледовик» (frostNeighbors),
+            // «Выросшие духи» (trapOnMove), «Воздушный элементаль» (flyOver).
+            // Флаг на бой, как у остальных карт персонажей.
+            A.heroElementalDraw = function heroElementalDraw(u) {
+                if (!B || !u || !u.def || u.def.subtype !== "elemental") return;
+                const side = u.side;
+                if (B.heroFlags.elementalDraw[side]) return;
+                const hd = heroDefOf(side);
+                if (!hd || hd.ability !== "firstElementalDraw") return;
+                B.heroFlags.elementalDraw[side] = true;
+                const n = hd.abilityVal || 1;
+                const hand = side === "p" ? B.hand : B.eHand;
+                if (side === "p") drawCards(n); else drawEnemy(n);
+                const drawn = hand[hand.length - 1];
+                floatText(960, side === "p" ? 640 : 300,
+                    `+ ${drawn ? GAME_LOC.t(`card.${drawn}.name`) : "…"}`, 0x8cd0ef);
+                sfx("chpoc");
+                refreshHud();
+            };
             // Итоговый урон заклинания по цели: у «Роя светлячков» (grw30) он
             // равен числу СВОИХ существ на поле (+ аура алтаря), у «Выстрела
             // стихией» (grw32) — числу карт Роста в руке, у прочих — spellDmg

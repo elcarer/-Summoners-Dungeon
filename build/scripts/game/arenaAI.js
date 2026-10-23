@@ -777,6 +777,25 @@
                     }
                 } else if (tr.effect === "confuse" || tr.effect === "entangle") {
                     if (victim) score += aiThreat(victim) * 1.0 + victim.curAtk * 0.2;
+                } else if (tr.effect === "freezeSplash") {
+                    // «Ледяные кандалы»: жертва + её соседи-существа (обе
+                    // стороны) пропускают марш; своих соседей — минус
+                    if (victim) {
+                        score += aiThreat(victim) * 0.9;
+                        const near = B.units.filter((o) => o !== victim && o.def.type === "unit"
+                            && Math.abs(o.col - victim.col) + Math.abs(o.row - victim.row) === 1);
+                        for (const o of near)
+                            score += (o.side === "p" ? aiThreat(o) * 0.7 : -aiThreat(o) * 1.1);
+                    }
+                } else if (tr.effect === "rowShift") {
+                    // «Снежный ком»: сдвиг и 2 урона ВСЕМУ вертикальному ряду;
+                    // своих в ряду — минус (здоровые бьют по нам же)
+                    const dmg = (tr.amount || 2) + altarBonus("e");
+                    for (const v of B.units) {
+                        if (v.col !== col || v.def.type !== "unit") continue;
+                        score += v.side === "p" ? aiThreat(v) * 0.55 : -(v.hp <= dmg
+                            ? 9 : aiThreat(v) * 0.8);
+                    }
                 } else if (tr.effect === "lure") {
                     for (const v of B.units) if (v.side === "p"
                         && Math.abs(v.col - col) + Math.abs(v.row - row) === 1)
@@ -834,6 +853,15 @@
                         v.side === "e" && Math.abs(v.col - c2) + Math.abs(v.row - r2) === 1));
                     pool = clean.length ? clean : safe;
                 }
+                // «Снежный ком»: 2 урона всему ряду (колонке клетки) — если в
+                // нём есть своё убиваемое существо, ловушку держим.
+                if (def.trap.effect === "rowShift") {
+                    const dmg = (def.trap.amount || 2) + altarBonus("e");
+                    pool = pool.filter(([c2]) => !B.units.some((v) =>
+                        v.side === "e" && v.col === c2 && v.def.type === "unit"
+                        && v.hp <= dmg));
+                    if (!pool.length) return null;
+                }
                 let best = [], bestScore = -Infinity;
                 for (const [c, r] of pool) {
                     const score = aiTrapScore(def, c, r);
@@ -848,6 +876,22 @@
             A.aiIceStrikeTarget = function aiIceStrikeTarget() {
                 const pick = iceStrikePick("e");
                 return pick && pick.score > 0 ? pick.unit : null;
+            };
+            // Цель «Гидроудара» (wis99) для ИИ: существо игрока — 1 урон и
+            // сдвиг К ЕГО базе (назад по маршу). Ценим добивание, сильных
+            // угроз, доступность клетки за спиной (без неё сдвига нет).
+            A.aiHydroPick = function aiHydroPick() {
+                let best = null, bestScore = 0;
+                const dmg = 1 + altarBonus("e");
+                for (const v of B.units) {
+                    if (v.side !== "p" || v.def.type !== "unit" || v.spellWard) continue;
+                    const kill = v.hp <= dmg;
+                    let s = kill ? 3.2 + aiThreat(v) * 0.5 : aiThreat(v) * 0.55;
+                    const r2 = v.row + 1; // его база — ряд игрока
+                    if (r2 < GRID && !unitAt(v.col, r2)) s += 0.9 + aiThreat(v) * 0.3;
+                    if (s > bestScore) { bestScore = s; best = v; }
+                }
+                return best;
             };
             // Играбельность заклинания для ИИ (общие проверки цели/эффекта).
             // forReplay — проверка ПОВТОРА «Горящими рунами»: карта уже не в руке.
@@ -953,11 +997,15 @@
                 // «Слабость» — есть чей-то урон, который стоит снять
                 if (s.debuffAtk && !B.units.some((v) => v.side === "p"
                     && v.def.type === "unit" && !v.spellWard && v.curAtk > 0)) return false;
+                // «Гидроудар» — есть чьё-то существо: урон 1 и сдвиг к базе
+                if (s.hydroPunch && !B.units.some((v) => v.side === "p"
+                    && v.def.type === "unit" && !v.spellWard)) return false;
                 // усиление/очарование — только если есть своё существо под него
                 // (огонь не дублируем; яд складывается — его можно докинуть);
-                // «Смыв»/«Слабость»/«Ледяной удар» целятся в ИГРОКА — этот
-                // гейт их не касается
+                // «Смыв»/«Слабость»/«Ледяной удар»/«Гидроудар» целятся в ИГРОКА —
+                // этот гейт их не касается
                 if (s.target === "anyUnit" && !s.bounce && !s.debuffAtk && !s.iceStrike
+                    && !s.hydroPunch
                     && !B.units.some((v) => v.side === "e"
                     && v.def.type === "unit" && (!s.enchantFire || !v.enchantFire))) return false;
                 // дротик/варево/огнешар — только если есть цель
@@ -1027,6 +1075,7 @@
                     if (s.baseHit) v += 1.6;
                     if (s.freeze) v += 1.0;
                     if (s.iceStrike) v += 2.0;
+                    if (s.hydroPunch) v += 1.2; // урон 1 + полезный сдвиг назад
                     return v;
                 }
                 if (d.type === "trap") return 2.0 + (d.cost || 0) * 0.2;
@@ -1142,6 +1191,21 @@
                     if (best) wolfVolley(best);
                 }
                 if (s.target === "anyUnit" && !s.nova) { // усиление/очарование — лучшему
+                    // «Гидроудар» (wis99): 1 урон + сдвиг К ЕГО базе,
+                    // цель — самая опасная (фокус руны, если годится)
+                    if (s.hydroPunch) {
+                        const foes = B.units.filter((v) => v.side === "p"
+                            && v.def.type === "unit" && !v.spellWard);
+                        let best = aiHydroPick();
+                        if (focus && foes.includes(focus)) best = focus;
+                        if (!best) return;
+                        aimOff(best);
+                        damageUnit(best, spellDmg(def, "e", true, true), null, "rocket");
+                        if (B.units.includes(best)) pushTowardBase(best);
+                        punch(best.node);
+                        sfx("aqua");
+                        return;
+                    }
                     // «Смыв» (wis85): существо игрока — в его руку; цель —
                     // самая опасная не-токенная единица (токены — крайний случай)
                     if (s.bounce) {

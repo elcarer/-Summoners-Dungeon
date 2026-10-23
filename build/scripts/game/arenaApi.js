@@ -397,6 +397,11 @@
                     return u ? { col: u.col, row: u.row, id: cardIdOf(u.def) } : null;
                 },
                 _aiTrapSpot: (id) => (B && CARDS[id] ? aiTrapSpot(CARDS[id]) : null),
+                // «Гидроудар» (тесты): сдвиг цели к её базе напрямую
+                _hydro(col, row) {
+                    const u = unitAt(col, row);
+                    return u ? pushTowardBase(u) : false;
+                },
                 // поиск/гадание/путешествие: какую карту выбрал ИИ
                 _aiSearchSpell: (n) => {
                     const k = B ? aiSearchSpell(n) : null;

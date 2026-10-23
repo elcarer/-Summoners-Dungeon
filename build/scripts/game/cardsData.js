@@ -444,11 +444,11 @@
                  subtype: "elf", // подтип — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x3f6d3a, img: "growth/80" },
-        // ── Стихия «Мудрость» (синие) — третья стихия, лица wisdom/81–96 ────
+        // ── Стихия «Мудрость» (синие) — третья стихия, лица wisdom/81–99 ────
         // (нумерация артов юзера — сквозная с 81). Герой этой стихии — Мира
         // (первое призванное существо получает «Защиту от заклинаний»);
-        // подземелье стихии — «Подземные ключи» (пока 1 этаж), карты также
-        // живут в стартере Миры (просил юзер).
+        // подземелье стихии — «Подземные ключи», карты также живут в стартере
+        // Миры (просил юзер).
         // «Воздушный элементаль»: Полёт — как у «Мини-феи» (grw14)
         wis81: { type: "unit", cost: 3, atk: 3, hp: 4, speed: 1,
                  creature: "goblin", ability: "flyOver",
@@ -555,6 +555,29 @@
                  subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "wisdom",
                  color: 0x3a6ea8, img: "wisdom/96" },
+        // «Ледяные кандалы»: ловушка на пустую клетку; существо врага,
+        // призванное или шагнувшее на неё, и все существа по соседству
+        // (верт/гориз) получают «Заморожен 1»
+        wis97: { type: "trap", cost: 1,
+                 trap: { event: "onEnemyCell", effect: "freezeSplash", freeze: 1 },
+                 kind: "control", // тип эффекта — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "wisdom",
+                 color: 0x2e4a72, img: "wisdom/97" },
+        // «Снежный ком»: ловушка на пустую клетку; при срабатывании каждое
+        // существо в клетках этого ВЕРТИКАЛЬНОГО ряда сдвигается на случайную
+        // соседнюю пустую клетку и получает 2 урона
+        wis98: { type: "trap", cost: 2,
+                 trap: { event: "onEnemyCell", effect: "rowShift", amount: 2 },
+                 kind: ["control", "damage"], // тип эффекта — по спеке юзера (cards.txt)
+                 rarity: "rare", elem: "wisdom",
+                 color: 0x2e4a72, img: "wisdom/98" },
+        // «Гидроудар»: выбранному существу 1 урон и сдвиг на 1 клетку
+        // БЛИЖЕ К ЕГО БАЗЕ (если там пусто)
+        wis99: { type: "spell", cost: 1,
+                 spell: { target: "anyUnit", dmg: 1, hydroPunch: true },
+                 kind: ["damage", "control"], // тип эффекта — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "wisdom",
+                 color: 0x4a7ac0, img: "wisdom/99" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -684,7 +707,10 @@
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
         // 2-й этаж (арт heroes/18.png): Мудрость, 11♥, первое срабатывание
-        // своей ловушки в бою даёт владельцу 1 энергию (firstTrapEnergy).
+        // своей ловушки в бою даёт владельцу 1 энергию (firstTrapEnergy);
+        // 3-й этаж (арт heroes/19.png): Мудрость, 12♥, первое срабатывание
+        // способности своего элементаля в бою — добор карты
+        // (firstElementalDraw).
         // Способности работают у обеих сторон.
         wisBreeze: { id: "wisBreeze", rarity: "common", baseHp: 10,
                      elems: ["wisdom"], starter: "wisdom",
@@ -692,6 +718,9 @@
         wisWater: { id: "wisWater", rarity: "common", baseHp: 11,
                     elems: ["wisdom"], starter: "wisdom",
                     img: "18", ability: "firstTrapEnergy", abilityVal: 1 },
+        wisSpirits: { id: "wisSpirits", rarity: "common", baseHp: 12,
+                      elems: ["wisdom"], starter: "wisdom",
+                      img: "19", ability: "firstElementalDraw", abilityVal: 1 },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -700,7 +729,7 @@
         "gobMaster", "boss",
         "grwBeasts", "grwGrove", "grwWild", "grwMagic", "grwCity",
         "grwControl", "grwBoss",
-        "wisBreeze", "wisWater"];
+        "wisBreeze", "wisWater", "wisSpirits"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

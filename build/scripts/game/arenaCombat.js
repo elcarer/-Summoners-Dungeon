@@ -21,6 +21,7 @@
                         ? { x: 960, y: 60, fill: 0xff8f6e }
                         : { x: 960, y: 840, fill: 0xff5f4e });
                 sfx("crash");
+                heroElementalDraw(attacker); // «Сонм духов»: способность элементаля
             };
             // «Древоброд глухой чащи» (grw31): при атаке урон атаки получают
             // ВСЕ существа и постройки по соседству (верт/гориз) с САМИМ
@@ -78,6 +79,7 @@
                 fxEvent("ice", { x: p.x, y: p.y - 12, scale: 0.72 });
                 punch(target.node);
                 sfx("aqua");
+                heroElementalDraw(attacker); // «Сонм духов»: способность элементаля
             };
 
             // «Старший ледовик» (wis95): после атаки — «Заморожен 1» существам
@@ -92,6 +94,7 @@
                     const v = unitAt(attacker.col + dc, attacker.row);
                     if (v && v !== attacker) addFrozen(v, 1);
                 }
+                heroElementalDraw(attacker); // «Сонм духов»: способность элементаля
             };
 
             // «Выросшие духи» (wis96): после перемещения разыгрывает ловушку
@@ -123,6 +126,7 @@
                 armTrap(u.side, cardId, col, row);
                 const p = cellXY(col, row);
                 floatText(p.x, p.y - 60, GAME_LOC.t(`card.${cardId}.name`), 0xb7d0ef);
+                heroElementalDraw(u); // «Сонм духов»: способность элементаля
             };
 
             // «Заморожен N» (wis91/wis92): существо пропускает перемещение
@@ -243,6 +247,7 @@
                     floatText(p.x, p.y - 39, "+1⚔", 0x9fd489);
                     punch(u.node);
                     sfx("up");
+                    heroElementalDraw(u); // «Сонм духов»: способность элементаля
                 }
             };
 
@@ -417,10 +422,18 @@
                 if (u.def.ability === "noTraps") return;
                 const foe = u.side === "p" ? "e" : "p";
                 let side = foe;
+                // клеточные ловушки-существа (freezeSplash/rowShift) срабатывают
+                // только на СУЩЕСТВ, как и написано в спеке; мины/засады и
+                // нейтральные ловушки по-прежнему ловят и строения
+                const cellEffect = (t) => {
+                    const e = t.def.trap.effect;
+                    if (e === "freezeSplash" || e === "rowShift") return u.def.type === "unit";
+                    return e === "cellDmg" || e === "ambush"
+                        || e === "confuse" || e === "cellDebuff"
+                        || e === "ancestor" || e === "entangle";
+                };
                 let i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
-                    && (t.def.trap.effect === "cellDmg" || t.def.trap.effect === "ambush"
-                        || t.def.trap.effect === "confuse" || t.def.trap.effect === "cellDebuff"
-                        || t.def.trap.effect === "ancestor" || t.def.trap.effect === "entangle"));
+                    && cellEffect(t));
                 if (i < 0) {
                     // «Решётка с шипами», «Шипастые лозы» и «Опутывание корней»
                     // нейтральны: срабатывают на ЛЮБОЕ существо, оказавшееся на
@@ -442,9 +455,89 @@
                 if (echo && B.units.includes(u)) applyCellTrap(trap, side, u);
             };
 
+            // «Ледяные кандалы» (wis97): активировавшее существо и все
+            // существа по соседству (верт/гориз) получают «Заморожен 1»;
+            // постройки addFrozen пропускает сам.
+            A.freezeSplash = function freezeSplash(u) {
+                if (!u || !B.units.includes(u)) return;
+                const victims = [u, ...B.units.filter((v) => v !== u
+                    && v.def.type === "unit"
+                    && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1)];
+                for (const v of victims) if (B.units.includes(v)) addFrozen(v, 1);
+            };
+
+            // «Снежный ком» (wis98): каждое существо в ВЕРТИКАЛЬНОМ ряду
+            // (одинаковый col) сдвигается на случайную соседнюю (верт/гориз)
+            // пустую клетку и получает 2 урона. Порядок хода случайный,
+            // клетки заняты «по факту» — двое в одну клетку не встанут.
+            // Постройки не существа: не двигаются и урона не получают.
+            A.snowballShift = function snowballShift(trap, side) {
+                const col = trap.col;
+                const list = B.units.filter((v) => v.col === col && v.def.type === "unit");
+                const order = shuffle(list.slice());
+                const moved = [];
+                for (const v of order) {
+                    if (!B.units.includes(v)) continue;
+                    const dirs = shuffle([[-1, 0], [1, 0], [0, -1], [0, 1]]);
+                    let dest = null;
+                    for (const [dc, dr] of dirs) {
+                        const c2 = v.col + dc, r2 = v.row + dr;
+                        if (c2 < 0 || c2 >= GRID || r2 < 0 || r2 >= GRID) continue;
+                        if (unitAt(c2, r2)) continue;
+                        dest = [c2, r2];
+                        break;
+                    }
+                    if (!dest) continue; // кругом занято — с места не сдвинуть
+                    v.col = dest[0];
+                    v.row = dest[1];
+                    const p = cellXY(v.col, v.row);
+                    glide(v, p.x, p.y);
+                    moved.push(v);
+                }
+                // сдвиг — перемещение: чужие ловушки на новых клетках срабатывают
+                for (const v of moved) if (B.units.includes(v)) triggerCellTraps(v);
+                const dmg = (trap.def.trap.amount || 2) + altarBonus(side);
+                for (const v of list) {
+                    if (!B.units.includes(v)) continue;
+                    const p = cellXY(v.col, v.row);
+                    fxEvent("ice", { x: p.x, y: p.y - 8, scale: 0.72 });
+                    damageUnit(v, dmg, null, "acid");
+                }
+                refreshHud();
+                checkEnd();
+            };
+
+            // «Гидроудар» (wis99): сдвиг на 1 клетку БЛИЖЕ К СВОЕЙ базе
+            // (игрок — row+1, враг — row−1), только если там пусто.
+            A.pushTowardBase = function pushTowardBase(u) {
+                if (!u || !B.units.includes(u) || u.def.type !== "unit") return false;
+                const dr = u.side === "p" ? 1 : -1;
+                const r2 = u.row + dr;
+                if (r2 < 0 || r2 >= GRID || unitAt(u.col, r2)) return false;
+                u.row = r2;
+                const p = cellXY(u.col, u.row);
+                glide(u, p.x, p.y);
+                fxEvent("ice", { x: p.x, y: p.y - 10, scale: 0.7 });
+                sfx("step");
+                triggerCellTraps(u); // втолкнули на ловушку — она срабатывает
+                return true;
+            };
+
             // Эффект сработавшей ловушки на клетке (отделён от поиска ловушки —
             // «Роща лоз» применяет его дважды); u — существо, наступившее на неё
             A.applyCellTrap = function applyCellTrap(trap, side, u) {
+                if (trap.def.trap.effect === "freezeSplash") {
+                    // «Ледяные кандалы»: существо и соседи (верт/гориз)
+                    freezeSplash(u);
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
+                if (trap.def.trap.effect === "rowShift") {
+                    // «Снежный ком»: весь вертикальный ряд сдвигается и получает 2
+                    snowballShift(trap, side);
+                    return;
+                }
                 if (trap.def.trap.effect === "cellDebuff") {
                     // «Шипастые лозы» (grw4): существо на клетке теряет 1 урона
                     // и 1 жизни; не пережило шипы — гибнет (не «урон», но смерть)
@@ -1299,8 +1392,13 @@
                     return autoTargetFor(cardId);
                 if (!focus || !B.units.includes(focus)) return autoTargetFor(cardId);
                 // «Защита от заклинаний»: на такое существо заклинание не целится
-                const ok = s.target === "anyUnit" ? focus.side === "p"
-                        && focus.def.type === "unit" && !focus.spellWard
+                // «Гидроудар» целится и в существ ВРАГА — руна может навести его
+                // на атакующего юнита (обычное anyUnit — только на своих)
+                const anyUnitOk = s.hydroPunch ? focus.def.type === "unit"
+                        && !focus.spellWard
+                    : focus.side === "p"
+                        && focus.def.type === "unit" && !focus.spellWard;
+                const ok = s.target === "anyUnit" ? anyUnitOk
                     : s.target === "ownUnit" ? focus.side === "p"
                         && focus.def.type === "unit" && !focus.spellWard
                     : s.target === "anyUnitDmg" ? (focus.def.type === "unit"
