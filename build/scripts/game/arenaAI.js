@@ -169,6 +169,10 @@
                 if (d.trapOnMove) v += 0.3; // «Выросшие духи»: ловушка с руки
                 if (d.leaderAura || d.plantEcho || d.druidEnergy
                     || d.sisterDraw || d.spellAura || d.campAura) v += 0.8;
+                if (d.altarSword) v += 0.9 + 0.25 * Math.max(0, (u.hp || 0) - 1);
+                if (d.starTower) v += 1.2;
+                if (d.cloudSpire) v += 1.8;
+                if (d.waterMage) v += 0.6;
                 if (u.venom) v += 0.4;
                 if (u.berserk) v += 0.3 * u.berserk;
                 return v;
@@ -184,11 +188,15 @@
                 if (d.ability === "archer") s += 0.9;
                 if (d.ability === "assassin") s += 0.8;
                 if (d.ability === "pushBack") s += 0.6;
-                if (d.ability === "flyOver") s += 0.5;
+                if (unitHasFly(u)) s += 0.5;
                 if (d.ability === "dash1") s += 0.4;
                 if (d.frostNeighbors) s += 0.8;
                 if (d.leaderAura || d.plantEcho || d.druidEnergy || d.sisterDraw
                     || d.spellAura || d.campAura || d.monolith) s += 0.9;
+                if (d.altarSword) s += 0.7;
+                if (d.starTower) s += 0.8;
+                if (d.cloudSpire) s += 1.4;
+                if (d.waterMage) s += 0.5;
                 if (u.venom) s += 0.8;
                 if (u.enchantFire) s += 0.8;
                 if (u.berserk) s += 0.5 * u.berserk;
@@ -205,6 +213,9 @@
                 if (d.thicket) s += 1.0;
                 if (d.leaderAura || d.plantEcho || d.druidEnergy || d.sisterDraw
                     || d.spellBuffAura || d.spellAura || d.campAura) s += 1.1;
+                if (d.altarSword) s += 0.7;
+                if (d.starTower) s += 0.9;
+                if (d.cloudSpire) s += 1.6;
                 if (d.keeperScale) s += 0.4;
                 if (u.venom) s += 0.3;
                 if (u.berserk) s += 0.3 * u.berserk;
@@ -352,6 +363,10 @@
                                 + (def.keeperScale ? 0.6 : 0);
                         }
                         if (b.def.sprout) score += 1.9 + 0.05 * Math.min(5, hp);
+                        if (b.def.altarSword) {
+                            score += 2.0 + 0.35 * Math.max(0, (b.hp || 0) - 1)
+                                + 0.12 * Math.min(6, atk);
+                        }
                         if (b.def.monolith && B.eDeck.some((x) => CARDS[x]
                             && CARDS[x].type === "unit" && CARDS[x].cost === (def.cost || 0) + 1))
                             score += 3.2;
@@ -411,7 +426,7 @@
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit"
                         && ahead.hp - atk === 1) score += 1.0;
                 }
-                if (def.ability === "flyOver" && ahead && ahead.side === "p"
+                if (unitHasFly({ def, side: "e" }) && ahead && ahead.side === "p"
                     && ahead.def.type === "unit") {
                     if (row + 2 < GRID && !unitAt(col, row + 2)) score += 1.0;
                 }
@@ -543,12 +558,18 @@
                     score += adjFree.length * 1.6;
                     score += adjOwn.length * 0.2;
                 }
+                if (def.altarSword) {
+                    // «Меч в алтаре»: ценен свободными клетками рядом —
+                    // следующие призывы получат бонус, а меч погибнет
+                    score += adjFree.length * 1.4;
+                    score += adjOwn.length * 0.25;
+                }
                 if (row === frontRow && rows.length > 1) score -= 0.7;
                 score -= adjFoe.length * 1.0;
                 // не замуровать ауру: без свободной соседней клетки призыв рядом
                 // больше не случится
                 if ((def.campAura || def.groveAura || def.monolith
-                    || def.elementalCircle) && !adjFree.length)
+                    || def.elementalCircle || def.altarSword) && !adjFree.length)
                     score -= 3;
                 return score;
             };
@@ -557,7 +578,7 @@
                 const free = freeCells(rows);
                 if (!free.length) return null;
                 if (def.campAura || def.campfire || def.sprout || def.groveAura
-                    || def.monolith || def.elementalCircle) {
+                    || def.monolith || def.elementalCircle || def.altarSword) {
                     let best = [], bestScore = -Infinity;
                     for (const [c, r] of free) {
                         const score = aiBuildingSpotScore(def, c, r, free);
@@ -1045,6 +1066,10 @@
                     // «Выросшие духи»: ценнее, когда в руке есть ловушка под него
                     if (d.trapOnMove) s += 0.4 + (B && B.eHand && B.eHand.some((id) =>
                         CARDS[id] && CARDS[id].type === "trap") ? 0.5 : 0);
+                    if (d.waterMage) s += 0.7 + (B && B.eDeck && B.eDeck.some((id) => {
+                        const t = CARDS[id];
+                        return t && t.type === "trap" && t.cost <= 2;
+                    }) ? 0.6 : 0);
                     if (d.ability === "archer" || d.ability === "assassin") s += 0.3;
                     if (d.ability === "dash1") s += 0.2;
                     return s;
@@ -1055,7 +1080,9 @@
                         + (d.monolith ? 1.6 : 0) + (d.spellAura ? 1.2 : 0)
                         + (d.treeHomes ? 1.2 : 0) + (d.mycelium ? 0.8 : 0)
                         + (d.sprout ? 0.8 : 0) + (d.campfire ? 0.8 : 0)
-                        + (d.elementalCircle ? 1.6 : 0);
+                        + (d.elementalCircle ? 1.6 : 0)
+                        + (d.altarSword ? 1.1 : 0) + (d.starTower ? 1.2 : 0)
+                        + (d.cloudSpire ? 2.2 : 0);
                 }
                 if (d.type === "spell") {
                     const s = d.spell || {};

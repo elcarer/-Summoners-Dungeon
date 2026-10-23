@@ -277,7 +277,7 @@
                                 // существом есть пустая клетка, перелетает на
                                 // неё вместо атаки (постройки не облетает)
                                 const over = ahead + dir;
-                                if (u.def.ability === "flyOver" && occ.def.type === "unit"
+                                if (unitHasFly(u) && occ.def.type === "unit"
                                     && over >= 0 && over < GRID && !unitAt(u.col, over)) {
                                     u.row = over;
                                     heroElementalDraw(u); // «Сонм духов»: способность элементаля (Полёт)

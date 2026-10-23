@@ -361,6 +361,36 @@
                 floatText(p.x, p.y - 69, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
             };
 
+            // «Водный маг» (wis107): после призыва бесплатно разыгрывает
+            // СЛУЧАЙНУЮ ловушку из КОЛОДЫ владельца (цена ≤ 2) на случайную
+            // пустую соседнюю (верт/гориз) клетку. Энергия не тратится; карта
+            // уходит из колоды в сброс. Руны/споры вешаются на существо — им
+            // нужна не пустая клетка, поэтому в выбор не попадают.
+            A.summonWaterMage = function summonWaterMage(u) {
+                if (!B.units.includes(u)) return; // мог умереть от мины при призыве
+                const deck = u.side === "p" ? B.deck : B.eDeck;
+                const discard = u.side === "p" ? B.discard : B.eDiscard;
+                const traps = u.side === "p" ? B.traps.p : B.traps.e;
+                const near = [[-1, 0], [1, 0], [0, -1], [0, 1]]
+                    .map(([dc, dr]) => [u.col + dc, u.row + dr])
+                    .filter(([c2, r2]) => c2 >= 0 && c2 < GRID && r2 >= 0 && r2 < GRID
+                        && !unitAt(c2, r2)
+                        && !traps.some((tr) => tr.col === c2 && tr.row === r2));
+                if (!near.length) return;
+                const picks = deck.map((id, i) => ({ id, i, def: CARDS[id] }))
+                    .filter((x) => x.def && x.def.type === "trap" && x.def.cost <= 2
+                        && x.def.trap.effect !== "castRandom"
+                        && x.def.trap.effect !== "sporeCurse");
+                if (!picks.length) return;
+                const pick = picks[(Math.random() * picks.length) | 0];
+                const [col, row] = near[(Math.random() * near.length) | 0];
+                deck.splice(pick.i, 1);
+                discard.push(pick.id);
+                armTrap(u.side, pick.id, col, row);
+                const p = cellXY(col, row);
+                floatText(p.x, p.y - 66, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
+            };
+
             // «Гоблинская приманка»: существо врага, шагающее С КЛЕТКИ, соседней
             // с ловушкой, сходит на клетку приманки вместо намеченной — и получает
             // 1 урона. Приманка одноразовая; занятая клетка приманки не манит.
@@ -871,9 +901,17 @@
             // «Защитный кокон» (grw19): цель получает «Защита 1» — любой урон
             // по ней уменьшается на 1 (режется в damageUnit). Коконы складываются,
             // бейдж показывает сумму; «Извлечение духа» снимает защиту целиком.
-            A.addProtect = function addProtect(u) {
-                u.protect = (u.protect || 0) + 1;
+            // «Облачный шпиль» (wis106) добавляет к сумме ауру «Защита 1» —
+            // unitProtectTotal считает её динамически, а этот помощник
+            // синхронизирует бейдж (появление/гибель шпиля, очистка).
+            A.refreshProtectMark = function refreshProtectMark(u) {
+                if (!u || !u.node) return;
+                const total = A.unitProtectTotal(u);
                 let mark = u.node.getChildByName("protectMark");
+                if (total <= 0) {
+                    if (mark) mark.destroy({ children: true });
+                    return;
+                }
                 if (!mark) {
                     mark = new PIXI.Container();
                     mark.name = "protectMark";
@@ -889,7 +927,11 @@
                     mark.position.set(36, -54); // зеркально меткам берсерка/спор
                     u.node.addChild(mark);
                 }
-                mark.getChildAt(1).text = String(u.protect);
+                mark.getChildAt(1).text = String(total);
+            };
+            A.addProtect = function addProtect(u) {
+                u.protect = (u.protect || 0) + 1;
+                A.refreshProtectMark(u);
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, GAME_LOC.t("card.grw19.name"), 0x8cd0ef);
                 fxEvent("ward", { x: p.x, y: p.y - 14, scale: 0.7 });
@@ -1087,8 +1129,9 @@
                 // споры/огненное дыхание реагируют на ФАКТИЧЕСКИ прошедший урон
                 let amt = amount;
                 let blocked = 0;
-                if (target.protect && amt > 0) {
-                    blocked = Math.min(target.protect, amt);
+                const protect = A.unitProtectTotal(target);
+                if (protect && amt > 0) {
+                    blocked = Math.min(protect, amt);
                     amt -= blocked;
                     const bp = cellXY(target.col, target.row);
                     floatText(bp.x, bp.y - 72, `Защита −${blocked}`, 0x8cd0ef);
@@ -1275,6 +1318,17 @@
                         floatText(p.x, p.y - 72, GAME_LOC.t("card.grw6.name"), 0x9fd489);
                         sfx("chpoc");
                         removeUnit(b); // ушёл в руку — не смерть, каскадов нет
+                    }
+                    // «Меч в алтаре» (wis104): в начале хода владельца +1♥
+                    if (b.def.altarSword) healUnit(b, 1);
+                    // «Башня звездочёта» (wis105): сначала добор, затем −1♥
+                    // (погибая от износа, башня всё равно даёт карту)
+                    if (b.def.starTower) {
+                        if (side === "p") drawCards(1); else drawEnemy(1);
+                        const p = cellXY(b.col, b.row);
+                        floatText(p.x, p.y - 66, `+1 ${GAME_LOC.t("card.wis105.name")}`, 0xffd98c);
+                        sfx("chpoc");
+                        damageUnit(b, 1, null, "dam");
                     }
                     if (b.def.elementalCircle) elementalCircleTick(b);
                 }

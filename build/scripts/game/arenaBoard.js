@@ -276,6 +276,27 @@
             // curAtk = база + bonusAtk (кровожадность, лагерь при призыве) + ауры.
             // Ауры строений пересчитываются при каждом addUnit/гибели строения;
             // bonusAtk переживает всё — это «навсегда».
+            // «Облачный шпиль» (wis106): глобальная аура своей стороны —
+            // «Полёт» (flyOver) и «Защита 1». Считаем по живым постройкам в
+            // момент проверки, поэтому аура сама снимается при гибели шпиля.
+            A.cloudSpireCount = function cloudSpireCount(side) {
+                let n = 0;
+                if (!B || !B.units) return 0;
+                for (const u of B.units) {
+                    if (u.side === side && u.def.type === "building" && u.def.cloudSpire) n++;
+                }
+                return n;
+            };
+            A.unitHasFly = function unitHasFly(u) {
+                return !!u && !!u.def && u.def.type === "unit"
+                    && (u.def.ability === "flyOver" || A.cloudSpireCount(u.side) > 0);
+            };
+            A.unitProtectTotal = function unitProtectTotal(u) {
+                if (!u || !u.def) return 0;
+                let n = u.protect || 0;
+                if (u.def.type === "unit") n += A.cloudSpireCount(u.side);
+                return n;
+            };
             A.recalcAuras = function recalcAuras() {
                 for (const side of ["p", "e"]) {
                     let atk = 0, hp = 0;
@@ -298,6 +319,7 @@
                             if (n) n.text = String(u.hp);
                         }
                         u.auraHp = hp;
+                        if (A.refreshProtectMark) A.refreshProtectMark(u);
                     }
                 }
             };
@@ -390,6 +412,28 @@
                         const p = cellXY(u.col, u.row);
                         floatText(p.x, p.y - 75, `+${grove}♥`, 0x9fd489);
                     }
+                    // «Меч в алтаре» (wis104): существо, призванное рядом с
+                    // этой постройкой, получает +1⚔ за каждую ЕЁ жизнь,
+                    // после чего меч-постройка погибает (штатный killUnit:
+                    // каскады смерти/возврат героем работают).
+                    for (const o of B.units.slice()) {
+                        if (o === u || o.side !== side || o.def.type !== "building"
+                            || !o.def.altarSword || !B.units.includes(o)
+                            || Math.abs(o.col - col) + Math.abs(o.row - row) !== 1) continue;
+                        const k = Math.max(0, o.hp | 0);
+                        if (k > 0) {
+                            u.bonusAtk += k;
+                            recalcAuras();
+                            const an = u.node.getChildByName("atk");
+                            if (an) an.text = String(u.curAtk);
+                            const p = cellXY(u.col, u.row);
+                            floatText(p.x, p.y - 60, `+${k}⚔`, 0x9fd489);
+                            sfx("up");
+                        }
+                        const op = cellXY(o.col, o.row);
+                        floatText(op.x, op.y - 90, GAME_LOC.t(`card.${cardIdOf(o.def)}.name`), 0xb7d0ef);
+                        killUnit(o, null);
+                    }
                     // «Три монолита» (grw26): призыв СВОЕГО существа по соседству
                     // — поиск в колоде существа с ценой на 1 больше призванного
                     // и в руку; монолит при этом теряет 1 жизнь (может и умереть)
@@ -420,6 +464,7 @@
                     else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
                     else if (def.ability === "spiritSummoner") summonSpiritCaller(u); // призыватель духов
                     else if (def.ability === "bombling") summonBombling(u); // бомблинг
+                    else if (def.waterMage) summonWaterMage(u); // водный маг: ловушка из колоды
                     if (def.berserkSummon) addBerserk(u, def.berserkSummon); // «Берсерк» — уже при призыве
                     // Способность героя (просил юзер): ПЕРВОЕ призванное игроком
                     // существо получает бонус — Горбаг +2 к урону, Эльмир +3 к
