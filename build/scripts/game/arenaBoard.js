@@ -125,6 +125,7 @@
                         // (варево строения не берёт — только существа)
                         root.board.userData.baseZone.eventMode = "none";
                         for (const u of B.units) {
+                            if (!spellAimable(u)) continue; // ward-цель не подсвечиваем
                             const ok = u.def.type === "unit"
                                 || (tg === "anyUnitDmg" && u.def.type === "building"
                                     && !def.spell.noBuildings);
@@ -138,7 +139,8 @@
                     }
                     if (tg === "ownUnit") { // жертва — только своё существо
                         root.board.userData.baseZone.eventMode = "none";
-                        for (const u of B.units) if (u.side === "p" && u.def.type === "unit") {
+                        for (const u of B.units) if (u.side === "p" && u.def.type === "unit"
+                            && spellAimable(u)) {
                             const rc = cellRect(u.col, u.row);
                             hi.rect(rc.x, rc.y, rc.w, rc.h);
                             hi.fill({ color: 0x7dc95e, alpha: 0.4 });
@@ -146,7 +148,7 @@
                         }
                         return;
                     }
-                    for (const u of B.units) if (u.side === "e") {
+                    for (const u of B.units) if (u.side === "e" && spellAimable(u)) {
                         const rc = cellRect(u.col, u.row);
                         hi.rect(rc.x, rc.y, rc.w, rc.h);
                         hi.fill({ color: 0xd05a3c, alpha: 0.4 });

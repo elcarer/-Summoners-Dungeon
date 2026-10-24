@@ -230,8 +230,8 @@
             A.iceStrikePick = function iceStrikePick(side) {
                 if (!B || !B.units) return null;
                 let best = null, bestScore = -Infinity;
-                for (const u of B.units) {
-                    if (u.def.type !== "unit" || u.spellWard) continue;
+                for (const u of spellTargets(B.units)) {
+                    if (u.def.type !== "unit") continue;
                     const near = iceStrikeVictims(u);
                     if (!near.length) continue;
                     let score = 0;
@@ -833,11 +833,10 @@
             // его карта призыва возвращается в руку владельца из любой зоны.
             // У токена (gobA/gobC/волк друида) карты призыва нет — просто
             // убирается. Полная рука возврат не блокирует.
-            // «Защита от заклинаний» (u.spellWard): «Смыв» — заклинание, такое
-            // существо не выбирается целью и не убирается (страховка на случай
-            // любого вызывающего, помимо валидации в applySpellPInner/ИИ).
+            // «Защита от заклинаний» отсеяна выбором цели (spellAimable) —
+            // сам эффект второй проверки не делает.
             A.bounceUnit = function bounceUnit(u) {
-                if (!u || !B.units.includes(u) || u.spellWard) return;
+                if (!u || !B.units.includes(u)) return;
                 const p = cellXY(u.col, u.row);
                 const id = cardIdOf(u.def);
                 removeUnit(u);
@@ -1657,24 +1656,22 @@
 
             // Цель свободного каста у игрока: атакующий (focus), если заклинание
             // может на него целиться, иначе автоцель как у «Горящих рун».
+            // «Защита от заклинаний» — общая проверка цели (spellAimable).
             A.runeTargetP = function runeTargetP(cardId, focus) {
                 const s = CARDS[cardId].spell;
                 if (s.target === "anyCell" || s.target === "none")
                     return autoTargetFor(cardId);
-                if (!focus || !B.units.includes(focus)) return autoTargetFor(cardId);
-                // «Защита от заклинаний»: на такое существо заклинание не целится
+                if (!focus || !B.units.includes(focus) || !spellAimable(focus))
+                    return autoTargetFor(cardId);
                 // «Гидроудар» целится и в существ ВРАГА — руна может навести его
                 // на атакующего юнита (обычное anyUnit — только на своих)
                 const anyUnitOk = s.hydroPunch ? focus.def.type === "unit"
-                        && !focus.spellWard
-                    : focus.side === "p"
-                        && focus.def.type === "unit" && !focus.spellWard;
+                    : focus.side === "p" && focus.def.type === "unit";
                 const ok = s.target === "anyUnit" ? anyUnitOk
                     : s.target === "ownUnit" ? focus.side === "p"
-                        && focus.def.type === "unit" && !focus.spellWard
+                        && focus.def.type === "unit"
                     : s.target === "anyUnitDmg" ? (focus.def.type === "unit"
-                            && !focus.spellWard)
-                        || (focus.def.type === "building" && !s.noBuildings)
+                        || (focus.def.type === "building" && !s.noBuildings))
                     : s.target === "enemyAny" ? focus.side !== "p"
                     : false;
                 return ok ? { col: focus.col, row: focus.row } : autoTargetFor(cardId);

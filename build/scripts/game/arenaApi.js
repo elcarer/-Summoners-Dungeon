@@ -101,7 +101,8 @@
                     : null),
                 // drag&drop (режим «Перетаскивание»): состояние для тестов
                 dragState() {
-                    return drag ? { idx: drag.idx, moved: drag.moved, over: drag.over } : null;
+                    return drag ? { idx: drag.idx, moved: drag.moved, over: drag.over,
+                        nodeIdx: drag.node ? drag.node.__handIdx : null } : null;
                 },
                 // геометрия первой карты руки (дизайн-координаты) — тесты «не закрывает поле»
                 handGeom() {
@@ -201,7 +202,7 @@
                 // оверлея-просмотра (п3)
                 selGlow() {
                     if (!root || !B || B.selected === null) return null;
-                    const n = root.cardsLayer.children[B.selected];
+                    const n = handNode(B.selected);
                     if (!n) return null;
                     const f = n.getChildByName("selframe");
                     if (!f) return null; // фолбэк-карта без свечения
@@ -249,7 +250,7 @@
                         eCards: root.hud.userData.eCardsT.text }
                     : null),
                 // узел карты руки (тесты: подсказка «−X» у энергии)
-                handCardNode: (idx) => (root && root.cardsLayer.children[idx]) || null,
+                handCardNode: (idx) => handNode(idx),
                 // пересборка руки (тесты: свежие узлы после подмены B.hand)
                 relayoutHand: () => { if (root) { layoutHand(); return true; } return false; },
                 // перерисовка HUD (тесты: сбросы/счётчики после подмен B.*)

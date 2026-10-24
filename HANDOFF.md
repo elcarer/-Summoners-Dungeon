@@ -3213,11 +3213,15 @@ dataCards.js: `STARTER_COLLECTIONS.wisdom`. Каталог 89 карт (83+6).
 **Механики.**
 - «Защита от заклинаний»: `u.spellWard` + метка wardMark (синий знак,
   снимается «Извлечением духа»). Два контура: (а) целью заклинаний не
-  выбирается — валидация во ВСЕХ ветках applySpellPInner (anyUnit,
-  anyUnitDmg, ownUnit×3, enemyAny), в onCellTap-прицеле, autoTargetFor,
-  runeTargetP, aiDmgTargets/aiBuffPick/aiCocoonPick, ИИ-цель «Смыва»
-  (фильтр `!spellWard` в enemyCastSpellEffectInner + страховка в
-  bounceUnit); (б) урона от
+  выбирается — ЕДИНАЯ проверка `spellAimable(u)` / `spellTargets(list)`
+  (arenaCore): на входе applySpellPInner (одна проверка на все целевые
+  ветки — anyUnit, anyUnitDmg, ownUnit×3, enemyAny; клеточные
+  anyCell/emptyCell/none существо не адресуют), в onCellTap-прицеле и
+  подсветке клеток, autoTargetFor, runeTargetP, iceStrikePick, во всех
+  списках целей ИИ (aiDmgTargets/aiBuffPick/aiCocoonPick/aiHydroPick/
+  aiWolfPick/aiNovaPick/aiSacrificePick/enemyCastSpellEffectInner) и
+  гейтах aiSpellPlayable; отдельные карты проверку не дублируют
+  (из bounceUnit страховка убрана — цель отсекается выбором); (б) урона от
   заклинаний не получает — флаг `A.spellCasting` ставят applySpellP
   (обёртка над …Inner), enemyCastSpellEffect (аналогично) и
   firewallTick; damageUnit при флаге молча съедает урон с текстом «✦
@@ -4300,3 +4304,43 @@ wis91/wis100/wis103 по 3⚡ у обеих сторон, wis92/существо
 выбирает незащищённое; гейт `aiSpellPlayable` (все защищены — false, есть
 незащищённый — true); обычный «Смыв» работает. Полный смоук не гонялся —
 правка точечная.
+
+## Волна «Централизованная „Защита от заклинаний“ + драг карты» (2026-10-24, проба ward_center_drag 28/28)
+
+**П1 (просил юзер).** Проверка `u.spellWard` больше не размазана по
+конкретным картам — одна точка выбора цели заклинания:
+- `arenaCore`: `spellAimable(u)` (существо можно выбрать целью заклинания)
+  и `spellTargets(list)` (фильтр списка целей). Дальше все выборы/фильтры
+  идут только через них.
+- Игрок: `onCellTap` (прицел), `applySpellPInner` — ОДНА проверка на входе
+  для всех целевых веток (anyUnit/anyUnitDmg/ownUnit×3/enemyAny; у
+  клеточных anyCell/emptyCell/none проверки нет — они не адресуют
+  существо), `autoTargetFor` (повтор «Горящими рунами»), `runeTargetP`
+  (руна-ловушка), подсветка клеток `redrawHighlight` не подсвечивает
+  ward-цель.
+- ИИ: все списки целей и гейты — `aiDmgTargets`, `aiBuffPick`,
+  `aiCocoonPick`, `aiHydroPick`, `aiWolfPick`, `aiNovaPick`,
+  `aiSacrificePick`, `iceStrikePick`, `enemyCastSpellEffectInner`,
+  `aiSpellPlayable`. Заодно закрыты дыры, где ward-цель раньше не
+  фильтровалась: стрелок «Атаки духами волков», цели «Круговой атаки»,
+  «Жертвоприношения», «Броска валуна», «Двойной атаки», гейты
+  «Извлечения духа» и «Природной мощи».
+- Из `bounceUnit` страховочная проверка убрана (прошлая волна) — она
+  дублировала выбор цели; урон от заклинаний по-прежнему гасит единый
+  `damageUnit` по флагу `A.spellCasting`.
+
+**П2 (баг юзера).** При перетаскивании карты призыва играла/рисовалась
+карта СПРАВА от неё. Причина: `hoverCard` поднимает наведённую карту
+наверх `cardsLayer` (порядок детей ≠ порядок руки), а `startCardDrag`
+брал узел как `children[idx]`. Теперь у узла есть метка `__handIdx`, а
+`handNode(idx)` ищет карту по ней; через него же работают `hoverCard`,
+`updateEnergyHint`, тест-хуки `handCardNode`/`selGlow`. `dragState()`
+дополнительно отдаёт `nodeIdx` (какой узел реально тащат).
+
+**Проверка.** `for_work/probe_ward_center_drag.mjs` (сервер 8183, Chrome
+9363): **28/28** — игрок не бьёт/не усиливает/не «смывает» ward-цель,
+повтор рун не берёт её автоцелью; ИИ не берёт ward в дротик/бафф/волков/
+круговую/жертву и не играет карты без незащищённых целей; драг после
+наведения тащит именно карту №2 и на поле появляется она. Регрессии:
+`probe_bounce_ward.mjs` **12/12**, `probe_arena_refactor.mjs` **23/23**.
+Полный смоук не гонялся — правки точечные.

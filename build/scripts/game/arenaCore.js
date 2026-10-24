@@ -87,6 +87,14 @@
             return Object.keys(CARDS).find((k) => CARDS[k] === def
                 || (def && def.__base && CARDS[k] === def.__base));
         };
+        // «Защита от заклинаний» (u.spellWard, способность героя Миры):
+        // существо нельзя выбрать целью заклинаний. Проверка ОДНА на весь бой
+        // — здесь. Все списки целей (игрок: onCellTap/applySpellPInner/
+        // autoTargetFor/runeTargetP; ИИ: aiDmgTargets/aiBuffPick/…; руны)
+        // фильтруются через spellTargets, поэтому отдельные карты свою
+        // проверку не дублируют.
+        A.spellAimable = (u) => !!u && !u.spellWard;
+        A.spellTargets = (list) => list.filter((u) => A.spellAimable(u));
         return A;
     };
 })();

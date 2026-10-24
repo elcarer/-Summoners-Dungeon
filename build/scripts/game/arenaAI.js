@@ -629,7 +629,7 @@
             A.aiSacrificePick = function aiSacrificePick() {
                 const dmg = CARDS.str11.spell.dmg;
                 let best = null, bestScore = 0;
-                for (const u of B.units) {
+                for (const u of spellTargets(B.units)) {
                     if (u.side !== "e" || u.def.type !== "unit") continue;
                     const victims = B.units.filter((v) => v.side === "p"
                         && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1
@@ -650,7 +650,8 @@
             // своих. Выбираем своё существо, у которого чужих соседей больше
             // и они опаснее; если выгоднее своих — заклинание не играем.
             A.aiNovaPick = function aiNovaPick() {
-                const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
+                const own = spellTargets(B.units.filter((v) => v.side === "e"
+                    && v.def.type === "unit"));
                 let best = null, bestScore = 0;
                 for (const v of own) {
                     let score = 0, foes = 0;
@@ -673,7 +674,8 @@
             // у которого впереди нет своих: лучше всего — чистая колонка до
             // базы игрока (урон в базу + волки на всём пути) или убийство.
             A.aiWolfPick = function aiWolfPick() {
-                const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
+                const own = spellTargets(B.units.filter((v) => v.side === "e"
+                    && v.def.type === "unit"));
                 let best = null, bestScore = -Infinity;
                 for (const u of own) {
                     let hit = null;
@@ -713,9 +715,9 @@
             // — самый живучий, для «Огненного дыхания» — крепкий атакующий.
             A.aiBuffPick = function aiBuffPick(def) {
                 const s = def.spell;
-                const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
-                    && !v.spellWard // «Защита от заклинаний»: целью заклинаний не выбирается
-                    && (!s.enchantFire || !v.enchantFire));
+                const own = spellTargets(B.units.filter((v) => v.side === "e"
+                    && v.def.type === "unit"
+                    && (!s.enchantFire || !v.enchantFire)));
                 if (!own.length) return null;
                 let best = null, bestScore = -Infinity;
                 for (const v of own) {
@@ -750,8 +752,8 @@
             // «Защитный кокон» — на своего под удар игрока (игрок ходит первым):
             // ценнее всего существо, которое вот-вот умрёт/движок.
             A.aiCocoonPick = function aiCocoonPick() {
-                const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
-                    && !v.spellWard);
+                const own = spellTargets(B.units.filter((v) => v.side === "e"
+                    && v.def.type === "unit"));
                 let best = null, bestScore = -Infinity;
                 for (const v of own) {
                     const att = unitAt(v.col, v.row + 1);
@@ -779,11 +781,10 @@
             };
             A.aiDmgTargets = function aiDmgTargets(def) {
                 const s = def.spell;
-                // «Защита от заклинаний» (u.spellWard): целью заклинаний
-                // не выбирается и урона от заклинаний не получает
-                return B.units.filter((v) => v.side === "p" && !v.spellWard
+                // «Защита от заклинаний» — общий фильтр целей (spellTargets)
+                return spellTargets(B.units.filter((v) => v.side === "p"
                     && (v.def.type === "unit"
-                        || (v.def.type === "building" && !s.noBuildings)));
+                        || (v.def.type === "building" && !s.noBuildings))));
             };
             // Выбор цели урона: добивание важнее «поцарапать» крупного;
             // иначе — максимум пользы на единицу урона (угроза × доля жизней),
@@ -938,8 +939,8 @@
             A.aiHydroPick = function aiHydroPick() {
                 let best = null, bestScore = 0;
                 const dmg = 1 + altarBonus("e");
-                for (const v of B.units) {
-                    if (v.side !== "p" || v.def.type !== "unit" || v.spellWard) continue;
+                for (const v of spellTargets(B.units)) {
+                    if (v.side !== "p" || v.def.type !== "unit") continue;
                     const kill = v.hp <= dmg;
                     let s = kill ? 3.2 + aiThreat(v) * 0.5 : aiThreat(v) * 0.55;
                     const r2 = v.row + 1; // его база — ряд игрока
@@ -991,14 +992,16 @@
                 // слабым метателем карту не переводим — держим для сильного
                 // из колоды (просил юзер: часть комбы в руке ждёт пару)
                 if (s.baseHit) {
-                    const throwers = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
+                    const throwers = spellTargets(B.units.filter((v) => v.side === "e"
+                        && v.def.type === "unit"));
                     if (!throwers.some((v) => v.curAtk >= 3 || v.curAtk >= B.playerBase)) return false;
                 }
                 // «Двойная атака» — берсерк платит жизнь за удар: вешаем
                 // на сильного (3+ урона) и крепкого (3+ жизней), либо на уже
                 // стоящего у базы врага (ряд 3+ — следующий марш в базу)
-                if (s.berserk && !B.units.some((v) => v.side === "e" && v.def.type === "unit"
-                    && ((v.curAtk >= 3 && v.hp >= 3) || (v.row >= 3 && v.curAtk >= 2)))) return false;
+                if (s.berserk && !spellTargets(B.units.filter((v) => v.side === "e"
+                    && v.def.type === "unit"
+                    && ((v.curAtk >= 3 && v.hp >= 3) || (v.row >= 3 && v.curAtk >= 2)))).length) return false;
                 // «Запутать руны» — сброс обеих рук: играем, только если у
                 // игрока карт больше, чем останется у нас после розыгрыша
                 if (s.discardHandDraw && B.hand.length <= B.eHand.length - 1) return false;
@@ -1016,10 +1019,11 @@
                 if (s.seek && !B.eDeck.length) return false;
                 // «Природная мощь»: есть свой крепыш (3+ жизни) — иначе +1 урона
                 // за энергию и карту не окупается
-                if (s.buffAtkByHp && !B.units.some((v) => v.side === "e"
-                    && v.def.type === "unit" && v.hp >= 3)) return false;
+                if (s.buffAtkByHp && !spellTargets(B.units.filter((v) => v.side === "e"
+                    && v.def.type === "unit" && v.hp >= 3)).length) return false;
                 // «Извлечение духа» — окупается, когда у цели 2+ свойств
-                if (s.purge && !B.units.some((v) => v.side === "p" && countProps(v) >= 2)) return false;
+                if (s.purge && !spellTargets(B.units.filter((v) => v.side === "p"))
+                    .some((v) => countProps(v) >= 2)) return false;
                 // «Похищение энергии» — крадём 2⚡, окупается при 2+⚡ у игрока
                 if (s.stealEnergy && B.energy < s.stealEnergy) return false;
                 // «Варка зелий» — в сбросах (своём или чужом) должно быть
@@ -1039,7 +1043,8 @@
                 // «Защитный кокон» — есть кому защищать и есть от кого: игрок
                 // ходит первым, поэтому кокон на своего под удар реально спасает
                 if (s.cocoon) {
-                    const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
+                    const own = spellTargets(B.units.filter((v) => v.side === "e"
+                        && v.def.type === "unit"));
                     const threat = own.some((v) => {
                         const a = unitAt(v.col, v.row + 1);
                         return a && a.side === "p" && a.def.type === "unit" && a.curAtk >= 2;
@@ -1050,26 +1055,27 @@
                 if (s.journey && !B.eDeck.slice(-Math.min(s.journey, B.eDeck.length))
                     .some((id) => CARDS[id] && CARDS[id].type === "unit")) return false;
                 // «Смыв» — есть существо игрока (желательно не токен);
-                // «Защита от заклинаний» целью заклинаний не выбирается
-                if (s.bounce && !B.units.some((v) => v.side === "p"
-                    && v.def.type === "unit" && !v.spellWard)) return false;
+                // «Защита от заклинаний» отсеяна общим фильтром целей
+                if (s.bounce && !spellTargets(B.units.filter((v) => v.side === "p"
+                    && v.def.type === "unit")).length) return false;
                 // «Рой ледо-пикси» — 4⚡ за 5 тел 1/1: держим, пока на поле
                 // есть хотя бы 3 свободные клетки (иначе призыв почти пуст)
                 if (s.iceSwarm && GRID * GRID - B.units.length < 3) return false;
                 // «Слабость» — есть чей-то урон, который стоит снять
-                if (s.debuffAtk && !B.units.some((v) => v.side === "p"
-                    && v.def.type === "unit" && !v.spellWard && v.curAtk > 0)) return false;
+                if (s.debuffAtk && !spellTargets(B.units.filter((v) => v.side === "p"
+                    && v.def.type === "unit" && v.curAtk > 0)).length) return false;
                 // «Гидроудар» — есть чьё-то существо: урон 1 и сдвиг к базе
-                if (s.hydroPunch && !B.units.some((v) => v.side === "p"
-                    && v.def.type === "unit" && !v.spellWard)) return false;
+                if (s.hydroPunch && !spellTargets(B.units.filter((v) => v.side === "p"
+                    && v.def.type === "unit")).length) return false;
                 // усиление/очарование — только если есть своё существо под него
                 // (огонь не дублируем; яд складывается — его можно докинуть);
                 // «Смыв»/«Слабость»/«Ледяной удар»/«Гидроудар» целятся в ИГРОКА —
                 // этот гейт их не касается
                 if (s.target === "anyUnit" && !s.bounce && !s.debuffAtk && !s.iceStrike
                     && !s.hydroPunch
-                    && !B.units.some((v) => v.side === "e"
-                    && v.def.type === "unit" && (!s.enchantFire || !v.enchantFire))) return false;
+                    && !spellTargets(B.units.filter((v) => v.side === "e"
+                        && v.def.type === "unit"
+                        && (!s.enchantFire || !v.enchantFire))).length) return false;
                 // дротик/варево/огнешар — только если есть цель
                 if (s.target === "anyUnitDmg" && !aiDmgTargets(def).length) return false;
                 return true;
@@ -1257,7 +1263,8 @@
                 const aimOff = (u) => { if (u && u.def.targetDiscount) castTargetOff = 1; };
                 if (s.nova) { // «Круговая атака»: своё существо, где чужих соседей
                     // больше и они опаснее своих (своих тоже задевает)
-                    const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit");
+                    const own = spellTargets(B.units.filter((v) => v.side === "e"
+                        && v.def.type === "unit"));
                     let best = aiNovaPick();
                     if (focus && own.includes(focus)) best = focus; // руна
                     aimOff(best);
@@ -1272,8 +1279,8 @@
                     // «Гидроудар» (wis99): 1 урон + сдвиг К ЕГО базе,
                     // цель — самая опасная (фокус руны, если годится)
                     if (s.hydroPunch) {
-                        const foes = B.units.filter((v) => v.side === "p"
-                            && v.def.type === "unit" && !v.spellWard);
+                        const foes = spellTargets(B.units.filter((v) => v.side === "p"
+                            && v.def.type === "unit"));
                         let best = aiHydroPick();
                         if (focus && foes.includes(focus)) best = focus;
                         if (!best) return;
@@ -1286,10 +1293,10 @@
                     }
                     // «Смыв» (wis85): существо игрока — в его руку; цель —
                     // самая опасная не-токенная единица (токены — крайний случай).
-                    // «Защита от заклинаний» (u.spellWard): не выбирается целью.
+                    // «Защита от заклинаний» отсеяна общим фильтром целей.
                     if (s.bounce) {
-                        const foes = B.units.filter((v) => v.side === "p"
-                            && v.def.type === "unit" && !v.spellWard);
+                        const foes = spellTargets(B.units.filter((v) => v.side === "p"
+                            && v.def.type === "unit"));
                         const real = foes.filter((v) => !v.token);
                         const pool = real.length ? real : foes;
                         const best = pool.slice()
@@ -1303,9 +1310,8 @@
                     }
                     // «Слабость» (wis86): −2 урона сильнейшему существу игрока
                     if (s.debuffAtk) {
-                        const best = B.units
-                            .filter((v) => v.side === "p" && v.def.type === "unit"
-                                && !v.spellWard) // защитой от заклинаний не выбирается
+                        const best = spellTargets(B.units
+                            .filter((v) => v.side === "p" && v.def.type === "unit"))
                             .sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
                         if (!best) return;
                         aimOff(best);
@@ -1323,7 +1329,7 @@
                     // сторона, а чей сосед попадёт под удар (iceStrikePick)
                     if (s.iceStrike) {
                         const focusOk = focus && B.units.includes(focus)
-                            && focus.def.type === "unit" && !focus.spellWard
+                            && focus.def.type === "unit" && spellAimable(focus)
                             && iceStrikeVictims(focus).length > 0;
                         const target = focusOk ? focus : aiIceStrikeTarget();
                         if (!target) return;
@@ -1336,10 +1342,10 @@
                         sfx("aqua");
                         return;
                     }
-                    const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit"
-                        && !v.spellWard // «Защита от заклинаний»: не выбирается
+                    const own = spellTargets(B.units.filter((v) => v.side === "e"
+                        && v.def.type === "unit"
                         && (!s.enchantFire || !v.enchantFire)
-                        && (!s.venom || !v.venom));
+                        && (!s.venom || !v.venom)));
                     // очарование «Огненного дыхания» вешается на крепкого атакующего
                     // (ему жить и бить, чтобы тянуть заклинания), «Природная мощь» —
                     // на самого живучего (+урона = жизням), усиление — на того, кто
@@ -1410,7 +1416,7 @@
                             sfx("up");
                         }
                     } else if (s.cocoon) { // «Защитный кокон» — своему под удар
-                        const own = B.units.filter((v) => v.side === "e");
+                        const own = spellTargets(B.units.filter((v) => v.side === "e"));
                         let best = aiCocoonPick();
                         if (focus && own.includes(focus)) best = focus;
                         if (best) addProtect(best);
@@ -1449,7 +1455,7 @@
                     cultRowSpawn("e", row);
                 }
                 if (s.target === "enemyAny") {
-                    const targets = B.units.filter((u) => u.side === "p");
+                    const targets = spellTargets(B.units.filter((u) => u.side === "p"));
                     // если база добивается — бьём базу, даже когда на поле есть
                     // существа (прежний ИИ всегда бил существо и упускал летал)
                     const baseDmg = s.dmg + heroSpellBonus(def, "e", false, true);
@@ -1539,7 +1545,8 @@
                     }
                 }
                 if (s.baseHit) { // «Бросок валуна»: своё сильнейшее бьёт базу героя — это его атака
-                    const own = B.units.filter((v) => v.side === "e" && v.def.type === "unit")
+                    const own = spellTargets(B.units.filter((v) => v.side === "e"
+                        && v.def.type === "unit"))
                         .slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row));
                     if (own[0]) { baseHit("e", own[0]); triggerAttackTraps(own[0]); }
                 }

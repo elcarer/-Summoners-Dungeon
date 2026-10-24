@@ -123,7 +123,7 @@
                         else deselect();
                         return;
                     }
-                    const typeOk = u && !u.spellWard // «Защита от заклинаний» — целью заклинаний не выбирается
+                    const typeOk = spellAimable(u) // «Защита от заклинаний» — единая проверка цели
                         && (tg === "anyUnitDmg"
                             ? (u.def.type === "unit"
                                 || (u.def.type === "building" && !sdef.spell.noBuildings))
@@ -247,12 +247,21 @@
             };
             A.applySpellPInner = function applySpellPInner(cardId, target, free = false, opts = null) {
                 const def = CARDS[cardId];
-                if (def.spell.target === "anyUnit") { // усиление/Смыв/Слабость
+                const tg = def.spell.target;
+                // «Защита от заклинаний» — ОДНА проверка на входе: заклинание,
+                // адресующее клетку с существом, не может выбрать ward-цель.
+                // Массовые и клеточные (none/anyCell/emptyCell) существо не
+                // адресуют — им эта проверка не нужна.
+                if (tg !== "none" && tg !== "anyCell" && tg !== "emptyCell"
+                    && target && target.col !== undefined) {
+                    const aimed = unitAt(target.col, target.row);
+                    if (aimed && !spellAimable(aimed)) return false;
+                }
+                if (tg === "anyUnit") { // усиление/Смыв/Слабость
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
-                    // «Защита от заклинаний» (u.spellWard): целью заклинаний
-                    // не выбирается — даже своими (просил юзер)
-                    if (!u || u.def.type !== "unit" || u.spellWard) return false;
+                    // тип карты проверяем здесь; защиту уже отсеял вход
+                    if (!u || u.def.type !== "unit") return false;
                     const p = cellXY(u.col, u.row);
                     if (def.spell.iceStrike) { // «Ледяной удар»: цель бьёт соседа
                         const victim = iceStrikeVictim(u);
@@ -330,9 +339,8 @@
                 if (def.spell.target === "anyUnitDmg") { // дротик: существо или строение; варево — только существо
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
-                    // «Защита от заклинаний» (u.spellWard): целью заклинаний
-                    // не выбирается (урон, пурж, кокон — всё мимо)
-                    if (!u || u.spellWard || (u.def.type !== "unit"
+                    // защиту отсеял единый вход; здесь — допустимый тип цели
+                    if (!u || (u.def.type !== "unit"
                         && (u.def.type !== "building" || def.spell.noBuildings))) return false;
                     if (def.spell.purge) { // «Извлечение духа»: снять все свойства, база лечится за каждое
                         const n = purgeUnit(u);
@@ -372,20 +380,20 @@
                 if (def.spell.target === "ownUnit" && def.spell.baseHit) { // «Бросок валуна»: своё существо бьёт базу врага — это его атака
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
-                    if (!u || u.side !== "p" || u.def.type !== "unit" || u.spellWard) return false;
+                    if (!u || u.side !== "p" || u.def.type !== "unit") return false;
                     baseHit("p", u);
                     triggerAttackTraps(u);
                 }
                 if (def.spell.target === "ownUnit" && def.spell.wolfVolley) { // «Атака духами волков»: Выстрел + волки на пути
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
-                    if (!u || u.side !== "p" || u.def.type !== "unit" || u.spellWard) return false;
+                    if (!u || u.side !== "p" || u.def.type !== "unit") return false;
                     wolfVolley(u);
                 }
                 if (def.spell.target === "ownUnit" && def.spell.sacrifice) { // жертва: убить своё, ударить соседей
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
-                    if (!u || u.side !== "p" || u.def.type !== "unit" || u.spellWard) return false;
+                    if (!u || u.side !== "p" || u.def.type !== "unit") return false;
                     const p = cellXY(u.col, u.row);
                     killUnit(u, null);
                     floatText(p.x, p.y - 45, "☠", 0xef9f8c);
@@ -484,8 +492,8 @@
                         sfx("rocket");
                     } else if (target.col !== undefined) {
                         const u = unitAt(target.col, target.row);
-                        // «Защита от заклинаний»: целью заклинаний не выбирается
-                        if (!u || u.side === "p" || u.spellWard) return false;
+                        // защиту отсеял единый вход; тут — только сторона
+                        if (!u || u.side === "p") return false;
                         damageUnit(u, def.spell.dmg + heroSpellBonus(def, "p",
                             u.def.type === "unit", true), null, "rocket");
                     } else return false;
@@ -511,8 +519,8 @@
                 const def = CARDS[cardId];
                 const tg = def.spell.target;
                 if (tg === "anyUnit" && def.spell.hydroPunch) { // «Гидроудар»
-                    const foes = B.units.filter((u) => u.side !== "p"
-                        && u.def.type === "unit" && !u.spellWard);
+                    const foes = spellTargets(B.units.filter((u) => u.side !== "p"
+                        && u.def.type === "unit"));
                     const best = foes.slice().sort((a, b) =>
                         (b.curAtk - a.curAtk) || (a.row - b.row))[0];
                     return best ? { col: best.col, row: best.row } : null;
@@ -522,21 +530,21 @@
                     return pick ? { col: pick.unit.col, row: pick.unit.row } : null;
                 }
                 if (tg === "anyUnit" || tg === "ownUnit") {
-                    const own = B.units.filter((u) => u.side === "p" && u.def.type === "unit"
-                        && !u.spellWard); // «Защита от заклинаний» не выбирается
+                    const own = spellTargets(B.units.filter((u) => u.side === "p"
+                        && u.def.type === "unit"));
                     const best = own.slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.row - a.row))[0];
                     return best ? { col: best.col, row: best.row } : null;
                 }
                 if (tg === "anyUnitDmg") {
                     if (def.spell.cocoon) { // кокон — своему крепышу
-                        const own = B.units.filter((u) => u.side === "p" && !u.spellWard);
+                        const own = spellTargets(B.units.filter((u) => u.side === "p"));
                         const best = own.slice().sort((a, b) => (b.hp - a.hp) || (b.curAtk - a.curAtk))[0];
                         return best ? { col: best.col, row: best.row } : null;
                     }
                     if (def.spell.purge) { // дух — чужой самый «заряженный» объект
                         let best = null, bestN = 0;
-                        for (const u of B.units) {
-                            if (u.side === "p" || u.spellWard) continue;
+                        for (const u of spellTargets(B.units)) {
+                            if (u.side === "p") continue;
                             const n = countProps(u);
                             if (n > bestN) { bestN = n; best = u; }
                         }
@@ -545,9 +553,9 @@
                     const dmg = def.spell.drainAll
                         ? Math.max(0, B.energy) + altarBonus("p") // повтор — цена не вычитается
                         : spellHitDmg(def);
-                    const targets = B.units.filter((u) => u.side !== "p" && !u.spellWard
+                    const targets = spellTargets(B.units.filter((u) => u.side !== "p"
                         && (u.def.type === "unit"
-                            || (u.def.type === "building" && !def.spell.noBuildings)));
+                            || (u.def.type === "building" && !def.spell.noBuildings))));
                     if (!targets.length) return null;
                     const kills = targets.filter((v) => v.hp <= dmg);
                     const best = (kills.length ? kills : targets)
@@ -555,11 +563,12 @@
                     return { col: best.col, row: best.row };
                 }
                 if (tg === "ownBuilding") { // раскопки — первая своя постройка
-                    const own = B.units.filter((u) => u.side === "p" && u.def.type === "building");
+                    const own = spellTargets(B.units.filter((u) => u.side === "p"
+                        && u.def.type === "building"));
                     return own.length ? { col: own[0].col, row: own[0].row } : null;
                 }
                 if (tg === "enemyAny") {
-                    const targets = B.units.filter((u) => u.side !== "p");
+                    const targets = spellTargets(B.units.filter((u) => u.side !== "p"));
                     if (!targets.length) return { base: true };
                     const best = targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
                     return { col: best.col, row: best.row };

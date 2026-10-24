@@ -98,6 +98,7 @@
             A.makeCardNode = function makeCardNode(card, idx) {
                 const def = CARDS[card];
                 const c = new PIXI.Container();
+                c.__handIdx = idx; // индекс в руке: слой может переставляться ховером
                 if (def.img) {
                     const face = new PIXI.Sprite(uiTex(`cards/${def.img}.png`));
                     face.anchor.set(0.5, 1); // оригинальный размер спрайта
@@ -196,6 +197,17 @@
                 return c;
             };
 
+            // Узел карты по индексу В РУКЕ. hoverCard поднимает наведённую карту
+            // наверх слоя, поэтому порядок cardsLayer.children перестаёт
+            // совпадать с порядком руки: брать детей «по индексу» нельзя —
+            // иначе перетаскивается соседняя карта (баг юзера). Метку __handIdx
+            // ставит makeCardNode, порядок детей для неё не важен.
+            A.handNode = function handNode(idx) {
+                if (!root) return null;
+                return root.cardsLayer.children.find((n) => n.__handIdx === idx)
+                    || root.cardsLayer.children[idx] || null;
+            };
+
             A.layoutHand = function layoutHand() {
                 for (const n of root.cardsLayer.children) n.destroy({ children: true });
                 root.cardsLayer.removeChildren();
@@ -268,7 +280,7 @@
                 const ht = root.hud.userData.pEnergyCostT;
                 const id = hoverIdx !== null && B && B.phase === "player" && !overlay
                     ? B.hand[hoverIdx] : null;
-                if (hoverIdx !== null && !root.cardsLayer.children[hoverIdx]) hoverIdx = null;
+                if (hoverIdx !== null && !handNode(hoverIdx)) hoverIdx = null;
                 if (!id || !CARDS[id]) { ht.visible = false; return; }
                 const c = effCost(id);
                 ht.text = "-" + c;
@@ -298,7 +310,7 @@
                     return;
                 }
                 if (!on) lowerRaisedCard();
-                const node = root.cardsLayer.children[idx];
+                const node = handNode(idx);
                 if (!node) return;
                 const raised = on || B.selected === idx;
                 if (on && !raisedCard) {
@@ -318,7 +330,7 @@
                 if (!G.settings.dragSummon || B.phase !== "player" || overlay || B.discarding || B.picking) return;
                 const def = CARDS[B.hand[idx]];
                 if (!def || (def.type !== "unit" && def.type !== "building")) return;
-                const node = root.cardsLayer.children[idx];
+                const node = handNode(idx);
                 if (!node) return;
                 const p = toDesign(e.global);
                 drag = { idx, node, homeX: node.x, homeY: node.y, sx: p.x, sy: p.y, moved: false, over: null };
