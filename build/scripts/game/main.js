@@ -131,6 +131,11 @@
             bear: { ...(await assets.loadCharacter("./images/sprites/bear_256")), scale: 1.1 },
             ent: { ...(await assets.loadCharacter("./images/sprites/ent_256")), scale: 1.3 },
             plant: { ...(await assets.loadCharacter("./images/sprites/plant_256")), scale: 0.8 },
+            // листы элементалей Мудрости (просил юзер): вода/лёд — water_el,
+            // воздух/песок — air_el, зимние/выросшие духи и ледо-пикси — spirit
+            water_el: await assets.loadCharacter("./images/sprites/water_el_256"),
+            air_el: await assets.loadCharacter("./images/sprites/air_el_256"),
+            spirit: await assets.loadCharacter("./images/sprites/spirit_256"),
         };
 
         // ── UI-корень: базовое разрешение 1920×1080, вписывается в окно ────

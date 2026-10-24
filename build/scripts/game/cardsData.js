@@ -451,14 +451,14 @@
         // Миры (просил юзер).
         // «Воздушный элементаль»: Полёт — как у «Мини-феи» (grw14)
         wis81: { type: "unit", cost: 3, atk: 3, hp: 4, speed: 1,
-                 creature: "goblin", ability: "flyOver",
+                 creature: "goblin", sheet: "air_el", ability: "flyOver",
                  subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "wisdom",
                  color: 0x3a6ea8, img: "wisdom/81" },
         // «Водный элементаль»: не активирует ловушки — ни наступая, ни
         // призываясь на клетку с ловушкой, ни идя на приманку
         wis82: { type: "unit", cost: 2, atk: 2, hp: 3, speed: 1,
-                 creature: "goblin", ability: "noTraps",
+                 creature: "goblin", sheet: "water_el", ability: "noTraps",
                  subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "wisdom",
                  color: 0x3a6ea8, img: "wisdom/82" },
@@ -500,14 +500,14 @@
         // «Зимние духи»: когда срабатывает любая ловушка (клеточная, отмена,
         // руна, приманка, ряд), получает +1 к урону навсегда (bonusAtk)
         wis89: { type: "unit", cost: 1, atk: 0, hp: 1, speed: 1,
-                 creature: "goblin", trapGrow: true,
+                 creature: "goblin", sheet: "spirit", trapGrow: true,
                  subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "wisdom",
                  color: 0x3a6ea8, img: "wisdom/89" },
         // «Снежный элементаль»: 2/2, при атаке по существу противника цель
         // получает −1 к урону (постоянно, как «Слабость»)
         wis90: { type: "unit", cost: 2, atk: 2, hp: 2, speed: 1,
-                 creature: "goblin", frostAttack: true,
+                 creature: "goblin", sheet: "water_el", frostAttack: true,
                  subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "wisdom",
                  color: 0x3a6ea8, img: "wisdom/90" },
@@ -530,7 +530,7 @@
         // «Ледяной элементаль»: 4/4, Сокрушение — общий флаг crush
         // (лишний урон после удара уходит в базу противника)
         wis93: { type: "unit", cost: 4, atk: 4, hp: 4, speed: 1,
-                 creature: "goblin", crush: true,
+                 creature: "goblin", sheet: "water_el", crush: true,
                  subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "wisdom",
                  color: 0x3a6ea8, img: "wisdom/93" },
@@ -544,14 +544,14 @@
         // «Старший ледовик»: после атаки накладывает «Заморожен 1» на
         // существ СЛЕВА И СПРАВА от СЕБЯ (постройки не морозятся)
         wis95: { type: "unit", cost: 5, atk: 5, hp: 6, speed: 1,
-                 creature: "goblin", frostNeighbors: true,
+                 creature: "goblin", sheet: "water_el", frostNeighbors: true,
                  subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "wisdom",
                  color: 0x3a6ea8, img: "wisdom/95" },
         // «Выросшие духи»: после перемещения бесплатно разыгрывает ловушку
         // из руки владельца на пустую соседнюю (верт/гориз) клетку
         wis96: { type: "unit", cost: 3, atk: 1, hp: 3, speed: 1,
-                 creature: "goblin", trapOnMove: true,
+                 creature: "goblin", sheet: "spirit", trapOnMove: true,
                  subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "wisdom",
                  color: 0x3a6ea8, img: "wisdom/96" },
@@ -640,7 +640,7 @@
         // «Песчаный дух»: 9/9 за 7⚡, в начале каждого СВОЕГО хода теряет
         // 1 урон и 1 жизнь (урон не ниже нуля; на 1♥ погибает от износа).
         wis109: { type: "unit", cost: 7, atk: 9, hp: 9, speed: 1,
-                  creature: "goblin", sandDecay: true,
+                  creature: "goblin", sheet: "air_el", sandDecay: true,
                   subtype: "elemental", // подтип — по спеке юзера (чат)
                   rarity: "epic", elem: "wisdom",
                   color: 0x3a6ea8, img: "wisdom/109" },
@@ -649,7 +649,7 @@
         // без траты энергии. Каст идёт от хозяина выбранной колоды, поэтому
         // «чужая» половина эффекта может ударить и по владельцу штормовика.
         wis110: { type: "unit", cost: 6, atk: 6, hp: 6, speed: 1,
-                  creature: "goblin", stormer: true,
+                  creature: "goblin", sheet: "air_el", stormer: true,
                   subtype: "elemental", // подтип — по спеке юзера (чат)
                   rarity: "epic", elem: "wisdom",
                   color: 0x3a6ea8, img: "wisdom/110" },
@@ -683,7 +683,7 @@
         // Ледо-пикси из «Роя ледо-пикси» (wis103) — служебная карта без
         // лица: Элементаль 1/1 с «Полётом», спавнится только заклинанием.
         icePixie: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
-                    creature: "goblin", ability: "flyOver",
+                    creature: "goblin", sheet: "spirit", ability: "flyOver",
                     subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                     rarity: "common", elem: "wisdom",
                     color: 0x3a6ea8 },
