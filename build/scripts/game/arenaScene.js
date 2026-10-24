@@ -270,6 +270,7 @@
                     else if (stumpPanel) closeStumpPanel(); // «Пень обряда» — оставить как было
                     else if (brewPanel) closeBrewPanel(); // «Варка зелий» — без выбора
                     else if (seekPanel) finishSeek(); // «Поиск знаний» — взять, что выбрано
+                    else if (grimPanel) closeGrimPanel(); // «Гримуар инея» — выбор сделан, просто закрыть
                     else closeRunesPanel(); // «Поиск рун» — отмена выбора
                     return;
                 }

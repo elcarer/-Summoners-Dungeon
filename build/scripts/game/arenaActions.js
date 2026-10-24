@@ -152,8 +152,19 @@
                         }
                         B.energy -= effCost(B.hand[B.selected]); // цена ловушки
                         const cardId = spendCard(B.selected);
-                        if (def.trap.effect === "sporeCurse") addSpores(u);
-                        else armTrap("p", cardId, 0, 0, u);
+                        if (def.trap.effect === "sporeCurse") {
+                            // «Битва умов» (wis114) врага отменяет и споры:
+                            // карта и энергия потрачены, эффект не срабатывает
+                            if (trapPlayCountered("p")) {
+                                const sp = cellXY(u.col, u.row);
+                                floatText(sp.x, sp.y - 60,
+                                    "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                            } else addSpores(u);
+                        } else if (!armTrap("p", cardId, 0, 0, u)) {
+                            const sp = cellXY(u.col, u.row);
+                            floatText(sp.x, sp.y - 60,
+                                "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                        }
                         deselect();
                         layoutHand();
                         redrawHighlight();
@@ -167,8 +178,13 @@
                     if (occupant && def.trap.effect !== "entangle") { deselect(); return; }
                     B.energy -= effCost(B.hand[B.selected]); // цена ловушки
                     const cardId = spendCard(B.selected);
-                    armTrap("p", cardId, col, row);
-                    if (occupant) triggerCellTraps(occupant); // сработала сразу
+                    const armed = armTrap("p", cardId, col, row);
+                    if (!armed) { // «Битва умов» (wis114) врага: ловушка не ставится
+                        const sp = cellXY(col, row);
+                        floatText(sp.x, sp.y - 60,
+                            "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                    }
+                    if (armed && occupant) triggerCellTraps(occupant); // сработала сразу
                     deselect();
                     layoutHand();
                     redrawHighlight();
@@ -510,6 +526,7 @@
                 if (def.spell.search) openRunesPanel(def.spell.search); // выбор поверх боя
                 if (def.spell.searchUnit) openRunesPanel(def.spell.searchUnit, "unit"); // «Рунное гадание»
                 if (def.spell.seek) openSeekPanel(def.spell.seek, def.spell.seekPicks || 1); // «Поиск знаний»
+                if (def.spell.grim) openGrimPanel(); // «Гримуар инея»: выбор типа + верхние 4
                 if (def.spell.journey) openJourneyPanel(def.spell.journey);
                 if (def.spell.discardPick) openBrewPanel(); // «Варка зелий»: выбор из сбросов
                 return true;

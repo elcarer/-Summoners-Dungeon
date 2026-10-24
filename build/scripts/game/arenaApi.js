@@ -150,6 +150,11 @@
                     top: [...seekTop], taken: [...seekTaken], left: seekPicks }),
                 seekPick(idx) { pickSeek(idx); },
                 seekDone() { finishSeek(); },
+                // «Гримуар инея» (wis113, тесты): стадия панели и выбор типа
+                grimState: () => ({ open: !!grimPanel, picking: !!(B && B.picking),
+                    stage: grimStage, type: grimType, top: [...grimTop] }),
+                grimPick(type) { pickGrimType(type); },
+                grimDone() { closeGrimPanel(); },
                 // «Старший ледовик»/«Выросшие духи» (тесты): способности напрямую
                 _frostNeighbors(col, row) {
                     const a = unitAt(col, row);

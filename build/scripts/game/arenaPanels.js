@@ -175,6 +175,101 @@
                 drawSeekPanel(); // карт осталось меньше — перерисовать
             };
 
+            // ── Панель «Гримуара инея» (wis113): два шага, как у «Пня обряда».
+            // Шаг 1 — выбрать тип карты («призыв»/«ловушка»/«заклинание»/
+            // «постройка»). Шаг 2 — посмотреть верхние 4 карты колоды: все
+            // карты выбранного типа уже взяты в руку, остальные сброшены;
+            // взятые показаны в полную силу, сброшенные затемнены. «Готово»
+            // (или Esc) закрывает. В колоде пусто — эффект вхолостую.
+            A.grimPanel = null;
+            A.grimStage = null; // "type" | "show"
+            A.grimType = null;
+            A.grimTop = [];
+            A.closeGrimPanel = function closeGrimPanel() {
+                if (grimPanel) {
+                    grimPanel.destroy({ children: true });
+                    grimPanel = null;
+                }
+                grimStage = null;
+                grimType = null;
+                grimTop = [];
+                if (B) B.picking = false;
+            };
+            A.openGrimPanel = function openGrimPanel() {
+                closeGrimPanel();
+                if (!B.deck.length) return; // смотреть нечего — эффект вхолостую
+                B.picking = true;
+                grimStage = "type";
+                drawGrimPanel();
+            };
+            A.pickGrimType = function pickGrimType(type) { // розыгрыш: забрать/сбросить сразу
+                if (!B || !B.picking || grimStage !== "type") return;
+                grimType = type;
+                const k = Math.min(4, B.deck.length);
+                grimTop = k ? B.deck.splice(B.deck.length - k, k) : []; // верх колоды — конец массива
+                const taken = grimTop.filter((id) => CARDS[id].type === type);
+                const rest = grimTop.filter((id) => CARDS[id].type !== type);
+                if (taken.length) B.hand.push(...taken);
+                if (rest.length) B.discard.push(...rest);
+                sfx("chpoc");
+                grimStage = "show";
+                layoutHand();
+                refreshHud();
+                drawGrimPanel();
+            };
+            A.drawGrimPanel = function drawGrimPanel() {
+                if (grimPanel) {
+                    grimPanel.destroy({ children: true });
+                    grimPanel = null;
+                }
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("grim.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t(grimStage === "type" ? "grim.hintType" : "grim.hintShow",
+                    { type: grimType ? t(`grim.${grimType}`) : "" }), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                if (grimStage === "type") {
+                    // два ряда по две кнопки (рамка 285..1635, как у прочих панелей)
+                    const rows = [["unit", "trap"], ["spell", "building"]];
+                    rows.forEach((pair, r) => pair.forEach((type, c) => {
+                        node.addChild(globalThis.GAME_UI.button(ctx, {
+                            tex: "button_menu.png", label: t(`grim.${type}`),
+                            x: c ? 1210 : 710, y: r ? 640 : 480, scale: 1,
+                            onTap: () => pickGrimType(type),
+                        }));
+                    }));
+                } else {
+                    const m = grimTop.length;
+                    const spread = Math.min(210, 1260 / Math.max(1, m));
+                    grimTop.forEach((cardId, idx) => {
+                        const okType = CARDS[cardId].type === grimType;
+                        const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                        c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                        if (!okType) c.alpha = 0.4; // сброшено
+                        node.addChild(c);
+                    });
+                    node.addChild(globalThis.GAME_UI.button(ctx, {
+                        tex: "button_menu.png", label: t("grim.ok"), x: 960, y: 762, scale: 1,
+                        onTap: closeGrimPanel,
+                    }));
+                }
+                root.addChild(node);
+                grimPanel = node;
+            };
+
             // ── Панель «Трёх монолитов» (grw26): поиск по ВСЕЙ колоде существа
             // заданной цены — одно в руку. Триггер — призыв своего существа по
             // соседству с монолитом (см. summonUnit); если монолитов несколько,

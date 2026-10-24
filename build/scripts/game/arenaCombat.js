@@ -416,6 +416,37 @@
                 return true;
             };
 
+            // «Элементаль серы» (wis115): после призыва все соседние (верт/гориз)
+            // существа ОБЕИХ сторон теряют 2 урона и 1 жизнь. Урон — постоянная
+            // «Слабость» (минус в bonusAtk, клампит recalcAuras); жизнь
+            // снимается напрямую (не входящий урон: защита и реакции на удар
+            // не срабатывают, как у «Песчаного духа»). На 0♥ сосед погибает.
+            A.summonSulfur = function summonSulfur(u) {
+                if (!B.units.includes(u)) return false; // мог умереть от мины при призыве
+                const near = B.units.filter((v) => v !== u && v.def.type === "unit"
+                    && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
+                if (!near.length) return false;
+                for (const v of near) {
+                    v.bonusAtk = (v.bonusAtk || 0) - 2;
+                    v.hp -= 1;
+                    const p = cellXY(v.col, v.row);
+                    floatText(p.x, p.y - 60, "−2⚔ −1♥", 0xef9f8c);
+                    punch(v.node);
+                }
+                recalcAuras();
+                sfx("acid");
+                heroElementalDraw(u); // способность элементаля
+                for (const v of near.slice()) {
+                    if (!B.units.includes(v)) continue; // каскад смерти соседа
+                    const an = v.node.getChildByName("atk");
+                    if (an) an.text = String(v.curAtk);
+                    const hn = v.node.getChildByName("hp");
+                    if (hn) hn.text = String(Math.max(0, v.hp));
+                    if (v.hp <= 0) killUnit(v, null);
+                }
+                return true;
+            };
+
             // Способности, которые «Озёрная дева» (wis111) может скопировать
             // у соседнего существа. Статы/подтип/арт/лист не копируются —
             // «способность», а не превращение в другое существо.
@@ -425,6 +456,7 @@
                 "crush", "thicket", "sandDecay", "leaderAura", "berserkSummon",
                 "keeperScale", "energyToStats", "animalCost", "targetDiscount",
                 "spellBuffAura", "sisterDraw", "plantEcho", "wolfSummon",
+                "trapCancel", "sulfurBurst",
             ];
             // Копирование способностей в per-unit копию def (как purgeUnit):
             // исходная карта каталога не меняется, cardIdOf узнаёт карту по
@@ -475,8 +507,10 @@
             // с ловушкой, сходит на клетку приманки вместо намеченной — и получает
             // 1 урона. Приманка одноразовая; занятая клетка приманки не манит.
             A.lureRedirect = function lureRedirect(u, fromCol, fromRow, toCol, toRow) {
-                // «Водный элементаль» (wis82) на приманку не ведётся
-                if (u.def.ability === "noTraps") return [toCol, toRow];
+                // «Водный элементаль» (wis82) на приманку не ведётся;
+                // «Дух реки» (wis112) тоже: перенаправление и урон — эффект
+                // приманки, а он отменяет эффекты активируемых им ловушек
+                if (u.def.ability === "noTraps" || u.def.trapCancel) return [toCol, toRow];
                 const foe = u.side === "p" ? "e" : "p";
                 const i = B.traps[foe].findIndex((tr) => tr.def.trap.effect === "lure"
                     && Math.abs(tr.col - fromCol) + Math.abs(tr.row - fromRow) === 1
@@ -578,6 +612,16 @@
                 floatText(p.x, p.y - 60, "?!", 0xe08cd0);
                 fxEvent("trap", { x: p.x, y: p.y - 8, scale: 0.9 });
                 const echo = trapEchoOnce(side); // первая ловушка боя — флаг потрачен
+                // «Дух реки» (wis112): активированная им ловушка снимается,
+                // но её эффект отменяется (спека юзера). Считается сработавшей
+                // («Зимние духи», «Путь воды»); «Роща лоз» тратит флаг на
+                // первом срабатывании, повторять нечего — как у отмен.
+                if (u.def.trapCancel) {
+                    floatText(p.x, p.y - 96,
+                        "✕ " + GAME_LOC.t(`card.${cardIdOf(trap.def)}.name`), 0x8cd0ef);
+                    heroElementalDraw(u); // способность элементаля
+                    return;
+                }
                 applyCellTrap(trap, side, u);
                 if (echo && B.units.includes(u)) applyCellTrap(trap, side, u);
             };
@@ -1545,7 +1589,17 @@
             // ── Ловушки ─────────────────────────────────────────────────────────
             // Мины хранят клетку (col/row); руна («Наскальная рунопись») —
             // само существо (unit) и ездит с ним. Лимита ловушек нет (просил юзер).
+            // «Битва умов» (wis114) противника: разыгранная ловушка отменяется
+            // (зеркало counterSpell/counterSummon). Гейт на ВСЕ пути постановки
+            // ловушек картой — рука, колода (руна/водный маг/штормовик),
+            // повтор: armTrap зовёт его первым делом.
+            A.trapPlayCountered = function trapPlayCountered(side) {
+                return !!counterTrapConsume(side === "p" ? "e" : "p", "counterTrap");
+            };
+
             A.armTrap = function armTrap(side, cardId, col, row, unit = null) {
+                if (CARDS[cardId] && CARDS[cardId].type === "trap"
+                    && trapPlayCountered(side)) return false;
                 B.traps[side].push({ def: CARDS[cardId], col, row, unit });
                 redrawTraps();
                 const p = unit ? cellXY(unit.col, unit.row) : cellXY(col, row);
@@ -1624,7 +1678,7 @@
                 // панельные заклинания (выбор из карт / призыв) авто-розыгрыша
                 // не имеют — уходят в руку владельца, разыграет сам за энергию
                 if (def.spell.search || def.spell.journey || def.spell.searchUnit
-                    || def.spell.seek) {
+                    || def.spell.seek || def.spell.grim) {
                     hand.push(pick.id);
                     return;
                 }

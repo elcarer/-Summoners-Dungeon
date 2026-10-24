@@ -471,6 +471,7 @@
                     else if (def.waterMage) heroMageDouble(u, () => summonWaterMage(u)); // водный маг
                     else if (def.illusion) heroMageDouble(u, () => summonIllusion(u)); // иллюзия
                     else if (def.lakeMaid) heroMageDouble(u, () => summonLakeMaid(u)); // озёрная дева
+                    else if (def.sulfurBurst) summonSulfur(u); // элементаль серы: −2⚔ −1♥ соседям
                     if (def.berserkSummon) addBerserk(u, def.berserkSummon); // «Берсерк» — уже при призыве
                     // Способность героя (просил юзер): ПЕРВОЕ призванное игроком
                     // существо получает бонус — Горбаг +2 к урону, Эльмир +3 к

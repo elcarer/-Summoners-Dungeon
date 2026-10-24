@@ -1026,6 +1026,8 @@
                     .some((id) => CARDS[id] && CARDS[id].type === "unit")) return false;
                 // «Поиск знаний»: брать нечего, если колода пуста
                 if (s.seek && !B.eDeck.length) return false;
+                // «Гримуар инея»: смотреть нечего, если колода пуста
+                if (s.grim && !B.eDeck.length) return false;
                 // «Природная мощь»: есть свой крепыш (3+ жизни) — иначе +1 урона
                 // за энергию и карту не окупается
                 if (s.buffAtkByHp && !spellTargets(B.units.filter((v) => v.side === "e"
@@ -1158,6 +1160,7 @@
                         (u) => u.side === "p" && u.def.type === "unit" && u.curAtk > 0).length) * 0.25;
                     if (s.search || s.searchUnit || s.journey || s.discardPick) v += 0.5;
                     if (s.seek) v += 0.6 + Math.min(4, B ? B.eDeck.length : 0) * 0.05;
+                    if (s.grim) v += 0.5 + Math.min(4, B ? B.eDeck.length : 0) * 0.05;
                     if (s.copyLast) v += 1.0;
                     if (s.wolfVolley) v += 2.0;
                     if (s.baseHit) v += 1.6;
@@ -1584,6 +1587,23 @@
                     const take = new Set();
                     for (const x of ranked.slice(0, want)) { take.add(x.i); B.eHand.push(x.id); }
                     for (let i = 0; i < top.length; i++) if (!take.has(i)) B.eDeck.push(top[i]);
+                    if (want) sfx("chpoc");
+                }
+                if (s.grim) { // «Гримуар инея»: тип с наибольшим числом карт среди верхних 4
+                    const k = Math.min(s.grim, B.eDeck.length);
+                    const top = k ? B.eDeck.splice(B.eDeck.length - k, k) : [];
+                    const by = {};
+                    for (let i = 0; i < top.length; i++) {
+                        const ty = CARDS[top[i]].type;
+                        (by[ty] = by[ty] || []).push(i);
+                    }
+                    // приоритет при равенстве: призыв > заклинание > ловушка > постройка
+                    let want = null;
+                    for (const ty of ["unit", "spell", "trap", "building"])
+                        if (by[ty] && (!want || by[ty].length > by[want].length)) want = ty;
+                    if (want) for (const i of by[want]) B.eHand.push(top[i]);
+                    for (let i = 0; i < top.length; i++)
+                        if (!want || CARDS[top[i]].type !== want) B.eDiscard.push(top[i]);
                     if (want) sfx("chpoc");
                 }
                 if (s.discardPick) { // «Варка зелий»: лучшее заклинание сбросов — в руку
