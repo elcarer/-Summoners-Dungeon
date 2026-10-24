@@ -262,8 +262,21 @@
                         try { return new PIXI.Color(c).toHex(); } catch (e) { return String(c); } };
                     const ud = root.hud.userData;
                     return { eEnergyX: ud.eEnergyIcon.x, pEnergyX: ud.pEnergyIcon.x,
-                        eCardsFill: hex(ud.eCardsT.style.fill), pCardsFill: hex(ud.pCardsT.style.fill) };
+                        eCardsFill: hex(ud.eCardsT.style.fill), pCardsFill: hex(ud.pCardsT.style.fill),
+                        // сброс игрока у колоды + счётчики колод/сбросов (тесты)
+                        discardX: ud.discardFace.x, discardY: ud.discardFace.y,
+                        discardScaleX: Math.round(ud.discardFace.scale.x * 1000) / 1000,
+                        deckX: ud.pDeckPile.x, deckY: ud.pDeckPile.y,
+                        deckScaleX: Math.round(ud.pDeckPile.scale.x * 1000) / 1000,
+                        cntSize: ud.discardCnt.style.fontSize,
+                        pDeckCntSize: ud.pDeckCnt.style.fontSize,
+                        eDeckCntSize: ud.eDeckCnt.style.fontSize,
+                        eDiscardCntSize: ud.eDiscardCnt.style.fontSize };
                 },
+                // подсказка статуса у значка эффекта (тесты: key = метка:значение)
+                effectTipState: () => (A.effectTip
+                    ? { key: A.effectTip.key, x: Math.round(A.effectTip.node.x),
+                        y: Math.round(A.effectTip.node.y) } : null),
                 // общий z-order поля (тесты): сортировка включена, zIndex — ряды
                 zOrder: () => (root && root.unitsLayer
                     ? { sortable: !!root.unitsLayer.sortableChildren,

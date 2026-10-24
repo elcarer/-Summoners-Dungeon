@@ -58,7 +58,16 @@
                 }
                 floatText(960, side === "p" ? 640 : 300, `✧ ${n}`, 0x8cd0ef);
                 sfx("chpoc");
-                if (side === "p") { layoutHand(); refreshHud(); }
+                if (side === "p") layoutHand();
+                refreshHud(); // счётчик карт врага тоже меняется
+            };
+            // «Запутать руны»: «ВЫ И ПРОТИВНИК сбрасываете все карты с руки
+            // и берёте по N» (спека юзера) — эффект обеих сторон, а не только
+            // кастующего. keepId — разыгрываемая карта кастующего (её сбросит
+            // вызывающий: castSpell через spendCard, ИИ — сам aiPlay).
+            A.confuseRunes = function confuseRunes(caster, count, keepId = null) {
+                discardHandDraw(caster, count, keepId);
+                discardHandDraw(caster === "p" ? "e" : "p", count);
             };
 
             // ── Способность героя «начиная бой берёт дополнительную случайную
@@ -145,6 +154,15 @@
                 if (!B.units.includes(u)) return;
                 const back = u.row + (u.side === "p" ? 1 : -1);
                 if (back < 0 || back >= GRID) {
+                    // выпад в СВОЮ базу на полклетки + пауза — как обычная
+                    // атака базы, на 0.5с дольше (просил юзер)
+                    const g = SCENE_GRID[curScene] || SCENE_GRID[1];
+                    const cp = cellXY(u.col, u.row);
+                    const edgeY = u.side === "p" ? g.rows[GRID] : g.rows[0];
+                    glide(u, cp.x, cp.y + (edgeY - cp.y) * 0.55);
+                    setWalk(u, true, u.side === "p" ? "walk_front" : "walk_back");
+                    await delay(0.5 / animK());
+                    if (B.stopped || !B.units.includes(u)) return;
                     ownBaseHit(u);
                     triggerAttackTraps(u); // удар по базе — тоже атака (руна)
                     removeUnit(u);
@@ -256,6 +274,16 @@
                         if (B.stopped || !B.units.includes(u)) break;
                         const ahead = u.row + dir;
                         if (ahead < 0 || ahead >= GRID) {
+                            // выпад в базу на полклетки + пауза: атака базы
+                            // стала длиннее на 0.5с (просил юзер — существа
+                            // слишком быстро били базу и исчезали)
+                            const g = SCENE_GRID[curScene] || SCENE_GRID[1];
+                            const cp = cellXY(u.col, u.row);
+                            const edgeY = side === "p" ? g.rows[0] : g.rows[GRID];
+                            glide(u, cp.x, cp.y + (edgeY - cp.y) * 0.55);
+                            setWalk(u, true);
+                            await delay(0.5 / animK());
+                            if (B.stopped || !B.units.includes(u)) break;
                             baseHit(side, u);
                             triggerAttackTraps(u); // удар по базе — тоже атака (руна)
                             removeUnit(u);
@@ -330,6 +358,8 @@
                         if (B.stopped || !B.units.includes(u)) break;
                         const ahead = u.row + dir;
                         if (ahead < 0 || ahead >= GRID) {
+                            await delay(0.5 / animK()); // атака базы дольше (просил юзер)
+                            if (B.stopped || !B.units.includes(u)) break;
                             baseHit(side, u);
                             triggerAttackTraps(u);
                         } else {

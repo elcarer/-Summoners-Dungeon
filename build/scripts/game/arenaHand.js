@@ -24,9 +24,78 @@
                 trapCard.node.destroy({ children: true });
                 trapCard = null;
             };
+            // ── Подсказка «что за эффект» при наведении на значок ──────────
+            // (просил юзер): у существ на поле есть метки статусов (яд, лёд,
+            // берсерк, …) — наведение курсора на метку показывает её название
+            // и описание. Позиции меток — локальные координаты узла существа
+            // (узел стоит в cellXY клетки), берём ближайшую в радиусе 17px.
+            A.EFFECT_MARKS = {
+                frozenMark: { name: "status.frozen.name", desc: "status.frozen.desc", val: (u) => u.frozen },
+                wardMark: { name: "spell.ward.name", desc: "spell.ward.desc", val: () => 0 },
+                sporeMark: { name: "status.spores.name", desc: "status.spores.desc", val: () => 0 },
+                enchMark: { name: "status.enchantFire.name", desc: "status.enchantFire.desc", val: () => 0 },
+                protectMark: { name: "status.protect.name", desc: "status.protect.desc", val: (u) => A.unitProtectTotal(u) },
+                berserkMark: { name: "status.berserk.name", desc: "status.berserk.desc", val: (u) => u.berserk },
+                confuseMark: { name: "status.confuse.name", desc: "status.confuse.desc", val: (u) => u.confused },
+                venomMark: { name: "status.venom.name", desc: "status.venom.desc", val: (u) => u.venom },
+                poisonMark: { name: "status.poison.name", desc: "status.poison.desc", val: (u) => u.poison },
+                entangleMark: { name: "status.entangle.name", desc: "status.entangle.desc", val: (u) => u.entangle },
+            };
+            A.effectTip = null; // { key, node }
+            A.effectTipHide = function effectTipHide() {
+                if (!effectTip) return;
+                effectTip.node.destroy({ children: true });
+                effectTip = null;
+            };
+            // Панель подсказки: тёмная плашка, название + описание; рисуется
+            // у метки (над существом), не вылезая за края экрана
+            A.showEffectTip = function showEffectTip(u, markName, mx, my) {
+                const mk = EFFECT_MARKS[markName];
+                const val = mk.val(u) || 0;
+                const key = `${markName}:${val}`;
+                if (effectTip && effectTip.key === key) return;
+                effectTipHide();
+                const name = GAME_LOC.t(mk.name) + (val > 1 ? ` ${val}` : "");
+                const desc = GAME_LOC.t(mk.desc);
+                const nt = T(name, 24, 0xf0c96a, { stroke: { color: 0x1c1207, width: 4 } });
+                const dt = T(desc, 19, 0xf3e6c2,
+                    { wordWrap: true, wordWrapWidth: 372, breakWords: true, lineHeight: 24 });
+                dt.y = 36;
+                const w = Math.max(nt.width, Math.min(382, dt.width)) + 30;
+                const h = dt.height + 58;
+                const node = new PIXI.Container();
+                const bg = new PIXI.Graphics();
+                bg.roundRect(0, 0, w, h, 12);
+                bg.fill({ color: 0x171310, alpha: 0.94 });
+                bg.stroke({ width: 3, color: 0x6b5c40 });
+                node.addChild(bg, nt, dt);
+                nt.x = dt.x = 15;
+                node.x = Math.max(240, Math.min(1680 - w, mx - w / 2));
+                node.y = Math.max(88, my - h - 26);
+                node.eventMode = "none";
+                root.addChild(node);
+                effectTip = { key, node };
+            };
+            // Курсор над меткой эффекта существа u? Показывает подсказку и
+            // возвращает true (карта существа при этом не дублируется)
+            A.markTipAt = function markTipAt(u, x, y) {
+                if (!u || !u.node) return false;
+                let best = null, bestD = 17 * 17;
+                for (const markName of Object.keys(EFFECT_MARKS)) {
+                    const node = u.node.getChildByName(markName);
+                    if (!node) continue;
+                    const dx = x - (u.node.x + node.x), dy = y - (u.node.y + node.y);
+                    const d = dx * dx + dy * dy;
+                    if (d <= bestD) { bestD = d; best = markName; }
+                }
+                if (!best) return false;
+                showEffectTip(u, best, x, y);
+                return true;
+            };
             A.hoverHideAll = function hoverHideAll() {
                 unitCardHide();
                 trapCardHide();
+                effectTipHide();
             };
             // Позиция «?» записана redrawTraps (__mx/__my); радиус чуть больше
             // самого значка — попасть курсором легко.
@@ -66,8 +135,13 @@
             A.unitHoverAt = function unitHoverAt(x, y) {
                 if (!root || !B) return;
                 const tr = playerTrapAtPoint(x, y);
-                if (tr) { showTrapCard(tr); return; }
+                if (tr) { showTrapCard(tr); effectTipHide(); return; }
                 trapCardHide();
+                // курсор на значке эффекта — подсказка вместо карты существа.
+                // Метки висят над головой существа и часто НАД соседней
+                // клеткой, поэтому ищем по всем существам, а не по клетке
+                for (const u of B.units) if (markTipAt(u, x, y)) { unitCardHide(); return; }
+                effectTipHide();
                 const hit = cellAt(x, y);
                 const u = hit ? unitAt(hit[0], hit[1]) : null;
                 if (!u) { unitCardHide(); return; }

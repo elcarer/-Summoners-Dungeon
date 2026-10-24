@@ -795,6 +795,7 @@
                 const i = B.units.indexOf(u);
                 if (i >= 0) B.units.splice(i, 1);
                 if (unitCard && unitCard.unit === u) unitCardHide(); // жетон умер
+                if (effectTip) effectTipHide(); // подсказка статуса умерла с ним
                 // руна («Наскальная рунопись») живёт на существе: существо ушло
                 // с поля (смерть, побег, удар по базе) — ловушка рассыпалась
                 for (const s of ["p", "e"]) {
@@ -1553,8 +1554,15 @@
                 return true;
             };
             A.triggerTraps = function triggerTraps(side, killer) {
-                if (!B.traps[side].length) return;
-                const trap = B.traps[side].shift();
+                // «при гибели своего существа» — это ловушка-«ряд» (rowDmg);
+                // в каталоге её пока нет (задел на будущее). Раньше здесь
+                // безусловно снималась ПЕРВАЯ ловушка списка — гибель своего
+                // существа молча съедала мину/отмену/руну и давала «Зимним
+                // духам» фантомное +1 (баг юзера). Расходуем только rowDmg.
+                const ti = B.traps[side].findIndex((t) => t.def.trap
+                    && t.def.trap.effect === "rowDmg");
+                if (ti < 0) return;
+                const trap = B.traps[side].splice(ti, 1)[0];
                 redrawTraps();
                 trapTriggered(side); // «Зимние духи»/«Путь воды»: сработала ловушка «при гибели»
                 const k = cellXY(killer.col, killer.row);

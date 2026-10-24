@@ -526,8 +526,17 @@
             // равные варианты перемешиваются, чтобы бои не были клонами.
             A.aiUnitSpot = function aiUnitSpot(def) {
                 const rows = deployRows("e");
-                const free = freeCells(rows);
+                let free = freeCells(rows);
                 if (!free.length) return null;
+                // «Иллюзия» без соседей — 0/0 и мгновенная гибель (просил
+                // юзер): только клетки рядом с существом (любой стороны —
+                // Иллюзия копирует и своих, и чужих). Таких клеток нет —
+                // карту не играем
+                if (def.illusion) {
+                    free = free.filter(([c, r]) => B.units.some((v) => v.def.type === "unit"
+                        && Math.abs(v.col - c) + Math.abs(v.row - r) === 1));
+                    if (!free.length) return null;
+                }
                 let best = [], bestScore = -Infinity;
                 for (const [c, r] of free) {
                     const score = aiSpotScore(def, c, r);
@@ -1551,11 +1560,12 @@
                     if (own[0]) { baseHit("e", own[0]); triggerAttackTraps(own[0]); }
                 }
                 if (s.draw) drawEnemy(s.draw);
-                // «Запутать руны»: обе руки в сброс, по 3 карты. При прямом
-                // розыгрыше карта ещё в руке — её оставляем, aiPlay уберёт её
-                // сам (fromHand); при повторе/руне карты в руке уже нет.
+                // «Запутать руны»: ОБЕ руки в сброс, по 3 карты (спека: «вы и
+                // противник»; раньше сбрасывалась только своя — баг юзера).
+                // При прямом розыгрыше карта ещё в руке — её оставляем, aiPlay
+                // уберёт её сам (fromHand); при повторе/руне карты в руке нет.
                 if (s.discardHandDraw)
-                    discardHandDraw("e", s.discardHandDraw,
+                    confuseRunes("e", s.discardHandDraw,
                         fromHand ? cardIdOf(def) : null);
                 if (s.search) { // «Поиск рун»: из ВЕРХНИХ N заклинаний — лучшее в руку
                     const k = aiSearchSpell(s.search);

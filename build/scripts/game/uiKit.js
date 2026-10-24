@@ -259,5 +259,18 @@
         };
     }
 
-    globalThis.GAME_UI = { T, fit, button, chip, cardFace, backTexOf, dimBg, scrollPane };
+    // Имя героя-противника для показа игроку: у героев-врагов id героя и id
+    // энкаунтера не всегда совпадают (wisMad ↔ wisBoss) — по ним и ловился
+    // «код ссылки» вместо имени в меню трофея. Порядок: enc.<id героя>.title
+    // → enc-ключ энкаунтера с этим hero → hero.<id героя>.name.
+    function foeTitle(heroId) {
+        const direct = `enc.${heroId}.title`;
+        if (GAME_LOC.t(direct) !== direct) return GAME_LOC.t(direct);
+        const enc = globalThis.GAME_DATA.ENCOUNTERS || {};
+        const found = Object.keys(enc).find((k) => enc[k] && enc[k].hero === heroId);
+        if (found) return GAME_LOC.t(`enc.${found}.title`);
+        return GAME_LOC.t(`hero.${heroId}.name`);
+    }
+
+    globalThis.GAME_UI = { T, fit, button, chip, cardFace, backTexOf, dimBg, scrollPane, foeTitle };
 })();

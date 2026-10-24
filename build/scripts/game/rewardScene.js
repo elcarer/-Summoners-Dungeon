@@ -89,7 +89,7 @@
                 lbl.position.set(175, 340);
                 lbl.eventMode = "none";
                 root.addChild(lbl);
-                const nm = T(t(`enc.${wonHero}.title`), 24, 0xf0c96a,
+                const nm = T(globalThis.GAME_UI.foeTitle(wonHero), 24, 0xf0c96a,
                     { stroke: { color: 0x1c1207, width: 5 } });
                 nm.anchor.set(0.5, 0);
                 nm.position.set(175, 725);

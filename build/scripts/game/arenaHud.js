@@ -54,9 +54,9 @@
                 eDeckPile.eventMode = "static";
                 eDeckPile.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("edeck"); });
                 c.addChild(eDeckPile);
-                const eDeckCnt = T("", 22, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4.5 } });
+                const eDeckCnt = T("", 44, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 9 } });
                 eDeckCnt.anchor.set(0.5, 1);
-                eDeckCnt.position.set(1630, 266);
+                eDeckCnt.position.set(1630, 274);
                 eDeckCnt.eventMode = "none";
                 c.addChild(eDeckCnt);
 
@@ -72,9 +72,9 @@
                 eDiscardFace.eventMode = "static";
                 eDiscardFace.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("ediscard"); });
                 c.addChild(eDiscardFace);
-                const eDiscardCnt = T("", 22, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4.5 } });
+                const eDiscardCnt = T("", 44, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 9 } });
                 eDiscardCnt.anchor.set(0.5, 1);
-                eDiscardCnt.position.set(1810, 266);
+                eDiscardCnt.position.set(1810, 274);
                 eDiscardCnt.eventMode = "none";
                 c.addChild(eDiscardCnt);
 
@@ -149,25 +149,27 @@
                 pDeckPile.eventMode = "static";
                 pDeckPile.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("deck"); });
                 c.addChild(pDeckPile);
-                const pDeckCnt = T("", 22, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4.5 } });
+                const pDeckCnt = T("", 44, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 9 } });
                 pDeckCnt.anchor.set(0.5, 1);
-                pDeckCnt.position.set(114, 1052);
+                pDeckCnt.position.set(114, 1062);
                 pDeckCnt.eventMode = "none";
                 c.addChild(pDeckCnt);
 
-                // сброс — правый нижний угол: последняя ушедшая карта приглушённым
-                // лицом (пусто — тусклая рубашка стихии игрока); клик — просмотр
+                // сброс игрока — СПРАВА от его колоды (просил юзер): как пара
+                // «колода-сброс» врага, тот же размер слота, что и колода.
+                // Пусто — тусклая полупрозрачная рубашка стихии, в бою —
+                // последняя ушедшая карта приглушённым лицом; клик — просмотр
                 const discardFace = new PIXI.Sprite(uiTex(playerBackTex()));
-                discardFace.position.set(1668, 724);
-                discardFace.scale.set(1); // рубашка стихии 230×338 — натуральный слот
+                discardFace.position.set(213, 806);
+                discardFace.scale.set(0.775, (0.775 * 330) / 338); // как колода: 230×338 → 178×250
                 discardFace.tint = 0x5a5a5a;
                 discardFace.alpha = 0.6;
                 discardFace.eventMode = "static";
                 discardFace.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("discard"); });
                 c.addChild(discardFace);
-                const discardCnt = T("", 22, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4.5 } });
+                const discardCnt = T("", 44, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 9 } });
                 discardCnt.anchor.set(0.5, 1);
-                discardCnt.position.set(1783, 1052);
+                discardCnt.position.set(302, 1062);
                 discardCnt.eventMode = "none";
                 c.addChild(discardCnt);
 
@@ -317,10 +319,16 @@
                 if (name === "settings") {
                     // из боя в настройках есть «В главное меню» (просил юзер):
                     // забег сохранён подземельем при уходе в бой — «Продолжить»
-                    // в меню вернёт к тому же врагу, бой начнётся заново
+                    // в меню вернёт к тому же врагу, бой начнётся заново.
+                    // «Убежать» (просил юзер): эффект как у проигрыша этого
+                    // боя (finish(false) — потеря карты, реванш с отступлением)
                     const panel = globalThis.GAME_SETTINGS_SCENE.buildPanel(ctx, {
                         onBack: closeOverlay,
                         onQuit: () => { closeOverlay(); scenes.go("menu"); },
+                        onFlee: () => {
+                            closeOverlay();
+                            if (B && B.phase !== "over") finish(false);
+                        },
                     });
                     panel.applySound();
                     node.addChild(panel.node);
@@ -434,12 +442,12 @@
                     ud.lastDiscard = last;
                     if (last && CARDS[last] && CARDS[last].img) {
                         ud.discardFace.texture = uiTex(`cards/${CARDS[last].img}.png`);
-                        ud.discardFace.scale.set(1); // лицо 230×338 — натуральный слот
+                        ud.discardFace.scale.set(0.775, (0.775 * 330) / 338); // слот как у колоды
                         ud.discardFace.tint = 0x8a8a8a;
                         ud.discardFace.alpha = 1;
                     } else {
                         ud.discardFace.texture = uiTex(playerBackTex());
-                        ud.discardFace.scale.set(1); // рубашка стихии 230×338 — тот же слот
+                        ud.discardFace.scale.set(0.775, (0.775 * 330) / 338); // слот как у колоды
                         ud.discardFace.tint = 0x5a5a5a;
                         ud.discardFace.alpha = 0.6;
                     }

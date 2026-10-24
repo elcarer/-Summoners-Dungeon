@@ -8,7 +8,9 @@
     // rebuild()-ом (степперы/язык/призыв). onBack — куда ведёт «Назад».
     // onQuit — необязательная кнопка «В главное меню» рядом с «Назад»
     // (её передают бой и подземелье; из главного меню она ни к чему).
-    function buildPanel(ctx, { onBack, onQuit }) {
+    // onFlee — необязательная кнопка «Убежать» (только бой): эффект как у
+    // проигрыша этого боя (просил юзер).
+    function buildPanel(ctx, { onBack, onQuit, onFlee }) {
         const { G } = ctx;
         const { T, button } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
@@ -137,7 +139,20 @@
             note.eventMode = "none";
             outer.addChild(note);
 
-            if (onQuit) { // выход в главное меню рядом с «Назад» (просил юзер)
+            if (onQuit && onFlee) { // бой: «Назад» + «Убежать» + «В главное меню»
+                outer.addChild(button(ctx, {
+                    tex: "button_menu.png", label: t("settings.back"), x: 435, y: 894, scale: 1.0,
+                    onTap: onBack,
+                }));
+                outer.addChild(button(ctx, {
+                    tex: "button_menu.png", label: t("settings.flee"), x: 960, y: 894, scale: 1.0,
+                    onTap: onFlee,
+                }));
+                outer.addChild(button(ctx, {
+                    tex: "button_menu.png", label: t("settings.quit"), x: 1485, y: 894, scale: 1.0,
+                    onTap: onQuit,
+                }));
+            } else if (onQuit) { // выход в главное меню рядом с «Назад» (просил юзер)
                 outer.addChild(button(ctx, {
                     tex: "button_menu.png", label: t("settings.back"), x: 735, y: 894, scale: 1.0,
                     onTap: onBack,

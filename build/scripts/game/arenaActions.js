@@ -499,11 +499,13 @@
                     } else return false;
                 }
                 if (def.spell.draw) drawCards(def.spell.draw);
-                // «Запутать руны»: обе руки — в сброс, по 3 карты. При прямом
-                // розыгрыше карта ещё в руке — её сбросит/оплатит castSpell
-                // (skipHandReset), поэтому эффект зовётся оттуда после spendCard.
+                // «Запутать руны»: обе руки — в сброс, по 3 карты (спека:
+                // «вы И ПРОТИВНИК»; раньше сбрасывалась только своя — баг
+                // юзера). При прямом розыгрыше карта ещё в руке — её сбросит/
+                // оплатит castSpell (skipHandReset), поэтому эффект зовётся
+                // оттуда после spendCard.
                 if (def.spell.discardHandDraw && !(opts && opts.skipHandReset))
-                    discardHandDraw("p", def.spell.discardHandDraw);
+                    confuseRunes("p", def.spell.discardHandDraw);
                 if (def.spell.brew) { B.brewCasts = (B.brewCasts || 0) + 1; refreshBrewBadges(); }
                 if (def.spell.search) openRunesPanel(def.spell.search); // выбор поверх боя
                 if (def.spell.searchUnit) openRunesPanel(def.spell.searchUnit, "unit"); // «Рунное гадание»
@@ -658,7 +660,7 @@
                 fxSpellCast(cardId, target, "p");
                 B.energy = def.spell.drainAll ? 0 : B.energy - effCost(cardId, "p", target);
                 spendCard(handIdx);
-                if (resetHand) discardHandDraw("p", resetHand);
+                if (resetHand) confuseRunes("p", resetHand); // обе стороны (спека)
                 heroFirstSpellEnergy("p"); // «Дуновение опасности»: +1⚡ за 1-е заклинание
                 heroStrReplay("p", cardId, def); // «Мастера огня»
                 B.lastSpell.p = cardId;
