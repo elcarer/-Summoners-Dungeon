@@ -179,21 +179,19 @@
             goldPlate.addChild(goldT);
             goldPlate.position.set(0, 96);
             c.addChild(goldPlate);
-            // настройки и колода доступны и из мира; «Назад» вернёт сюда
+            // настройки доступны и из мира; «Назад» вернёт сюда. Колода —
+            // только по карте героя (просил юзер): рубашку убрали, карта
+            // героя поднята на её место
             c.addChild(hudIcon("icon_setting.png", 1839, 66, () => {
                 G.uiReturn = "world";
                 scenes.go("settings");
             }));
-            c.addChild(hudIcon("card_back_small.png", 1839, 162, () => {
-                G.uiReturn = "world";
-                scenes.go("deck");
-            }, 0.675));
-            // карточка героя (просил юзер): под кнопками, клик — в колоду,
-            // наведение — рост до натурального размера (ctx.heroHover)
+            // карточка героя (просил юзер): на месте бывшей рубашки, клик —
+            // в колоду, наведение — рост до натурального размера (ctx.heroHover)
             const wHero = globalThis.GAME_DATA.HEROES[G.heroId]
                 || globalThis.GAME_DATA.HEROES.gorbag;
             const heroHolder = new PIXI.Container();
-            heroHolder.position.set(1839, 245);
+            heroHolder.position.set(1839, 162);
             heroHolder.hitArea = new PIXI.Rectangle(-57.5, 0, 115, 169); // исходное место
             const heroCard = new PIXI.Sprite(uiTex(`heroes/${wHero.img}.png`));
             heroCard.anchor.set(0.5, 0);

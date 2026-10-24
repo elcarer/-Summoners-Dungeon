@@ -498,6 +498,12 @@
                         ov.addChild(lossName);
                     }
                 }
+                // Куда ведёт кнопка поражения (просил юзер): колода после
+                // потери карты может стать меньше минимума этажа — тогда
+                // игрок запирается в редакторе колоды («deck»); если минимум
+                // не набрать даже из коллекции — «newGame» (проигрыш)
+                const afterLoss = (!victory && !draft && G.lossAftermath)
+                    ? G.lossAftermath() : null;
                 B.continueAction = () => {
                     if (draft) {
                         // карта сокровищ использована — объект уходит с этажа
@@ -517,7 +523,13 @@
                         }
                         if (G.saveRun) G.saveRun(); // враг побеждён — забег продолжается
                         scenes.go("reward");
-                    } else if (B.lossCard) {
+                    } else if (afterLoss === "newGame") {
+                        // минимум не набрать даже из коллекции — проигрыш:
+                        // сейв снимается; новая игра с тем же стартовым героем
+                        if (globalThis.GAME_META.clearRun) globalThis.GAME_META.clearRun();
+                        G.resetRun(G.starterId);
+                        scenes.go("menu");
+                    } else {
                         // реванш (просил юзер): враг жив на месте, герой
                         // отступает на соседнюю клетку — бой не перезапускается
                         // сам, но касание врага начинает его заново
@@ -525,13 +537,12 @@
                             G.dungeon.heroPos = globalThis.GAME_DUNGEON.retreatCell(G.activeEnemy);
                         G.activeEnemy = null;
                         if (G.saveRun) G.saveRun(); // забег жив: этаж и колода (−1 карта)
-                        scenes.go("dungeon");
-                    } else {
-                        // колода опустела — забег закончен: сейв снимается;
-                        // стартер той же стихии (забег был её)
-                        if (globalThis.GAME_META.clearRun) globalThis.GAME_META.clearRun();
-                        G.resetRun(G.elem);
-                        scenes.go("menu");
+                        if (afterLoss === "deck") {
+                            // колода ниже минимума (просил юзер): запереть
+                            // игрока в редакторе колоды до сбора минимума
+                            G.uiReturn = "dungeon";
+                            scenes.go("deck");
+                        } else scenes.go("dungeon");
                     }
                 };
                 if (victory) {
@@ -547,7 +558,13 @@
                     btn.position.set(960, 585);
                     btn.eventMode = "static";
                     ov.addChild(btn);
-                    const bt = T(t(draft || B.lossCard ? "arena.toDungeon" : "arena.toMenu"), 45, 0xf3e6c2);
+                    // подпись кнопки поражения: обычный реванш — «В подземелье»,
+                    // запертый редактор колоды — «В колоду», проигрыш — «В меню»
+                    const backKey = draft ? "arena.toDungeon"
+                        : afterLoss === "newGame" ? "arena.toMenu"
+                        : afterLoss === "deck" ? "arena.toDeck"
+                        : (B.lossCard ? "arena.toDungeon" : "arena.toMenu");
+                    const bt = T(t(backKey), 45, 0xf3e6c2);
                     bt.anchor.set(0.5);
                     globalThis.GAME_UI.fit(bt, btn.texture.width * btn.scale.x * 0.8, 11); // не шире кнопки
                     bt.position.set(960, 585);

@@ -618,21 +618,19 @@
             goldPlate.position.set(0, 96);
             c.addChild(goldPlate);
             c.userData = { floorT, hpT, goldT, fit: true };
-            // настройки и колода — доступны и из подземелья; «Назад» вернёт сюда
+            // настройки доступны и из подземелья; «Назад» вернёт сюда.
+            // Колода — только по карте героя (просил юзер): рубашку убрали,
+            // карта героя поднята на её место
             c.addChild(hudIcon("icon_setting.png", 1839, 66, () => {
                 G.uiReturn = "dungeon";
                 scenes.go("settings");
             }));
-            c.addChild(hudIcon("card_back_small.png", 1839, 162, () => {
-                G.uiReturn = "dungeon";
-                scenes.go("deck");
-            }, 0.675));
-            // карточка героя (просил юзер): под кнопками, клик — в колоду,
-            // наведение — рост до натурального размера (ctx.heroHover)
+            // карточка героя (просил юзер): на месте бывшей рубашки, клик —
+            // в колоду, наведение — рост до натурального размера (ctx.heroHover)
             const dHero = globalThis.GAME_DATA.HEROES[G.heroId]
                 || globalThis.GAME_DATA.HEROES.gorbag;
             const heroHolder = new PIXI.Container();
-            heroHolder.position.set(1839, 245);
+            heroHolder.position.set(1839, 162);
             heroHolder.hitArea = new PIXI.Rectangle(-57.5, 0, 115, 169); // исходное место
             const heroCard = new PIXI.Sprite(uiTex(`heroes/${dHero.img}.png`));
             heroCard.anchor.set(0.5, 0);
@@ -1332,6 +1330,17 @@
                         setHeroAxes(0, 0);
                         path = null;
                         st.heroPos = { x: hx, y: hy };
+                        // бой с колодой меньше минимума этажа запрещён
+                        // (просил юзер): запираем в редакторе колоды —
+                        // замок не выпустит, пока минимум не собран
+                        const need = globalThis.GAME_DATA.deckMinFor(
+                            G.run && G.run.floor ? G.run.floor : 1);
+                        if (G.deck.length < need) {
+                            showToast(GAME_LOC.t("dungeon.deckLow", { min: need }));
+                            G.uiReturn = "dungeon";
+                            scenes.go("deck");
+                            return;
+                        }
                         G.activeEnemy = t.enemy;
                         scenes.go("arena");
                         return;

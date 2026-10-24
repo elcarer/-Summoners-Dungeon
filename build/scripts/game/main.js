@@ -405,6 +405,27 @@
                 this.persistMeta(); // колода активного героя — она же G.deck
                 return id;
             },
+            // Итог поражения после потери карты (просил юзер): колода меньше
+            // минимума этажа — «deck» (запереть игрока в редакторе колоды
+            // до сбора минимума); набрать минимум нельзя даже из коллекции
+            // (сумма карт доступных стихий всех героев игрока — коллекция
+            // общая и уже включает копии в колодах) — «newGame», проигрыш;
+            // иначе «dungeon» — обычный реванш.
+            lossAftermath() {
+                const D = globalThis.GAME_DATA;
+                const min = D.deckMinFor(this.run && this.run.floor ? this.run.floor : 1);
+                if (this.deck.length >= min) return "dungeon";
+                const heroes = [this.starterId, ...(this.captured || [])];
+                const reach = heroes.some((h) => {
+                    const elems = (D.HEROES[h] || D.HEROES.gorbag).elems;
+                    let n = 0;
+                    for (const id in this.collection)
+                        if (this.collection[id] > 0 && D.CARDS[id]
+                            && elems.includes(D.CARDS[id].elem)) n += this.collection[id];
+                    return n >= min;
+                });
+                return reach ? "deck" : "newGame";
+            },
         };
         // ── Ховер-увеличение карточки героя в HUD (просил юзер) ────────────
         // Зона наведения — исходное место карточки (hitArea держателя не

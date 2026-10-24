@@ -191,6 +191,26 @@
             headerRef.deck.text = t("deck.current", { n: G.deck.length, max: DECK_MAX });
             headerRef.min.text = t("deck.min", { min: deckMinNow() });
             headerRef.min.style.fill = G.deck.length < deckMinNow() ? 0xff8f6e : 0x8a7c5e;
+            updateLockHint();
+        }
+
+        // ── Замок редактора колоды (просил юзер) ──────────────────────────
+        // Вернуться в мир/подземелье с колодой меньше минимума этажа нельзя —
+        // бой с такой колодой запрещён (обычный повод — потеря карты после
+        // проигрыша). «Назад» молча не пускает, в правом верхнем углу висит
+        // подсказка; в меню выход свободный — боя там нет.
+        let lockHintRef = null;
+        const runReturn = () => G.uiReturn === "dungeon" || G.uiReturn === "world";
+        function updateLockHint() {
+            if (!lockHintRef) return;
+            lockHintRef.text = (runReturn() && G.deck.length < deckMinNow())
+                ? t("deck.locked", { min: deckMinNow() }) : "";
+        }
+        function doBack() {
+            if (runReturn() && G.deck.length < deckMinNow()) return;
+            const to = G.uiReturn || "menu"; // откуда пришли (меню/мир/подземелье)
+            G.uiReturn = null;
+            scenes.go(to);
         }
 
         // Имя героя: стартовые — свои ключи, карты противников — названия
@@ -380,6 +400,17 @@
                 root.addChild(ch);
             }
 
+            // подсказка замка (правый верхний угол): пустая, пока колода
+            // в норме или выход не в забег
+            const lockHint = T("", 21, 0xff8f6e,
+                { stroke: { color: 0x1c1207, width: 5 } });
+            lockHint.anchor.set(1, 0);
+            lockHint.position.set(1836, 104);
+            lockHint.eventMode = "none";
+            root.addChild(lockHint);
+            lockHintRef = lockHint;
+            updateLockHint();
+
             if (tab === "heroes") {
                 buildHeroesTab();
             } else {
@@ -448,11 +479,7 @@
 
             root.addChild(button(ctx, {
                 tex: "button_menu.png", label: t("deck.back"), x: 165, y: 78, scale: 1,
-                onTap: () => {
-                    const to = G.uiReturn || "menu"; // откуда пришли (меню/подземелье)
-                    G.uiReturn = null;
-                    scenes.go(to);
-                },
+                onTap: doBack, // замок минимума — внутри doBack
             }));
             ui.addChild(root);
         }
@@ -544,6 +571,9 @@
         }
 
         const api = {
+            // «Назад» программно (тесты): тот же замок минимума при возврате
+            // в мир/подземелье
+            backTap() { if (!root) return false; doBack(); return true; },
             add(id) {
                 if (G.deck.length >= DECK_MAX) return false;
                 if (!heroElemOk(id)) return false; // стихия не из героя
