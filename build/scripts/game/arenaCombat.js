@@ -124,6 +124,7 @@
                 const cardId = hand.splice(i, 1)[0];
                 const [col, row] = cells[0];
                 discard.push(cardId);
+                noteDiscard();
                 armTrap(u.side, cardId, col, row);
                 const p = cellXY(col, row);
                 floatText(p.x, p.y - 60, GAME_LOC.t(`card.${cardId}.name`), 0xb7d0ef);
@@ -386,6 +387,7 @@
                 const [col, row] = near[(Math.random() * near.length) | 0];
                 deck.splice(pick.i, 1);
                 discard.push(pick.id);
+                noteDiscard();
                 armTrap(u.side, pick.id, col, row);
                 const p = cellXY(col, row);
                 floatText(p.x, p.y - 66, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);
@@ -456,7 +458,7 @@
                 "crush", "thicket", "sandDecay", "leaderAura", "berserkSummon",
                 "keeperScale", "energyToStats", "animalCost", "targetDiscount",
                 "spellBuffAura", "sisterDraw", "plantEcho", "wolfSummon",
-                "trapCancel", "sulfurBurst",
+                "trapCancel", "sulfurBurst", "slimeGain",
             ];
             // Копирование способностей в per-unit копию def (как purgeUnit):
             // исходная карта каталога не меняется, cardIdOf узнаёт карту по
@@ -532,10 +534,130 @@
                 triggerCellTraps(u);
                 archerShot(u);
                 trapOnMoveAct(u); // «Выросшие духи»: ловушка из руки на соседнюю клетку
+                labyrinthAct(u); // «Мистический лабиринт»: дошёл до базы — перенос к постройке
                 // руна/споры на существе ездят вместе с ним: маркер «?» и его
                 // точка наведения (tr.__mx/__my) должны переехать на новую клетку
                 if (B.traps.p.some((tr) => tr.unit === u)
                     || B.traps.e.some((tr) => tr.unit === u)) redrawTraps();
+            };
+
+            // «Мистический лабиринт» (wis117): существо ПОДОШЛО (маршем/шагом)
+            // на клетку рядом с базой владельца постройки — переносится на
+            // случайную пустую клетку по соседству (верт/гориз) с постройкой
+            // (спека юзера). Призыв на клетку у базы перенос не триггерит:
+            // afterMoved зовётся только на перемещения. Пустых соседей нет —
+            // перенести некуда, существо остаётся. После переноса ловушки на
+            // новой клетке срабатывают (это тоже перемещение).
+            A.labyrinthAct = function labyrinthAct(u) {
+                if (!B.units.includes(u) || u.def.type !== "unit") return;
+                for (const b of B.units) {
+                    if (!b.def.labyrinth) continue;
+                    // база игрока — за нижним рядом (GRID-1), врага — за верхним (0)
+                    if (u.row !== (b.side === "p" ? GRID - 1 : 0)) continue;
+                    const spots = [];
+                    for (const [dc, dr] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                        const c2 = b.col + dc, r2 = b.row + dr;
+                        if (c2 < 0 || c2 >= GRID || r2 < 0 || r2 >= GRID) continue;
+                        if (unitAt(c2, r2)) continue;
+                        spots.push([c2, r2]);
+                    }
+                    if (!spots.length) continue; // кругом занято — не переносим
+                    const [nc, nr] = spots[(Math.random() * spots.length) | 0];
+                    u.col = nc;
+                    u.row = nr;
+                    const p = cellXY(nc, nr);
+                    glide(u, p.x, p.y);
+                    fxEvent("cast", { x: p.x, y: p.y - 24, color: 0x8c9ef0 });
+                    sfx("chpoc");
+                    floatText(p.x, p.y - 72,
+                        GAME_LOC.t("wisdom.labyrinthMove"), 0x8cd0ef);
+                    refreshHud();
+                    triggerCellTraps(u); // перенесли на ловушку — она срабатывает
+                    return; // одна постройка за перемещение
+                }
+            };
+
+            // «Болотная слизь» (wis116): когда ЛЮБАЯ карта уходит в сброс
+            // (рука/колода/потраченное заклинание/излишек руки) — каждая
+            // слизь на поле получает +1 к урону (спека юзера). Зовётся из
+            // ВСЕХ точек сброса (B.discard/B.eDiscard.push); смерть существ
+            // сбросом не считается (removeUnit карту не отдаёт). n — сколько
+            // карт ушло разом (гримуар/путешествие сбрасывают пачками).
+            A.noteDiscard = function noteDiscard(n = 1) {
+                if (!B) return;
+                for (const v of B.units.slice()) {
+                    if (!v.def.slimeGain || !B.units.includes(v)) continue;
+                    v.bonusAtk = (v.bonusAtk || 0) + n;
+                    recalcAuras(); // обновит и бейдж урона
+                    const p = cellXY(v.col, v.row);
+                    floatText(p.x, p.y - 39, `+${n}⚔`, 0x9fd489);
+                    punch(v.node);
+                }
+            };
+
+            // «Гроза» (wis118): вся оставшаяся энергия (сверх цены, при
+            // свободном касте — вся) сгорает; за каждую единицу — 2 урона
+            // случайному существу ИЛИ постройке противника, НОВАЯ случайная
+            // цель на каждый удар (спека юзера). Бонусы алтаря/героя не
+            // добавляются — спека говорит ровно «2 урона за каждую 1».
+            // Энергию обнуляет вызывающий путь (как у drainAll: castSpell,
+            // aiPlay, руна, повторы — все гасят по флагу stormAll).
+            A.stormStrike = function stormStrike(side, cardId, free = false) {
+                const cost = free ? 0 : effCost(cardId, side);
+                const strikes = Math.max(0, (side === "p" ? B.energy : B.eEnergy) - cost);
+                for (let n = 0; n < strikes; n++) {
+                    const targets = spellTargets(B.units.filter((v) => v.side !== side));
+                    if (!targets.length) break; // целей нет — энергия всё равно сгорает
+                    const t = targets[(Math.random() * targets.length) | 0];
+                    const p = cellXY(t.col, t.row);
+                    fxEvent("impact", { x: p.x, y: p.y - 24, color: 0xffe28a,
+                        power: 0.75 });
+                    punch(t.node);
+                    damageUnit(t, 2, null, "dam");
+                }
+                if (strikes > 0) sfx("rocket");
+                refreshHud();
+                checkEnd();
+                return strikes;
+            };
+
+            // «Отражение» (wis120): заклинание противника, выбранное целью
+            // в СУЩЕСТВО владельца ловушки, летит в случайное существо
+            // противника (спека юзера). Постройки не ловятся («вашего
+            // существа»); у противника нет существ — ловушка не тратится,
+            // заклинание идёт по исходной цели. Возвращает новую цель
+            // (или исходный u). Зовётся ДО применения эффекта: у игрока —
+            // на входе applySpellPInner, у ИИ — в ветках
+            // enemyCastSpellEffectInner после выбора best-цели.
+            A.reflectAim = function reflectAim(defenderSide, u) {
+                if (!u || !B.units.includes(u) || u.side !== defenderSide
+                    || u.def.type !== "unit") return u;
+                const i = B.traps[defenderSide].findIndex((t) =>
+                    t.def.trap && t.def.trap.effect === "reflectSpell");
+                if (i < 0) return u;
+                const caster = defenderSide === "p" ? "e" : "p";
+                const pool = B.units.filter((v) => v.side === caster
+                    && v.def.type === "unit" && spellAimable(v));
+                if (!pool.length) return u;
+                B.traps[defenderSide].splice(i, 1);
+                redrawTraps();
+                trapTriggered(defenderSide); // «Зимние духи»/«Путь воды»
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 60, "?!", 0xe08cd0);
+                fxEvent("trap", { x: p.x, y: p.y - 8, scale: 0.9 });
+                sfx("mine");
+                trapEchoOnce(defenderSide); // «Роща лоз»: флаг тратится —
+                // повторять перенаправление нечего (одна цель на заклинание)
+                return pool[(Math.random() * pool.length) | 0];
+            };
+
+            // «Ловушка-пузырь» (wis119): существо под пузырём запрещает
+            // СВОЕЙ стороне играть карту призыва того же существа, пока оно
+            // на поле (спека юзера). Юнит удалён (смерть/Смыв/база) — запрет
+            // снят: флаг живёт на юните.
+            A.bubbleBlocked = function bubbleBlocked(side, cardId) {
+                return B.units.some((v) => v.side === side && v.bubbleBlock
+                    && cardIdOf(v.def) === cardId);
             };
             // Ловушки на клетке: «Гоблинская мина» (взрыв 3+1 по соседям),
             // «Гоблинская засада» (выход гоблинов стороны-хозяйки), «Дух
@@ -588,7 +710,8 @@
                 // нейтральные ловушки по-прежнему ловят и строения
                 const cellEffect = (t) => {
                     const e = t.def.trap.effect;
-                    if (e === "freezeSplash" || e === "rowShift") return u.def.type === "unit";
+                    if (e === "freezeSplash" || e === "rowShift"
+                        || e === "bubble") return u.def.type === "unit";
                     return e === "cellDmg" || e === "ambush"
                         || e === "confuse" || e === "cellDebuff"
                         || e === "ancestor" || e === "entangle";
@@ -699,6 +822,22 @@
             // Эффект сработавшей ловушки на клетке (отделён от поиска ловушки —
             // «Роща лоз» применяет его дважды); u — существо, наступившее на неё
             A.applyCellTrap = function applyCellTrap(trap, side, u) {
+                if (trap.def.trap.effect === "bubble") {
+                    // «Ловушка-пузырь» (wis119): урон существа становится 0
+                    // (atkZero — кламп в recalcAuras; «Извлечение духа» снимает)
+                    // и противник не может играть карту призыва этого существа,
+                    // пока оно на поле боя (спека юзера)
+                    u.atkZero = true;
+                    u.bubbleBlock = true;
+                    recalcAuras();
+                    const p2 = cellXY(u.col, u.row);
+                    floatText(p2.x, p2.y - 39, "⚔=0", 0x8cd0ef);
+                    fxEvent("ice", { x: p2.x, y: p2.y - 8, scale: 0.72 });
+                    sfx("aqua");
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
                 if (trap.def.trap.effect === "freezeSplash") {
                     // «Ледяные кандалы»: существо и соседи (верт/гориз)
                     freezeSplash(u, side);
@@ -1240,6 +1379,7 @@
                 if (u.confused) { u.confused = 0; n++; }
                 if (u.venom) { u.venom = 0; n++; }
                 if (u.poison) { u.poison = 0; n++; }
+                if (u.atkZero) { u.atkZero = false; n++; } // «Ловушка-пузырь» (wis119)
                 if (u.entangle) { u.entangle = 0; n++; }
                 if (u.frozen) { u.frozen = 0; n++; }
                 if (u.spellWard) { u.spellWard = false; n++; removeWardMark(u); }
@@ -1415,12 +1555,14 @@
                 const [col, row] = near[(Math.random() * near.length) | 0];
                 const p = cellXY(col, row);
                 if (counterTrapConsume(side === "p" ? "e" : "p", "counterSummon")) {
+                noteDiscard();
                     discard.push(cardId);
                     floatText(p.x, p.y - 60,
                         "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                     return;
                 }
                 addUnit(side, cardId, col, row);
+                noteDiscard();
                 discard.push(cardId);
                 floatText(p.x, p.y - 78, GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                 sfx("chpoc");
@@ -1687,6 +1829,7 @@
                 if (counterTrapConsume(side === "p" ? "e" : "p", "counterSpell")) {
                     floatText(fp.x, fp.y - 60,
                         "✕ " + GAME_LOC.t(`card.${pick.id}.name`), 0x8cd0ef);
+                        noteDiscard();
                     discard.push(pick.id);
                     return;
                 }
@@ -1694,10 +1837,11 @@
                     const last = side === "p" ? B.lastSpell.p : B.lastSpell.e;
                     const ok = last && last !== "str25" && CARDS[last]
                         && CARDS[last].type === "spell";
-                    if (!ok) { discard.push(pick.id); return; } // повтора нет — впустую
+                    if (!ok) { discard.push(pick.id); noteDiscard(); return; } // повтора нет — впустую
                     if (side === "p") { B.lastSpell.p = "str25"; replaySpell(last); }
                     else { B.lastSpell.e = "str25"; enemyReplayLast(); }
                     afterSpellPlayed();
+                    noteDiscard();
                     discard.push(pick.id);
                     return;
                 }
@@ -1705,14 +1849,15 @@
                     const rt = runeTargetP(pick.id, focus);
                     applySpellP(pick.id, rt, true);
                     fxSpellCast(pick.id, rt, "p");
-                    if (def.spell.drainAll) B.energy = 0; // огнешар и бесплатно его сжигает
+                    if (def.spell.drainAll || def.spell.stormAll) B.energy = 0; // огнешар/гроза и бесплатно сжигают энергию
                     B.lastSpell.p = pick.id;
                 } else {
                     enemyCastSpellEffect(def, true, focus);
-                    if (def.spell.drainAll) B.eEnergy = 0;
+                    if (def.spell.drainAll || def.spell.stormAll) B.eEnergy = 0;
                     B.lastSpell.e = pick.id;
                 }
                 afterSpellPlayed(); // «Заклинатель клинков» реагирует и на это
+                noteDiscard();
                 discard.push(pick.id);
             };
 
@@ -1746,7 +1891,7 @@
                 if (!last || last === "str25" || !CARDS[last]
                     || CARDS[last].type !== "spell") return false;
                 enemyCastSpellEffect(CARDS[last], true);
-                if (CARDS[last].spell.drainAll) B.eEnergy = 0;
+                if (CARDS[last].spell.drainAll || CARDS[last].spell.stormAll) B.eEnergy = 0;
                 for (const zone of [B.eHand, B.eDeck, B.eDiscard]) {
                     const i = zone.indexOf(last);
                     if (i >= 0) { zone.splice(i, 1); break; }

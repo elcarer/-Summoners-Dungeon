@@ -308,9 +308,11 @@
                     }
                     for (const u of B.units) if (u.side === side && u.def.type === "unit") {
                         // «Шипастые лозы» уводят бонус в минус — урон не ниже нуля;
-                        // atkPenalty — постоянная убыль «Песчаного духа» (wis109)
-                        const newAtk = Math.max(0, u.def.atk + (u.bonusAtk || 0)
-                            + (u.atkPenalty || 0) + atk);
+                        // atkPenalty — постоянная убыль «Песчаного духа» (wis109);
+                        // atkZero — «Ловушка-пузырь» (wis119): урон ровно 0
+                        const newAtk = u.atkZero ? 0
+                            : Math.max(0, u.def.atk + (u.bonusAtk || 0)
+                                + (u.atkPenalty || 0) + atk);
                         if (u.curAtk !== newAtk) {
                             u.curAtk = newAtk;
                             const n = u.node.getChildByName("atk");

@@ -39,6 +39,7 @@
                     sfx("rocket");
                 } else {
                     B.discard.push(cardId);
+                    noteDiscard();
                 }
                 B.hand.splice(handIdx, 1);
                 B.selected = null;
@@ -91,11 +92,20 @@
                 if (B.journeySummon) { // «Глубокое путешествие»: бесплатный призыв
                     if (!deployRows("p").includes(row) || unitAt(col, row)) return;
                     const cardId = B.journeySummon;
+                    // «Ловушка-пузырь» (wis119) врага: призыв того же существа
+                    // под пузырём не проходит — заклинание не тратится, игрок
+                    // выбирает другую карту/клетку
+                    if (bubbleBlocked("p", cardId)) {
+                        floatText(cellXY(col, row).x, cellXY(col, row).y - 60,
+                            "✕", 0x8cd0ef);
+                        return;
+                    }
                     B.journeySummon = null;
                     // «Отмена призыва» (wis84) врага: бесплатный призыв — тоже
                     // призыв; карта уходит в сброс, существо не появляется
                     if (counterTrapConsume("e", "counterSummon")) {
                         B.discard.push(cardId);
+                        noteDiscard();
                         const jp = cellXY(col, row);
                         floatText(jp.x, jp.y - 60,
                             "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
@@ -198,6 +208,17 @@
                     deselect();
                     return;
                 }
+                // «Ловушка-пузырь» (wis119) врага: существо под пузырём
+                // запрещает играть карту призыва того же существа, пока оно
+                // на поле (спека юзера) — розыгрыш не проходит, карта в руке
+                if (CARDS[B.hand[B.selected]].type === "unit"
+                    && bubbleBlocked("p", B.hand[B.selected])) {
+                    const sp = cellXY(col, row);
+                    floatText(sp.x, sp.y - 60, "✕", 0x8cd0ef);
+                    sfx("mine");
+                    deselect();
+                    return;
+                }
                 B.energy -= effCost(B.hand[B.selected]);
                 const cardId = spendCard(B.selected);
                 // «Отмена призыва» (wis84) врага: существо не появляется,
@@ -272,6 +293,15 @@
                     && target && target.col !== undefined) {
                     const aimed = unitAt(target.col, target.row);
                     if (aimed && !spellAimable(aimed)) return false;
+                    // «Отражение» (wis120) врага: заклинание игрока, целью
+                    // выбрано СУЩЕСТВО врага, летит в случайное существо
+                    // игрока (спека юзера). Цель подменяется ДО эффекта.
+                    const rt = reflectAim("e", aimed);
+                    if (rt !== aimed) target = { col: rt.col, row: rt.row };
+                }
+                if (def.spell.stormAll) { // «Гроза»: вся оставшаяся энергия — удары по 2
+                    stormStrike("p", cardId, free);
+                    return true;
                 }
                 if (tg === "anyUnit") { // усиление/Смыв/Слабость
                     if (!target || target.col === undefined) return false;
@@ -428,6 +458,7 @@
                     removeUnit(u); // в сброс без каскадов смерти — постройка не «убита»
                     recalcAuras();
                     B.discard.push(id);
+                    noteDiscard();
                     const p = cellXY(cell.col, cell.row);
                     floatText(p.x, p.y - 60, "⤓", 0xef9f8c);
                     sfx("chpoc");
@@ -620,7 +651,7 @@
                 const target = autoTargetFor(cardId);
                 applySpellP(cardId, target, true);
                 fxSpellCast(cardId, target, "p");
-                if (def.spell.drainAll) B.energy = 0; // огнешар и в повторе сжигает энергию
+                if (def.spell.drainAll || def.spell.stormAll) B.energy = 0; // огнешар/гроза и в повторе сжигают энергию
                 const hi = B.hand.indexOf(cardId);
                 if (hi >= 0) B.hand.splice(hi, 1);
                 else {
@@ -675,7 +706,8 @@
                 if (!applySpellP(cardId, target, false,
                     resetHand ? { skipHandReset: true } : null)) return false;
                 fxSpellCast(cardId, target, "p");
-                B.energy = def.spell.drainAll ? 0 : B.energy - effCost(cardId, "p", target);
+                B.energy = (def.spell.drainAll || def.spell.stormAll)
+                    ? 0 : B.energy - effCost(cardId, "p", target);
                 spendCard(handIdx);
                 if (resetHand) confuseRunes("p", resetHand); // обе стороны (спека)
                 heroFirstSpellEnergy("p"); // «Дуновение опасности»: +1⚡ за 1-е заклинание

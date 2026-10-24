@@ -303,7 +303,7 @@
                     // разыгрывается первым, чтобы хватило и на остальные карты
                     if (s.energyPerHand || s.energyPerTrap) return 1;
                     if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
-                        || s.sacrifice || s.copyLast
+                        || s.sacrifice || s.copyLast || s.stormAll
                         || s.purge || s.stealEnergy || s.fireflies
                         || s.growthHand || s.nova || s.debuffEnemyAtkAll
                         || s.iceStrike) return 2;
@@ -317,11 +317,12 @@
                 // движок добора, играется, когда важное уже разыграно
                 if (def.type === "building") return def.monolith ? 5.5 : 1;
                 if (def.type === "trap") {
-                    // «Отмена заклинания»/«Отмена призыва» (wis83/wis84):
-                    // реактивные ловушки — чем раньше висят, тем больше шансов
-                    // поймать розыгрыш (просил юзер: контроль)
+                    // «Отмена заклинания»/«Отмена призыва» (wis83/wis84) и
+                    // «Отражение» (wis120): реактивные ловушки — чем раньше
+                    // висят, тем больше шансов поймать розыгрыш (контроль)
                     return def.trap.effect === "counterSpell"
-                        || def.trap.effect === "counterSummon" ? 1.2 : 5;
+                        || def.trap.effect === "counterSummon"
+                        || def.trap.effect === "reflectSpell" ? 1.2 : 5;
                 }
                 // вождь / заклинатель клинков / пастух / друид / сестра — двигатели
                 // связок: ставим до существ, чьи способности они усилят/оплатят
@@ -1018,6 +1019,10 @@
                 if (s.draw && B.eHand.length >= HAND_MAX) return false;
                 // огнешар при энергии 1..2 почти пуст (урон 0..1) — копим дальше
                 if (s.drainAll && B.eEnergy < 3) return false;
+                // «Гроза»: после оплаты цены должен остаться хотя бы 1⚡ удара
+                // и хоть одна цель у игрока (иначе энергия сгорит впустую)
+                if (s.stormAll && (B.eEnergy - effCost(cardIdOf(def), "e") < 1
+                    || !aiDmgTargets(def).length)) return false;
                 // «Поиск рун»: в верхних картах колоды должно быть заклинание
                 if (s.search && !B.eDeck.slice(-s.search)
                     .some((id) => CARDS[id] && CARDS[id].type === "spell")) return false;
@@ -1140,6 +1145,8 @@
                     if (s.aoeDmg) v += s.aoeDmg * 1.4;
                     if (s.dmg) v += s.dmg * 1.1;
                     if (s.drainAll) v += 1.5;
+                    // «Гроза»: ценнее при запасе энергии и целях у игрока
+                    if (s.stormAll) v += 1 + Math.min(4, B.eEnergy) * 0.4;
                     if (s.fireflies) v += 1.2;
                     if (s.growthHand) v += 1.0;
                     if (s.firewall) v += 1.6;
@@ -1215,13 +1222,14 @@
             };
             // «Глубокое путешествие»: 1 призыв из верхних N — берём лучший,
             // а не случайный. Если места на поле нет, карта хоть в руку.
-            A.aiSummonPick = function aiSummonPick(n) {
+            A.aiSummonPick = function aiSummonPick(n, allow = null) {
                 let best = null, bestScore = -Infinity;
                 const animals = B.units.filter((v) => v.side === "e"
                     && v.def.type === "unit" && v.def.creature === "animal").length;
                 for (const x of aiTopCards(n)) {
                     const d = CARDS[x.id];
                     if (!d || d.type !== "unit") continue;
+                    if (allow && !allow(x.id)) continue; // «Ловушка-пузырь» (wis119)
                     let sc = aiCardPower(d);
                     if (d.keeperScale) sc += animals * 0.35;
                     if (d.energyToStats) sc += Math.max(0, B.eEnergy - 1) * 0.2;
@@ -1273,6 +1281,12 @@
                 const s = def.spell;
                 castTargetOff = 0;
                 const aimOff = (u) => { if (u && u.def.targetDiscount) castTargetOff = 1; };
+                if (s.stormAll) { // «Гроза»: вся оставшаяся энергия — удары по 2
+                    // по случайным существам/постройкам игрока; энергию гасит
+                    // aiPlay/руна по флагу stormAll (как у drainAll)
+                    stormStrike("e", cardIdOf(def), free);
+                    return;
+                }
                 if (s.nova) { // «Круговая атака»: своё существо, где чужих соседей
                     // больше и они опаснее своих (своих тоже задевает)
                     const own = spellTargets(B.units.filter((v) => v.side === "e"
@@ -1296,6 +1310,7 @@
                         let best = aiHydroPick();
                         if (focus && foes.includes(focus)) best = focus;
                         if (!best) return;
+                        best = reflectAim("p", best); // «Отражение» (wis120) игрока
                         aimOff(best);
                         damageUnit(best, spellDmg(def, "e", true, true), null, "rocket");
                         if (B.units.includes(best)) pushTowardBase(best);
@@ -1311,9 +1326,10 @@
                             && v.def.type === "unit"));
                         const real = foes.filter((v) => !v.token);
                         const pool = real.length ? real : foes;
-                        const best = pool.slice()
+                        let best = pool.slice()
                             .sort((a, b) => aiThreat(b) - aiThreat(a) || b.row - a.row)[0];
                         if (!best) return;
+                        best = reflectAim("p", best); // «Отражение» (wis120) игрока
                         aimOff(best);
                         punch(best.node);
                         bounceUnit(best);
@@ -1322,10 +1338,11 @@
                     }
                     // «Слабость» (wis86): −2 урона сильнейшему существу игрока
                     if (s.debuffAtk) {
-                        const best = spellTargets(B.units
+                        let best = spellTargets(B.units
                             .filter((v) => v.side === "p" && v.def.type === "unit"))
                             .sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
                         if (!best) return;
+                        best = reflectAim("p", best); // «Отражение» (wis120) игрока
                         aimOff(best);
                         best.bonusAtk = (best.bonusAtk || 0) - s.debuffAtk;
                         recalcAuras();
@@ -1343,8 +1360,9 @@
                         const focusOk = focus && B.units.includes(focus)
                             && focus.def.type === "unit" && spellAimable(focus)
                             && iceStrikeVictims(focus).length > 0;
-                        const target = focusOk ? focus : aiIceStrikeTarget();
+                        let target = focusOk ? focus : aiIceStrikeTarget();
                         if (!target) return;
+                        target = reflectAim("p", target); // «Отражение» (wis120) игрока
                         const victim = iceStrikeVictim(target);
                         if (!victim) return;
                         aimOff(target); // скидка «Заклятого древоброда»
@@ -1420,6 +1438,7 @@
                         }
                         if (focus && targets.includes(focus)) best = focus; // руна
                         if (best) {
+                            best = reflectAim("p", best); // «Отражение» (wis120) игрока
                             const n = purgeUnit(best);
                             B.enemyBase = Math.min(B.enemyBaseMax, B.enemyBase + n);
                             floatText(960, 60, `+${n}`, 0x9fd489);
@@ -1441,6 +1460,7 @@
                         let best = aiDmgTargetPick(def, targets, free);
                         if (focus && targets.includes(focus)) best = focus; // руна
                         if (!best) return;
+                        best = reflectAim("p", best); // «Отражение» (wis120) игрока
                         aimOff(best); // скидка «Заклятого древоброда»
                         const dmg = aiDmgFor(def, best, free, true);
                         damageUnit(best, dmg, null, "rocket");
@@ -1604,6 +1624,8 @@
                     if (want) for (const i of by[want]) B.eHand.push(top[i]);
                     for (let i = 0; i < top.length; i++)
                         if (!want || CARDS[top[i]].type !== want) B.eDiscard.push(top[i]);
+                    noteDiscard(top.filter((id) => !want
+                        || CARDS[id].type !== want).length); // «Болотная слизь»
                     if (want) sfx("chpoc");
                 }
                 if (s.discardPick) { // «Варка зелий»: лучшее заклинание сбросов — в руку
@@ -1633,13 +1655,17 @@
                         removeUnit(out); // в сброс без каскадов смерти
                         recalcAuras();
                         B.eDiscard.push(cardIdOf(out.def));
+                        noteDiscard();
                         B.eDiscard.splice(B.eDiscard.indexOf(back), 1);
                         addUnit("e", back, cell.col, cell.row);
                         sfx("chpoc");
                     }
                 }
                 if (s.journey) { // «Глубокое путешествие»: лучший призыв из верхних N — бесплатно
-                    const chosen = aiSummonPick(s.journey); // выбор ДО изъятия карт
+                    // «Ловушка-пузырь» (wis119) игрока: карту существа под
+                    // пузырём не призываем (спека юзера) — она уйдёт в rest
+                    const chosen = aiSummonPick(s.journey, (id) =>
+                        !bubbleBlocked("e", id)); // выбор ДО изъятия карт
                     const k = Math.min(s.journey, B.eDeck.length);
                     const top = k ? B.eDeck.splice(B.eDeck.length - k, k) : [];
                     const chosenId = chosen ? chosen.id : null;
@@ -1648,6 +1674,7 @@
                         const r = (Math.random() * rest.length) | 0;
                         B.eHand.push(rest[r]); // одна случайная — в руку (по правилу карты)
                         for (let i = 0; i < rest.length; i++) if (i !== r) B.eDiscard.push(rest[i]);
+                        noteDiscard(rest.length - 1); // «Болотная слизь»
                     }
                     if (chosenId) {
                         // клетка призыва — теми же правилами связок, что и обычный
@@ -1691,6 +1718,10 @@
                     for (const pick of affordable) {
                         const def = pick.def;
                         if (def.type === "unit" || def.type === "building") {
+                            // «Ловушка-пузырь» (wis119) игрока: существо под
+                            // пузырём запрещает ИИ играть карту призыва того
+                            // же существа (спека юзера) — карту держим
+                            if (def.type === "unit" && bubbleBlocked("e", pick.id)) continue;
                             // «Отряд эльфов» забирает ВСЮ энергию: без запаса в 2⚡
                             // это 0–1/0–1 — карту не переводим (группа 3.5 уже
                             // отодвинула его в конец розыгрыша)
@@ -1727,6 +1758,7 @@
                                 B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eEnergy -= effCost(cardId, "e");
                                 B.eDiscard.push(cardId);
+                                noteDiscard();
                                 floatText(960, 500,
                                     "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                                 hideEnemyCard();
@@ -1737,6 +1769,7 @@
                             B.eEnergy -= effCost(cardId, "e");
                             addUnit("e", cardId, col, row);
                             B.eDiscard.push(cardId); // как у игрока: карта в сброс (иначе цикл «Трусливого гоблина» не работает)
+                            noteDiscard();
                             hideEnemyCard();
                             played = true;
                             break;
@@ -1794,6 +1827,7 @@
                             if (counterTrapConsume("p", "counterSpell")) {
                                 B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eDiscard.push(cardId);
+                                noteDiscard();
                                 B.eEnergy -= effCost(cardId, "e");
                                 floatText(960, 500,
                                     "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
@@ -1815,7 +1849,7 @@
                             // (повтор «Горящими рунами» бесплатен — скидка не копится)
                             const tOff = def.spell.copyLast ? 0 : castTargetOff;
                             castTargetOff = 0;
-                            B.eEnergy = def.spell.drainAll
+                            B.eEnergy = (def.spell.drainAll || def.spell.stormAll)
                                 ? 0 : B.eEnergy - Math.max(0, effCost(cardId, "e") - tOff);
                             heroFirstSpellEnergy("e"); // «Дуновение опасности»
                             // рука ИИ тоже не больше 7 — излишек панельных доборов
@@ -1823,13 +1857,14 @@
                             while (B.eHand.length > HAND_MAX) {
                                 const sp = B.eHand.splice((Math.random() * B.eHand.length) | 0, 1)[0];
                                 B.eDiscard.push(sp);
+                                noteDiscard();
                                 B.scorch.e.delete(sp); // метка ушла вместе с картой
                             }
                             if (B.scorch.e.has(cardId)) { // «Сожжение»: карта удалена из боя
                                 B.scorch.e.delete(cardId);
                                 floatText(960, 640, `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
                                 sfx("rocket");
-                            } else B.eDiscard.push(cardId);
+                            } else { B.eDiscard.push(cardId); noteDiscard(); }
                             heroStrReplay("e", cardId, def); // «Мастера огня»
                             B.lastSpell.e = cardId;
                             afterSpellPlayed(); // «Заклинатель клинков» на поле

@@ -634,6 +634,7 @@
                 const cardId = B.hand.splice(idx, 1)[0];
                 if (cardId) {
                     B.discard.push(cardId);
+                    noteDiscard();
                     B.scorch.p.delete(cardId); // метка ушла вместе с этой картой
                 }
                 sfx("chpoc");

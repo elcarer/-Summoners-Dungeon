@@ -694,6 +694,41 @@
                   subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                   rarity: "epic", elem: "wisdom",
                   color: 0x3a6ea8, img: "wisdom/115" },
+        // «Болотная слизь» (wis116): +1⚔ каждый раз, когда ЛЮБАЯ карта
+        // уходит в сброс (точки сброса зовут noteDiscard — см. arenaCombat)
+        wis116: { type: "unit", cost: 2, atk: 0, hp: 4, speed: 1,
+                  creature: "goblin", sheet: "water_el", slimeGain: true,
+                  subtype: "elemental", // подтип — по спеке юзера
+                  rarity: "epic", elem: "wisdom",
+                  color: 0x3a6ea8, img: "wisdom/116" },
+        // «Мистический лабиринт» (wis117): существо, подошедшее (маршем)
+        // на клетку рядом с базой владельца, переносится на пустую клетку
+        // по соседству с постройкой (labyrinthAct в afterMoved)
+        wis117: { type: "building", cost: 6, atk: 0, hp: 6,
+                  labyrinth: true,
+                  rarity: "epic", elem: "wisdom",
+                  color: 0x2e4a72, img: "wisdom/117" },
+        // «Гроза» (wis118): вся оставшаяся энергия (сверх цены) сгорает;
+        // за каждую единицу — 2 урона случайному существу или постройке
+        // противника, новая случайная цель на каждый удар (stormStrike)
+        wis118: { type: "spell", cost: 2,
+                  spell: { target: "none", stormAll: true },
+                  kind: "damage", rarity: "epic", elem: "wisdom",
+                  color: 0x4a7ac0, img: "wisdom/118" },
+        // «Ловушка-пузырь» (wis119): существо, активировавшее ловушку,
+        // теряет весь урон и запрещает противнику играть карту призыва
+        // того же существа, пока оно на поле боя
+        wis119: { type: "trap", cost: 3,
+                  trap: { event: "onEnemyCell", effect: "bubble" },
+                  kind: "control", rarity: "rare", elem: "wisdom",
+                  color: 0x2e4a72, img: "wisdom/119" },
+        // «Отражение» (wis120): заклинание противника, выбранное целью
+        // в существо владельца, летит в случайное существо противника
+        // (reflectAim — перехват цели до применения эффекта)
+        wis120: { type: "trap", cost: 1,
+                  trap: { event: "onEnemySpellAim", effect: "reflectSpell" },
+                  kind: "control", rarity: "epic", elem: "wisdom",
+                  color: 0x2e4a72, img: "wisdom/120" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
