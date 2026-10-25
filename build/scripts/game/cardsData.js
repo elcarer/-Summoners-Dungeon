@@ -729,6 +729,48 @@
                   trap: { event: "onEnemySpellAim", effect: "reflectSpell" },
                   kind: "control", rarity: "epic", elem: "wisdom",
                   color: 0x2e4a72, img: "wisdom/120" },
+        // ── Стихия «Тлен» (чёрные) — четвёртая стихия, лица decay/121–126 ──
+        // (нумерация артов юзера — сквозная со 121). Герой стихии — Мортис
+        // (necr_256), первый призванный Скелет получает «Выкапливание 1»;
+        // подземелья у стихии пока нет — карты живут в стартере Мортиса.
+        // «Боевой скелет» — тип призываемого существа Скелет (подтип юзера)
+        dec121: { type: "unit", cost: 1, atk: 1, hp: 2, speed: 1,
+                  creature: "goblin", // плейсхолдер листа поля боя (гоблин)
+                  subtype: "skeleton", // подтип — по спеке юзера (чат)
+                  rarity: "common", elem: "decay",
+                  color: 0x504048, img: "decay/121" },
+        // «Зомби-селянин» — тип призываемого существа Зомби
+        dec122: { type: "unit", cost: 2, atk: 3, hp: 3, speed: 1,
+                  creature: "goblin", // плейсхолдер листа поля боя (гоблин)
+                  subtype: "zombie", // подтип — по спеке юзера (чат)
+                  rarity: "common", elem: "decay",
+                  color: 0x504048, img: "decay/122" },
+        // «Нетопырь» — Животное с «Полётом» (flyOver, как «Мини-фея»)
+        dec123: { type: "unit", cost: 3, atk: 5, hp: 1, speed: 1,
+                  creature: "goblin", ability: "flyOver",
+                  subtype: "animal", // подтип — по спеке юзера (чат)
+                  rarity: "common", elem: "decay",
+                  color: 0x504048, img: "decay/123" },
+        // «Поднятие мёртвых»: выбрать карту существа из СВОЕГО сброса — в руку
+        dec124: { type: "spell", cost: 1,
+                  spell: { target: "none", raiseDead: true },
+                  kind: "draw", // тип эффекта — по спеке юзера (чат)
+                  rarity: "common", elem: "decay",
+                  color: 0x63424e, img: "decay/124" },
+        // «Пытка разума»: выбранный игрок (вы или противник) сбрасывает
+        // 2 случайные карты с руки
+        dec125: { type: "spell", cost: 1,
+                  spell: { target: "none", mindTorture: 2 },
+                  kind: "discard", // тип эффекта — по спеке юзера (чат)
+                  rarity: "common", elem: "decay",
+                  color: 0x63424e, img: "decay/125" },
+        // «Негативный поток»: 1 урон любому существу или противнику
+        // (его базе) — новая цель «существо или враг» (anyUnitOrFoe)
+        dec126: { type: "spell", cost: 1,
+                  spell: { target: "anyUnitOrFoe", dmg: 1 },
+                  kind: "damage", // тип эффекта — по спеке юзера (чат)
+                  rarity: "common", elem: "decay",
+                  color: 0x63424e, img: "decay/126" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -765,13 +807,15 @@
     ];
     // Стартовые колоды по стихиям (выбор при «Новая игра»): Рост — карты
     // 41–46 юзера по 2 копии; Мудрость — карты 81–86 по 2 копии, стартер
-    // Миры (просил юзер).
+    // Миры (просил юзер); Тлен — карты 121–126 по 2 копии, стартер Мортиса.
     const STARTER_DECKS = {
         strength: DEFAULT_DECK,
         growth: ["grw1", "grw1", "grw2", "grw2", "grw3", "grw3",
                  "grw4", "grw4", "grw5", "grw5", "grw6", "grw6"],
         wisdom: ["wis81", "wis81", "wis82", "wis82", "wis83", "wis83",
                  "wis84", "wis84", "wis85", "wis85", "wis86", "wis86"],
+        decay: ["dec121", "dec121", "dec122", "dec122", "dec123", "dec123",
+                "dec124", "dec124", "dec125", "dec125", "dec126", "dec126"],
     };
 
     // Лимита ловушек НЕТ (просил юзер: «если он есть — это и есть баг»).
@@ -818,6 +862,14 @@
             id: "mira", rarity: "common",
             baseHp: 15, elems: ["wisdom"], starter: "wisdom",
             img: "16", ability: "firstSummonWard",
+        },
+        // Мортис (просил юзер): Тлен, первый призванный в бою Скелет
+        // получает «Выкапливание 1» (firstSkeletonDig) — однажды после
+        // смерти возвращается на ту же клетку без траты энергии
+        mortis: {
+            id: "mortis", rarity: "common",
+            baseHp: 15, elems: ["decay"], starter: "decay",
+            img: "24", ability: "firstSkeletonDig", abilityVal: 1,
         },
         gob: { id: "gob", rarity: "common", baseHp: 10,
                elems: ["strength"], starter: "strength",
@@ -903,7 +955,7 @@
                   elems: ["wisdom"], starter: "wisdom",
                   img: "23", ability: "firstMageDouble", abilityVal: 1 },
     };
-    const HERO_ORDER = ["gorbag", "elmir", "mira"];
+    const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
     // пещеры, затем Роща Роста, затем «Подземные ключи» (просил юзер)
     const HERO_FOE_ORDER = ["gob", "gobBig", "gobTrap", "gobFire", "gobElite",

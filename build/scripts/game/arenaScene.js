@@ -65,7 +65,8 @@
                         builtGuard: { p: false, e: false },
                         firstBuilding: { p: false, e: false },
                         trapEcho: { p: false, e: false },
-                        buildReplay: { p: false, e: false } },
+                        buildReplay: { p: false, e: false },
+                        skeletonDig: { p: false, e: false } },
                     enemyBase: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
                     enemyBaseMax: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
                     deck: shuffle([...pDeck]), discard: [], hand: [],
@@ -103,6 +104,8 @@
                 runesPanel = null; runesTop = [];
                 journeyPanel = null; journeyTop = [];
                 brewPanel = null; brewPile = null;
+                raisePanel = null;
+                torturePanel = null;
                 unitCard = null;
                 sfx("openRoom"); // начало боя
 
@@ -269,6 +272,8 @@
                     if (journeyPanel) finishJourney(null); // «Глубокое путешествие» — без призыва
                     else if (stumpPanel) closeStumpPanel(); // «Пень обряда» — оставить как было
                     else if (brewPanel) closeBrewPanel(); // «Варка зелий» — без выбора
+                    else if (raisePanel) closeRaisePanel(); // «Поднятие мёртвых» — без выбора
+                    else if (torturePanel) closeTorturePanel(); // «Пытка разума» — без выбора
                     else if (seekPanel) finishSeek(); // «Поиск знаний» — взять, что выбрано
                     else if (grimPanel) closeGrimPanel(); // «Гримуар инея» — выбор сделан, просто закрыть
                     else closeRunesPanel(); // «Поиск рун» — отмена выбора

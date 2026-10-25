@@ -18,6 +18,7 @@
         strength: starterCollection(DEFAULT_DECK),
         growth: starterCollection(STARTER_DECKS.growth),
         wisdom: starterCollection(STARTER_DECKS.wisdom), // стартер Миры
+        decay: starterCollection(STARTER_DECKS.decay), // стартер Мортиса
     };
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N
@@ -100,6 +101,12 @@
                  // 116–120: 119 редкая ×3, эпические — по 1 копии
                  "wis116", "wis117", "wis118", "wis119", "wis119", "wis119",
                  "wis120"],
+        // Тлен: все 6 карт обычные ×3 — на будущее для сундуков/магазина
+        // подземелья стихии (сейчас карт в стартере Мортиса достаточно,
+        // данжа Тлен ещё нет)
+        decay: ["dec121", "dec121", "dec121", "dec122", "dec122", "dec122",
+                "dec123", "dec123", "dec123", "dec124", "dec124", "dec124",
+                "dec125", "dec125", "dec125", "dec126", "dec126", "dec126"],
     };
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────

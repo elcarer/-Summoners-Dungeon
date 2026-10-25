@@ -177,6 +177,7 @@
                 if (d.lakeMaid) v += 0.5; // «Озёрная дева»: чужая способность
                 if (u.venom) v += 0.4;
                 if (u.berserk) v += 0.3 * u.berserk;
+                if (u.exhuming) v += 0.8 * u.exhuming; // «Выкапливание»: вернётся после смерти
                 return v;
             };
             // Опасность ЧУЖОГО (игрока) существа для нашей базы/поля. Нужна
@@ -306,7 +307,7 @@
                         || s.sacrifice || s.copyLast || s.stormAll
                         || s.purge || s.stealEnergy || s.fireflies
                         || s.growthHand || s.nova || s.debuffEnemyAtkAll
-                        || s.iceStrike) return 2;
+                        || s.mindTorture || s.iceStrike) return 2;
                     if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk
                         || s.enchantFire || s.cocoon || s.venom) return 4;
                     if (s.baseHit || s.wolfVolley) return 4.5; // бьёт СВОИМ существом
@@ -1046,6 +1047,15 @@
                 // заклинание, которое стоит тащить (саму Варку ИИ не берёт)
                 if (s.discardPick && !spellsInDiscard("e").concat(spellsInDiscard("p"))
                     .some((id) => id !== "grw23")) return false;
+                // «Поднятие мёртвых» — в своём сбросе должно быть существо
+                if (s.raiseDead && !unitsInDiscard("e").length) return false;
+                // «Пытка разума» — сбрасывать нечего, если рука игрока пуста
+                // (свою ИИ не режет)
+                if (s.mindTorture && !B.hand.length) return false;
+                // «Негативный поток» — нужна цель: существо или добивание базы
+                if (s.target === "anyUnitOrFoe"
+                    && !spellTargets(B.units.filter((v) => v.def.type === "unit")).length
+                    && B.playerBase > s.dmg) return false;
                 // «Раскопки» — нужна своя постройка и постройка сброса ДОРОЖЕ
                 // худшей своей (иначе обмен картой не окупается)
                 if (s.excavate) {
@@ -1507,6 +1517,36 @@
                     damageBase("p", s.baseDmg + heroSpellBonus(def, "e", false, true),
                         { x: 960, y: 840, fill: 0xff5f4e });
                     sfx("rocket");
+                }
+                if (s.raiseDead) { // «Поднятие мёртвых»: лучшее существо сброса — в руку
+                    const units = unitsInDiscard("e");
+                    if (units.length) {
+                        const best = units.slice()
+                            .sort((a, b) => aiCardPower(CARDS[b]) - aiCardPower(CARDS[a]))[0];
+                        B.eDiscard.splice(B.eDiscard.indexOf(best), 1);
+                        B.eHand.push(best);
+                        sfx("chpoc");
+                        refreshHud();
+                    }
+                }
+                if (s.mindTorture) { // «Пытка разума»: ИИ всегда выбирает игрока
+                    randomDiscard("p", s.mindTorture);
+                }
+                if (s.target === "anyUnitOrFoe") { // «Негативный поток»: существо или база
+                    // свои цели смысла не имеют — бьём по существам игрока
+                    const targets = spellTargets(B.units.filter((u) =>
+                        u.side !== "e" && u.def.type === "unit"));
+                    const baseDmg = s.dmg + heroSpellBonus(def, "e", false, true);
+                    if (!targets.length || B.playerBase <= baseDmg) {
+                        damageBase("p", baseDmg, { x: 960, y: 840, fill: 0xff5f4e });
+                        sfx("rocket");
+                    } else {
+                        const best = focus && targets.includes(focus)
+                            ? focus // руна: именно атакованный
+                            : (aiDmgTargetPick(def, targets) || targets[0]);
+                        if (best) damageUnit(best, s.dmg + heroSpellBonus(def, "e", true, true),
+                            null, "rocket");
+                    }
                 }
                 if (s.stealEnergy) { // «Похищение энергии»: 2⚡ игрока — нам
                     const got = Math.min(s.stealEnergy, B.energy);

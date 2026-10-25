@@ -137,11 +137,13 @@
                         && (tg === "anyUnitDmg"
                             ? (u.def.type === "unit"
                                 || (u.def.type === "building" && !sdef.spell.noBuildings))
+                            : tg === "anyUnitOrFoe" ? u.def.type === "unit" // «Негативный поток»: существо или база врага
                             : tg === "ownBuilding" ? u.def.type === "building"
                             : u.def.type === "unit");
                     const sideOk = !u || !(tg === "ownUnit" || tg === "ownBuilding")
                         || u.side === "p";
                     const known = tg === "anyUnit" || tg === "anyUnitDmg"
+                        || tg === "anyUnitOrFoe"
                         || tg === "ownUnit" || tg === "ownBuilding";
                     // «Ледяной удар»: у цели должен быть хотя бы один сосед-
                     // существо, иначе заклинание не разыгрывается
@@ -303,6 +305,11 @@
                     stormStrike("p", cardId, free);
                     return true;
                 }
+                // «Поднятие мёртвых» (dec124): в своём сбросе нет существ —
+                // заклинание не разыгрывается (карта и энергия целы)
+                if (def.spell.raiseDead && !unitsInDiscard("p").length) return false;
+                // «Пытка разума» (dec125): обе руки пусты — сбрасывать нечего
+                if (def.spell.mindTorture && !B.hand.length && !B.eHand.length) return false;
                 if (tg === "anyUnit") { // усиление/Смыв/Слабость
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
@@ -545,6 +552,21 @@
                             u.def.type === "unit", true), null, "rocket");
                     } else return false;
                 }
+                // «Негативный поток» (dec126): 1 урон ЛЮБОМУ существу (обе
+                // стороны, постройки — не существа) или противнику (его базе)
+                if (def.spell.target === "anyUnitOrFoe") {
+                    if (!target) return false;
+                    if (target.base === true) {
+                        damageBase("e", def.spell.dmg + heroSpellBonus(def, "p", false, true),
+                            { x: 960, y: 60, fill: 0xff8f6e });
+                        sfx("rocket");
+                    } else if (target.col !== undefined) {
+                        const u = unitAt(target.col, target.row);
+                        if (!u || u.def.type !== "unit") return false;
+                        damageUnit(u, def.spell.dmg + heroSpellBonus(def, "p", true, true),
+                            null, "rocket");
+                    } else return false;
+                }
                 if (def.spell.draw) drawCards(def.spell.draw);
                 // «Запутать руны»: обе руки — в сброс, по 3 карты (спека:
                 // «вы И ПРОТИВНИК»; раньше сбрасывалась только своя — баг
@@ -560,6 +582,11 @@
                 if (def.spell.grim) openGrimPanel(); // «Гримуар инея»: выбор типа + верхние 4
                 if (def.spell.journey) openJourneyPanel(def.spell.journey);
                 if (def.spell.discardPick) openBrewPanel(); // «Варка зелий»: выбор из сбросов
+                // «Поднятие мёртвых»: существа своего сброса — в руку (гейт
+                // выше: пусто в сбросе → карта не разыгрывается)
+                if (def.spell.raiseDead) openRaisePanel();
+                // «Пытка разума»: панель «кто сбрасывает случайные карты»
+                if (def.spell.mindTorture) openTorturePanel(def.spell.mindTorture);
                 return true;
             };
 
@@ -622,6 +649,15 @@
                     if (!targets.length) return { base: true };
                     const best = targets.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
                     return { col: best.col, row: best.row };
+                }
+                if (tg === "anyUnitOrFoe") { // «Негативный поток»: существо любой стороны или база
+                    const dmg = spellHitDmg(def);
+                    const targets = spellTargets(B.units.filter((u) => u.def.type === "unit"));
+                    const kills = targets.filter((v) => v.hp <= dmg);
+                    if (!kills.length && B.enemyBase <= dmg) return { base: true };
+                    const pool = kills.length ? kills : targets;
+                    const best = pool.slice().sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                    return best ? { col: best.col, row: best.row } : { base: true };
                 }
                 if (tg === "anyCell") { // стена костров — ряд, где больше врагов
                     const counts = [0, 0, 0, 0, 0];

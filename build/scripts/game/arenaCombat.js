@@ -1083,6 +1083,97 @@
                 }
                 heroDeathReplay(u); // «Гоблин-вождь»: первый погибший гоблин возвращается
                 heroBuildingReplay(u); // «Хранитель рощи»: первая погибшая постройка возвращается
+                exhumingReplay(u); // «Выкапливание»: существо возвращается после смерти
+            };
+
+            // ── «Выкапливание N» (Мортис, просил юзер): существо ОДИН раз
+            // после смерти призывается обратно на поле — на ту же клетку
+            // (занята — соседнюю пустую верт/гориз) — с базовыми статами
+            // и БЕЗ траты энергии; счётчик понижается на 1, на 0 свойство
+            // исчезает. Штатный addUnit: ловушки клетки/ауры/постройки
+            // срабатывают, как на призыв. Смертью считается только killUnit —
+            // «Смыв»/«Раскопки» (removeUnit без каскадов) не будят скелета.
+            A.addExhuming = function addExhuming(u, n) {
+                u.exhuming = n;
+                updateExhumingMark(u);
+            };
+            A.updateExhumingMark = function updateExhumingMark(u) {
+                if (!u.node) return;
+                let mark = u.node.getChildByName("exhumingMark");
+                if (!u.exhuming || u.exhuming <= 0) {
+                    if (mark) mark.destroy({ children: true });
+                    return;
+                }
+                if (!mark) {
+                    mark = new PIXI.Container();
+                    mark.name = "exhumingMark";
+                    mark.eventMode = "none";
+                    const g = new PIXI.Graphics();
+                    g.circle(0, 0, 13.5);
+                    g.fill({ color: 0x4a4034 });
+                    g.stroke({ width: 3, color: 0xc9b98c });
+                    mark.addChild(g);
+                    const tx = T("", 17, 0xf3e6c2);
+                    tx.anchor.set(0.5);
+                    mark.addChild(tx);
+                    mark.position.set(34, -66); // правее головы (левее — берсерк)
+                    u.node.addChild(mark);
+                }
+                const label = mark.children[mark.children.length - 1];
+                if (label && label.text !== undefined) label.text = String(u.exhuming);
+            };
+            A.exhumingReplay = function exhumingReplay(u) {
+                if (!u || u.def.type !== "unit" || u.token || !(u.exhuming > 0)) return;
+                const side = u.side;
+                const id = cardIdOf(u.def);
+                const left = u.exhuming - 1;
+                const col = u.col, row = u.row;
+                let cell = !unitAt(col, row) ? [col, row] : null;
+                if (!cell) { // клетку успели занять — ближайшая свободная
+                    const spots = [[-1, 0], [1, 0], [0, -1], [0, 1]]
+                        .map(([dc, dr]) => [col + dc, row + dr])
+                        .filter(([c2, r2]) => c2 >= 0 && c2 < GRID && r2 >= 0
+                            && r2 < GRID && !unitAt(c2, r2));
+                    if (spots.length) cell = spots[(Math.random() * spots.length) | 0];
+                }
+                const p = cellXY(col, row);
+                if (!cell) { // поле забито — вернуться некуда (крайний случай)
+                    floatText(p.x, p.y - 84,
+                        "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0x8a7c5e);
+                    return;
+                }
+                floatText(p.x, p.y - 84,
+                    "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0xc9b98c);
+                sfx("use");
+                const u2 = addUnit(side, id, cell[0], cell[1]);
+                if (u2 && left > 0 && B.units.includes(u2)) addExhuming(u2, left);
+            };
+
+            // Случайный сброс N карт с руки стороны (Пытка разума, dec125):
+            // карты под «Сожжением» сгорают (как при сбросе панели переполнения),
+            // сброс кормит «Болотную слизь» (noteDiscard). Возвращает число карт.
+            A.randomDiscard = function randomDiscard(side, n) {
+                const hand = side === "p" ? B.hand : B.eHand;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const scorch = B.scorch[side];
+                let dropped = 0, burned = 0;
+                for (let k = 0; k < n && hand.length; k++) {
+                    const id = hand.splice((Math.random() * hand.length) | 0, 1)[0];
+                    if (scorch && scorch.has(id)) { scorch.delete(id); burned++; }
+                    else { discard.push(id); dropped++; }
+                }
+                if (dropped) noteDiscard(dropped);
+                floatText(960, side === "p" ? 640 : 300,
+                    `✧ −${dropped + burned}`, 0x8cd0ef);
+                sfx("chpoc");
+                if (side === "p") layoutHand();
+                refreshHud();
+                return dropped + burned;
+            };
+            // Существа в сбросе стороны (панель «Поднятие мёртвых» + гейт ИИ)
+            A.unitsInDiscard = function unitsInDiscard(side) {
+                const disc = side === "p" ? B.discard : B.eDiscard;
+                return disc.filter((id) => CARDS[id] && CARDS[id].type === "unit");
             };
 
             // Способность «Хранителя рощи» (buildingDeathReplay, просил юзер):
@@ -1360,6 +1451,7 @@
                 if (u.entangle) n++;
                 if (u.frozen) n++;
                 if (u.spellWard) n++;
+                if (u.exhuming) n++;
                 return n;
             };
             // Снять ВСЕ свойства/эффекты цели; возвращает, сколько снято, —
@@ -1383,11 +1475,12 @@
                 if (u.entangle) { u.entangle = 0; n++; }
                 if (u.frozen) { u.frozen = 0; n++; }
                 if (u.spellWard) { u.spellWard = false; n++; removeWardMark(u); }
+                if (u.exhuming) { u.exhuming = 0; n++; updateExhumingMark(u); }
                 // «Иллюзия» (wis108): без способности связь с источником
                 // больше не действует — смерть источника её не убивает
                 if (u.illusionOf) u.illusionOf = null;
                 for (const m of ["sporeMark", "enchMark", "protectMark", "berserkMark", "confuseMark",
-                    "venomMark", "poisonMark", "entangleMark", "frozenMark"]) {
+                    "venomMark", "poisonMark", "entangleMark", "frozenMark", "exhumingMark"]) {
                     const node = u.node.getChildByName(m);
                     if (node) node.destroy({ children: true });
                 }

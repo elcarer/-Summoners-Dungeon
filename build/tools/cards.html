@@ -216,6 +216,7 @@
                 <button id="presetStr"></button>
                 <button id="presetGrw"></button>
                 <button id="presetWis"></button>
+                <button id="presetDec"></button>
                 <button id="clearBtn"></button>
             </div>
             <div class="btnRow">
@@ -268,7 +269,8 @@
             sub: "Подтип:", tokens: "токены (без лица)",
             subNone: "без подтипа",
             subNames: { goblin: "Гоблин", animal: "Животное", elf: "Эльф",
-                plant: "Растение", elemental: "Элементаль", mage: "Маг" },
+                plant: "Растение", elemental: "Элементаль", mage: "Маг",
+                skeleton: "Скелет", zombie: "Зомби" },
             kind: "Тип эффекта:",
             kindNames: {
                 damage: "Нанесение урона", buff: "Усиление",
@@ -286,7 +288,7 @@
             deckEmpty: "Колода пуста — кликните «+» на карте",
             maxLine: "{n} / {max} карт", fewLine: "{n} / {max} · минимум {min}",
             presetStr: "Старт: Сила", presetGrw: "Старт: Рост",
-            presetWis: "Старт: Мудрость", clear: "Очистить",
+            presetWis: "Старт: Мудрость", presetDec: "Старт: Тлен", clear: "Очистить",
             saveFile: "⬇ файл", loadFile: "⬆ файл",
             slots: "Мои колоды (память браузера)", slotSave: "Сохранить",
             slotEmpty: "Пока ничего не сохранено",
@@ -303,7 +305,8 @@
             sub: "Subtype:", tokens: "tokens (no face)",
             subNone: "no subtype",
             subNames: { goblin: "Goblin", animal: "Animal", elf: "Elf",
-                plant: "Plant", elemental: "Elemental", mage: "Mage" },
+                plant: "Plant", elemental: "Elemental", mage: "Mage",
+                skeleton: "Skeleton", zombie: "Zombie" },
             kind: "Effect:",
             kindNames: {
                 damage: "Damage", buff: "Buff", debuff: "Stat reduction",
@@ -319,7 +322,7 @@
             deckEmpty: "Deck is empty — press «+» on a card",
             maxLine: "{n} / {max} cards", fewLine: "{n} / {max} · min {min}",
             presetStr: "Starter: Strength", presetGrw: "Starter: Growth",
-            presetWis: "Starter: Wisdom", clear: "Clear",
+            presetWis: "Starter: Wisdom", presetDec: "Starter: Decay", clear: "Clear",
             saveFile: "⬇ file", loadFile: "⬆ file",
             slots: "My decks (browser storage)", slotSave: "Save",
             slotEmpty: "Nothing saved yet",
@@ -448,6 +451,7 @@
     function backOf(elem) { // рубашка токенов без лица — как backTexOf игры
         return elem === "growth" ? "../images/ui/card_nature_back.png"
             : elem === "wisdom" ? "../images/ui/card_wisdom_back.png"
+            : elem === "decay" ? "../images/ui/card_decay_back.png"
                                  : "../images/ui/card_goblin_back.png";
     }
     function renderGrid() {
@@ -851,7 +855,8 @@
             state.type, (tp) => t("type." + tp));
         chipSet($("rarityBtns"), ["common", "rare", "epic"],
             state.rarity, (r) => t("rarity." + r));
-        chipSet($("subBtns"), ["goblin", "animal", "elf", "plant", "elemental", "none"],
+        chipSet($("subBtns"), ["goblin", "animal", "elf", "plant", "elemental",
+            "mage", "skeleton", "zombie", "none"],
             state.subtype, (s) => s === "none" ? T("subNone") : T("subNames")[s]);
         chipSet($("kindBtns"), ["damage", "buff", "debuff", "search", "copy", "control",
             "protect", "draw", "discard", "resource", "summon", "summonBuilding", "castSpell"],
@@ -931,6 +936,7 @@
         $("presetStr").textContent = T("presetStr");
         $("presetGrw").textContent = T("presetGrw");
         $("presetWis").textContent = T("presetWis");
+        $("presetDec").textContent = T("presetDec");
         $("clearBtn").textContent = T("clear");
         $("saveFile").textContent = T("saveFile");
         $("loadFile").textContent = T("loadFile");
@@ -967,6 +973,8 @@
         setDeckFrom(D.STARTER_DECKS.growth, t("elem.growth")));
     $("presetWis").addEventListener("click", () =>
         setDeckFrom(D.STARTER_DECKS.wisdom, t("elem.wisdom")));
+    $("presetDec").addEventListener("click", () =>
+        setDeckFrom(D.STARTER_DECKS.decay, t("elem.decay")));
     $("clearBtn").addEventListener("click", () => {
         state.deck.cards = {}; persist(); renderDeck(); renderGrid();
     });

@@ -126,13 +126,16 @@
                         lastSpell: B.lastSpell.p,
                         journeySummon: B.journeySummon,
                         eDeck: B.eDeck.length,
-                        units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0, venom: u.venom || 0, poison: u.poison || 0, entangle: u.entangle || 0, frozen: u.frozen || 0, frozenMark: !!u.node.getChildByName("frozenMark"), ward: !!u.spellWard, token: !!u.token })),
+                        units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0, venom: u.venom || 0, poison: u.poison || 0, entangle: u.entangle || 0, frozen: u.frozen || 0, frozenMark: !!u.node.getChildByName("frozenMark"), ward: !!u.spellWard, token: !!u.token, exhuming: u.exhuming || 0, exhumingMark: !!u.node.getChildByName("exhumingMark") })),
                         traps: { p: B.traps.p.length, e: B.traps.e.length },
                         // эффекты висящих ловушек (тесты: «Отмена заклинания/
                         // призыва» и др. — какие ловушки на поле)
                         trapFx: { p: B.traps.p.map((t) => t.def.trap.effect),
                             e: B.traps.e.map((t) => t.def.trap.effect) },
                         firewalls: B.firewalls.map((f) => ({ side: f.side, row: f.row, left: f.left })),
+                        // «Поднятие мёртвых»/«Пытка разума» (тесты): панели
+                        raise: { open: !!raisePanel, cards: unitsInDiscard("p") },
+                        torture: { open: !!torturePanel, count: tortureCount },
                     };
                 },
                 // «Стена костров» (тесты): касты + сколько спрайтов огня на поле
@@ -203,6 +206,10 @@
                 excavateState: () => ({ open: !!excavatePanel, picking: !!(B && B.picking),
                     cell: excavateCell, blds: excavatePanel ? buildingsInDiscard() : [] }),
                 excavatePick(idx) { pickExcavate(idx); },
+                // «Поднятие мёртвых» (dec124, тесты): панель и выбор существа
+                raisePick(idx) { pickRaise(idx); },
+                // «Пытка разума» (dec125, тесты): панель и выбор стороны
+                torturePick(side) { pickTorture(side); },
                 // тест-хуки поправок: свечение выбранной карты (п2) и сетка
                 // оверлея-просмотра (п3)
                 selGlow() {

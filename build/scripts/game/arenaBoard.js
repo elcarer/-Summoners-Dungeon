@@ -148,6 +148,20 @@
                         }
                         return;
                     }
+                    if (tg === "anyUnitOrFoe") { // «Негативный поток»: любое существо + база врага
+                        root.board.userData.baseZone.eventMode = "static";
+                        for (const u of B.units) {
+                            if (u.def.type !== "unit" || !spellAimable(u)) continue;
+                            const rc = cellRect(u.col, u.row);
+                            hi.rect(rc.x, rc.y, rc.w, rc.h);
+                            hi.fill({ color: u.side === "p" ? 0x7dc95e : 0xd05a3c, alpha: 0.4 });
+                            hi.stroke({ width: 2, color: u.side === "p" ? 0xa8e890 : 0xef9f8c });
+                        }
+                        hi.rect(705, 42, 510, 54);
+                        hi.fill({ color: 0xd05a3c, alpha: 0.3 });
+                        hi.stroke({ width: 2, color: 0xef9f8c });
+                        return;
+                    }
                     for (const u of B.units) if (u.side === "e" && spellAimable(u)) {
                         const rc = cellRect(u.col, u.row);
                         hi.rect(rc.x, rc.y, rc.w, rc.h);
@@ -507,6 +521,23 @@
                             addWardMark(u);
                             floatText(hp2.x, hp2.y - 75,
                                 "✦ " + GAME_LOC.t("spell.ward.name"), 0x8cd0ef);
+                            sfx("up");
+                        }
+                    }
+                    // «Мортис» (firstSkeletonDig, просил юзер): первый
+                    // призванный стороной СКЕЛЕТ получает «Выкапливание 1» —
+                    // однажды после смерти вернётся на ту же клетку. Флаг
+                    // тратится только на скелета (не-скелет его не ест);
+                    // тест-хук _spawn подстройку героя не триггерит.
+                    if (def.type === "unit" && def.subtype === "skeleton" && !u.token
+                        && !opts.testSummon && !B.heroFlags.skeletonDig[side]) {
+                        const hd = heroDefOf(side);
+                        if (hd && hd.ability === "firstSkeletonDig") {
+                            B.heroFlags.skeletonDig[side] = true;
+                            addExhuming(u, hd.abilityVal || 1);
+                            const sp = cellXY(col, row);
+                            floatText(sp.x, sp.y - 96,
+                                "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0xc9b98c);
                             sfx("up");
                         }
                     }

@@ -53,11 +53,12 @@
         // подводная арена «Подземных ключей» (стихия Мудрость)
         uiTextures["scenes/3.png"] = await assets.loadTexture("./images/scenes/3.png");
         // эффект поля «Стена костров» и рубашки колод по стихиям
-        // (гоблины/природа/мудрость)
+        // (гоблины/природа/мудрость/тлен)
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
         uiTextures["card_goblin_back.png"] = await assets.loadTexture("./images/ui/card_goblin_back.png");
         uiTextures["card_nature_back.png"] = await assets.loadTexture("./images/ui/card_nature_back.png");
         uiTextures["card_wisdom_back.png"] = await assets.loadTexture("./images/ui/card_wisdom_back.png");
+        uiTextures["card_decay_back.png"] = await assets.loadTexture("./images/ui/card_decay_back.png");
         // тайлы подземелий юзера: images/dungeon_tiles/<данж>/<…>.png —
         // полы 64×64 (floor/0-9) и стены walls/* по маске соседей.
         // Свой набор на каждый данж: goblins_lair (Сила), growth_lair (Рост),
@@ -115,6 +116,7 @@
             strength: await assets.loadCharacter("./images/sprites/goblin_256"),
             growth: await assets.loadCharacter("./images/sprites/elf_256"),
             wisdom: await assets.loadCharacter("./images/sprites/sorca_256"), // Мира
+            decay: await assets.loadCharacter("./images/sprites/necr_256"), // Мортис
         };
         // Листы существ поля боя. Стандарт: <имя>_256.png — сетка 256×256,
         // 4 ряда анимаций (спереди/сзади/справа/слева) по 6 кадров + json-манифест.
@@ -694,7 +696,8 @@
                 title.position.set(960, 44);
                 title.eventMode = "none";
                 epRoot.addChild(title);
-                const sub = T(t("menu.pickHeroSub"), 30, 0xd8c79d);
+                const sub = T(t("menu.pickHeroSub"), 30, 0xd8c79d,
+                    { stroke: { color: 0x1c1207, width: 7 } }); // обводка — читается на пёстрой карте
                 sub.anchor.set(0.5, 0);
                 sub.position.set(960, 190);
                 sub.eventMode = "none";
@@ -702,8 +705,9 @@
 
                 const cards = [];
                 // раскладка в 1 ряд: 2 героя — как раньше, 3+ — плотнее, чтобы
-                // панель (480px) влезала в экран (Мира — третий, просил юзер)
-                const gap = Math.min(720, 1400 / Math.max(1, GAME_DATA.HERO_ORDER.length - 1));
+                // панель (480px) влезала в экран; при 4 героях (Мортис) карточки
+                // встают вплотную — крайние панели ровно у кромок 1920
+                const gap = Math.min(720, 1440 / Math.max(1, GAME_DATA.HERO_ORDER.length - 1));
                 GAME_DATA.HERO_ORDER.forEach((id, k) => {
                     const h = GAME_DATA.HEROES[id];
                     const cx = 960 + (k - (GAME_DATA.HERO_ORDER.length - 1) / 2) * gap;

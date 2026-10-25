@@ -724,6 +724,124 @@
                 refreshHud();
                 checkEnd();
             };
+
+            // ── Панель «Поднятие мёртвых» (dec124): карты СУЩЕСТВ из СВОЕГО
+            // сброса — выбрать одну, она уходит в руку (без «Сожжения»).
+            // Существ в сбросе нет — заклинание не разыгрывается вовсе
+            // (гейт в applySpellPInner, карта и энергия целы).
+            A.raisePanel = null;
+            A.closeRaisePanel = function closeRaisePanel() {
+                if (!raisePanel) return;
+                raisePanel.destroy({ children: true });
+                raisePanel = null;
+                if (B) B.picking = false;
+            };
+            A.openRaisePanel = function openRaisePanel() {
+                closeRaisePanel();
+                const units = unitsInDiscard("p");
+                if (!units.length) return; // страховка гейта applySpellPInner
+                B.picking = true;
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("raise.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("raise.hint"), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const m = units.length;
+                const spread = Math.min(210, 1260 / m);
+                units.forEach((cardId, idx) => {
+                    const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                    c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                    c.eventMode = "static";
+                    c.on("pointertap", () => pickRaise(idx));
+                    node.addChild(c);
+                });
+                node.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("raise.back"), x: 960, y: 762, scale: 1,
+                    onTap: closeRaisePanel, // карта уже потрачена — эффект вхолостую
+                }));
+                root.addChild(node);
+                raisePanel = node;
+            };
+            A.pickRaise = function pickRaise(idx) { // idx — среди существ сброса
+                if (!B || !B.picking || !raisePanel) return;
+                const units = unitsInDiscard("p");
+                const cardId = units[idx];
+                if (!cardId) return;
+                B.discard.splice(B.discard.indexOf(cardId), 1);
+                B.hand.push(cardId);
+                sfx("chpoc");
+                const p = cellXY(2, 4);
+                floatText(p.x, p.y + 84, "↩ " + GAME_LOC.t(`card.${cardId}.name`), 0x9fd489);
+                closeRaisePanel();
+                layoutHand();
+                refreshHud();
+            };
+
+            // ── Панель «Пытки разума» (dec125): выбрать, КТО сбрасывает
+            // 2 случайные карты с руки — вы или противник. Сторона с пустой
+            // рукой не выбирается (эффект по ней пуст); у обеих пусто —
+            // заклинание не разыгрывается (гейт в applySpellPInner).
+            A.torturePanel = null;
+            A.tortureCount = 2;
+            A.closeTorturePanel = function closeTorturePanel() {
+                if (!torturePanel) return;
+                torturePanel.destroy({ children: true });
+                torturePanel = null;
+                if (B) B.picking = false;
+            };
+            A.openTorturePanel = function openTorturePanel(n) {
+                closeTorturePanel();
+                tortureCount = n;
+                B.picking = true;
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("torture.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("torture.hint", { n: tortureCount }), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const whoBtn = (key, side, x) => {
+                    const btn = globalThis.GAME_UI.button(ctx, {
+                        tex: "button_menu.png", label: t(key), x, y: 560, scale: 1,
+                        onTap: () => pickTorture(side),
+                    });
+                    if (!(side === "p" ? B.hand : B.eHand).length) btn.alpha = 0.45;
+                    return btn;
+                };
+                node.addChild(whoBtn("torture.you", "p", 660));
+                node.addChild(whoBtn("torture.foe", "e", 1260));
+                root.addChild(node);
+                torturePanel = node;
+            };
+            A.pickTorture = function pickTorture(side) {
+                if (!B || !B.picking || !torturePanel) return;
+                closeTorturePanel();
+                randomDiscard(side, tortureCount);
+            };
         }
     };
 })();
