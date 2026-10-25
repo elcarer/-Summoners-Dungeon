@@ -297,6 +297,7 @@
             draft: null, // мини-игра «Карта сокровищ»: picks/ePicks/objIdx
             draftBattle: false, // текущий бой — драфт-бой (итог ведёт в подземелье)
             uiReturn: null, // откуда открыты настройки/колода (кнопка «Назад»)
+            quests: null, // сюжетная линия забега (GAME_QUESTS): active/done/announced/pending
             // миграция старых сейвов: колода без «колод по героям» —
             // становится колодой активного героя
             heroDecksOf() {
@@ -369,6 +370,8 @@
                 this.rewardDraft = false;
                 this.draft = null;
                 this.draftBattle = false;
+                // сюжетная линия — с первого квеста (анонс при входе в мир)
+                this.quests = globalThis.GAME_QUESTS.fresh();
                 this.deck = [...globalThis.GAME_DATA.STARTER_DECKS[h.starter]];
                 this.collection = { ...globalThis.GAME_DATA.STARTER_COLLECTIONS[h.starter] };
                 this.heroDecks = { [this.heroId]: this.deck }; // новая игра — колоды заново
@@ -392,6 +395,12 @@
                     dungeonStates: JSON.parse(JSON.stringify(this.dungeonStates || {})),
                     worldPos: this.world.heroPos,
                     worldOut: this.world.out,
+                    quests: this.quests ? {
+                        active: this.quests.active,
+                        done: { ...(this.quests.done || {}) },
+                        announced: !!this.quests.announced,
+                        pending: this.quests.pending || null,
+                    } : null,
                 });
             },
             // поражение в бою: случайная карта колоды теряется НАВСЕГДА
@@ -494,6 +503,7 @@
             sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
             heroHover,        // ctx.heroHover(держатель, спрайт, bigX, bigY)
+            questModal: 0,    // открыт модальный квест-диалог (мир/подземелье стоят)
         };
 
         const scenes = createScenes({ addSystem });
@@ -594,6 +604,9 @@
                         ? Object.fromEntries(caveIds.map((c) => [c, r.floors[c] || 1]))
                         : { gob: r.floor, grw: 1, wis: 1 };
                     G.world = { heroPos: r.worldPos || null, out: !!r.worldOut };
+                    // сюжетная линия забега (старые сейвы — без неё: первый
+                    // квест активен, но без окна-анонса)
+                    G.quests = globalThis.GAME_QUESTS.revive(r.quests);
                     // продолжение с середины этажа — в подземелье, иначе —
                     // в открытый мир (герой вышел из пещер или только начал);
                     // решает ОТФИЛЬТРОВАННОЕ состояние (G.dungeon), не сейв
@@ -798,6 +811,14 @@
             arenaApi: arenaScene.api, deckApi: deckScene.api,
             rewardApi: rewardScene.api, settingsApi: settingsScene.api,
             draftApi: draftScene.api, worldApi: worldScene.api,
+            questApi: {
+                state: () => globalThis.GAME_QUESTS.stateOf(G),
+                dialog: () => globalThis.GAME_QUESTS.dialogInfo(),
+                tap: () => globalThis.GAME_QUESTS.tap(),
+                modal: () => (ctx.questModal || 0) > 0,
+                close: () => globalThis.GAME_QUESTS.forcedClose(ctx),
+                review: () => globalThis.GAME_QUESTS.showReview(ctx),
+            },
             audio: {
                 track: () => audio.status().track,
                 status: () => audio.status(),
@@ -818,6 +839,7 @@
                 scene: scenes.current,
                 hero: { ...G.hero }, floor: G.run.floor, gold: G.gold,
                 heroId: G.heroId, elem: G.elem, cave: G.run.cave,
+                quests: globalThis.GAME_QUESTS.stateOf(G),
                 // герои: активный, завоёванные карты, колоды по героям
                 heroes: {
                     captured: [...G.captured],

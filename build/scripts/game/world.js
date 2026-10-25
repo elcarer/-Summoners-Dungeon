@@ -179,6 +179,13 @@
             goldPlate.addChild(goldT);
             goldPlate.position.set(0, 96);
             c.addChild(goldPlate);
+            // активный квест сюжетной линии (просил юзер): иконка под золотом
+            // открывает текст задания; без квестов иконки нет
+            if (G.quests && G.quests.active) {
+                c.addChild(hudIcon("icon_rune.png", 39, 196, () => {
+                    globalThis.GAME_QUESTS.showReview(ctx);
+                }, 0.9));
+            }
             // настройки доступны и из мира; «Назад» вернёт сюда. Колода —
             // только по карте героя (просил юзер): рубашку убрали, карта
             // героя поднята на её место
@@ -325,11 +332,15 @@
                 camera.centerOn(hp.x, hp.y);
                 uiHud = buildHud();
                 ctx.ui.addChild(uiHud);
+                // квест-диалоги: анонс нового задания / окно незабранной
+                // награды (открываются поверх мира, герой стоит)
+                globalThis.GAME_QUESTS.onSceneEnter(ctx);
             },
             exit() {
                 if (heroId !== null) {
                     G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
                 }
+                globalThis.GAME_QUESTS.forcedClose(ctx); // диалог не сиротеет
                 // забег сохраняется и из мира (вход в пещеру/меню/настройки)
                 if (G.saveRun) G.saveRun();
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
@@ -350,36 +361,44 @@
                 COMPONENTS.animationSpeed[heroId] = (ctx.heroSheet.animationSpeed || 0.2)
                     * Math.max(0.25, ((G.settings && G.settings.animSpeed) ?? 5) / 5);
 
-                // ведение по пути (как в подземелье: клавиши главнее)
-                if (path && (charInput.ix || charInput.iy)) path = null;
-                if (path && !path.length) path = null;
-                if (path) {
-                    const dx = path[0].x - hx, dy = path[0].y - hy;
-                    if (Math.hypot(dx, dy) < 5) {
-                        const last = path.length === 1 ? path[0] : null;
-                        path.shift();
-                        if (!path.length) {
-                            if (last) {
-                                COMPONENTS.positionX[heroId] = last.x;
-                                COMPONENTS.positionY[heroId] = last.y;
+                // квест-диалог открыт (модальный) — герой стоит и не входит
+                // в пещеры, пока окно не закрыто
+                if (ctx.questModal) {
+                    setHeroAxes(0, 0);
+                    path = null;
+                } else {
+                    // ведение по пути (как в подземелье: клавиши главнее)
+                    if (path && (charInput.ix || charInput.iy)) path = null;
+                    if (path && !path.length) path = null;
+                    if (path) {
+                        const dx = path[0].x - hx, dy = path[0].y - hy;
+                        if (Math.hypot(dx, dy) < 5) {
+                            const last = path.length === 1 ? path[0] : null;
+                            path.shift();
+                            if (!path.length) {
+                                if (last) {
+                                    COMPONENTS.positionX[heroId] = last.x;
+                                    COMPONENTS.positionY[heroId] = last.y;
+                                }
+                                path = null;
                             }
-                            path = null;
                         }
                     }
-                }
-                if (path) {
-                    const dx = path[0].x - hx, dy = path[0].y - hy;
-                    const d = Math.hypot(dx, dy) || 1;
-                    setHeroAxes(dx / d, dy / d);
-                } else {
-                    setHeroAxes(charInput.ix, charInput.iy);
+                    if (path) {
+                        const dx = path[0].x - hx, dy = path[0].y - hy;
+                        const d = Math.hypot(dx, dy) || 1;
+                        setHeroAxes(dx / d, dy / d);
+                    } else {
+                        setHeroAxes(charInput.ix, charInput.iy);
+                    }
                 }
 
                 uiHud.userData.hpT.text = GAME_LOC.t("dungeon.hp", { hp: G.hero.hp, max: G.hero.maxHp });
                 uiHud.userData.goldT.text = String(G.gold);
                 globalThis.GAME_UI.fit(uiHud.userData.hpT, 128, 11);
 
-                // входы в подземелья — касание арки
+                // входы в подземелья — касание арки (диалог открыт — молчат)
+                if (!ctx.questModal)
                 for (const [ch, caveId] of Object.entries(CAVES_ON_MAP)) {
                     const at = findCh(ch);
                     if (Math.hypot(at.x - hx, at.y - hy) < TS * 0.85) {

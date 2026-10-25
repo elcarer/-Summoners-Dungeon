@@ -462,6 +462,13 @@
                     const enc2 = ENCOUNTERS[B.encId] || ENCOUNTERS.gob;
                     if (enc2.hero && G.captureHero && G.captureHero(enc2.hero))
                         G.wonHero = enc2.hero;
+                    // сюжетная линия (просил юзер): победа в подземелье СВОЕЙ
+                    // стихии выполняет активный квест — окно награды откроется
+                    // после экрана выбора карты (на входе в подземелье)
+                    if (globalThis.GAME_QUESTS)
+                        globalThis.GAME_QUESTS.onBattleWin(G, {
+                            boss: !!(G.activeEnemy && G.activeEnemy.boss),
+                        });
                 }
                 if (draft && victory) {
                     // награда драфта — одна ЛЮБАЯ карта драфт-колоды на выбор

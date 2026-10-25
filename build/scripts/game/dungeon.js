@@ -617,6 +617,13 @@
             goldPlate.addChild(goldT);
             goldPlate.position.set(0, 96);
             c.addChild(goldPlate);
+            // активный квест сюжетной линии (просил юзер): иконка под золотом
+            // открывает текст задания; без квестов иконки нет
+            if (G.quests && G.quests.active) {
+                c.addChild(hudIcon("icon_rune.png", 39, 196, () => {
+                    globalThis.GAME_QUESTS.showReview(ctx);
+                }, 0.9));
+            }
             c.userData = { floorT, hpT, goldT, fit: true };
             // настройки доступны и из подземелья; «Назад» вернёт сюда.
             // Колода — только по карте героя (просил юзер): рубашку убрали,
@@ -1214,9 +1221,14 @@
                 camera.centerOn(st.heroPos.x, st.heroPos.y);
                 uiHud = buildHud();
                 ctx.ui.addChild(uiHud);
+                // квест-диалоги: окно награды за выполненный квест открывается
+                // именно здесь — после экрана выбора наградной карты (просил
+                // юзер); также анонс нового задания поверх подземелья
+                globalThis.GAME_QUESTS.onSceneEnter(ctx);
             },
             exit() {
                 const st = myState;
+                globalThis.GAME_QUESTS.forcedClose(ctx); // диалог не сиротеет
                 // heroPos пишем только пока G.dungeon — всё ещё состояние
                 // этой сцены: подъём/спуск свапнули его до переключения
                 if (st && heroId !== null && G.dungeon === st) {
@@ -1307,7 +1319,7 @@
                 globalThis.GAME_UI.fit(uiHud.userData.hpT, 105, 11);
 
                 // ── триггеры: окно объекта, враги, выход ───────────────────
-                if (st.win) {
+                if (st.win || ctx.questModal) { // квест-диалог — как окно объекта
                     // окно открыто: герой стоит на месте, боя/выхода нет
                     setHeroAxes(0, 0);
                     path = null;
@@ -1322,7 +1334,7 @@
                         if (d < TS * 0.85) { openObject(o); break; }
                     }
                 }
-                if (!st.win) for (const t of tokens) {
+                if (!st.win && !ctx.questModal) for (const t of tokens) {
                     if (!t.enemy.alive) continue;
                     if (Math.hypot(t.enemy.x - hx, t.enemy.y - hy) < TS * 0.85) {
                         // мгновенный стоп у энкаунтера (просил юзер): гасим
@@ -1347,7 +1359,7 @@
                     }
                 }
                 // ── лестница у старта: наверх; на 1-м этаже — в открытый мир ──
-                if (!st.win && st.ladder
+                if (!st.win && !ctx.questModal && st.ladder
                     && Math.hypot(st.ladder.x - hx, st.ladder.y - hy) < TS * 0.85) {
                     const from = st.floor;
                     st.heroPos = { x: hx, y: hy };
@@ -1375,7 +1387,8 @@
                     && Math.hypot(st.exit.x - hx, st.exit.y - hy) > TS * 1.25) {
                     st.exitCool = false;
                 }
-                if (!st.win && st.exit && Math.hypot(st.exit.x - hx, st.exit.y - hy) < TS * 0.85) {
+                if (!st.win && !ctx.questModal && st.exit
+                    && Math.hypot(st.exit.x - hx, st.exit.y - hy) < TS * 0.85) {
                     if (st.exitCool) {
                         // поднялись и стоим на спуске: уйдём на клетку-другую —
                         // выход «остынет» и снова заработает
