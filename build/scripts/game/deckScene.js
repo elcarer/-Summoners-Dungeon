@@ -575,6 +575,7 @@
             // в мир/подземелье
             backTap() { if (!root) return false; doBack(); return true; },
             add(id) {
+                if (!root) return false; // вне редактора перерисовывать нечего
                 if (G.deck.length >= DECK_MAX) return false;
                 if (!heroElemOk(id)) return false; // стихия не из героя
                 if (countIn(id) >= (G.collection[id] || 0)) return false;
@@ -585,6 +586,7 @@
                 return true;
             },
             remove(id) {
+                if (!root) return false; // вне редактора перерисовывать нечего
                 const i = G.deck.lastIndexOf(id);
                 if (i < 0 || G.deck.length <= deckMinNow()) return false;
                 G.deck.splice(i, 1);

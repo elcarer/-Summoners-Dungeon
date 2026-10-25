@@ -194,8 +194,12 @@
         let contentH = 0, t = 0, dragging = false, explicitH = null;
 
         function relayout() {
-            const b = inner.getLocalBounds();
-            contentH = explicitH !== null ? explicitH : Math.max(0, b.height);
+            // высоту даёт setContent: getLocalBounds на свежем (не
+            // отрендеренном) контенте врёт до кадра, а в сериях быстрых
+            // перерисовок (add/remove в редакторе колоды) падает вовсе —
+            // границы меряем только при отсутствии явной высоты
+            contentH = explicitH !== null ? explicitH
+                : Math.max(0, inner.getLocalBounds().height);
             const max = Math.max(0, contentH - h);
             if (max <= 0) {
                 t = 0;

@@ -869,6 +869,16 @@
                         score += aiThreat(v) * 0.3;
                 } else if (tr.effect === "ambush" || tr.effect === "ancestor") {
                     if (victim) score += aiThreat(victim) * 0.4;
+                } else if (tr.effect === "alliesStrike") {
+                    // «Тёмные цепи»: существо на клетке атакуют соседние СВОИ
+                    // существа — ценность клетки = суммарная угроза соседей
+                    const near = B.units.filter((o) => o.side === "e"
+                        && o.def.type === "unit"
+                        && Math.abs(o.col - col) + Math.abs(o.row - row) === 1);
+                    if (near.length) {
+                        for (const o of near) score += aiThreat(o) * 0.9;
+                        if (victim) score += 0.5;
+                    } else score = 0; // без соседей ловушка мертва
                 }
                 return score;
             };
@@ -910,6 +920,14 @@
                             c2 === strong.col && r2 === strong.row - 1);
                         if (f2.length) pool = f2;
                     }
+                }
+                // «Тёмные цепи»: клетка годится, только если рядом (верт/гориз)
+                // есть СВОЁ существо — его атака и есть урон ловушки
+                if (def.trap.effect === "alliesStrike") {
+                    pool = pool.filter(([c2, r2]) => B.units.some((v) =>
+                        v.side === "e" && v.def.type === "unit"
+                        && Math.abs(v.col - c2) + Math.abs(v.row - r2) === 1));
+                    if (!pool.length) return null;
                 }
                 // «Гоблинская мина»: сплэш задевает соседей клетки — рядом не
                 // должно быть своих убиваемых; совсем небезопасно — держим мину.
@@ -1146,7 +1164,7 @@
                         + (d.sprout ? 0.8 : 0) + (d.campfire ? 0.8 : 0)
                         + (d.elementalCircle ? 1.6 : 0)
                         + (d.altarSword ? 1.1 : 0) + (d.starTower ? 1.2 : 0)
-                        + (d.cloudSpire ? 2.2 : 0);
+                        + (d.cloudSpire ? 2.2 : 0) + (d.darkAltar ? 1.4 : 0);
                 }
                 if (d.type === "spell") {
                     const s = d.spell || {};
@@ -1190,7 +1208,15 @@
                         - 0.3 * Math.min(6, B.eHand.length);
                     return v;
                 }
-                if (d.type === "trap") return 2.0 + (d.cost || 0) * 0.2;
+                if (d.type === "trap") {
+                    let v = 2.0 + (d.cost || 0) * 0.2;
+                    // «Тёмные цепи»: ценнее, когда на поле уже есть свои
+                    // существа — их атака и есть урон ловушки
+                    if (d.trap.effect === "alliesStrike" && B)
+                        v += Math.min(4, B.units.filter((u) =>
+                            u.side === "e" && u.def.type === "unit").length) * 0.4;
+                    return v;
+                }
                 return 1;
             };
             // Верхние N карт колоды ИИ с исходными индексами (верх — последний).

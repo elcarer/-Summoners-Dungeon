@@ -711,7 +711,8 @@
                 const cellEffect = (t) => {
                     const e = t.def.trap.effect;
                     if (e === "freezeSplash" || e === "rowShift"
-                        || e === "bubble") return u.def.type === "unit";
+                        || e === "bubble" || e === "alliesStrike")
+                        return u.def.type === "unit";
                     return e === "cellDmg" || e === "ambush"
                         || e === "confuse" || e === "cellDebuff"
                         || e === "ancestor" || e === "entangle";
@@ -822,6 +823,36 @@
             // Эффект сработавшей ловушки на клетке (отделён от поиска ловушки —
             // «Роща лоз» применяет его дважды); u — существо, наступившее на неё
             A.applyCellTrap = function applyCellTrap(trap, side, u) {
+                if (trap.def.trap.effect === "alliesStrike") {
+                    // «Тёмные цепи» (dec127): вошедшее на клетку существо
+                    // атакуют ВСЕ соседние СВОИ (хозяйки ловушки) существа —
+                    // полной атакой (урон с бонусами + «Сокрушение»/
+                    // «Ядовитость»/лёд/толчок, как у доп. атак «Берсерка»).
+                    // Соседи бьют в случайном порядке; цель могла умереть
+                    // от предыдущего — её не трогают.
+                    const allies = shuffle(B.units.filter((v) => v.side === side
+                        && v !== u && v.def.type === "unit"
+                        && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1));
+                    for (const a of allies) {
+                        if (!B.units.includes(u)) break; // цель уже погибла
+                        if (!B.units.includes(a)) continue;
+                        const ap = cellXY(a.col, a.row);
+                        floatText(ap.x, ap.y - 60, "⚔", 0xffb26e);
+                        punch(a.node);
+                        sfx("sword");
+                        const hpBefore = u.hp;
+                        damageUnit(u, a.curAtk, a, "sword");
+                        crushHit(a, a.curAtk, hpBefore); // «Сокрушение»
+                        venomApply(a, u); // «Ядовитость»
+                        frostAttack(a, u); // «Снежный элементаль»: −1⚔ цели
+                        frostNeighbors(a); // «Старший ледовик»: лёд соседям
+                        afterAttackPush(a, u); // «Проросший кабан»
+                        triggerAttackTraps(a); // руна: существо атаковало
+                    }
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
                 if (trap.def.trap.effect === "bubble") {
                     // «Ловушка-пузырь» (wis119): урон существа становится 0
                     // (atkZero — кламп в recalcAuras; «Извлечение духа» снимает)
@@ -1740,6 +1771,28 @@
                         damageUnit(b, 1, null, "dam");
                     }
                     if (b.def.elementalCircle) elementalCircleTick(b);
+                    // «Тёмный алтарь» (dec128): в начале хода владельца
+                    // случайное существо противника теряет 1 жизнь — снятие
+                    // жизни напрямую (не входящий урон, как у «Песчаного
+                    // духа»); на 0♥ жертва погибает. Алтарь с 2♥ мог погибнуть
+                    // от самоповреждения построек выше — тогда не тикает
+                    if (b.def.darkAltar && B.units.includes(b)) {
+                        const foes = B.units.filter((v) => v.side !== side
+                            && v.def.type === "unit");
+                        if (foes.length) {
+                            const victim = foes[(Math.random() * foes.length) | 0];
+                            victim.hp -= 1;
+                            recalcAuras();
+                            const hn = victim.node.getChildByName("hp");
+                            if (hn) hn.text = String(Math.max(0, victim.hp));
+                            const vp = cellXY(victim.col, victim.row);
+                            floatText(vp.x, vp.y - 60, "−1♥", 0xef9f8c);
+                            punch(victim.node);
+                            fxEvent("debuff", { x: vp.x, y: vp.y - 10, scale: 0.8 });
+                            sfx("acid");
+                            if (victim.hp <= 0) killUnit(victim, null);
+                        }
+                    }
                 }
                 // «Весёлый штормовик» (wis110): в начале хода владельца —
                 // случайное заклинание из случайной колоды, без энергии.
