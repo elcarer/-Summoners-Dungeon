@@ -44,12 +44,13 @@
                 const scorch = B.scorch[side];
                 const old = hand.splice(0, hand.length);
                 let kept = false, burned = 0, dropped = 0;
+                const droppedIds = [];
                 for (const id of old) {
                     if (!kept && keepId && id === keepId) { kept = true; hand.push(id); continue; }
                     if (scorch && scorch.has(id)) { scorch.delete(id); burned++; }
-                    else { discard.push(id); dropped++; }
+                    else { discard.push(id); dropped++; droppedIds.push(id); }
                 }
-                noteDiscard(dropped); // «Болотная слизь»: вся рука в сброс
+                noteDiscard(dropped, side, droppedIds); // «Болотная слизь»: вся рука в сброс
                 const n = count | 0;
                 if (side === "p") drawCards(n); else drawEnemy(n);
                 if (burned) {

@@ -485,6 +485,10 @@
                 if (s.target === "anyUnitOrFoe"
                     && !spellTargets(B.units.filter((v) => v.def.type === "unit")).length
                     && B.playerBase > s.dmg) return false;
+                // «Метка некроманта» (dec137) — вешаем на своё крепкое
+                // существо (2+♥): метка на тряпку 0/1 не окупается
+                if (s.exhumingMark && !spellTargets(B.units.filter((v) => v.side === "e"
+                    && v.def.type === "unit" && v.hp >= 2)).length) return false;
                 // «Раскопки» — нужна своя постройка и постройка сброса ДОРОЖЕ
                 // худшей своей (иначе обмен картой не окупается)
                 if (s.excavate) {

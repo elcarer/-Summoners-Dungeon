@@ -39,7 +39,7 @@
                     sfx("rocket");
                 } else {
                     B.discard.push(cardId);
-                    noteDiscard();
+                    noteDiscard(1, "p", [cardId]);
                 }
                 B.hand.splice(handIdx, 1);
                 B.selected = null;
@@ -105,7 +105,7 @@
                     // призыв; карта уходит в сброс, существо не появляется
                     if (counterTrapConsume("e", "counterSummon")) {
                         B.discard.push(cardId);
-                        noteDiscard();
+                        noteDiscard(1, "p", [cardId]);
                         const jp = cellXY(col, row);
                         floatText(jp.x, jp.y - 60,
                             "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
@@ -379,8 +379,16 @@
                         if (def.spell.berserk) addBerserk(u, def.spell.berserk);
                         if (def.spell.venom) addVenom(u, def.spell.venom); // «Отравленные лезвия»
                         if (def.spell.nova) novaSplash(u); // «Круговая атака»
+                        // «Метка некроманта» (dec137): «Выкапливание 1» —
+                        // счётчик стакается с уже висящим (Мортис/вторая метка)
+                        if (def.spell.exhumingMark) {
+                            addExhuming(u, (u.exhuming || 0) + def.spell.exhumingMark);
+                            floatText(p.x, p.y - 90,
+                                "⛏ +" + def.spell.exhumingMark, 0xc9b98c);
+                        }
                         if (def.spell.buffAtk || def.spell.buffHp
-                            || def.spell.buffAtkByHp || def.spell.enchantFire) {
+                            || def.spell.buffAtkByHp || def.spell.enchantFire
+                            || def.spell.exhumingMark) {
                             fxEvent("buff", { x: p.x, y: p.y - 12,
                                 color: def.spell.enchantFire ? 0xff8a5e : 0xffd98c,
                                 scale: 0.82 });
@@ -465,7 +473,7 @@
                     removeUnit(u); // в сброс без каскадов смерти — постройка не «убита»
                     recalcAuras();
                     B.discard.push(id);
-                    noteDiscard();
+                    noteDiscard(1, "p", [id]);
                     const p = cellXY(cell.col, cell.row);
                     floatText(p.x, p.y - 60, "⤓", 0xef9f8c);
                     sfx("chpoc");

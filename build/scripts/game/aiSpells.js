@@ -155,9 +155,19 @@
                         }
                         if (s.berserk) addBerserk(best, s.berserk);
                         if (s.venom) addVenom(best, s.venom); // «Отравленные лезвия»
+                        // «Метка некроманта» (dec137): «Выкапливание» на самое
+                        // ценное своё существо (aiBuffPick уже выбрал лучшего;
+                        // счётчик стакается с уже висящим)
+                        if (s.exhumingMark) {
+                            addExhuming(best, (best.exhuming || 0) + s.exhumingMark);
+                            const p = cellXY(best.col, best.row);
+                            floatText(p.x, p.y - 90,
+                                "⛏ +" + s.exhumingMark, 0xc9b98c);
+                        }
                     }
                     punch(best.node);
-                    if (s.buffAtk || s.buffHp || s.buffAtkByHp || s.enchantFire) {
+                    if (s.buffAtk || s.buffHp || s.buffAtkByHp || s.enchantFire
+                        || s.exhumingMark) {
                         const bp = cellXY(best.col, best.row);
                         fxEvent("buff", { x: bp.x, y: bp.y - 12,
                             color: s.enchantFire ? 0xff8a5e : 0xffd98c, scale: 0.82 });
@@ -392,8 +402,9 @@
                     if (want) for (const i of by[want]) B.eHand.push(top[i]);
                     for (let i = 0; i < top.length; i++)
                         if (!want || CARDS[top[i]].type !== want) B.eDiscard.push(top[i]);
-                    noteDiscard(top.filter((id) => !want
-                        || CARDS[id].type !== want).length); // «Болотная слизь»
+                    const grimRest = top.filter((id) => !want
+                        || CARDS[id].type !== want);
+                    noteDiscard(grimRest.length, "e", grimRest); // «Болотная слизь»
                     if (want) sfx("chpoc");
                 }
                 if (s.discardPick) { // «Варка зелий»: лучшее заклинание сбросов — в руку
@@ -423,7 +434,7 @@
                         removeUnit(out); // в сброс без каскадов смерти
                         recalcAuras();
                         B.eDiscard.push(cardIdOf(out.def));
-                        noteDiscard();
+                        noteDiscard(1, "e", [cardIdOf(out.def)]);
                         B.eDiscard.splice(B.eDiscard.indexOf(back), 1);
                         addUnit("e", back, cell.col, cell.row);
                         sfx("chpoc");
@@ -442,7 +453,8 @@
                         const r = (Math.random() * rest.length) | 0;
                         B.eHand.push(rest[r]); // одна случайная — в руку (по правилу карты)
                         for (let i = 0; i < rest.length; i++) if (i !== r) B.eDiscard.push(rest[i]);
-                        noteDiscard(rest.length - 1); // «Болотная слизь»
+                        noteDiscard(rest.length - 1, "e",
+                            rest.filter((_, i) => i !== r)); // «Болотная слизь»
                     }
                     if (chosenId) {
                         // клетка призыва — теми же правилами связок, что и обычный

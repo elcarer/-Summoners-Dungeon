@@ -33,14 +33,14 @@
                 const [col, row] = near[(Math.random() * near.length) | 0];
                 const p = cellXY(col, row);
                 if (counterTrapConsume(side === "p" ? "e" : "p", "counterSummon")) {
-                noteDiscard();
+                noteDiscard(1, side, [cardId]);
                     discard.push(cardId);
                     floatText(p.x, p.y - 60,
                         "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                     return;
                 }
                 addUnit(side, cardId, col, row);
-                noteDiscard();
+                noteDiscard(1, side, [cardId]);
                 discard.push(cardId);
                 floatText(p.x, p.y - 78, GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                 sfx("chpoc");
@@ -158,6 +158,39 @@
                             fxEvent("debuff", { x: vp.x, y: vp.y - 10, scale: 0.8 });
                             sfx("acid");
                             if (victim.hp <= 0) killUnit(victim, null);
+                        }
+                    }
+                    // «Дурное варево» (dec139): в начале хода владельца
+                    // сбрасывает одну карту с руки и получает +1 жизнь.
+                    // Сброс — авто, наименее ценная карта (aiCardPower):
+                    // панель выбора в начале хода заморозила бы анимации боя.
+                    // Пустая рука — эффекта нет (нечем платить). Сброс идёт
+                    // через noteDiscard — варево бьёт им же базу врага,
+                    // артефакты его запоминают (спека: «любая карта»)
+                    if (b.def.evilBrew && B.units.includes(b)) {
+                        const hand = side === "p" ? B.hand : B.eHand;
+                        const discard = side === "p" ? B.discard : B.eDiscard;
+                        const scorch = B.scorch[side];
+                        if (hand.length) {
+                            let wi = 0, ws = Infinity;
+                            for (let i = 0; i < hand.length; i++) {
+                                const pv = aiCardPower(CARDS[hand[i]]);
+                                if (pv < ws) { ws = pv; wi = i; }
+                            }
+                            const id = hand.splice(wi, 1)[0];
+                            const bp = cellXY(b.col, b.row);
+                            if (scorch && scorch.has(id)) {
+                                scorch.delete(id); // сгорела — сбросом не считается
+                                floatText(bp.x, bp.y - 66,
+                                    `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
+                            } else {
+                                discard.push(id);
+                                noteDiscard(1, side, [id]);
+                                floatText(bp.x, bp.y - 66,
+                                    "⤓ " + GAME_LOC.t(`card.${id}.name`), 0xc9b98c);
+                            }
+                            if (B.units.includes(b)) healUnit(b, 1);
+                            if (side === "p") layoutHand();
                         }
                     }
                 }

@@ -616,6 +616,8 @@
                     if (d.lakeMaid) s += 0.7;
                     if (d.sandDecay) s -= 1.0; // 9/9 за 7⚡, но тает каждый ход
                     if (d.ability === "archer" || d.ability === "assassin") s += 0.3;
+                    // «Скелет-лучник» (dec135): «Выстрел 2» дороже обычного
+                    if (d.ability === "archer") s += ((d.shotDmg || 1) - 1) * 0.55;
                     if (d.ability === "dash1") s += 0.2;
                     return s;
                 }
@@ -627,7 +629,10 @@
                         + (d.sprout ? 0.8 : 0) + (d.campfire ? 0.8 : 0)
                         + (d.elementalCircle ? 1.6 : 0)
                         + (d.altarSword ? 1.1 : 0) + (d.starTower ? 1.2 : 0)
-                        + (d.cloudSpire ? 2.2 : 0) + (d.darkAltar ? 1.4 : 0);
+                        + (d.cloudSpire ? 2.2 : 0) + (d.darkAltar ? 1.4 : 0)
+                        + (d.curseObelisk ? 1.7 : 0) // dec136: растёт и отражает
+                        + (d.relicVault ? 1.3 : 0) // dec138: копит сбросы
+                        + (d.evilBrew ? 1.6 : 0); // dec139: давит базу всяким сбросом
                 }
                 if (d.type === "spell") {
                     const s = d.spell || {};
@@ -662,6 +667,7 @@
                     if (s.copyLast) v += 1.0;
                     if (s.wolfVolley) v += 2.0;
                     if (s.baseHit) v += 1.6;
+                    if (s.exhumingMark) v += 1.1; // dec137: вторая жизнь существу
                     if (s.freeze) v += 1.0;
                     if (s.iceStrike) v += 2.0;
                     if (s.hydroPunch) v += 1.2; // урон 1 + полезный сдвиг назад

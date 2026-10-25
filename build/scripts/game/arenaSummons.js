@@ -122,7 +122,7 @@
                 const [col, row] = near[(Math.random() * near.length) | 0];
                 deck.splice(pick.i, 1);
                 discard.push(pick.id);
-                noteDiscard();
+                noteDiscard(1, u.side, [pick.id]);
                 armTrap(u.side, pick.id, col, row);
                 const p = cellXY(col, row);
                 floatText(p.x, p.y - 66, GAME_LOC.t(`card.${pick.id}.name`), 0x9fd489);

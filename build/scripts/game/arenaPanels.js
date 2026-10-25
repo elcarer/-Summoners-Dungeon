@@ -211,7 +211,7 @@
                 const rest = grimTop.filter((id) => CARDS[id].type !== type);
                 if (taken.length) B.hand.push(...taken);
                 if (rest.length) B.discard.push(...rest);
-                noteDiscard(rest.length); // «Болотная слизь»: пачка в сброс
+                noteDiscard(rest.length, "p", rest); // «Болотная слизь»: пачка в сброс
                 sfx("chpoc");
                 grimStage = "show";
                 layoutHand();
@@ -526,7 +526,8 @@
                     const k = (Math.random() * rest.length) | 0;
                     B.hand.push(rest[k]); // одна случайная — в руку
                     for (let i = 0; i < rest.length; i++) if (i !== k) B.discard.push(rest[i]);
-                    noteDiscard(rest.length - 1); // «Болотная слизь»
+                    noteDiscard(rest.length - 1, "p",
+                        rest.filter((_, i) => i !== k)); // «Болотная слизь»
                 }
                 sfx("chpoc");
                 closeJourneyPanel();

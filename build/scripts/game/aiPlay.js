@@ -193,7 +193,7 @@
                                 B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eEnergy -= effCost(cardId, "e");
                                 B.eDiscard.push(cardId);
-                                noteDiscard();
+                                noteDiscard(1, "e", [cardId]);
                                 floatText(960, 500,
                                     "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                                 hideEnemyCard();
@@ -204,7 +204,7 @@
                             B.eEnergy -= effCost(cardId, "e");
                             addUnit("e", cardId, col, row);
                             B.eDiscard.push(cardId); // как у игрока: карта в сброс (иначе цикл «Трусливого гоблина» не работает)
-                            noteDiscard();
+                            noteDiscard(1, "e", [cardId]);
                             hideEnemyCard();
                             played = true;
                             break;
@@ -262,7 +262,7 @@
                             if (counterTrapConsume("p", "counterSpell")) {
                                 B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eDiscard.push(cardId);
-                                noteDiscard();
+                                noteDiscard(1, "e", [cardId]);
                                 B.eEnergy -= effCost(cardId, "e");
                                 floatText(960, 500,
                                     "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
@@ -292,14 +292,14 @@
                             while (B.eHand.length > HAND_MAX) {
                                 const sp = B.eHand.splice((Math.random() * B.eHand.length) | 0, 1)[0];
                                 B.eDiscard.push(sp);
-                                noteDiscard();
+                                noteDiscard(1, "e", [sp]);
                                 B.scorch.e.delete(sp); // метка ушла вместе с картой
                             }
                             if (B.scorch.e.has(cardId)) { // «Сожжение»: карта удалена из боя
                                 B.scorch.e.delete(cardId);
                                 floatText(960, 640, `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
                                 sfx("rocket");
-                            } else { B.eDiscard.push(cardId); noteDiscard(); }
+                            } else { B.eDiscard.push(cardId); noteDiscard(1, "e", [cardId]); }
                             heroStrReplay("e", cardId, def); // «Мастера огня»
                             B.lastSpell.e = cardId;
                             afterSpellPlayed(); // «Заклинатель клинков» на поле

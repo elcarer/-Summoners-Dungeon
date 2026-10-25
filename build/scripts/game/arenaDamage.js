@@ -130,6 +130,43 @@
                 if (killer && killer.def && killer.def.type === "unit" && killer.side !== u.side) {
                     triggerTraps(u.side, killer);
                 }
+                // «Проклятый обелиск» (dec136): когда умирает ЛЮБОЕ существо
+                // (обе стороны; постройки не считаются), каждая живая копия
+                // получает +1 жизнь
+                if (u.def.type === "unit") for (const v of B.units.slice()) {
+                    if (!v.def.curseObelisk || !B.units.includes(v)) continue;
+                    healUnit(v, 1);
+                }
+                // «Проклятые артефакты» (dec138): при смерти постройки все
+                // запомненные ею карты возвращаются в руку владельца — по
+                // одной копии из сброса, иначе из колоды (карты нигде нет —
+                // эта копия не возвращается)
+                if (u.def.type === "building" && u.def.relicVault
+                    && u.relics && u.relics.length) {
+                    const side = u.side;
+                    const hand = side === "p" ? B.hand : B.eHand;
+                    const discard = side === "p" ? B.discard : B.eDiscard;
+                    const deck = side === "p" ? B.deck : B.eDeck;
+                    const p = cellXY(u.col, u.row);
+                    let back = 0;
+                    for (const id of u.relics) {
+                        let i = discard.indexOf(id);
+                        if (i >= 0) discard.splice(i, 1);
+                        else {
+                            i = deck.indexOf(id);
+                            if (i >= 0) deck.splice(i, 1);
+                            else continue; // копии нет нигде — не возвращается
+                        }
+                        hand.push(id);
+                        back++;
+                    }
+                    if (back) {
+                        floatText(p.x, p.y - 90, `⤓ +${back}`, 0xc9b98c);
+                        sfx("chpoc");
+                        if (side === "p") layoutHand();
+                        refreshHud();
+                    }
+                }
                 heroDeathReplay(u); // «Гоблин-вождь»: первый погибший гоблин возвращается
                 heroBuildingReplay(u); // «Хранитель рощи»: первая погибшая постройка возвращается
                 exhumingReplay(u); // «Выкапливание»: существо возвращается после смерти
@@ -338,6 +375,16 @@
                 }
                 punch(target.node);
                 sfx(snd);
+                // «Проклятый обелиск» (dec136): урон, нанесённый постройке
+                // СУЩЕСТВОМ (атака/спецудар; заклинания и ловушки бьют без
+                // killer-существа), столько же бьёт базу противника обелиска —
+                // но не больше жизней самого обелиска ДО удара
+                if (amt > 0 && target.def.curseObelisk && killer && killer.def
+                    && killer.def.type === "unit" && killer.side !== target.side) {
+                    const refl = Math.min(amt, target.hp + amt);
+                    if (refl > 0) damageBase(target.side === "p" ? "e" : "p", refl,
+                        { x: 960, y: target.side === "p" ? 240 : 840, fill: 0xb07ad5 });
+                }
                 if (target.hp <= 0) { killUnit(target, killer); return; }
                 // «Гоблин-асассин»: существо, оставшееся после его урона
                 // с 1 жизнью, добивается

@@ -242,15 +242,17 @@
             // слизь на поле получает +1 к урону (спека юзера). Зовётся из
             // ВСЕХ точек сброса (B.discard/B.eDiscard.push); смерть существ
             // сбросом не считается (removeUnit карту не отдаёт). n — сколько
-            // карт ушло разом (гримуар/путешествие сбрасывают пачками).
-
+            // карт ушло разом (гримуар/путешествие сбрасывают пачками);
+            // side/ids — чьи и какие карты ушли в сброс: их запоминают
+            // «Проклятые артефакты» (dec138) и за них бьёт «Дурное варево»
+            // (dec139). Сгоревшие «Сожжением» карты в ids не попадают.
             // «Болотная слизь» (wis116): когда ЛЮБАЯ карта уходит в сброс
             // (рука/колода/потраченное заклинание/излишек руки) — каждая
             // слизь на поле получает +1 к урону (спека юзера). Зовётся из
             // ВСЕХ точек сброса (B.discard/B.eDiscard.push); смерть существ
             // сбросом не считается (removeUnit карту не отдаёт). n — сколько
             // карт ушло разом (гримуар/путешествие сбрасывают пачками).
-            A.noteDiscard = function noteDiscard(n = 1) {
+            A.noteDiscard = function noteDiscard(n = 1, side = null, ids = null) {
                 if (!B) return;
                 for (const v of B.units.slice()) {
                     if (!v.def.slimeGain || !B.units.includes(v)) continue;
@@ -260,6 +262,28 @@
                     floatText(p.x, p.y - 39, `+${n}⚔`, 0x9fd489);
                     punch(v.node);
                 }
+                // «Проклятые артефакты» (dec138): СВОЯ сброшенная карта
+                // запоминается постройкой (ids — карты, реально ушедшие
+                // в сброс; сгоревшие «Сожжением» не считаются)
+                if (side && ids && ids.length) for (const v of B.units.slice()) {
+                    if (!v.def.relicVault || v.side !== side
+                        || !B.units.includes(v)) continue;
+                    v.relics = v.relics || [];
+                    v.relics.push(...ids);
+                    const p = cellXY(v.col, v.row);
+                    floatText(p.x, p.y - 60, `⤓ +${ids.length}`, 0xc9b98c);
+                }
+                // «Дурное варево» (dec139): ЛЮБАЯ сброшенная карта (обе
+                // стороны, включая потраченные заклинания) — база противника
+                // владельца варева теряет 1 жизнь за каждую карту
+                for (const v of B.units.slice()) {
+                    if (!v.def.evilBrew || !B.units.includes(v)) continue;
+                    const k = ids ? ids.length : n;
+                    if (!(k > 0)) continue;
+                    damageBase(v.side === "p" ? "e" : "p", k,
+                        { x: 960, y: v.side === "p" ? 240 : 840, fill: 0xb07ad5 });
+                }
+                refreshHud();
             };
 
             // «Гроза» (wis118): вся оставшаяся энергия (сверх цены, при
@@ -357,23 +381,25 @@
             // Возвращает true один раз за бой; флаг тратится на первом
             // срабатывании, даже если повторять эффект не по кому.
 
-            // «Выстрел 1» (Гоблинский лучник): после перемещения — 1 урон
-            // ближайшему существу или строению впереди по вертикали (любой
-            // стороны); если вертикаль перед ним пуста — 1 урон базе противника.
+            // «Выстрел N» (Гоблинский лучник — 1, Скелет-лучник dec135 — 2):
+            // после перемещения — N урона ближайшему существу или строению
+            // впереди по вертикали (любой стороны); если вертикаль перед ним
+            // пуста — N урона базе противника.
             A.archerShot = function archerShot(u) {
                 if (!B.units.includes(u) || u.def.ability !== "archer") return;
+                const dmg = u.def.shotDmg || 1;
                 const dir = u.side === "p" ? -1 : 1;
                 for (let r = u.row + dir; r >= 0 && r < GRID; r += dir) {
                     const o = unitAt(u.col, r);
                     if (o) {
-                        damageUnit(o, 1, u, "dam");
+                        damageUnit(o, dmg, u, "dam");
                         refreshHud();
                         checkEnd();
                         return;
                     }
                 }
                 sfx("crash");
-                damageBase(u.side === "p" ? "e" : "p", 1,
+                damageBase(u.side === "p" ? "e" : "p", dmg,
                     u.side === "p"
                         ? { x: cellXY(u.col, 0).x, y: cellXY(u.col, 0).y - 15, fill: 0xff8f6e }
                         : { x: cellXY(u.col, GRID - 1).x, y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff5f4e });
@@ -423,12 +449,13 @@
                 const discard = side === "p" ? B.discard : B.eDiscard;
                 const scorch = B.scorch[side];
                 let dropped = 0, burned = 0;
+                const droppedIds = [];
                 for (let k = 0; k < n && hand.length; k++) {
                     const id = hand.splice((Math.random() * hand.length) | 0, 1)[0];
                     if (scorch && scorch.has(id)) { scorch.delete(id); burned++; }
-                    else { discard.push(id); dropped++; }
+                    else { discard.push(id); dropped++; droppedIds.push(id); }
                 }
-                if (dropped) noteDiscard(dropped);
+                if (dropped) noteDiscard(dropped, side, droppedIds);
                 floatText(960, side === "p" ? 640 : 300,
                     `✧ −${dropped + burned}`, 0x8cd0ef);
                 sfx("chpoc");
@@ -474,7 +501,7 @@
                 if (counterTrapConsume(side === "p" ? "e" : "p", "counterSpell")) {
                     floatText(fp.x, fp.y - 60,
                         "✕ " + GAME_LOC.t(`card.${pick.id}.name`), 0x8cd0ef);
-                        noteDiscard();
+                        noteDiscard(1, side, [pick.id]);
                     discard.push(pick.id);
                     return;
                 }
@@ -482,11 +509,11 @@
                     const last = side === "p" ? B.lastSpell.p : B.lastSpell.e;
                     const ok = last && last !== "str25" && CARDS[last]
                         && CARDS[last].type === "spell";
-                    if (!ok) { discard.push(pick.id); noteDiscard(); return; } // повтора нет — впустую
+                    if (!ok) { discard.push(pick.id); noteDiscard(1, side, [pick.id]); return; } // повтора нет — впустую
                     if (side === "p") { B.lastSpell.p = "str25"; replaySpell(last); }
                     else { B.lastSpell.e = "str25"; enemyReplayLast(); }
                     afterSpellPlayed();
-                    noteDiscard();
+                    noteDiscard(1, side, [pick.id]);
                     discard.push(pick.id);
                     return;
                 }
@@ -502,7 +529,7 @@
                     B.lastSpell.e = pick.id;
                 }
                 afterSpellPlayed(); // «Заклинатель клинков» реагирует и на это
-                noteDiscard();
+                noteDiscard(1, side, [pick.id]);
                 discard.push(pick.id);
             };
 

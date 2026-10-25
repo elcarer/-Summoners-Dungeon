@@ -33,7 +33,7 @@
                 const cardId = hand.splice(i, 1)[0];
                 const [col, row] = cells[0];
                 discard.push(cardId);
-                noteDiscard();
+                noteDiscard(1, u.side, [cardId]);
                 armTrap(u.side, cardId, col, row);
                 const p = cellXY(col, row);
                 floatText(p.x, p.y - 60, GAME_LOC.t(`card.${cardId}.name`), 0xb7d0ef);
