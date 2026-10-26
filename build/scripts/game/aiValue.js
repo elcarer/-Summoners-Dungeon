@@ -629,6 +629,7 @@
                         v.side === "e" && v.def.type === "unit"
                         && v.def.subtype === "skeleton").length;
                     if (d.acolyteCast) s += 0.5; // dec148: бесплатный каст из сброса
+                    if (d.fatBelly) s += 0.9; // dec149: растёт от каждой своей смерти
                     return s;
                 }
                 if (d.type === "building") {
@@ -641,6 +642,7 @@
                         + (d.altarSword ? 1.1 : 0) + (d.starTower ? 1.2 : 0)
                         + (d.cloudSpire ? 2.2 : 0) + (d.darkAltar ? 1.4 : 0)
                         + (d.curseObelisk ? 1.7 : 0) // dec136: растёт и отражает
+                        + (d.birthSwamp ? 1.5 : 0) // dec151: кормит призванных рядом
                         + (d.relicVault ? 1.3 : 0) // dec138: копит сбросы
                         + (d.evilBrew ? 1.6 : 0) // dec139: давит базу всяким сбросом
                         + (d.boneField ? 1.6 : 0) // dec141: скелет каждый ход
@@ -687,6 +689,11 @@
                     if (s.skeletonCrowd) v += 3 * 0.65; // dec140: три Скелета 1/2
                     if (s.poison) v += 1.4; // dec144: растущий яд — тариф выше
                     if (s.destroy) v += 2.7; // dec145: убийство любого существа минус карта
+                    // dec150: размен тела на серию случайных ударов (ценнее
+                    // при своём крупном существе и целях у игрока)
+                    if (s.beastBlast) v += 1.4 + Math.min(4,
+                        B.units.filter((u) => u.side === "e"
+                            && u.def.type === "unit").length) * 0.2;
                     if (s.forbidden) v += 2.0
                         + Math.min(3, B ? B.eDeck.length : 0) * 0.1; // dec130: 3 карты
                     if (s.discardHandDraw) v += 1.0

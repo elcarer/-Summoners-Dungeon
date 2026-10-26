@@ -139,6 +139,48 @@
                     if (!v.def.curseObelisk || !B.units.includes(v)) continue;
                     healUnit(v, 1);
                 }
+                // «Болото рождения» (dec151): на смерть любого существа
+                // (обе стороны) постройка получает +1 жизнь
+                if (u.def.type === "unit") for (const v of B.units.slice()) {
+                    if (!v.def.birthSwamp || !B.units.includes(v)) continue;
+                    healUnit(v, 1);
+                }
+                // «Толстопуз» (dec149): когда умирает существо его владельца
+                // (не он сам), каждая живая копия прибавляет себе БАЗОВЫЕ
+                // ⚔/♥ умершего (статы карты, не текущие с баффами)
+                if (u.def.type === "unit") for (const v of B.units.slice()) {
+                    if (v === u || v.side !== u.side || !v.def.fatBelly
+                        || !B.units.includes(v)) continue;
+                    const a = u.def.atk || 0, h = u.def.hp || 0;
+                    v.bonusAtk += a;
+                    v.hp += h;
+                    recalcAuras();
+                    const hn = v.node.getChildByName("hp");
+                    if (hn) hn.text = String(v.hp);
+                    const p = cellXY(v.col, v.row);
+                    floatText(p.x, p.y - 66, `+${a}⚔ +${h}♥`, 0x9fd489);
+                    punch(v.node);
+                    sfx("up");
+                }
+                // «Жажда смерти» (decThirst, heroes/30): ПЕРВАЯ за бой гибель
+                // СВОЕГО существа лечит базу владельца на 3
+                if (u.def.type === "unit") {
+                    const hd = heroDefOf(u.side);
+                    if (hd && hd.ability === "firstDeathHeal"
+                        && !B.heroFlags.firstDeathHeal[u.side]) {
+                        B.heroFlags.firstDeathHeal[u.side] = true;
+                        if (u.side === "p") {
+                            B.playerBase = Math.min(B.playerBaseMax, B.playerBase + 3);
+                        } else {
+                            B.enemyBase = Math.min(B.enemyBaseMax, B.enemyBase + 3);
+                        }
+                        floatText(960, u.side === "p" ? 840 : 60, "+3♥", 0x9fd489);
+                        fxEvent("heal", { x: 960, y: u.side === "p" ? 830 : 70,
+                            scale: 1.15 });
+                        punch(root.hud);
+                        sfx("up");
+                    }
+                }
                 // «Проклятые артефакты» (dec138): при смерти постройки все
                 // запомненные ею карты возвращаются в руку владельца — по
                 // одной копии из сброса, иначе из колоды (карты нигде нет —

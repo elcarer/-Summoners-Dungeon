@@ -316,11 +316,13 @@
             // «Скелет послушника» (dec148): после появления разыгрывает
             // СЛУЧАЙНУЮ карту заклинания стоимостью ≤maxCost из СВОЕГО
             // сброса — бесплатно (энергия не тратится, карта остаётся
-            // в сбросе). Панельные заклинания (выбор игрока: Пытка разума,
-            // Запретные знания, поиски/варка/гримуар/поднятие) и сжигатели
-            // энергии (Огнешар/Гроза) не берём: бесплатный каст не должен
-            // открывать панели и жечь энергию. Цель — авто: врагу хватает
-            // его движка (enemyCastSpellEffect), игроку — applySpellP с
+            // в сбросе). Панельные заклинания и сжигатели энергии (Огнешар/
+            // Гроза) — ТОЖЕ (просил юзер): у врага их исполняет его движок
+            // (enemyCastSpellEffect), у игрока открывается штатная панель
+            // выбора; сжигатели жгут энергию и в бесплатном касте — как
+            // в повторе «Горящих рун». Не берём только «Горящие руны»:
+            // ветки повтора в движках прямого каста нет. Цель — авто:
+            // врагу хватает его движка, игроку — applySpellP с
             // acolyteTargetFor (вредоносные — в лучшего чужого, остальное —
             // автоцель повтора «Горящих рун»)
             A.acolyteTargetFor = function acolyteTargetFor(cardId) {
@@ -354,11 +356,7 @@
                     seen[id] = 1;
                     const d = CARDS[id];
                     if (!d || d.type !== "spell" || (d.cost || 0) > maxCost) continue;
-                    const s = d.spell;
-                    if (s.copyLast || s.drainAll || s.stormAll || s.excavate
-                        || s.sacrifice || s.search || s.searchUnit || s.seek
-                        || s.grim || s.journey || s.discardPick || s.raiseDead
-                        || s.mindTorture || s.forbidden) continue;
+                    if (d.spell.copyLast) continue; // повтора в движках каста нет
                     cands.push(id);
                 }
                 if (!cands.length) return false;
@@ -370,6 +368,9 @@
                     if (side === "e") {
                         if (!aiSpellPlayable(CARDS[id])) continue;
                         enemyCastSpellEffect(CARDS[id], true); // авто-цели ИИ
+                        // Огнешар/Гроза сжигают энергию и бесплатным кастом
+                        if (CARDS[id].spell.drainAll || CARDS[id].spell.stormAll)
+                            B.eEnergy = 0;
                         refreshHud();
                         return true;
                     }
@@ -377,11 +378,38 @@
                     if (t === null && CARDS[id].spell.target !== "none") continue;
                     if (applySpellP(id, t, true)) {
                         fxSpellCast(id, t, "p");
+                        if (CARDS[id].spell.drainAll || CARDS[id].spell.stormAll)
+                            B.energy = 0;
                         refreshHud();
                         return true;
                     }
                 }
                 return false;
+            };
+            // «Взрыв твари» (dec150): своё существо погибает, затем 1 урона
+            // столько раз, какова была сумма его ⚔+♥; каждый удар — случайному
+            // существу/постройке противника ИЛИ его базе (база в общем пуле)
+            A.beastBlastCast = function beastBlastCast(side, u) {
+                const n = (u.curAtk || 0) + (u.hp || 0);
+                const p = cellXY(u.col, u.row);
+                killUnit(u, null);
+                floatText(p.x, p.y - 45, "☠", 0xef9f8c);
+                floatText(p.x, p.y - 78, "💥" + (n > 1 ? `×${n}` : ""), 0xffb26e);
+                const foe = side === "p" ? "e" : "p";
+                for (let i = 0; i < n; i++) {
+                    const pool = B.units.filter((v) => v.side === foe);
+                    // база — равноправная цель в пуле с существами/постройками
+                    if (!pool.length
+                        || Math.random() * (pool.length + 1) >= pool.length) {
+                        damageBase(foe, 1, side === "p"
+                            ? { x: 960, y: 60, fill: 0xff8f6e }
+                            : { x: 960, y: 840, fill: 0xff5f4e });
+                    } else {
+                        const t = pool[(Math.random() * pool.length) | 0];
+                        damageUnit(t, 1, null, "rocket");
+                    }
+                }
+                sfx("rocket");
             };
             A.noteDiscard = function noteDiscard(n = 1, side = null, ids = null) {
                 if (!B) return;

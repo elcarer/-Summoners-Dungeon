@@ -508,6 +508,29 @@
                         punch(o.node);
                         damageUnit(o, 1, null, "monolith");
                     }
+                    // «Болото рождения» (dec151): призванное рядом (верт/гориз)
+                    // СВОЁ существо получает +2⚔/+2♥, постройка при этом
+                    // теряет 2 жизни (может умереть — штатный damageUnit)
+                    for (const o of B.units.slice()) {
+                        if (o === u || o.side !== side || o.def.type !== "building"
+                            || !o.def.birthSwamp || !B.units.includes(o)
+                            || Math.abs(o.col - col) + Math.abs(o.row - row) !== 1) continue;
+                        u.bonusAtk += 2;
+                        u.hp += 2;
+                        recalcAuras();
+                        const an = u.node.getChildByName("atk");
+                        if (an) an.text = String(u.curAtk);
+                        const hn = u.node.getChildByName("hp");
+                        if (hn) hn.text = String(u.hp);
+                        const up = cellXY(u.col, u.row);
+                        floatText(up.x, up.y - 66, "+2⚔ +2♥", 0x9fd489);
+                        punch(u.node);
+                        sfx("up");
+                        const sp = cellXY(o.col, o.row);
+                        floatText(sp.x, sp.y - 60, "−2♥", 0xef9f8c);
+                        punch(o.node);
+                        damageUnit(o, 2, null, "monolith");
+                    }
                     // «Эльфийский друид»: каждый призыв СУЩЕСТВА (не постройки)
                     // даёт владельцу каждого друида на поле +1 энергии — будит
                     // и призыв друида («другое существо» — не он сам)

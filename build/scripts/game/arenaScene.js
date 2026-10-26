@@ -71,7 +71,8 @@
                         skeletonDig: { p: false, e: false },
                         digReward: { p: false, e: false },
                         discardReplay: { p: false, e: false },
-                        skeletonStrike: { p: false, e: false } },
+                        skeletonStrike: { p: false, e: false },
+                        firstDeathHeal: { p: false, e: false } },
                     enemyBase: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
                     enemyBaseMax: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
                     deck: shuffle([...pDeck]), discard: [], hand: [],
@@ -95,6 +96,9 @@
                 // меньше — старт с 0 вместо 1 (дальнейшие ходы как раньше)
                 if (eHeroDef && eHeroDef.ability === "firstTurnEnergyDown") B.energy = 0;
                 if (heroDef.ability === "firstTurnEnergyDown") B.eEnergy = 0;
+                // «Карта сокровищ»: соперник по драфту начинает бой с 3
+                // энергии вместо стандартной 1 (просил юзер)
+                if (encId === "draft") B.eEnergy = 3;
                 // Стандартный старт обеих сторон (просил юзер): 1 энергия
                 // (выше) и 4 карты в руке; геройские доборы (startDraw*,
                 // heroStartDraw ниже) всегда ЛЯГУТ СВЕРХУ этих четырёх

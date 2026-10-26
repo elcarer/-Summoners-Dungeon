@@ -500,6 +500,12 @@
                         }
                     }
                 }
+                if (def.spell.target === "ownUnit" && def.spell.beastBlast) { // «Взрыв твари» (dec150): своё гибнет, серия случайных ударов
+                    if (!target || target.col === undefined) return false;
+                    const u = unitAt(target.col, target.row);
+                    if (!u || u.side !== "p" || u.def.type !== "unit") return false;
+                    beastBlastCast("p", u);
+                }
                 if (def.spell.target === "ownBuilding" && def.spell.excavate) { // «Раскопки»
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);

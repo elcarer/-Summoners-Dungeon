@@ -402,6 +402,17 @@
                                 damageUnit(v, s.dmg, null, "rocket");
                     }
                 }
+                if (s.beastBlast) { // «Взрыв твари» (dec150): жертва — жетон
+                    // либо самый дешёвый размен; урон растёт от суммы ⚔+♥
+                    let best = null, bs = -1e9;
+                    for (const v of B.units) {
+                        if (v.side !== "e" || v.def.type !== "unit") continue;
+                        const sc = (v.curAtk || 0) + (v.hp || 0)
+                            + (v.token ? 10 : 0) - aiThreat(v) * 0.5;
+                        if (sc > bs) { bs = sc; best = v; }
+                    }
+                    if (best) beastBlastCast("e", best);
+                }
                 if (s.baseHit) { // «Бросок валуна»: своё сильнейшее бьёт базу героя — это его атака
                     const own = spellTargets(B.units.filter((v) => v.side === "e"
                         && v.def.type === "unit"))

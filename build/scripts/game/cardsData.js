@@ -922,6 +922,31 @@
                   acolyteCast: 3,
                   rarity: "rare", elem: "decay",
                   color: 0x504048, img: "decay/148" },
+        // «Толстопуз» (dec149): когда умирает существо его владельца
+        // (любое, кроме него самого), каждая живая копия прибавляет себе
+        // БАЗОВЫЕ ⚔/♥ умершего (fatBelly — хук в killUnit)
+        dec149: { type: "unit", cost: 2, atk: 0, hp: 2, speed: 1,
+                  creature: "goblin", // плейсхолдер листа поля боя (некр по стихии)
+                  subtype: "zombie", // подтип — по спеке юзера (чат)
+                  fatBelly: 1,
+                  rarity: "rare", elem: "decay",
+                  color: 0x504048, img: "decay/149" },
+        // «Взрыв твари» (dec150): убивает своё существо, затем наносит 1
+        // урона столько раз, какова сумма его ⚔+♥, каждый раз — случайному
+        // существу/постройке противника или его базе (beastBlast —
+        // beastBlastCast в arenaCombat, ветки в arenaActions/aiSpells)
+        dec150: { type: "spell", cost: 1,
+                  spell: { target: "ownUnit", beastBlast: true },
+                  kind: "damage", // тип эффекта — по спеке юзера («Нанесение урона»)
+                  rarity: "rare", elem: "decay",
+                  color: 0x63424e, img: "decay/150" },
+        // «Болото рождения» (dec151): призванное рядом (верт/гориз) СВОЁ
+        // существо получает +2⚔/+2♥, постройка при этом теряет 2 жизни;
+        // на смерть любого существа (обе стороны) — +1 жизнь (birthSwamp —
+        // хуки в addUnit/killUnit)
+        dec151: { type: "building", cost: 4, atk: 0, hp: 5, birthSwamp: true,
+                  rarity: "epic", elem: "decay",
+                  color: 0x504048, img: "decay/151" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1148,6 +1173,12 @@
         decArmy: { id: "decArmy", rarity: "rare", baseHp: 14,
                    elems: ["decay"], starter: "decay",
                    img: "29", ability: "firstSkeletonStrike" },
+        // 6-й этаж (арт heroes/30.png): Тлен, 15♥, первая за бой гибель
+        // СВОЕГО существа лечит базу владельца на 3 (firstDeathHeal —
+        // хук в killUnit)
+        decThirst: { id: "decThirst", rarity: "rare", baseHp: 15,
+                     elems: ["decay"], starter: "decay",
+                     img: "30", ability: "firstDeathHeal" },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1158,7 +1189,8 @@
         "grwControl", "grwBoss",
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
-        "decBones", "decBlack", "decUnder", "decMind", "decArmy"];
+        "decBones", "decBlack", "decUnder", "decMind", "decArmy",
+        "decThirst"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

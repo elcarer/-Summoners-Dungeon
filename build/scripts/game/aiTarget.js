@@ -395,6 +395,11 @@
                 const s = def.spell;
                 if (s.copyLast) return aiReplayOk();
                 if (s.sacrifice && !aiSacrificePick()) return false;
+                // «Взрыв твари» (dec150) — есть своё существо с суммой ⚔+♥ 3+
+                // (иначе карта переводится зря)
+                if (s.beastBlast && !B.units.some((v) => v.side === "e"
+                    && v.def.type === "unit"
+                    && (v.curAtk || 0) + (v.hp || 0) >= 3)) return false;
                 // «Стена костров» — ряд должен окупаться (не на своих, просил
                 // юзер); всем рядам в убыток — карту держим до подходящего поля
                 if (s.firewall && aiFirewallRow() === null) return false;
