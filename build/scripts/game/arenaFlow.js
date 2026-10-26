@@ -75,7 +75,8 @@
             // ── Способность героя «начиная бой берёт дополнительную случайную
             // карту … из колоды» (просил юзер): «Банда гоблинов» — карту
             // гоблина, «Засада гоблинов» — карту ловушки, «Лесные звери» —
-            // карту животного, «Буйная растительность» — карту растения.
+            // карту животного, «Буйная растительность» — карту растения,
+            // «Живые кости» — карту Скелета (подтип skeleton).
             // Вызывается в enter() ПОСЛЕ сборки root (всплывающий текст
             // рисуется в root.fx).
             A.heroStartDraw = function heroStartDraw(side) {
@@ -84,7 +85,8 @@
                 const want = hd.ability === "startDrawGoblin" ? "goblin"
                     : hd.ability === "startDrawTrap" ? "trap"
                     : hd.ability === "startDrawAnimal" ? "animal"
-                    : hd.ability === "startDrawPlant" ? "plant" : null;
+                    : hd.ability === "startDrawPlant" ? "plant"
+                    : hd.ability === "startDrawSkeleton" ? "skeleton" : null;
                 if (!want) return;
                 const deck = side === "p" ? B.deck : B.eDeck;
                 const hand = side === "p" ? B.hand : B.eHand;
@@ -93,6 +95,8 @@
                         : want === "trap" ? x.def.type === "trap"
                         : want === "animal"
                             ? x.def.type === "unit" && x.def.creature === "animal"
+                        : want === "skeleton"
+                            ? x.def.type === "unit" && x.def.subtype === "skeleton"
                             : !!x.def.plant); // растение — существо или постройка
                 if (!pool.length) return;
                 const pick = pool[(Math.random() * pool.length) | 0];

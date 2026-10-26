@@ -11,12 +11,13 @@
     const TS = 40;
     // '#': деревья/скалы (стена), '~': вода (тоже стена), '.': трава,
     // 'W': старт героя, 'C': вход в Гоблинские пещеры (Сила), 'G': вход
-    // в Рощу Роста (Рост), 'K': вход в «Подземные ключи» (Мудрость).
+    // в Рощу Роста (Рост), 'K': вход в «Подземные ключи» (Мудрость),
+    // 'D': вход в «Земли мёртвых» (Тлен).
     // Входы стоят в поле у скальных массивов — арка читается без рамки.
     const ROWS = [
         "##############################",
         "#............................#",
-        "#...##.....~~~.....###.......#",
+        "#...##.....~~~.....###..D....#",
         "#..........~~~...............#",
         "#..##.......~.......##...##..#",
         "#......................##....#",
@@ -33,7 +34,7 @@
         "##############################",
     ];
     // входы подземелий: символ карты → id данжа (dataCards CAVES)
-    const CAVES_ON_MAP = { C: "gob", G: "grw", K: "wis" };
+    const CAVES_ON_MAP = { C: "gob", G: "grw", K: "wis", D: "dec" };
     const W = ROWS[0].length, H = ROWS.length;
 
     function findCh(ch) {
@@ -259,12 +260,13 @@
                 ctx.collide.rows = ROWS; // коллизии героя — по карте мира
                 ctx.collide.ts = 40; // после подземелья (клетка 64) — вернуть шаг мира
                 const cave = findCh("C"), spawn = findCh("W"), grove = findCh("G");
-                const keys = findCh("K");
+                const keys = findCh("K"), dead = findCh("D");
                 // точка появления: вышедший из подземелья герой стоит у входа
                 // ТОГО данжа; сохранившаяся позиция у самого входа не должна
                 // мгновенно сработать триггер — ставим клеткой левее
-                const caves = [cave, grove, keys];
-                const cavePos = (id) => (id === "grw" ? grove : id === "wis" ? keys : cave);
+                const caves = [cave, grove, keys, dead];
+                const cavePos = (id) => (id === "grw" ? grove : id === "wis" ? keys
+                    : id === "dec" ? dead : cave);
                 const nearCave = (p) => caves.some((cv) =>
                     Math.hypot(p.x - cv.x, p.y - cv.y) < TS * 1.2);
                 let hp = G.world.heroPos ? { ...G.world.heroPos } : null;
@@ -301,6 +303,7 @@
                 layer.addChild(makeCave("C", "world.cave"));
                 layer.addChild(makeCave("G", "world.caveGrowth"));
                 layer.addChild(makeCave("K", "world.caveWisdom"));
+                layer.addChild(makeCave("D", "world.caveDecay"));
                 worldContainer.addChild(layer);
 
                 // герой — лист по стихии забега (Рост — эльф, Сила — гоблин)
@@ -418,7 +421,7 @@
                     return {
                         heroPos: hero, spawn: findCh("W"),
                         cave: findCh("C"), grove: findCh("G"),
-                        keys: findCh("K"),
+                        keys: findCh("K"), dead: findCh("D"),
                     };
                 },
                 setHeroPos(x, y) {

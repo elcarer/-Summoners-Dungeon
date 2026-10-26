@@ -425,6 +425,8 @@
                 if (s.iceStrike && !aiIceStrikeTarget()) return false;
                 // «Культ кочерыжки» — нужна хоть одна пустая клетка под гоблинов
                 if (s.cultRow && B.units.length >= GRID * GRID) return false;
+                // «Толпа скелетов» — нужна хоть одна пустая клетка под скелетов
+                if (s.skeletonCrowd && B.units.length >= GRID * GRID) return false;
                 // «Поднять стяги!» — окупается при двух и более своих существах
                 if (s.buffAllAtk
                     && B.units.filter((v) => v.side === "e" && v.def.type === "unit").length < 2) return false;

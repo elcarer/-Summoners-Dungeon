@@ -114,7 +114,10 @@
                 "dec135", "dec135", "dec135", "dec136",
                 "dec137", "dec137", "dec137",
                 "dec138", "dec138", "dec138",
-                "dec139", "dec139", "dec139"],
+                "dec139", "dec139", "dec139",
+                // 140–141: толпа и поле костей — обычные ×3
+                "dec140", "dec140", "dec140",
+                "dec141", "dec141", "dec141"],
     };
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
@@ -261,6 +264,15 @@
                           "wis111"],
                    grow: ["wis91", "wis93", "wis95", "wis96", "wis100",
                           "wis102", "wis105", "wis106", "wis108", "wis109"] },
+        // ── «Земли мёртвых» (четвёртое подземелье, стихия «Тлен») ──────────
+        // 1-й этаж (просил юзер): «Живые кости» — база 10♥, ядро 11 карт
+        // (Боевой скелет ×2, Скелет-лучник, Зомби-селянин ×2, Толпа
+        // скелетов ×2, Нетопырь ×2, Поле костей ×2). Босса у данжа пока
+        // нет, поэтому без grow — обычный враг, играет ядром как есть.
+        decBones: { scene: 1, baseHp: 10, elem: "decay", hero: "decBones",
+                    core: ["dec121", "dec121", "dec135", "dec122", "dec122",
+                           "dec140", "dec140", "dec123", "dec123", "dec141",
+                           "dec141"] },
     };
     // Подземелья открытого мира: стихия (пул наград/драфта) и кап глубины.
     // У «Подземных ключей» шесть этажей; главарь «Безумный маг» стоит на
@@ -269,6 +281,7 @@
         gob: { elem: "strength", maxFloor: 6, boss: "boss" },      // Гоблинские пещеры
         grw: { elem: "growth", maxFloor: 6, boss: "grwBoss" },     // Роща Роста
         wis: { elem: "wisdom", maxFloor: 6, boss: "wisBoss" },     // Подземные ключи
+        dec: { elem: "decay", maxFloor: 1 },                       // Земли мёртвых (1 этаж, пока без босса)
     };
     // Этаж → какие обычные враги на нём водятся; после конца списка — набор
     // для самых глубоких этажей. Босс (B) есть на каждом этаже данжа,
@@ -303,8 +316,12 @@
         ["wisMaster", "wisMaster"],             // 5
         ["wisCity", "wisCity"],                 // 6
     ];
+    // «Земли мёртвых»: пока один этаж — «Живые кости» (просил юзер)
+    const FLOOR_MOBS_DECAY = [
+        ["decBones", "decBones"],               // 1
+    ];
     const MOB_TABLES = { gob: FLOOR_MOBS, grw: FLOOR_MOBS_GROWTH,
-                         wis: FLOOR_MOBS_WISDOM };
+                         wis: FLOOR_MOBS_WISDOM, dec: FLOOR_MOBS_DECAY };
     // Пул добора колоды врага по редкости. Панельные карты (str11 жертва,
     // str25 руны, str26 путешествие) ИИ теперь разыгрывает сам — цель он
     // выбирает по своим приоритетам, без экрана (просил юзер).
@@ -412,7 +429,7 @@
         CARDS, RARITY_COLORS, DEFAULT_DECK, DEFAULT_COLLECTION, DECK_MAX, DECK_MIN,
         deckMinFor, TRAP_SLOTS,
         DECK_COPIES, REWARD_POOL, REWARD_POOLS, ENCOUNTERS, FLOOR_MOBS,
-        FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM,
+        FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM, FLOOR_MOBS_DECAY,
         MOB_TABLES, ENEMY_FILL, ENEMY_FILLS, CAVES,
         STARTER_DECKS, STARTER_COLLECTIONS, HEROES, HERO_ORDER, HERO_FOE_ORDER,
         enemyDeck, mobForFloor, ELEM_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,

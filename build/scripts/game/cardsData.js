@@ -824,6 +824,18 @@
         dec139: { type: "building", cost: 3, atk: 0, hp: 3, evilBrew: true,
                   rarity: "rare", elem: "decay",
                   color: 0x504048, img: "decay/139" },
+        // «Толпа скелетов» (dec140): Скелеты 1/2 (служебная карта skel) на
+        // выбранной пустой клетке и слева/справа от неё — только на пустые
+        dec140: { type: "spell", cost: 3,
+                  spell: { target: "emptyCell", skeletonCrowd: true },
+                  kind: "summon", // тип эффекта — по спеке юзера («Появление существ»)
+                  rarity: "common", elem: "decay",
+                  color: 0x63424e, img: "decay/140" },
+        // «Поле костей» (dec141): в начале хода владельца призывает Скелета
+        // 1/2 в пустую клетку перед постройкой (на 1 ближе к базе противника)
+        dec141: { type: "building", cost: 2, atk: 0, hp: 3, boneField: true,
+                  rarity: "common", elem: "decay",
+                  color: 0x504048, img: "decay/141" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -850,6 +862,13 @@
                     subtype: "elemental", // подтип — по спеке юзера (cards.txt)
                     rarity: "common", elem: "wisdom",
                     color: 0x3a6ea8 },
+        // Скелет из «Толпы скелетов» (dec140) и «Поля костей» (dec141) —
+        // служебная карта без лица, как gobA/icePixie: спавнится только ими.
+        skel: { type: "unit", cost: 1, atk: 1, hp: 2, speed: 1,
+                creature: "goblin", // плейсхолдер листа поля боя (гоблин)
+                subtype: "skeleton", // подтип — по спеке юзера (чат)
+                rarity: "common", elem: "decay",
+                color: 0x504048 },
     };
     const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
 
@@ -1007,6 +1026,12 @@
         wisMad: { id: "wisMad", rarity: "epic", baseHp: 18,
                   elems: ["wisdom"], starter: "wisdom",
                   img: "23", ability: "firstMageDouble", abilityVal: 1 },
+        // ── «Земли мёртвых»: карта персонажа врага (просил юзер).
+        // 1-й этаж (арт heroes/25.png): Тлен, 10♥, начиная бой берёт
+        // дополнительную случайную карту Скелета из колоды.
+        decBones: { id: "decBones", rarity: "common", baseHp: 10,
+                    elems: ["decay"], starter: "decay",
+                    img: "25", ability: "startDrawSkeleton" },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1016,7 +1041,8 @@
         "grwBeasts", "grwGrove", "grwWild", "grwMagic", "grwCity",
         "grwControl", "grwBoss",
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
-        "wisCity", "wisMad"];
+        "wisCity", "wisMad",
+        "decBones"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

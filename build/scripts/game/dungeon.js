@@ -22,7 +22,8 @@
     // у Рощи Роста свой арт): Сила — goblins_lair, Рост — growth_lair,
     // Мудрость — water_lair («Подземные ключи»)
     const TILE_SETS = { gob: "goblins_lair", grw: "growth_lair",
-                        wis: "water_lair" };
+                        wis: "water_lair",
+                        dec: "goblins_lair" }; // Земли мёртвых — пока тайлы пещер
     const tileSetOf = (cave) => TILE_SETS[cave] || TILE_SETS.gob;
     // Версия раскладки этажа: тайлы 64px данжа (v9 — у 5-го этажа
     // «Подземных ключей» появился спуск на новый 6-й; старые сейвы без

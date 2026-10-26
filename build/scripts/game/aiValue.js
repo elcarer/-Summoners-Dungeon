@@ -240,7 +240,7 @@
                     if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk
                         || s.enchantFire || s.cocoon || s.venom) return 4;
                     if (s.baseHit || s.wolfVolley) return 4.5; // бьёт СВОИМ существом
-                    if (s.iceSwarm) return 3; // тела — как обычный призыв
+                    if (s.iceSwarm || s.skeletonCrowd) return 3; // тела — как обычный призыв
                     return 6; // поиск рун / гадание / поиск знаний / глубокое путешествие
                 }
                 // «Три монолита» — без спешки (просил юзер: не в приоритете):
@@ -632,7 +632,8 @@
                         + (d.cloudSpire ? 2.2 : 0) + (d.darkAltar ? 1.4 : 0)
                         + (d.curseObelisk ? 1.7 : 0) // dec136: растёт и отражает
                         + (d.relicVault ? 1.3 : 0) // dec138: копит сбросы
-                        + (d.evilBrew ? 1.6 : 0); // dec139: давит базу всяким сбросом
+                        + (d.evilBrew ? 1.6 : 0) // dec139: давит базу всяким сбросом
+                        + (d.boneField ? 1.6 : 0); // dec141: скелет каждый ход
                 }
                 if (d.type === "spell") {
                     const s = d.spell || {};
@@ -672,6 +673,7 @@
                     if (s.iceStrike) v += 2.0;
                     if (s.hydroPunch) v += 1.2; // урон 1 + полезный сдвиг назад
                     if (s.iceSwarm) v += Math.min(5, s.iceSwarm) * 0.55; // 5 тел 1/1
+                    if (s.skeletonCrowd) v += 3 * 0.65; // dec140: три Скелета 1/2
                     if (s.discardHandDraw) v += 1.0
                         + 0.35 * Math.min(6, B.hand.length)
                         - 0.3 * Math.min(6, B.eHand.length);

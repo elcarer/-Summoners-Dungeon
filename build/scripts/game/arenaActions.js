@@ -254,6 +254,20 @@
                 return n;
             };
 
+            // «Толпа скелетов» (dec140): Скелеты 1/2 (служебная карта skel)
+            // на выбранной клетке и слева/справа от неё — только на пустые
+            // клетки поля (занятый сосед или край поля пропускаются).
+            // Возвращает число призванных.
+            A.skeletonCrowdSpawn = function skeletonCrowdSpawn(side, col, row) {
+                let n = 0;
+                for (const c of [col, col - 1, col + 1]) {
+                    if (c < 0 || c >= GRID || unitAt(c, row)) continue;
+                    addUnit(side, "skel", c, row, { token: true });
+                    n++;
+                }
+                return n;
+            };
+
             // «Рой ледо-пикси» (wis103): на N СЛУЧАЙНЫХ ПУСТЫХ клетках поля
             // (не только своей зоны призыва) появляются Элементали 1/1
             // с «Полётом» (служебная карта icePixie). Клетки выбираются без
@@ -426,10 +440,12 @@
                     // «Ядро кометы»: выжившее существо получает «Заморожен N»
                     if (def.spell.freeze && B.units.includes(u)) addFrozen(u, def.spell.freeze, "p");
                 }
-                if (def.spell.target === "emptyCell") { // культ кочерыжки: ряд в гоблинах
+                if (def.spell.target === "emptyCell") { // культ — ряд в гоблинах; толпа — 3 скелета
                     if (!target || target.col === undefined) return false;
                     if (unitAt(target.col, target.row)) return false;
-                    cultRowSpawn("p", target.row);
+                    if (def.spell.skeletonCrowd) { // «Толпа скелетов»: клетка + слева/справа
+                        if (skeletonCrowdSpawn("p", target.col, target.row)) sfx("use");
+                    } else cultRowSpawn("p", target.row);
                 }
                 if (def.spell.target === "anyCell") { // стена костров: ряд горит N ходов владельца
                     if (!target || target.col === undefined) return false;

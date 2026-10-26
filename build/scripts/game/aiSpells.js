@@ -224,15 +224,28 @@
                     redrawFirewalls();
                     sfx("rocket");
                 }
-                if (s.target === "emptyCell") { // культ — ряд, где больше пустых (ничья — где больше игроков)
-                    const empt = [0, 0, 0, 0, 0], pu = [0, 0, 0, 0, 0];
-                    for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++)
-                        if (!unitAt(c, r)) empt[r]++;
-                    for (const v of B.units) if (v.side === "p") pu[v.row]++;
-                    let row = 0;
-                    for (let r = 1; r < GRID; r++)
-                        if (empt[r] > empt[row] || (empt[r] === empt[row] && pu[r] > pu[row])) row = r;
-                    cultRowSpawn("e", row);
+                if (s.target === "emptyCell") {
+                    if (s.skeletonCrowd) { // толпа — клетка с пустыми соседями, ближе к базе игрока
+                        let bc = -1, br = -1, bs = -1;
+                        for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++) {
+                            if (unitAt(c, r)) continue;
+                            let sc = 1;
+                            if (c > 0 && !unitAt(c - 1, r)) sc++;
+                            if (c < GRID - 1 && !unitAt(c + 1, r)) sc++;
+                            sc = sc * 10 + r; // плотнее и впереди — лучше
+                            if (sc > bs) { bs = sc; bc = c; br = r; }
+                        }
+                        if (bc >= 0 && skeletonCrowdSpawn("e", bc, br)) sfx("use");
+                    } else { // культ — ряд, где больше пустых (ничья — где больше игроков)
+                        const empt = [0, 0, 0, 0, 0], pu = [0, 0, 0, 0, 0];
+                        for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++)
+                            if (!unitAt(c, r)) empt[r]++;
+                        for (const v of B.units) if (v.side === "p") pu[v.row]++;
+                        let row = 0;
+                        for (let r = 1; r < GRID; r++)
+                            if (empt[r] > empt[row] || (empt[r] === empt[row] && pu[r] > pu[row])) row = r;
+                        cultRowSpawn("e", row);
+                    }
                 }
                 if (s.target === "enemyAny") {
                     const targets = spellTargets(B.units.filter((u) => u.side === "p"));
