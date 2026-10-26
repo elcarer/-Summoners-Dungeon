@@ -741,14 +741,15 @@
                   color: 0x504048, img: "decay/121" },
         // «Зомби-селянин» — тип призываемого существа Зомби
         dec122: { type: "unit", cost: 2, atk: 3, hp: 3, speed: 1,
-                  creature: "goblin", // плейсхолдер листа поля боя (гоблин)
+                  creature: "zombie", sheet: "zomb", // Зомби, лист зомби юзера
                   subtype: "zombie", // подтип — по спеке юзера (чат)
                   rarity: "common", elem: "decay",
                   color: 0x504048, img: "decay/122" },
         // «Нетопырь» — Животное с «Полётом» (flyOver, как «Мини-фея»)
         dec123: { type: "unit", cost: 3, atk: 5, hp: 1, speed: 1,
-                  creature: "goblin", ability: "flyOver",
+                  creature: "animal", sheet: "bat", // Животное, лист нетопыря юзера
                   subtype: "animal", // подтип — по спеке юзера (чат)
+                  ability: "flyOver",
                   rarity: "common", elem: "decay",
                   color: 0x504048, img: "decay/123" },
         // «Поднятие мёртвых»: выбрать карту существа из СВОЕГО сброса — в руку
@@ -808,9 +809,9 @@
                   color: 0x504048, img: "decay/131" },
         // «Вампир» (dec132): после атаки получает 1 жизнь
         dec132: { type: "unit", cost: 3, atk: 3, hp: 4, speed: 1,
-                  creature: "goblin", // плейсхолдер листа поля боя (гоблин)
+                  creature: "animal", sheet: "bat", // Животное, лист нетопыря юзера
                   vampHeal: 1,
-                  subtype: "mage", // «Колдун» — подтип по спеке юзера (cards.txt)
+                  subtype: "animal", // «Животное» — подтип по спеке юзера (cards.txt/чат)
                   rarity: "rare", elem: "decay",
                   color: 0x504048, img: "decay/132" },
         // «Иссушение почвы» (dec133): ловушка-отмена — срабатывает, когда
@@ -868,7 +869,7 @@
                   color: 0x504048, img: "decay/141" },
         // «Паршивище» (dec142): большой зомби 3/8 без способностей
         dec142: { type: "unit", cost: 5, atk: 3, hp: 8, speed: 1,
-                  creature: "goblin", // плейсхолдер листа поля боя (гоблин)
+                  creature: "zombie", sheet: "zomb", // Зомби, лист зомби юзера
                   subtype: "zombie", // подтип — по спеке юзера (чат)
                   rarity: "common", elem: "decay",
                   color: 0x504048, img: "decay/142" },
@@ -899,7 +900,7 @@
         // существа из сброса эффектом «Выкапливания» — иначе нетопырь
         // возвращался бы бесконечно (addUnit opts.rebirth)
         dec146: { type: "unit", cost: 4, atk: 6, hp: 2, speed: 1,
-                  creature: "goblin", // плейсхолдер листа поля боя (некр по стихии)
+                  creature: "animal", sheet: "bat", // Животное, лист нетопыря юзера
                   subtype: "animal", // подтип — по спеке юзера («Животное»)
                   exhuming: 1, summonDiscard: 1,
                   rarity: "rare", elem: "decay",
@@ -926,7 +927,7 @@
         // (любое, кроме него самого), каждая живая копия прибавляет себе
         // БАЗОВЫЕ ⚔/♥ умершего (fatBelly — хук в killUnit)
         dec149: { type: "unit", cost: 2, atk: 0, hp: 2, speed: 1,
-                  creature: "goblin", // плейсхолдер листа поля боя (некр по стихии)
+                  creature: "zombie", sheet: "zomb", // Зомби, лист зомби юзера
                   subtype: "zombie", // подтип — по спеке юзера (чат)
                   fatBelly: 1,
                   rarity: "rare", elem: "decay",

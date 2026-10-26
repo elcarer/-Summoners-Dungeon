@@ -141,6 +141,10 @@
             water_el: await assets.loadCharacter("./images/sprites/water_el_256"),
             air_el: await assets.loadCharacter("./images/sprites/air_el_256"),
             spirit: await assets.loadCharacter("./images/sprites/spirit_256"),
+            // листы Тлена юзера (просил юзер): зомби — zomb (dec122/142/149),
+            // нетопыри — bat (dec123/132/146: Нетопырь, Вампир, Восставший нетопырь)
+            zomb: await assets.loadCharacter("./images/sprites/zomb_256"),
+            bat: await assets.loadCharacter("./images/sprites/bat_256"),
         };
 
         // ── UI-корень: базовое разрешение 1920×1080, вписывается в окно ────
