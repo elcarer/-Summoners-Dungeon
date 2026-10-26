@@ -1026,20 +1026,23 @@
             function buildSellList() {
                 const c2 = new PIXI.Container();
                 const rows = [];
+                // показываем только ПРОДАВАЕМОЕ: копии сверх вложенных в
+                // колоду (просил юзер) — карты, целиком лежащие в колоде,
+                // в списке нет, счётчик ×N — без колодных копий
                 const ids = Object.keys(CARDS)
-                    .filter((id) => (G.collection[id] || 0) > 0)
+                    .filter((id) => (G.collection[id] || 0) - countInDeck(id) > 0)
                     .sort((a, b) => (CARDS[a].cost - CARDS[b].cost) || a.localeCompare(b));
                 ids.forEach((id, i) => {
                     const col = i % 5, rowI = (i / 5) | 0;
-                    const owned = G.collection[id] || 0;
-                    const canSell = owned - countInDeck(id) > 0 && !sellLocked();
+                    const free = (G.collection[id] || 0) - countInDeck(id);
+                    const canSell = !sellLocked();
                     const cx = 93 + col * 198, cy = 138 + rowI * 307.5;
                     const card = cardFace(ctx, id, { scale: 0.5, dim: !canSell });
                     card.position.set(cx, cy);
                     card.eventMode = "static";
                     if (canSell) card.on("pointertap", () => { shopSell(id); });
                     c2.addChild(card);
-                    const lbl = T(`×${owned} · ${t("shop.price", { n: SHOP_SELL[CARDS[id].rarity] })}`,
+                    const lbl = T(`×${free} · ${t("shop.price", { n: SHOP_SELL[CARDS[id].rarity] })}`,
                         19, canSell ? 0xd8c79d : 0x8a7c5e);
                     lbl.anchor.set(0.5, 0);
                     lbl.position.set(cx, cy + 138);
@@ -1256,6 +1259,18 @@
                 const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
                 const dt = ticker.deltaMS / 1000;
 
+                // Эскейп — дублирует кнопку «выход» открытого меню (просил
+                // юзер): квест-диалог закрывается своей кнопкой, окно объекта
+                // — «Уйти» (магазин/карта сокровищ) или «Взять» (сундук/
+                // золото — оно там единственное)
+                if (ctx.input.wasPressed("Escape")) {
+                    if ((ctx.questModal || 0) > 0) globalThis.GAME_QUESTS.tap();
+                    else if (winObj) {
+                        if (winRefs && winRefs.leaveBtn) winRefs.leaveBtn.emit("pointertap");
+                        else if (winRefs && winRefs.takeBtn) winRefs.takeBtn.emit("pointertap");
+                    }
+                }
+
                 // скорость анимаций из настроек (0..10; 5 = скорость листа,
                 // ниже 2 — ползунок в минимум) — живая, как в бою (просил юзер)
                 COMPONENTS.animationSpeed[heroId] = (ctx.heroSheet.animationSpeed || 0.2)
@@ -1458,6 +1473,7 @@
                     })),
                     sell: (sellRows || []).map((r) => ({
                         id: r.id, price: SHOP_SELL[CARDS[r.id].rarity], canSell: r.canSell,
+                        free: (G.collection[r.id] || 0) - countInDeck(r.id),
                     })),
                 };
                 if (winObj.type === "map") return { kind: "map" };

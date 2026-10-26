@@ -687,6 +687,9 @@
             },
             update(ticker) {
                 if (!root) return;
+                // Эскейп = «Назад» (просил юзер): дублирует кнопку выхода,
+                // замок минимума колоды работает как у кнопки (внутри doBack)
+                if (ctx.input.wasPressed("Escape")) doBack();
                 if (zoom) {
                     const z = zoom;
                     z.cur += (z.tgt - z.cur) * Math.min(1, (ticker.deltaMS / 1000) * 14);

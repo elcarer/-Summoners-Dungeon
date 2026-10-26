@@ -364,6 +364,11 @@
                 COMPONENTS.animationSpeed[heroId] = (ctx.heroSheet.animationSpeed || 0.2)
                     * Math.max(0.25, ((G.settings && G.settings.animSpeed) ?? 5) / 5);
 
+                // Эскейп закрывает квест-диалог его кнопкой (просил юзер —
+                // дублирование кнопок «выход» меню на клавишу)
+                if (ctx.input.wasPressed("Escape") && (ctx.questModal || 0) > 0)
+                    globalThis.GAME_QUESTS.tap();
+
                 // квест-диалог открыт (модальный) — герой стоит и не входит
                 // в пещеры, пока окно не закрыто
                 if (ctx.questModal) {

@@ -87,6 +87,83 @@
                 floatText(p.x, p.y - 60, "⤓ " + GAME_LOC.t(`card.${mark}.name`), 0x8a7c5e);
             };
 
+            // «Склеп» (dec157, просил юзер): клик по постройке разыгрывает
+            // ВЕРХНЮЮ карту сброса СРАЗУ — не «в руку и ждём», а автоматом:
+            // карта на миг уходит в руку и играется штатными путями
+            // (onCellTap/castSpell — оплата, контрловушки, скидка Архилича
+            // как при ручном розыгрыше). Заклинание с целью — автоцель
+            // (autoTargetFor), существо/мина — передний ряд, постройка —
+            // тыл, руна/споры — сильнейший чужой. Не выходит (нет энергии/
+            // клетки/цели) — карта остаётся в сбросе. Одна карта за раз
+            A.cryptAutoPlay = function cryptAutoPlay(cardId, fromCol, fromRow) {
+                const def = CARDS[cardId];
+                const p = cellXY(fromCol, fromRow);
+                const deny = () => {
+                    floatText(p.x, p.y - 96,
+                        "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8a7c5e);
+                    return false;
+                };
+                if (!def || effCost(cardId, "p") > B.energy) return deny();
+                const rows = deployRows("p");
+                const free = freeCells(rows);
+                const spotIn = (wantRow) => { // ряд занят целиком — любой свободный
+                    let pool = free.filter(([, r]) => r === wantRow);
+                    if (!pool.length) pool = free;
+                    pool.sort((a, b) => Math.abs(a[0] - 2) - Math.abs(b[0] - 2));
+                    return pool[0] || null;
+                };
+                let tap = null; // { col, row } для onCellTap
+                if (def.type === "unit" || def.type === "building") {
+                    if (!free.length || (def.type === "unit" && bubbleBlocked("p", cardId)))
+                        return deny();
+                    tap = spotIn(def.type === "unit" ? rows[0] : rows[rows.length - 1]);
+                } else if (def.type === "trap") {
+                    if (def.trap.effect === "castRandom" || def.trap.effect === "sporeCurse") {
+                        // руна/споры — сильнейшее существо врага
+                        const foes = B.units.filter((v) => v.side === "e"
+                            && v.def.type === "unit")
+                            .sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row));
+                        if (!foes.length) return deny();
+                        tap = { col: foes[0].col, row: foes[0].row };
+                    } else { // мина — передний ряд: враг ступит раньше
+                        if (!free.length) return deny();
+                        tap = spotIn(rows[0]);
+                    }
+                }
+                const di = B.discard.lastIndexOf(cardId);
+                if (di < 0) return deny();
+                B.discard.splice(di, 1);
+                B.hand.push(cardId);
+                B.cryptTaken = cardId;
+                floatText(p.x, p.y - 96,
+                    "⤒ " + GAME_LOC.t(`card.${cardId}.name`), 0xb7d0ef);
+                sfx("chpoc");
+                const idx = B.hand.length - 1;
+                const back = () => { // не сыгралась — вернуть в сброс, метку снять
+                    const hi = B.hand.indexOf(cardId);
+                    if (hi >= 0) B.hand.splice(hi, 1);
+                    B.discard.push(cardId);
+                    B.cryptTaken = null;
+                };
+                if (def.type === "spell") {
+                    if (def.spell.target === "none" || def.spell.copyLast) {
+                        if (!castSpell(idx)) back();
+                    } else {
+                        const t = autoTargetFor(cardId);
+                        if (t === null || !castSpell(idx, t)) back();
+                    }
+                } else {
+                    B.selected = idx;
+                    onCellTap(tap[0], tap[1]); // tap — пара [col, row]
+                }
+                B.selected = null;
+                B.spellTarget = false;
+                layoutHand();
+                redrawHighlight();
+                refreshHud();
+                return true;
+            };
+
             // снять выбор карты: карты руки снова интерактивны
             A.deselect = function deselect() {
                 if (B.selected === null && !B.spellTarget) return;
@@ -158,24 +235,14 @@
                     return;
                 }
                 if (B.selected === null) {
-                    // «Склеп» (dec157): клик по своей постройке снимает ВЕРХНЮЮ
-                    // карту своего сброса в руку — игрок разыгрывает её как
-                    // обычную, после розыгрыша она замешивается в колоду
-                    // (cryptSettle в spendCard); не разыграл — вернётся в
-                    // сброс в конце хода (cryptRefund). Одна карта за раз
+                    // «Склеп» (dec157): клик по своей постройке СРАЗУ
+                    // разыгрывает верхнюю карту сброса (с оплатой) —
+                    // просил юзер: не ждать, пока игрок сыграет её сам.
+                    // Одна карта за раз (cryptTaken гасит повторный клик)
                     const cb = unitAt(col, row);
                     if (cb && cb.side === "p" && cb.def.type === "building"
-                        && cb.def.cryptPlay && B.discard.length
-                        && !B.cryptTaken && B.hand.length < HAND_MAX) {
-                        const cardId = B.discard.pop();
-                        B.hand.push(cardId);
-                        B.cryptTaken = cardId;
-                        layoutHand();
-                        redrawHighlight();
-                        refreshHud();
-                        floatText(cellXY(col, row).x, cellXY(col, row).y - 96,
-                            "⤒ " + GAME_LOC.t(`card.${cardId}.name`), 0xb7d0ef);
-                        sfx("chpoc");
+                        && cb.def.cryptPlay && B.discard.length && !B.cryptTaken) {
+                        cryptAutoPlay(B.discard[B.discard.length - 1], col, row);
                     }
                     return;
                 }
@@ -898,7 +965,7 @@
                     heroStrReplay("p", cardId, def); // «Мастера огня»
                     B.lastSpell.p = "str25"; // повтор самой себя — бесконечная цепочка
                     replaySpell(last);
-                    afterSpellPlayed();
+                    afterSpellPlayed("p");
                     layoutHand();
                     redrawHighlight();
                     refreshHud();
@@ -924,7 +991,7 @@
                 heroFirstSpellEnergy("p"); // «Дуновение опасности»: +1⚡ за 1-е заклинание
                 heroStrReplay("p", cardId, def); // «Мастера огня»
                 B.lastSpell.p = cardId;
-                afterSpellPlayed(); // «Заклинатель клинков» и его соседи
+                afterSpellPlayed("p"); // «Заклинатель клинков» и его соседи
                 layoutHand();
                 redrawHighlight();
                 refreshHud();
