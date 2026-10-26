@@ -169,7 +169,23 @@
                 }
                 heroDeathReplay(u); // «Гоблин-вождь»: первый погибший гоблин возвращается
                 heroBuildingReplay(u); // «Хранитель рощи»: первая погибшая постройка возвращается
+                lichRaiseGhost(killer, u); // «Лич»: призрак на клетку убитого
                 exhumingReplay(u); // «Выкапливание»: существо возвращается после смерти
+            };
+
+            // «Лич» (dec131, просил юзер): убив существо (любой стороны),
+            // призывает Призрака 2/1 (токен ghost) на клетку убитого.
+            // Клетку успели занять (возврат героя) — призрак не является;
+            // «Выкапливание» убитого срабатывает ниже и уходит на соседнюю.
+            A.lichRaiseGhost = function lichRaiseGhost(killer, u) {
+                if (!killer || killer === u || !killer.def || !killer.def.lichRaise
+                    || !B.units.includes(killer)) return;
+                if (!u || u.def.type !== "unit") return;
+                if (unitAt(u.col, u.row)) return; // клетка занята — некуда
+                addUnit(killer.side, "ghost", u.col, u.row, { token: true });
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 108,
+                    GAME_LOC.t("card.ghost.name"), 0xb7d0ef);
             };
 
             // ── «Выкапливание N» (Мортис, просил юзер): существо ОДИН раз

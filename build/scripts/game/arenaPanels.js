@@ -843,6 +843,60 @@
                 closeTorturePanel();
                 randomDiscard(side, tortureCount);
             };
+
+            // «Запретные знания» (dec130, просил юзер): панель «кто берёт
+            // 3 карты и теряет 2 жизни» — зеркало «Пытки разума»
+            A.forbiddenPanel = null;
+            A.forbiddenCfg = null;
+            A.closeForbiddenPanel = function closeForbiddenPanel() {
+                if (!forbiddenPanel) return;
+                forbiddenPanel.destroy({ children: true });
+                forbiddenPanel = null;
+                if (B) B.picking = false;
+            };
+            A.openForbiddenPanel = function openForbiddenPanel(cfg) {
+                closeForbiddenPanel();
+                forbiddenCfg = cfg;
+                B.picking = true;
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("forbidden.title"), 39, 0xf0c96a,
+                    { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("forbidden.hint",
+                    { n: forbiddenCfg.draw, hp: forbiddenCfg.dmg }), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const whoBtn = (key, side, x) => globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t(key), x, y: 560, scale: 1,
+                    onTap: () => pickForbidden(side),
+                });
+                node.addChild(whoBtn("torture.you", "p", 660));
+                node.addChild(whoBtn("torture.foe", "e", 1260));
+                root.addChild(node);
+                forbiddenPanel = node;
+            };
+            A.pickForbidden = function pickForbidden(side) {
+                if (!B || !B.picking || !forbiddenPanel) return;
+                closeForbiddenPanel();
+                if (side === "p") drawCards(forbiddenCfg.draw);
+                else drawEnemy(forbiddenCfg.draw);
+                damageBase(side, forbiddenCfg.dmg,
+                    { x: 960, y: side === "p" ? 840 : 240, fill: 0xff8f6e });
+                refreshHud();
+                checkEnd();
+            };
         }
     };
 })();

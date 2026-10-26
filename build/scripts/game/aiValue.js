@@ -252,6 +252,7 @@
                     // висят, тем больше шансов поймать розыгрыш (контроль)
                     return def.trap.effect === "counterSpell"
                         || def.trap.effect === "counterSummon"
+                        || def.trap.effect === "counterBuilding"
                         || def.trap.effect === "reflectSpell" ? 1.2 : 5;
                 }
                 // вождь / заклинатель клинков / пастух / друид / сестра — двигатели
@@ -619,6 +620,8 @@
                     // «Скелет-лучник» (dec135): «Выстрел 2» дороже обычного
                     if (d.ability === "archer") s += ((d.shotDmg || 1) - 1) * 0.55;
                     if (d.ability === "dash1") s += 0.2;
+                    if (d.lichRaise) s += 1.0; // dec131: Призрак 2/1 за каждое убийство
+                    if (d.vampHeal) s += 0.5; // dec132: отхил после каждой атаки
                     return s;
                 }
                 if (d.type === "building") {
@@ -633,7 +636,8 @@
                         + (d.curseObelisk ? 1.7 : 0) // dec136: растёт и отражает
                         + (d.relicVault ? 1.3 : 0) // dec138: копит сбросы
                         + (d.evilBrew ? 1.6 : 0) // dec139: давит базу всяким сбросом
-                        + (d.boneField ? 1.6 : 0); // dec141: скелет каждый ход
+                        + (d.boneField ? 1.6 : 0) // dec141: скелет каждый ход
+                        + (d.bonePile ? 1.4 : 0); // dec143: «Выкапливание» каждому призыву рядом
                 }
                 if (d.type === "spell") {
                     const s = d.spell || {};
@@ -674,6 +678,8 @@
                     if (s.hydroPunch) v += 1.2; // урон 1 + полезный сдвиг назад
                     if (s.iceSwarm) v += Math.min(5, s.iceSwarm) * 0.55; // 5 тел 1/1
                     if (s.skeletonCrowd) v += 3 * 0.65; // dec140: три Скелета 1/2
+                    if (s.forbidden) v += 2.0
+                        + Math.min(3, B ? B.eDeck.length : 0) * 0.1; // dec130: 3 карты
                     if (s.discardHandDraw) v += 1.0
                         + 0.35 * Math.min(6, B.hand.length)
                         - 0.3 * Math.min(6, B.eHand.length);

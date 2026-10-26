@@ -104,6 +104,7 @@
                         afterAttackPush(attacker, victim);
                     }
                     triggerAttackTraps(attacker); // руна: существо атаковало
+                    vampireHeal(attacker); // «Вампир»: после атаки
                 } finally {
                     A.spellCasting = wasCasting;
                 }

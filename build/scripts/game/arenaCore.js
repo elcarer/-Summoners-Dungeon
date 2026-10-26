@@ -25,10 +25,10 @@
     const PURGE_DEF_KEYS = ["ability", "animalCost", "aura", "altarSword",
         "campAura", "campfire", "cloudSpire", "crush", "energyToStats",
         "frostAttack", "frostNeighbors", "groveAura", "illusion", "keeperScale",
-        "lakeMaid", "leaderAura", "monolith", "mycelium", "plantEcho",
+        "lakeMaid", "leaderAura", "lichRaise", "monolith", "mycelium", "plantEcho",
         "riteStump", "sandDecay", "spellBuffAura", "sprout", "sisterDraw",
         "starTower", "stormer", "berserkSummon", "portalLeap", "targetDiscount",
-        "thicket", "trapGrow", "trapOnMove", "waterMage", "wolfSummon"];
+        "thicket", "trapGrow", "trapOnMove", "vampHeal", "waterMage", "wolfSummon"];
 
     NS.createContext = function createContext(ctx) {
         const { scenes, G, uiTex, scheduler } = ctx;

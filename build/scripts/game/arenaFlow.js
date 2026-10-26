@@ -86,7 +86,8 @@
                     : hd.ability === "startDrawTrap" ? "trap"
                     : hd.ability === "startDrawAnimal" ? "animal"
                     : hd.ability === "startDrawPlant" ? "plant"
-                    : hd.ability === "startDrawSkeleton" ? "skeleton" : null;
+                    : hd.ability === "startDrawSkeleton" ? "skeleton"
+                    : hd.ability === "startDrawDecaySpell" ? "decaySpell" : null;
                 if (!want) return;
                 const deck = side === "p" ? B.deck : B.eDeck;
                 const hand = side === "p" ? B.hand : B.eHand;
@@ -97,6 +98,8 @@
                             ? x.def.type === "unit" && x.def.creature === "animal"
                         : want === "skeleton"
                             ? x.def.type === "unit" && x.def.subtype === "skeleton"
+                        : want === "decaySpell"
+                            ? x.def.type === "spell" && x.def.elem === "decay"
                             : !!x.def.plant); // растение — существо или постройка
                 if (!pool.length) return;
                 const pick = pool[(Math.random() * pool.length) | 0];
@@ -273,6 +276,7 @@
                             frostNeighbors(u); // «Старший ледовик»: лёд соседям-существам
                             afterAttackPush(u, occ); // «Проросший кабан»
                             triggerAttackTraps(u); // руна: существо атаковало
+                            vampireHeal(u); // «Вампир»: после атаки
                             refreshHud();
                             if (checkEnd()) return;
                         }
@@ -334,6 +338,7 @@
                                 frostNeighbors(u); // «Старший ледовик»: лёд соседям-существам
                                 afterAttackPush(u, occ); // «Проросший кабан»
                                 triggerAttackTraps(u); // руна: существо атаковало
+                                vampireHeal(u); // «Вампир»: после атаки
                                 refreshHud();
                                 if (checkEnd()) return;
                             }
@@ -382,6 +387,7 @@
                             frostNeighbors(u); // «Старший ледовик»: лёд соседям-существам
                             afterAttackPush(u, occ); // «Проросший кабан»
                             triggerAttackTraps(u);
+                            vampireHeal(u); // «Вампир»: после атаки
                         }
                         refreshHud();
                         if (checkEnd()) return;
@@ -531,7 +537,25 @@
                     if (victory) {
                         if (G.activeEnemy) {
                             G.activeEnemy.alive = false;
-                            if (G.activeEnemy.boss) G.dungeon.bossDead = true;
+                            if (G.activeEnemy.boss) {
+                                G.dungeon.bossDead = true;
+                                // «Карта сокровищ» (просил юзер): только на
+                                // последнем этаже данжа с боссом и только
+                                // после победы над боссом — объект появляется
+                                // на его клетке отдельным кодом (не из пула
+                                // генерации этажа); 64 — клетка данжа
+                                const cv = G.dungeon && G.dungeon.cave
+                                    ? globalThis.GAME_DATA.CAVES[G.dungeon.cave] : null;
+                                if (cv && cv.boss && G.dungeon.floor === cv.maxFloor
+                                    && !G.dungeon.objects.some((o) => o.type === "map")) {
+                                    G.dungeon.objects.push({
+                                        type: "map",
+                                        col: Math.round(G.activeEnemy.x / 64 - 0.5),
+                                        row: Math.round(G.activeEnemy.y / 64 - 0.5),
+                                        taken: false,
+                                    });
+                                }
+                            }
                         }
                         if (G.saveRun) G.saveRun(); // враг побеждён — забег продолжается
                         scenes.go("reward");

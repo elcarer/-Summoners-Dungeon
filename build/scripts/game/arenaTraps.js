@@ -288,6 +288,7 @@
                         frostAttack(a, u); // «Снежный элементаль»: −1⚔ цели
                         frostNeighbors(a); // «Старший ледовик»: лёд соседям
                         afterAttackPush(a, u); // «Проросший кабан»
+                        vampireHeal(a); // «Вампир»: после атаки
                         triggerAttackTraps(a); // руна: существо атаковало
                     }
                     refreshHud();

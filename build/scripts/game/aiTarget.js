@@ -483,6 +483,10 @@
                 // «Пытка разума» — сбрасывать нечего, если рука игрока пуста
                 // (свою ИИ не режет)
                 if (s.mindTorture && !B.hand.length) return false;
+                // «Запретные знания» (dec130) — ИИ берёт карты СЕБЕ, теряя
+                // 2♥ базы: играем только со здоровой базой (5+♥) и не
+                // пустой колодой (иначе тратим энергию вхолостую)
+                if (s.forbidden && (B.enemyBase <= 4 || !B.eDeck.length)) return false;
                 // «Негативный поток» — нужна цель: существо или добивание базы
                 if (s.target === "anyUnitOrFoe"
                     && !spellTargets(B.units.filter((v) => v.def.type === "unit")).length

@@ -187,9 +187,12 @@
                             const [col, row] = spot;
                             const cardId = B.eHand[pick.i];
                             // «Отмена призыва» (wis84) игрока: существо не
-                            // появляется, карта и энергия врага потрачены
-                            if (def.type === "unit"
-                                && counterTrapConsume("p", "counterSummon")) {
+                            // появляется, карта и энергия врага потрачены;
+                            // «Иссушение почвы» (dec133) — то же для ПОСТРОЕК
+                            if ((def.type === "unit"
+                                    && counterTrapConsume("p", "counterSummon"))
+                                || (def.type === "building"
+                                    && counterTrapConsume("p", "counterBuilding"))) {
                                 B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eEnergy -= effCost(cardId, "e");
                                 B.eDiscard.push(cardId);

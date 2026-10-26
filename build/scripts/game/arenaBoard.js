@@ -432,6 +432,20 @@
                         const p = cellXY(u.col, u.row);
                         floatText(p.x, p.y - 75, `+${grove}♥`, 0x9fd489);
                     }
+                    // «Разложенные кости» (dec143): существо, призванное рядом
+                    // (верт/гориз) с этой постройкой, получает «Выкапливание 1»
+                    // за каждую постройку — счётчик общий с меткой/Мортисом
+                    let bones = 0;
+                    for (const o of B.units) if (o !== u && o.side === side
+                        && o.def.type === "building" && o.def.bonePile
+                        && Math.abs(o.col - col) + Math.abs(o.row - row) === 1) bones += 1;
+                    if (bones) {
+                        addExhuming(u, (u.exhuming || 0) + bones);
+                        const bp = cellXY(col, row);
+                        floatText(bp.x, bp.y - 96,
+                            "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0xc9b98c);
+                        sfx("up");
+                    }
                     // «Меч в алтаре» (wis104): существо, призванное рядом с
                     // этой постройкой, получает +1⚔ за каждую ЕЁ жизнь,
                     // после чего меч-постройка погибает (штатный killUnit:
@@ -659,6 +673,7 @@
                         frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
                         frostNeighbors(u); // «Старший ледовик»: лёд соседям-существам
                         afterAttackPush(u, occ); // «Проросший кабан»
+                        vampireHeal(u); // «Вампир»: после атаки
                         refreshHud();
                         checkEnd();
                     }

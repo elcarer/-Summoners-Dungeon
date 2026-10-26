@@ -324,6 +324,18 @@
                 floatText(p.x, p.y - 84,
                     "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0xc9b98c);
                 sfx("use");
+                // «Смерть из-под земли» (firstDigReward, просил юзер):
+                // первое за бой срабатывание «Выкапливания» стороны —
+                // 1 карта и 1 энергия
+                const hd = heroDefOf(side);
+                if (hd && hd.ability === "firstDigReward"
+                    && !B.heroFlags.digReward[side]) {
+                    B.heroFlags.digReward[side] = true;
+                    if (side === "p") { drawCards(1); B.energy += 1; }
+                    else { drawEnemy(1); B.eEnergy += 1; }
+                    floatText(p.x, p.y - 118, "+1⚡ +1", 0xffd98c);
+                    sfx("up");
+                }
                 const u2 = addUnit(side, id, cell[0], cell[1]);
                 if (u2 && left > 0 && B.units.includes(u2)) addExhuming(u2, left);
             };

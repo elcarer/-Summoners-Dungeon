@@ -283,6 +283,11 @@
                 if (s.mindTorture) { // «Пытка разума»: ИИ всегда выбирает игрока
                     randomDiscard("p", s.mindTorture);
                 }
+                if (s.forbidden) { // «Запретные знания» (dec130): ИИ берёт себе
+                    drawEnemy(s.forbidden.draw);
+                    damageBase("e", s.forbidden.dmg, { x: 960, y: 240, fill: 0xff8f6e });
+                    refreshHud();
+                }
                 if (s.target === "anyUnitOrFoe") { // «Негативный поток»: существо или база
                     // свои цели смысла не имеют — бьём по существам игрока
                     const targets = spellTargets(B.units.filter((u) =>

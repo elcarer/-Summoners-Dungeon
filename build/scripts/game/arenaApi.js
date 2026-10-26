@@ -210,6 +210,8 @@
                 raisePick(idx) { pickRaise(idx); },
                 // «Пытка разума» (dec125, тесты): панель и выбор стороны
                 torturePick(side) { pickTorture(side); },
+                // «Запретные знания» (dec130, тесты): панель и выбор стороны
+                forbiddenPick(side) { pickForbidden(side); },
                 // тест-хуки поправок: свечение выбранной карты (п2) и сетка
                 // оверлея-просмотра (п3)
                 selGlow() {

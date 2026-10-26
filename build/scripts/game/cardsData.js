@@ -791,6 +791,36 @@
                   kind: "damage", // тип эффекта — по спеке юзера (чат)
                   rarity: "common", elem: "decay",
                   color: 0x63424e, img: "decay/129" },
+        // «Запретные знания» (dec130): выбранный игрок берёт 3 карты
+        // и теряет 2 жизни (панель выбора — как «Пытка разума»)
+        dec130: { type: "spell", cost: 1,
+                  spell: { target: "none", forbidden: { draw: 3, dmg: 2 } },
+                  kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "decay",
+                  color: 0x63424e, img: "decay/130" },
+        // «Лич» (dec131): убив существо, призывает Призрака 2/1 (токен
+        // ghost) на клетку убитого
+        dec131: { type: "unit", cost: 3, atk: 3, hp: 2, speed: 1,
+                  creature: "goblin", // плейсхолдер листа поля боя (гоблин)
+                  lichRaise: true,
+                  subtype: "skeleton", // подтип — по спеке юзера (cards.txt)
+                  rarity: "rare", elem: "decay",
+                  color: 0x504048, img: "decay/131" },
+        // «Вампир» (dec132): после атаки получает 1 жизнь
+        dec132: { type: "unit", cost: 3, atk: 3, hp: 4, speed: 1,
+                  creature: "goblin", // плейсхолдер листа поля боя (гоблин)
+                  vampHeal: 1,
+                  subtype: "mage", // «Колдун» — подтип по спеке юзера (cards.txt)
+                  rarity: "rare", elem: "decay",
+                  color: 0x504048, img: "decay/132" },
+        // «Иссушение почвы» (dec133): ловушка-отмена — срабатывает, когда
+        // противник разыгрывает постройку: она не появляется, карта и
+        // энергия потрачены (зеркало «Отмены призыва» для построек)
+        dec133: { type: "trap", cost: 2,
+                  trap: { event: "onEnemyBuilding", effect: "counterBuilding" },
+                  kind: "control", // тип эффекта — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "decay",
+                  color: 0x443840, img: "decay/133" },
         // «Скелет-лучник» (dec135): «Выстрел 2» — тот же механический выстрел,
         // что у Гоблинского лучника (ability archer), но урон 2 (shotDmg)
         dec135: { type: "unit", cost: 2, atk: 0, hp: 1, speed: 1,
@@ -836,6 +866,18 @@
         dec141: { type: "building", cost: 2, atk: 0, hp: 3, boneField: true,
                   rarity: "common", elem: "decay",
                   color: 0x504048, img: "decay/141" },
+        // «Паршивище» (dec142): большой зомби 3/8 без способностей
+        dec142: { type: "unit", cost: 5, atk: 3, hp: 8, speed: 1,
+                  creature: "goblin", // плейсхолдер листа поля боя (гоблин)
+                  subtype: "zombie", // подтип — по спеке юзера (чат)
+                  rarity: "common", elem: "decay",
+                  color: 0x504048, img: "decay/142" },
+        // «Разложенные кости» (dec143): существо, призванное рядом
+        // (верт/гориз) с этой постройкой, получает «Выкапливание 1»
+        // (зеркало военного лагеря/лесного монолита)
+        dec143: { type: "building", cost: 5, atk: 0, hp: 4, bonePile: true,
+                  rarity: "rare", elem: "decay",
+                  color: 0x504048, img: "decay/143" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -869,6 +911,13 @@
                 subtype: "skeleton", // подтип — по спеке юзера (чат)
                 rarity: "common", elem: "decay",
                 color: 0x504048 },
+        // Призрак из «Лича» (dec131) — служебная карта без лица, как skel:
+        // в пулах/энкаунтерах её нет, спавнится только убийством Лича
+        ghost: { type: "unit", cost: 1, atk: 2, hp: 1, speed: 1,
+                 creature: "goblin", // плейсхолдер листа поля боя (гоблин)
+                 subtype: "ghost", // подтип — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "decay",
+                 color: 0x504048 },
     };
     const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
 
@@ -1032,6 +1081,17 @@
         decBones: { id: "decBones", rarity: "common", baseHp: 10,
                     elems: ["decay"], starter: "decay",
                     img: "25", ability: "startDrawSkeleton" },
+        // 2-й этаж (арт heroes/26.png): Тлен, 11♥, начиная бой берёт
+        // дополнительное случайное заклинание стихии Тлен из колоды
+        decBlack: { id: "decBlack", rarity: "common", baseHp: 11,
+                    elems: ["decay"], starter: "decay",
+                    img: "26", ability: "startDrawDecaySpell" },
+        // 3-й этаж (арт heroes/27.png): Тлен, 12♥, при первом за бой
+        // срабатывании своей способности «Выкапливание» берёт 1 карту
+        // и получает 1 энергию
+        decUnder: { id: "decUnder", rarity: "common", baseHp: 12,
+                    elems: ["decay"], starter: "decay",
+                    img: "27", ability: "firstDigReward" },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1042,7 +1102,7 @@
         "grwControl", "grwBoss",
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
-        "decBones"];
+        "decBones", "decBlack", "decUnder"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

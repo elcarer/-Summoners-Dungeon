@@ -224,10 +224,12 @@
                 B.energy -= effCost(B.hand[B.selected]);
                 const cardId = spendCard(B.selected);
                 // «Отмена призыва» (wis84) врага: существо не появляется,
-                // карта и энергия потрачены (строения отмену не триггерят —
-                // спека говорит о существах)
-                if (CARDS[cardId].type === "unit"
-                    && counterTrapConsume("e", "counterSummon")) {
+                // карта и энергия потрачены. «Иссушение почвы» (dec133) —
+                // то же для ПОСТРОЕК: срабатывает на розыгрыш строения
+                if ((CARDS[cardId].type === "unit"
+                        && counterTrapConsume("e", "counterSummon"))
+                    || (CARDS[cardId].type === "building"
+                        && counterTrapConsume("e", "counterBuilding"))) {
                     const sp = cellXY(col, row);
                     floatText(sp.x, sp.y - 60,
                         "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
@@ -611,6 +613,9 @@
                 if (def.spell.raiseDead) openRaisePanel();
                 // «Пытка разума»: панель «кто сбрасывает случайные карты»
                 if (def.spell.mindTorture) openTorturePanel(def.spell.mindTorture);
+                // «Запретные знания» (dec130): панель «кто берёт 3 карты
+                // и теряет 2 жизни»
+                if (def.spell.forbidden) openForbiddenPanel(def.spell.forbidden);
                 return true;
             };
 
