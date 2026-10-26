@@ -162,6 +162,17 @@
                         hi.stroke({ width: 2, color: 0xef9f8c });
                         return;
                     }
+                    if (tg === "enemyUnit") { // «Тёмный контроль» — только существа врага
+                        root.board.userData.baseZone.eventMode = "none";
+                        for (const u of B.units) if (u.side === "e"
+                            && u.def.type === "unit" && spellAimable(u)) {
+                            const rc = cellRect(u.col, u.row);
+                            hi.rect(rc.x, rc.y, rc.w, rc.h);
+                            hi.fill({ color: 0xd05a3c, alpha: 0.4 });
+                            hi.stroke({ width: 2, color: 0xef9f8c });
+                        }
+                        return;
+                    }
                     for (const u of B.units) if (u.side === "e" && spellAimable(u)) {
                         const rc = cellRect(u.col, u.row);
                         hi.rect(rc.x, rc.y, rc.w, rc.h);

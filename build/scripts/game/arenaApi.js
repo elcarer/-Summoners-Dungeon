@@ -391,6 +391,10 @@
                 _effCost(cardId, side = "p", target = null) {
                     return effCost(cardId, side, target);
                 },
+                // трата флага «Архилича» (проба скидки первой эпик-карты)
+                _consumeEpic(cardId, side = "p") {
+                    consumeEpicDiscount(cardId, side);
+                },
                 // план добора ИИ по шкале (тесты мягкого правила): сколько карт
                 // возьмёт и какой доход всего
                 aiDrawPlan: () => (B

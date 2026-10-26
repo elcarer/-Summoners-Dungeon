@@ -195,6 +195,7 @@
                                     && counterTrapConsume("p", "counterBuilding"))) {
                                 B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eEnergy -= effCost(cardId, "e");
+                                consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 B.eDiscard.push(cardId);
                                 noteDiscard(1, "e", [cardId]);
                                 floatText(960, 500,
@@ -205,6 +206,7 @@
                             }
                             B.eHand.splice(pick.i, 1);
                             B.eEnergy -= effCost(cardId, "e");
+                            consumeEpicDiscount(cardId, "e"); // «Архилич»
                             // playCtx для «Сброса разума» (decMind): dec146 при
                             // появлении сбрасывает карту; свой выход карты в
                             // сброс ниже вернёт её в руку, если помечена
@@ -233,6 +235,7 @@
                                 const cardId = B.eHand[pick.i];
                                 B.eHand.splice(pick.i, 1);
                                 B.eEnergy -= effCost(cardId, "e");
+                                consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 if (def.trap.effect === "sporeCurse") addSpores(pu);
                                 else armTrap("e", cardId, 0, 0, pu);
                                 hideEnemyCard();
@@ -253,6 +256,7 @@
                             const cardId = B.eHand[pick.i];
                             B.eHand.splice(pick.i, 1);
                             B.eEnergy -= effCost(cardId, "e");
+                            consumeEpicDiscount(cardId, "e"); // «Архилич»
                             armTrap("e", cardId, col, row);
                             hideEnemyCard();
                             played = true;
@@ -272,6 +276,7 @@
                                 B.eDiscard.push(cardId);
                                 noteDiscard(1, "e", [cardId]);
                                 B.eEnergy -= effCost(cardId, "e");
+                                consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 floatText(960, 500,
                                     "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                                 hideEnemyCard();
@@ -299,6 +304,7 @@
                             castTargetOff = 0;
                             B.eEnergy = (def.spell.drainAll || def.spell.stormAll)
                                 ? 0 : B.eEnergy - Math.max(0, effCost(cardId, "e") - tOff);
+                            consumeEpicDiscount(cardId, "e"); // «Архилич»: флаг первой эпик-карты
                             heroFirstSpellEnergy("e"); // «Дуновение опасности»
                             // рука ИИ тоже не больше 7 — излишек панельных доборов
                             // сбрасывается случайно (как панель сброса у игрока)

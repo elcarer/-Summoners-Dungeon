@@ -230,13 +230,14 @@
                         && v.def.type === "unit" && v.curAtk >= B.playerBase)) return 0;
                     if (s.wolfVolley && aiWolfLethal()) return 0; // волки добивают базу
                     // «Цветение кристаллов» — ускоритель: энергия за размер руки,
-                    // разыгрывается первым, чтобы хватило и на остальные карты
-                    if (s.energyPerHand || s.energyPerTrap) return 1;
+                    // разыгрывается первым, чтобы хватило и на остальные карты;
+                    // «Извлечение тьмы» (dec153) — тоже энергодвижок
+                    if (s.energyPerHand || s.energyPerTrap || s.darkExtract) return 1;
                     if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
                         || s.sacrifice || s.copyLast || s.stormAll
                         || s.purge || s.stealEnergy || s.fireflies
                         || s.growthHand || s.nova || s.debuffEnemyAtkAll
-                        || s.mindTorture || s.iceStrike) return 2;
+                        || s.mindTorture || s.iceStrike || s.mindControl) return 2;
                     if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk
                         || s.enchantFire || s.cocoon || s.venom) return 4;
                     if (s.baseHit || s.wolfVolley) return 4.5; // бьёт СВОИМ существом
@@ -694,6 +695,8 @@
                     if (s.beastBlast) v += 1.4 + Math.min(4,
                         B.units.filter((u) => u.side === "e"
                             && u.def.type === "unit").length) * 0.2;
+                    if (s.darkExtract) v += 1.5; // dec153: энергия = ⚔+♥ жертвы
+                    if (s.mindControl) v += 2.4; // dec134: чужое существо — сильный ход
                     if (s.forbidden) v += 2.0
                         + Math.min(3, B ? B.eDeck.length : 0) * 0.1; // dec130: 3 карты
                     if (s.discardHandDraw) v += 1.0
@@ -708,6 +711,7 @@
                     if (d.trap.effect === "alliesStrike" && B)
                         v += Math.min(4, B.units.filter((u) =>
                             u.side === "e" && u.def.type === "unit").length) * 0.4;
+                    if (d.trap.effect === "ghostGrave") v += 1.2; // dec152: смерть + призрак
                     return v;
                 }
                 return 1;

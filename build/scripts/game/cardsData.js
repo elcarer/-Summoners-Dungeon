@@ -947,6 +947,32 @@
         dec151: { type: "building", cost: 4, atk: 0, hp: 5, birthSwamp: true,
                   rarity: "epic", elem: "decay",
                   color: 0x504048, img: "decay/151" },
+        // «Тёмный контроль» (dec134, просил юзер): заклинание забирает
+        // существо противника на свою сторону («как будто вы его призвали»),
+        // но платит 2 жизни базы (mindControl — число = цена; ветки в
+        // arenaActions/aiSpells/autoTargetFor, target «enemyUnit»)
+        dec134: { type: "spell", cost: 4,
+                  spell: { target: "enemyUnit", mindControl: 2 },
+                  kind: "control", // тип эффекта — по спеке юзера (cards.txt)
+                  rarity: "epic", elem: "decay",
+                  color: 0x63424e, img: "decay/134" },
+        // «Гримуар духов» (dec152, просил юзер): ловушка на клетке —
+        // переместившееся/призванное туда существо противника уничтожается,
+        // на его клетке является Призрак 2/1 стороны-хозяйки (ghostGrave —
+        // applyCellTrap; фильтр существ-only в triggerCellTraps)
+        dec152: { type: "trap", cost: 4,
+                  trap: { event: "onEnemyCell", effect: "ghostGrave" },
+                  kind: ["destroy", "summon"], // типы эффекта — по спеке юзера (cards.txt)
+                  rarity: "rare", elem: "decay",
+                  color: 0x443840, img: "decay/152" },
+        // «Извлечение тьмы» (dec153, просил юзер): своё существо гибнет —
+        // энергия = сумма его ⚔+♥ (darkExtract; ветки в arenaActions/
+        // aiSpells/autoTargetFor)
+        dec153: { type: "spell", cost: 0,
+                  spell: { target: "ownUnit", darkExtract: true },
+                  kind: "resource", // тип эффекта — по спеке юзера («Получение ресурсов»)
+                  rarity: "epic", elem: "decay",
+                  color: 0x63424e, img: "decay/153" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1179,6 +1205,12 @@
         decThirst: { id: "decThirst", rarity: "rare", baseHp: 15,
                      elems: ["decay"], starter: "decay",
                      img: "30", ability: "firstDeathHeal" },
+        // «Архилич» (босс «Земель мёртвых», просил юзер): первая за бой
+        // Эпическая карта владельца стоит на 2 энергии дешевле
+        // (epicDiscount — effCost + consumeEpicDiscount в arenaCards)
+        decLich: { id: "decLich", rarity: "epic", baseHp: 18,
+                   elems: ["decay"], starter: "decay",
+                   img: "31", ability: "epicDiscount", abilityVal: 2 },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1190,7 +1222,7 @@
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
-        "decThirst"];
+        "decThirst", "decLichBoss"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

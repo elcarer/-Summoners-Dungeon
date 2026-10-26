@@ -413,6 +413,43 @@
                     }
                     if (best) beastBlastCast("e", best);
                 }
+                if (s.darkExtract) { // «Извлечение тьмы» (dec153): жертва —
+                    // жетон либо своё с максимумом суммы ⚔+♥ (она станет энергией)
+                    let best = null, bs = -1e9;
+                    for (const v of B.units) {
+                        if (v.side !== "e" || v.def.type !== "unit") continue;
+                        const sc = (v.curAtk || 0) + (v.hp || 0)
+                            + (v.token ? 10 : 0);
+                        if (sc > bs) { bs = sc; best = v; }
+                    }
+                    if (best) {
+                        const n = (best.curAtk || 0) + (best.hp || 0);
+                        const p2 = cellXY(best.col, best.row);
+                        killUnit(best, null);
+                        floatText(p2.x, p2.y - 45, "☠", 0xef9f8c);
+                        B.eEnergy += n;
+                        floatText(960, 60, `+${n}⚡`, 0xffd98c);
+                        punch(root.hud);
+                        sfx("aqua");
+                    }
+                }
+                if (s.mindControl) { // «Тёмный контроль» (dec134): забираем
+                    // самое опасное существо игрока (реальные ценнее жетонов),
+                    // платя 2♥ базы
+                    let best = spellTargets(B.units.filter((v) => v.side === "p"
+                        && v.def.type === "unit"))
+                        .sort((a, b) => (aiThreat(b) - aiThreat(a))
+                            || ((a.token ? 1 : 0) - (b.token ? 1 : 0)))[0];
+                    if (!best) return;
+                    damageBase("e", s.mindControl, { x: 960, y: 240, fill: 0xff8f6e });
+                    best.side = "e"; // как собственный призыв: марши/атаки по новой стороне
+                    recalcAuras();
+                    const p2 = cellXY(best.col, best.row);
+                    floatText(p2.x, p2.y - 78, "⇄", 0xc9a0ef);
+                    fxEvent("seal", { x: p2.x, y: p2.y - 8, color: 0xc9a0ef, scale: 0.85 });
+                    punch(best.node);
+                    sfx("chpoc");
+                }
                 if (s.baseHit) { // «Бросок валуна»: своё сильнейшее бьёт базу героя — это его атака
                     const own = spellTargets(B.units.filter((v) => v.side === "e"
                         && v.def.type === "unit"))

@@ -400,6 +400,17 @@
                 if (s.beastBlast && !B.units.some((v) => v.side === "e"
                     && v.def.type === "unit"
                     && (v.curAtk || 0) + (v.hp || 0) >= 3)) return false;
+                // «Извлечение тьмы» (dec153) — жертва с суммой ⚔+♥ 6+ либо
+                // жетон 4+ (меньше энергии с тела не берём)
+                if (s.darkExtract && !B.units.some((v) => v.side === "e"
+                    && v.def.type === "unit"
+                    && ((v.curAtk || 0) + (v.hp || 0) >= 6
+                        || (v.token && (v.curAtk || 0) + (v.hp || 0) >= 4)))) return false;
+                // «Тёмный контроль» (dec134) — есть чьё-то опасное существо
+                // (угроза 4+): тряпку забирать не окупается даже со скидкой
+                if (s.mindControl && !spellTargets(B.units.filter((v) =>
+                    v.side === "p" && v.def.type === "unit"
+                    && aiThreat(v) >= 4)).length) return false;
                 // «Стена костров» — ряд должен окупаться (не на своих, просил
                 // юзер); всем рядам в убыток — карту держим до подходящего поля
                 if (s.firewall && aiFirewallRow() === null) return false;

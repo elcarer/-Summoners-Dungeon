@@ -26,6 +26,15 @@
                     if (hd && hd.ability === "firstBuildingDiscount"
                         && !B.heroFlags.firstBuilding[side]) d += hd.abilityVal || 2;
                 }
+                // «Архилич» (decLich): ПЕРВАЯ сыгранная Эпическая карта
+                // стороны стоит на 2 энергии дешевле. Флаг тратится в момент
+                // реальной оплаты (consumeEpicDiscount), поэтому скидка видна
+                // и в тинте руки, и в расчётах ИИ (зеркало «Города мудрости»)
+                if (def.rarity === "epic" && B) {
+                    const hd = heroDefOf(side);
+                    if (hd && hd.ability === "epicDiscount"
+                        && !B.heroFlags.epicDiscount[side]) d += hd.abilityVal || 2;
+                }
                 // «Озверевший шатун» (grw36): −1 за каждое СВОЁ Животное на поле
                 if (def.animalCost && B)
                     d += B.units.filter((v) => v.side === side
@@ -37,6 +46,21 @@
                     if (aim && aim.def.targetDiscount) d += 1;
                 }
                 return Math.max(0, def.cost - d);
+            };
+            // «Архилич» (decLich): трата флага первой Эпической карты —
+            // зовётся из точек РЕАЛЬНОЙ оплаты карты (игрок: castSpell/
+            // playCardAt; ИИ: aiPlay). Бесплатные касты (руна, повторы
+            // «Горящих рун», послушник) флаг не тратят — карта не «стоит».
+            A.consumeEpicDiscount = function consumeEpicDiscount(cardId, side) {
+                const def = CARDS[cardId];
+                if (!B || !def || def.rarity !== "epic") return;
+                const hd = heroDefOf(side);
+                if (!hd || hd.ability !== "epicDiscount"
+                    || B.heroFlags.epicDiscount[side]) return;
+                B.heroFlags.epicDiscount[side] = true;
+                const n = hd.abilityVal || 2;
+                floatText(960, side === "p" ? 640 : 300, `−${n}⚡`, 0xc9a0ef);
+                sfx("up");
             };
             // «Пастух росянок» (grw40): пока он на поле стороны, способности
             // Растений (метка plant) этой стороны срабатывают на 1 раз больше

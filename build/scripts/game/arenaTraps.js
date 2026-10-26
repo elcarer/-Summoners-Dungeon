@@ -134,7 +134,8 @@
                 const cellEffect = (t) => {
                     const e = t.def.trap.effect;
                     if (e === "freezeSplash" || e === "rowShift"
-                        || e === "bubble" || e === "alliesStrike")
+                        || e === "bubble" || e === "alliesStrike"
+                        || e === "ghostGrave")
                         return u.def.type === "unit";
                     return e === "cellDmg" || e === "ambush"
                         || e === "confuse" || e === "cellDebuff"
@@ -333,6 +334,22 @@
                     if (hn) hn.text = String(Math.max(0, u.hp));
                     sfx("acid");
                     if (u.hp <= 0) killUnit(u, null);
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
+                if (trap.def.trap.effect === "ghostGrave") {
+                    // «Гримуар духов» (dec152): вошедшее существо противника
+                    // уничтожается, на его клетке является Призрак 2/1
+                    // (жетон ghost) стороны-хозяйки ловушки
+                    const p2 = cellXY(u.col, u.row);
+                    killUnit(u, null);
+                    floatText(p2.x, p2.y - 45, "☠", 0xef9f8c);
+                    if (!unitAt(u.col, u.row))
+                        addUnit(side, "ghost", u.col, u.row, { token: true });
+                    floatText(p2.x, p2.y - 108,
+                        GAME_LOC.t("card.ghost.name"), 0xb7d0ef);
+                    sfx("chpoc");
                     refreshHud();
                     checkEnd();
                     return;

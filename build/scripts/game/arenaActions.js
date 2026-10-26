@@ -138,12 +138,14 @@
                             ? (u.def.type === "unit"
                                 || (u.def.type === "building" && !sdef.spell.noBuildings))
                             : tg === "anyUnitOrFoe" ? u.def.type === "unit" // «Негативный поток»: существо или база врага
+                            : tg === "enemyUnit" ? u.def.type === "unit" // «Тёмный контроль»: только существо врага
                             : tg === "ownBuilding" ? u.def.type === "building"
                             : u.def.type === "unit");
-                    const sideOk = !u || !(tg === "ownUnit" || tg === "ownBuilding")
-                        || u.side === "p";
+                    const sideOk = !u
+                        || ((tg === "ownUnit" || tg === "ownBuilding") ? u.side === "p"
+                        : tg === "enemyUnit" ? u.side !== "p" : true);
                     const known = tg === "anyUnit" || tg === "anyUnitDmg"
-                        || tg === "anyUnitOrFoe"
+                        || tg === "anyUnitOrFoe" || tg === "enemyUnit"
                         || tg === "ownUnit" || tg === "ownBuilding";
                     // «Ледяной удар»: у цели должен быть хотя бы один сосед-
                     // существо, иначе заклинание не разыгрывается
@@ -164,6 +166,7 @@
                         }
                         B.energy -= effCost(B.hand[B.selected]); // цена ловушки
                         const cardId = spendCard(B.selected);
+                        consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                         if (def.trap.effect === "sporeCurse") {
                             // «Битва умов» (wis114) врага отменяет и споры:
                             // карта и энергия потрачены, эффект не срабатывает
@@ -190,6 +193,7 @@
                     if (occupant && def.trap.effect !== "entangle") { deselect(); return; }
                     B.energy -= effCost(B.hand[B.selected]); // цена ловушки
                     const cardId = spendCard(B.selected);
+                    consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                     const armed = armTrap("p", cardId, col, row);
                     if (!armed) { // «Битва умов» (wis114) врага: ловушка не ставится
                         const sp = cellXY(col, row);
@@ -223,6 +227,7 @@
                 }
                 B.energy -= effCost(B.hand[B.selected]);
                 const cardId = spendCard(B.selected);
+                consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                 // «Отмена призыва» (wis84) врага: существо не появляется,
                 // карта и энергия потрачены. «Иссушение почвы» (dec133) —
                 // то же для ПОСТРОЕК: срабатывает на розыгрыш строения
@@ -506,6 +511,32 @@
                     if (!u || u.side !== "p" || u.def.type !== "unit") return false;
                     beastBlastCast("p", u);
                 }
+                if (def.spell.target === "enemyUnit" && def.spell.mindControl) { // «Тёмный контроль» (dec134): существо врага переходит на вашу сторону, вы теряете 2 жизни
+                    if (!target || target.col === undefined) return false;
+                    const u = unitAt(target.col, target.row);
+                    if (!u || u.side === "p" || u.def.type !== "unit") return false;
+                    damageBase("p", def.spell.mindControl, { x: 960, y: 840, fill: 0xff8f6e });
+                    u.side = "p"; // «как будто вы его призвали»: марши/атаки по новой стороне, метки остаются
+                    recalcAuras();
+                    const p = cellXY(u.col, u.row);
+                    floatText(p.x, p.y - 78, "⇄", 0xc9a0ef);
+                    fxEvent("seal", { x: p.x, y: p.y - 8, color: 0xc9a0ef, scale: 0.85 });
+                    punch(u.node);
+                    sfx("chpoc");
+                }
+                if (def.spell.target === "ownUnit" && def.spell.darkExtract) { // «Извлечение тьмы» (dec153): своё гибнет — энергия = сумма ⚔+♥
+                    if (!target || target.col === undefined) return false;
+                    const u = unitAt(target.col, target.row);
+                    if (!u || u.side !== "p" || u.def.type !== "unit") return false;
+                    const n = (u.curAtk || 0) + (u.hp || 0);
+                    const p = cellXY(u.col, u.row);
+                    killUnit(u, null);
+                    floatText(p.x, p.y - 45, "☠", 0xef9f8c);
+                    B.energy += n;
+                    floatText(960, 840, `+${n}⚡`, 0xffd98c);
+                    punch(root.hud);
+                    sfx("aqua");
+                }
                 if (def.spell.target === "ownBuilding" && def.spell.excavate) { // «Раскопки»
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
@@ -659,6 +690,19 @@
                     const pick = iceStrikePick("p");
                     return pick ? { col: pick.unit.col, row: pick.unit.row } : null;
                 }
+                if (tg === "ownUnit" && def.spell.darkExtract) { // «Извлечение тьмы»: своё с наибольшей суммой ⚔+♥
+                    const own = spellTargets(B.units.filter((u) => u.side === "p"
+                        && u.def.type === "unit"));
+                    const best = own.slice().sort((a, b) =>
+                        ((b.curAtk || 0) + (b.hp || 0)) - ((a.curAtk || 0) + (a.hp || 0)))[0];
+                    return best ? { col: best.col, row: best.row } : null;
+                }
+                if (tg === "enemyUnit") { // «Тёмный контроль»: самое опасное существо врага
+                    const foes = spellTargets(B.units.filter((u) => u.side !== "p"
+                        && u.def.type === "unit"));
+                    const best = foes.slice().sort((a, b) => aiThreat(b) - aiThreat(a))[0];
+                    return best ? { col: best.col, row: best.row } : null;
+                }
                 if (tg === "anyUnit" || tg === "ownUnit") {
                     const own = spellTargets(B.units.filter((u) => u.side === "p"
                         && u.def.type === "unit"));
@@ -767,6 +811,7 @@
                 if (cTrap) {
                     B.energy -= effCost(cardId, "p", target);
                     spendCard(handIdx);
+                    consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                     const p = cellXY(cTrap.col, cTrap.row);
                     floatText(p.x, p.y + 66, "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                     layoutHand();
@@ -781,6 +826,7 @@
                         || CARDS[last].type !== "spell") return false;
                     B.energy -= effCost(cardId, "p", target);
                     spendCard(handIdx);
+                    consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                     heroFirstSpellEnergy("p"); // «Дуновение опасности»
                     heroStrReplay("p", cardId, def); // «Мастера огня»
                     B.lastSpell.p = "str25"; // повтор самой себя — бесконечная цепочка
@@ -804,6 +850,7 @@
                 fxSpellCast(cardId, target, "p");
                 B.energy = (def.spell.drainAll || def.spell.stormAll)
                     ? 0 : B.energy - effCost(cardId, "p", target);
+                consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                 spendCard(handIdx); // при пометке «Сброса разума» вернёт карту в руку
                 B.playCtx = null;
                 if (resetHand) confuseRunes("p", resetHand); // обе стороны (спека)
