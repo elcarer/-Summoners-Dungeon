@@ -185,9 +185,32 @@
                 return savedMeta.activeHeroId;
             return HERO_ORDER[0];
         }
-        // активный герой тоже переживает перезапуск (его меняют в «Героях»)
-        const savedActiveId = savedMeta && GAME_DATA.HEROES[savedMeta.activeHeroId]
-            ? savedMeta.activeHeroId : "gorbag";
+        // Нормализация меты (sd_meta или блока сохранения): карты прошлых
+        // версий (тестовые id) отфильтровываются; если коллекция опустела
+        // или в старой НЕПУСТОЙ колоде не осталось валидных карт — новые
+        // базовые значения. Одно место для бута и загрузки блока из
+        // настроек — состояние применяется одинаково.
+        // Пустая колода — НОРМА для завоёванного героя (начинает без карт,
+        // просил юзер); стартовую подставляем только совсем старому сейву,
+        // где все id отфильтровались миграцией.
+        function buildMetaState(m) {
+            const deck = m ? m.deck.filter((id) => GAME_DATA.CARDS[id]) : [];
+            const deckNeedsDefault = !m || (m.deck.length > 0 && deck.length === 0);
+            const coll = m
+                ? Object.fromEntries(Object.entries(m.collection || {})
+                    .filter(([id]) => GAME_DATA.CARDS[id]))
+                : {};
+            return {
+                deck: deckNeedsDefault ? [...DEFAULT_DECK] : deck,
+                collection: Object.keys(coll).length ? coll : { ...DEFAULT_COLLECTION },
+                heroDecks: m && m.heroDecks ? m.heroDecks : null,
+                captured: m && Array.isArray(m.captured) ? m.captured : [],
+                // активный герой тоже переживает перезапуск (его меняют в «Героях»)
+                heroId: m && GAME_DATA.HEROES[m.activeHeroId] ? m.activeHeroId : "gorbag",
+                starterId: savedStarterId(m),
+            };
+        }
+        const metaState = buildMetaState(savedMeta);
 
         // ── Звук: два канала движка — эффекты («звук») и музыка («музыка») ──
         const audio = createAudio();
@@ -268,34 +291,25 @@
             world, ECS, COMPONENTS, DATA, blocked, input: charInput, addSystem,
         });
 
-        // Миграция сейва: карты прошлых версий (тестовые id) отфильтровываются;
-        // если коллекция опустела или в старой НЕПУСТОЙ колоде не осталось
-        // валидных карт — новые базовые значения.
-        const savedDeck = savedMeta ? savedMeta.deck.filter((id) => GAME_DATA.CARDS[id]) : [];
-        // Пустая колода — НОРМА для завоёванного героя (начинает без карт,
-        // просил юзер); стартовую подставляем только совсем старому сейву,
-        // где все id отфильтровались миграцией.
-        const deckNeedsDefault = !savedMeta
-            || (savedMeta.deck.length > 0 && savedDeck.length === 0);
-        const savedColl = savedMeta
-            ? Object.fromEntries(Object.entries(savedMeta.collection || {})
-                .filter(([id]) => GAME_DATA.CARDS[id]))
-            : {};
+        // Миграция сейва — см. buildMetaState выше (общая с блоками сохранений)
 
         const G = {
             hero: { hp: 10, maxHp: 10 }, gold: 0,
             run: { floor: 1, cave: "gob", floors: { gob: 1, grw: 1, wis: 1 } },
-            heroId: savedActiveId, // активный герой забега (можно сменить в «Героях»)
-            starterId: savedStarterId(), // выбранный при «Новой игре» — не меняется
+            heroId: metaState.heroId, // активный герой забега (можно сменить в «Героях»)
+            starterId: metaState.starterId, // выбранный при «Новой игре» — не меняется
             elem: "strength", // стихия забега — из героя, задаёт стартовую колоду
             settings,
-            deck: deckNeedsDefault ? [...DEFAULT_DECK] : savedDeck,
-            collection: Object.keys(savedColl).length ? savedColl : { ...DEFAULT_COLLECTION },
+            deck: metaState.deck,
+            collection: metaState.collection,
             // колода каждого героя своя (переключение во вкладке «Герои»);
             // heroDecks[heroId] всегда указывает на АКТИВНУЮ G.deck
-            heroDecks: savedMeta && savedMeta.heroDecks ? savedMeta.heroDecks : null,
+            heroDecks: metaState.heroDecks,
             // завоёванные карты персонажей противников (просил юзер)
-            captured: savedMeta && Array.isArray(savedMeta.captured) ? savedMeta.captured : [],
+            captured: metaState.captured,
+            // забег поднят в G (бут — false; «Продолжить»/новая игра — true):
+            // «Сохранить» из настроек при live делает сначала штатный автосейв
+            live: false,
             dungeon: null, activeEnemy: null, battle: null,
             world: { heroPos: null, out: false }, // открытый мир: где герой
             dungeonStates: {}, // этажи подземелий, ключ «данж:этаж» (gob:1, grw:2…)
@@ -367,6 +381,7 @@
                 this.heroId = h.id;
                 this.starterId = h.id; // он же остаётся в «Героях» навсегда
                 this.elem = h.elems[0];
+                this.live = true; // забег поднят в G — «Сохранить» берёт его
                 this.hero.hp = this.hero.maxHp;
                 this.gold = 0;
                 this.run = { floor: 1, cave: "gob", floors: { gob: 1, grw: 1, wis: 1 } };
@@ -411,6 +426,37 @@
                         pending: this.quests.pending || null,
                     } : null,
                 });
+            },
+            // Кнопка «Сохранить» в настройках (просил юзер): весь прогресс
+            // игры — забег + мета — уходит в именованный блок с датой.
+            // live — сначала штатный автосейв, блок снимает свежее
+            // состояние; из меню без забега в G блок снимает sd_run/sd_meta
+            // с диска как есть. Возвращает имя созданного блока
+            saveBlockNow() {
+                if (this.live) { this.saveRun(); this.persistMeta(); }
+                return globalThis.GAME_META.saveBlock(
+                    globalThis.GAME_META.loadRun(),
+                    globalThis.GAME_META.loadMeta());
+            },
+            // Кнопка «Загрузить» в настройках: блок сначала возвращается
+            // на диск (F5 поднимет именно его), затем мета и забег
+            // применяются к G — как при буте и «Продолжить». Блок без
+            // забега (писался из меню до начала игры) — только мета,
+            // сцена не меняется. Возвращает имя блока или null
+            loadBlock(name) {
+                const b = globalThis.GAME_META.readBlock(name);
+                if (!b) return null;
+                globalThis.GAME_META.restoreBlock(b);
+                const metaState = buildMetaState(b.meta);
+                this.deck = metaState.deck;
+                this.collection = metaState.collection;
+                this.heroDecks = metaState.heroDecks;
+                this.captured = metaState.captured;
+                this.heroId = metaState.heroId;
+                this.starterId = metaState.starterId;
+                if (b.run) applySavedRun(b.run);
+                else this.live = false;
+                return b.name;
             },
             // поражение в бою: случайная карта колоды теряется НАВСЕГДА
             // (просил юзер — вместо сброса забега). Списывается и из
@@ -519,6 +565,74 @@
         ctx.scenes = scenes;
         const t = (k, v) => GAME_LOC.t(k, v);
 
+        // Поднять забег из сейва (sd_run или блока сохранения) в G и
+        // продолжить игру: герой внутри пещер — в подземелье, иначе — в
+        // открытый мир. Одно место для «Продолжить» в меню и «Загрузить»
+        // в настройках (просил юзер).
+        function applySavedRun(r) {
+            // бой в сейв не входит: из арены выведет её exit() — здесь
+            // только гасим ссылки на врага и накопленные награды драфта
+            G.battle = null;
+            G.activeEnemy = null;
+            G.rewardDeck = null;
+            G.rewardDraft = false;
+            G.draft = null;
+            G.draftBattle = false;
+            G.live = true;
+            G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp || 10 };
+            G.gold = r.gold || 0;
+            G.elem = r.elem || "strength";
+            // герой из сейва; у старых сейвов heroId ещё нет —
+            // герой восстанавливается по стихии забега
+            G.heroId = globalThis.GAME_DATA.HEROES[r.heroId]
+                ? r.heroId
+                : (G.elem === "growth" ? "elmir" : "gorbag");
+            // у старых сейвов забега поля нет — стартовый остаётся
+            // из sd_meta (с миграцией)
+            if (HERO_ORDER.includes(r.starterId)) G.starterId = r.starterId;
+            // поднимаются только этажи текущей геометрии (MAP_V —
+            // теперь тайлы 64px goblins_lair): сейвы волн с другой
+            // сеткой пересоберутся. Архив адресуется «данж:этаж»;
+            // у старых сейвов (одни гоблинские пещеры) данж по
+            // умолчанию gob
+            const mapV = GAME_DUNGEON.MAP_V;
+            G.dungeon = r.dungeon && r.dungeon.v === mapV ? r.dungeon : null;
+            if (G.dungeon && !G.dungeon.cave) G.dungeon.cave = "gob";
+            G.dungeonStates = {};
+            for (const k in (r.dungeonStates || {})) {
+                const st = r.dungeonStates[k];
+                if (!st || st.v !== mapV) continue;
+                st.cave = st.cave || "gob";
+                G.dungeonStates[st.cave + ":" + st.floor] = st;
+            }
+            if (!G.dungeon) G.dungeon = G.dungeonStates[(r.cave || "gob") + ":" + r.floor] || null;
+            if (G.dungeon)
+                G.dungeonStates[G.dungeon.cave + ":" + G.dungeon.floor] = G.dungeon;
+            // глубина у каждого подземелья своя; активное — где герой
+            G.run.floor = r.floor;
+            G.run.cave = G.dungeon ? G.dungeon.cave : (r.cave || "gob");
+            // глубины всех данжей каталога (gob/grw/wis): новые
+            // подземелья не должны терять прогресс при «Продолжить»
+            const caveIds = Object.keys(globalThis.GAME_DATA.CAVES);
+            G.run.floors = r.floors && typeof r.floors === "object"
+                ? Object.fromEntries(caveIds.map((c) => [c, r.floors[c] || 1]))
+                : { gob: r.floor, grw: 1, wis: 1 };
+            G.world = { heroPos: r.worldPos || null, out: !!r.worldOut };
+            // сюжетная линия забега (старые сейвы — без неё: первый
+            // квест активен, но без окна-анонса)
+            G.quests = globalThis.GAME_QUESTS.revive(r.quests);
+            // продолжение с середины этажа — в подземелье, иначе — в
+            // открытый мир (герой вышел из пещер или только начал);
+            // решает ОТФИЛЬТРОВАННОЕ состояние (G.dungeon), не сейв.
+            // Переход в текущую сцену — транзитом floorSwap (сцены не
+            // умеют перезаходить в себя)
+            const target = G.dungeon ? "dungeon" : "world";
+            if (scenes.current === target) {
+                floorSwap.next = target;
+                scenes.go("floorSwap");
+            } else scenes.go(target);
+        }
+
         // ── Сцена «Меню» ───────────────────────────────────────────────────
         let menuRoot = null;
         const T = (text, size, fill, opts = {}) => new PIXI.Text({
@@ -574,52 +688,7 @@
                 const bCont = addMenuBtn(t("menu.continue"), 960, 630, () => {
                     const r = GAME_META.loadRun();
                     if (!contEnabled || !r) return;
-                    G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp || 10 };
-                    G.gold = r.gold || 0;
-                    G.elem = r.elem || "strength";
-                    // герой из сейва; у старых сейвов heroId ещё нет —
-                    // герой восстанавливается по стихии забега
-                    G.heroId = globalThis.GAME_DATA.HEROES[r.heroId]
-                        ? r.heroId
-                        : (G.elem === "growth" ? "elmir" : "gorbag");
-                    // у старых сейвов забега поля нет — стартовый остаётся
-                    // из sd_meta (с миграцией)
-                    if (HERO_ORDER.includes(r.starterId)) G.starterId = r.starterId;
-                    // поднимаются только этажи текущей геометрии (MAP_V —
-                    // теперь тайлы 64px goblins_lair): сейвы волн с другой
-                    // сеткой пересоберутся. Архив адресуется «данж:этаж»;
-                    // у старых сейвов (одни гоблинские пещеры) данж по
-                    // умолчанию gob
-                    const mapV = GAME_DUNGEON.MAP_V;
-                    G.dungeon = r.dungeon && r.dungeon.v === mapV ? r.dungeon : null;
-                    if (G.dungeon && !G.dungeon.cave) G.dungeon.cave = "gob";
-                    G.dungeonStates = {};
-                    for (const k in (r.dungeonStates || {})) {
-                        const st = r.dungeonStates[k];
-                        if (!st || st.v !== mapV) continue;
-                        st.cave = st.cave || "gob";
-                        G.dungeonStates[st.cave + ":" + st.floor] = st;
-                    }
-                    if (!G.dungeon) G.dungeon = G.dungeonStates[(r.cave || "gob") + ":" + r.floor] || null;
-                    if (G.dungeon)
-                        G.dungeonStates[G.dungeon.cave + ":" + G.dungeon.floor] = G.dungeon;
-                    // глубина у каждого подземелья своя; активное — где герой
-                    G.run.floor = r.floor;
-                    G.run.cave = G.dungeon ? G.dungeon.cave : (r.cave || "gob");
-                    // глубины всех данжей каталога (gob/grw/wis): новые
-                    // подземелья не должны терять прогресс при «Продолжить»
-                    const caveIds = Object.keys(globalThis.GAME_DATA.CAVES);
-                    G.run.floors = r.floors && typeof r.floors === "object"
-                        ? Object.fromEntries(caveIds.map((c) => [c, r.floors[c] || 1]))
-                        : { gob: r.floor, grw: 1, wis: 1 };
-                    G.world = { heroPos: r.worldPos || null, out: !!r.worldOut };
-                    // сюжетная линия забега (старые сейвы — без неё: первый
-                    // квест активен, но без окна-анонса)
-                    G.quests = globalThis.GAME_QUESTS.revive(r.quests);
-                    // продолжение с середины этажа — в подземелье, иначе —
-                    // в открытый мир (герой вышел из пещер или только начал);
-                    // решает ОТФИЛЬТРОВАННОЕ состояние (G.dungeon), не сейв
-                    scenes.go(G.dungeon ? "dungeon" : "world");
+                    applySavedRun(r); // поднятие забега — см. applySavedRun
                 });
                 if (!contEnabled) bCont.alpha = 0.45; // забега нет — кнопка приглушена
                 const bNew = addMenuBtn(t("menu.newGame"), 960, 720, () => {
@@ -794,8 +863,14 @@
         scenes.add("world", worldScene);
         // транзит между этажами: сцены не умеют перезаходить в себя
         // (createScenes игнорирует go() в текущую), лестница наверх ходит
-        // этажами через этот ретранслятор
-        scenes.add("floorSwap", { enter() { scenes.go("dungeon"); } });
+        // этажами через этот ретранслятор. next — целевая сцена транзита
+        // (по умолчанию подземелье; «Загрузить» из настроек подставляет
+        // и мир), после прогона сбрасывается обратно
+        const floorSwap = {
+            next: "dungeon",
+            enter() { const to = this.next; this.next = "dungeon"; scenes.go(to); },
+        };
+        scenes.add("floorSwap", floorSwap);
         const dungeonScene = GAME_DUNGEON.createDungeonScene(ctx);
         scenes.add("dungeon", dungeonScene);
         const arenaScene = GAME_ARENA.createArenaScene(ctx);
