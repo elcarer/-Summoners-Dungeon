@@ -280,15 +280,21 @@
                 sfx("acid");
             };
             // Начало хода стороны, ДО марша: каждое отравленное её существо
-            // теряет жизни по мощности яда (штатный урон — яд может убить)
-            // Начало хода стороны, ДО марша: каждое отравленное её существо
-            // теряет жизни по мощности яда (штатный урон — яд может убить)
+            // теряет жизни по мощности яда (штатный урон — яд может убить).
+            // Правило «Яда» (спека dec144): при срабатывании мощность яда
+            // на выжившем +1 — яд растёт с каждым тиком (действует на весь
+            // эффект «Яд», включая «Ядовитость» grw29)
             A.poisonTick = function poisonTick(side) {
                 for (const u of B.units.slice()) {
                     if (u.side !== side || u.def.type !== "unit" || !(u.poison > 0)) continue;
                     const p = cellXY(u.col, u.row);
                     floatText(p.x, p.y - 60, `☠ −${u.poison}`, 0xb7d178);
                     damageUnit(u, u.poison, null, "acid");
+                    if (B.units.includes(u)) { // умерло от тика — маркер не трогаем
+                        u.poison += 1;
+                        const mark = u.node.getChildByName("poisonMark");
+                        if (mark) mark.getChildAt(1).text = String(u.poison);
+                    }
                 }
                 refreshHud();
                 checkEnd();

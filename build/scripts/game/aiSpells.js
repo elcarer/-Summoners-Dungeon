@@ -91,6 +91,36 @@
                         sfx("acid");
                         return;
                     }
+                    // «Трупный яд» (dec144): «Яд N» на существо игрока —
+                    // яд тикает и растёт, поэтому цель — самое живучее
+                    // (успеет потерять больше); при равенстве — опаснее
+                    if (s.poison) {
+                        let best = spellTargets(B.units
+                            .filter((v) => v.side === "p" && v.def.type === "unit"))
+                            .sort((a, b) => (b.hp - a.hp) || (b.curAtk - a.curAtk))[0];
+                        if (!best) return;
+                        best = reflectAim("p", best); // «Отражение» (wis120) игрока
+                        aimOff(best);
+                        addPoison(best, s.poison);
+                        punch(best.node);
+                        return;
+                    }
+                    // «Разложение» (dec145): уничтожить существо игрока —
+                    // крупнейшая угроза; затем ИИ сбрасывает карту с руки
+                    // (наименее ценную; сама dec145 ещё в руке — не её)
+                    if (s.destroy) {
+                        let best = spellTargets(B.units
+                            .filter((v) => v.side === "p" && v.def.type === "unit"))
+                            .sort((a, b) => aiThreat(b) - aiThreat(a))[0];
+                        if (!best) return;
+                        best = reflectAim("p", best); // «Отражение» (wis120) игрока
+                        aimOff(best);
+                        punch(best.node);
+                        killUnit(best, null);
+                        discardWeakest("e", cardIdOf(def));
+                        refreshHud();
+                        return;
+                    }
                     // «Ледяной удар» (wis92): цель бьёт случайного соседа-
                     // существо; урон считает сама цель, поэтому важна не её
                     // сторона, а чей сосед попадёт под удар (iceStrikePick)

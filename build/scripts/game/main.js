@@ -52,6 +52,8 @@
         uiTextures["scenes/2.png"] = await assets.loadTexture("./images/scenes/2.png");
         // подводная арена «Подземных ключей» (стихия Мудрость)
         uiTextures["scenes/3.png"] = await assets.loadTexture("./images/scenes/3.png");
+        // арена «Земель мёртвых» (стихия Тлен)
+        uiTextures["scenes/4.png"] = await assets.loadTexture("./images/scenes/4.png");
         // эффект поля «Стена костров» и рубашки колод по стихиям
         // (гоблины/природа/мудрость/тлен)
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
@@ -129,6 +131,7 @@
             goblin: heroSheets.strength,
             elf: heroSheets.growth,
             wisdom: heroSheets.wisdom, // существа Мудрости — сорка (плейсхолдер)
+            necr: heroSheets.decay, // существа Тлена — некр (пока один лист, просил юзер)
             wolf: await assets.loadCharacter("./images/sprites/wolf_256"),
             bear: { ...(await assets.loadCharacter("./images/sprites/bear_256")), scale: 1.1 },
             ent: { ...(await assets.loadCharacter("./images/sprites/ent_256")), scale: 1.3 },

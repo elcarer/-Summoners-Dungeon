@@ -13,8 +13,10 @@
                     || globalThis.GAME_DATA.HEROES.gorbag;
                 // фон и сетка поля — по подземелью: гоблинские пещеры —
                 // scenes/1.png, Роща Роста — scenes/2.png (просил юзер),
-                // Мудрость/«Подземные ключи» — scenes/3.png (подводная пещера)
-                curScene = enc.elem === "growth" ? 2 : enc.elem === "wisdom" ? 3 : 1;
+                // Мудрость/«Подземные ключи» — scenes/3.png (подводная пещера),
+                // Тлен/«Земли мёртвых» — scenes/4.png
+                curScene = enc.elem === "growth" ? 2 : enc.elem === "wisdom" ? 3
+                    : enc.elem === "decay" ? 4 : 1;
                 if (ctx.music) ctx.music("battle");
                 // колода врага хранится в враге подземелья (кидается при
                 // генерации этажа по глубине); для старых сейвов — генерим.
@@ -67,7 +69,8 @@
                         trapEcho: { p: false, e: false },
                         buildReplay: { p: false, e: false },
                         skeletonDig: { p: false, e: false },
-                        digReward: { p: false, e: false } },
+                        digReward: { p: false, e: false },
+                        discardReplay: { p: false, e: false } },
                     enemyBase: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
                     enemyBaseMax: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
                     deck: shuffle([...pDeck]), discard: [], hand: [],

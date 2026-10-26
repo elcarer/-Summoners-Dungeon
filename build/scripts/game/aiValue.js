@@ -622,6 +622,8 @@
                     if (d.ability === "dash1") s += 0.2;
                     if (d.lichRaise) s += 1.0; // dec131: Призрак 2/1 за каждое убийство
                     if (d.vampHeal) s += 0.5; // dec132: отхил после каждой атаки
+                    if (d.exhuming) s += 1.2; // dec146: вторая жизнь
+                    if (d.summonDiscard) s -= 0.4; // dec146: платит картой при появлении
                     return s;
                 }
                 if (d.type === "building") {
@@ -678,6 +680,8 @@
                     if (s.hydroPunch) v += 1.2; // урон 1 + полезный сдвиг назад
                     if (s.iceSwarm) v += Math.min(5, s.iceSwarm) * 0.55; // 5 тел 1/1
                     if (s.skeletonCrowd) v += 3 * 0.65; // dec140: три Скелета 1/2
+                    if (s.poison) v += 1.4; // dec144: растущий яд — тариф выше
+                    if (s.destroy) v += 2.7; // dec145: убийство любого существа минус карта
                     if (s.forbidden) v += 2.0
                         + Math.min(3, B ? B.eDeck.length : 0) * 0.1; // dec130: 3 карты
                     if (s.discardHandDraw) v += 1.0

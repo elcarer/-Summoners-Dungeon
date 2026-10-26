@@ -234,7 +234,14 @@
                     floatText(sp.x, sp.y - 60,
                         "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                 } else {
+                    // playCtx для «Сброса разума» (decMind): dec146 при
+                    // появлении сбрасывает карту — эффект розыгрыша
+                    B.playCtx = { side: "p", cardId };
                     addUnit("p", cardId, col, row);
+                    // карта игрока выходит в сброс ДО эффекта dec146 —
+                    // помеченную возвращаем явно (заклинания — в noteDiscard)
+                    discardReplayReturn("p", cardId);
+                    B.playCtx = null;
                 }
                 if (ctx.sfx) ctx.sfx();
                 layoutHand();
@@ -364,6 +371,16 @@
                         sfx("acid");
                         return true;
                     }
+                    // «Разложение» (dec145): уничтожьте существо, затем
+                    // сбросьте карту с руки (авто, наименее ценная; сама
+                    // dec145 ещё в руке — себя не сбрасывает)
+                    if (def.spell.destroy) {
+                        punch(u.node);
+                        killUnit(u, null);
+                        discardWeakest("p", cardId);
+                        refreshHud();
+                        return true;
+                    }
                     if (def.spell.enchantFire) { // «Огненное дыхание» — метка-очарование
                         u.enchantFire = true;
                         const mark = new PIXI.Graphics();
@@ -394,6 +411,7 @@
                         }
                         if (def.spell.berserk) addBerserk(u, def.spell.berserk);
                         if (def.spell.venom) addVenom(u, def.spell.venom); // «Отравленные лезвия»
+                        if (def.spell.poison) addPoison(u, def.spell.poison); // «Трупный яд»
                         if (def.spell.nova) novaSplash(u); // «Круговая атака»
                         // «Метка некроманта» (dec137): «Выкапливание 1» —
                         // счётчик стакается с уже висящим (Мортис/вторая метка)
@@ -768,12 +786,20 @@
                     checkEnd();
                     return true;
                 }
+                // playCtx — карта в процессе розыгрыша: её эффекты (сбросы
+                // карт) видит noteDiscard для способности «Сброс разума»
+                // (decMind); снимается после выхода карты в сброс
+                B.playCtx = { side: "p", cardId };
                 if (!applySpellP(cardId, target, false,
-                    resetHand ? { skipHandReset: true } : null)) return false;
+                    resetHand ? { skipHandReset: true } : null)) {
+                    B.playCtx = null;
+                    return false;
+                }
                 fxSpellCast(cardId, target, "p");
                 B.energy = (def.spell.drainAll || def.spell.stormAll)
                     ? 0 : B.energy - effCost(cardId, "p", target);
-                spendCard(handIdx);
+                spendCard(handIdx); // при пометке «Сброса разума» вернёт карту в руку
+                B.playCtx = null;
                 if (resetHand) confuseRunes("p", resetHand); // обе стороны (спека)
                 heroFirstSpellEnergy("p"); // «Дуновение опасности»: +1⚡ за 1-е заклинание
                 heroStrReplay("p", cardId, def); // «Мастера огня»

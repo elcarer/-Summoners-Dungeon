@@ -878,6 +878,29 @@
         dec143: { type: "building", cost: 5, atk: 0, hp: 4, bonePile: true,
                   rarity: "rare", elem: "decay",
                   color: 0x504048, img: "decay/143" },
+        // «Трупный яд» (dec144): «Яд 1» на любое существо; при каждом
+        // срабатывании яда мощность +1 (правило эффекта «Яд» — poisonTick)
+        dec144: { type: "spell", cost: 1,
+                  spell: { target: "anyUnit", poison: 1 },
+                  kind: "damage", // тип эффекта — по спеке юзера («Нанесение урона»)
+                  rarity: "common", elem: "decay",
+                  color: 0x63424e, img: "decay/144" },
+        // «Разложение» (dec145): уничтожьте любое существо, затем сбросьте
+        // карту с руки (авто, наименее ценная — кроме самой dec145)
+        dec145: { type: "spell", cost: 2,
+                  spell: { target: "anyUnit", destroy: true, selfDiscard: 1 },
+                  kind: "destroy", // тип эффекта — по спеке юзера («Уничтожение существа»)
+                  rarity: "rare", elem: "decay",
+                  color: 0x63424e, img: "decay/145" },
+        // «Восставший нетопырь» (dec146): 6/2 с «Выкапливанием 1»; после
+        // появления на поле (включая возврат выкапливанием) сбрасывает
+        // карту с руки (авто, наименее ценная)
+        dec146: { type: "unit", cost: 4, atk: 6, hp: 2, speed: 1,
+                  creature: "goblin", // плейсхолдер листа поля боя (некр по стихии)
+                  subtype: "animal", // подтип — по спеке юзера («Животное»)
+                  exhuming: 1, summonDiscard: 1,
+                  rarity: "rare", elem: "decay",
+                  color: 0x504048, img: "decay/146" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1092,6 +1115,12 @@
         decUnder: { id: "decUnder", rarity: "common", baseHp: 12,
                     elems: ["decay"], starter: "decay",
                     img: "27", ability: "firstDigReward" },
+        // 4-й этаж (арт heroes/28.png): Тлен, 13♥, первая за бой карта,
+        // чей эффект сбросил карты, после своего розыгрыша возвращается
+        // в руку (playCtx/noteDiscard — см. arenaCombat)
+        decMind: { id: "decMind", rarity: "common", baseHp: 13,
+                   elems: ["decay"], starter: "decay",
+                   img: "28", ability: "firstDiscardReplay" },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1102,7 +1131,7 @@
         "grwControl", "grwBoss",
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
-        "decBones", "decBlack", "decUnder"];
+        "decBones", "decBlack", "decUnder", "decMind"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

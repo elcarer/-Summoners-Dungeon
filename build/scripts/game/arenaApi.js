@@ -366,6 +366,19 @@
                 // (проба сокрушения/чащи/ядовитости без полного хода ИИ)
                 async _march(side) { await marchSide(side); return true; },
                 _poisonTick(side) { poisonTick(side); return true; },
+                // тест-хук: единый сброс-хук (проба «Сброса разума» decMind)
+                _noteDiscard(n, side, ids) { noteDiscard(n, side, ids); return true; },
+                // тест-хуки волны «Тлен 144–146»: текущая сцена поля и лист
+                // существ по стихии карты (фолбэк sheetOf)
+                _scene() { return { curScene }; },
+                _sheetName(id) {
+                    const def = CARDS[id];
+                    if (!def) return null;
+                    const sh = sheetOf({ def });
+                    if (!sh || !ctx.creatureSheets) return null;
+                    return Object.keys(ctx.creatureSheets)
+                        .find((k) => ctx.creatureSheets[k] === sh) || null;
+                },
                 // установка ловушки стороной (проба опутывания без розыгрыша
                 // карты); существо на клетке — «нахождение», как у клика игрока
                 _armTrap(side, cardId, col, row) {

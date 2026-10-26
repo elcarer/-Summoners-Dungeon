@@ -205,9 +205,14 @@
                             }
                             B.eHand.splice(pick.i, 1);
                             B.eEnergy -= effCost(cardId, "e");
+                            // playCtx для «Сброса разума» (decMind): dec146 при
+                            // появлении сбрасывает карту; свой выход карты в
+                            // сброс ниже вернёт её в руку, если помечена
+                            B.playCtx = { side: "e", cardId };
                             addUnit("e", cardId, col, row);
                             B.eDiscard.push(cardId); // как у игрока: карта в сброс (иначе цикл «Трусливого гоблина» не работает)
                             noteDiscard(1, "e", [cardId]);
+                            B.playCtx = null;
                             hideEnemyCard();
                             played = true;
                             break;
@@ -273,6 +278,10 @@
                                 played = true;
                                 break;
                             }
+                            // playCtx для «Сброса разума» (decMind): пометка
+                            // ставится на эффекты карты; возврат — в noteDiscard
+                            // при выходе самой карты в сброс ниже
+                            B.playCtx = { side: "e", cardId };
                             if (def.spell.copyLast) {
                                 // «Горящие руны»: повтор ПОСЛЕДНЕГО заклинания тем
                                 // же кодом эффектов (бесплатно для его цены)
@@ -280,6 +289,7 @@
                             } else {
                                 enemyCastSpellEffect(def, false, null, true);
                             }
+                            B.playCtx = null;
                             // indexOf: панельные эффекты кладут карты в руку —
                             // индексы могли сместиться
                             B.eHand.splice(B.eHand.indexOf(cardId), 1);

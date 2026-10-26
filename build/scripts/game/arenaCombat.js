@@ -260,8 +260,86 @@
             // ВСЕХ точек сброса (B.discard/B.eDiscard.push); смерть существ
             // сбросом не считается (removeUnit карту не отдаёт). n — сколько
             // карт ушло разом (гримуар/путешествие сбрасывают пачками).
+            // Сброс «карты с руки» эффектом карты (dec145 «Разложение»,
+            // dec146 «Восставший нетопырь»): авто, наименее ценная по
+            // aiCardPower — как upkeep-сброс «Дурного варева» (панель
+            // выбора заморозила бы анимации боя). exceptId — карта в
+            // процессе розыгрыша (себя не сбрасываем); пустая рука —
+            // эффекта нет; сгоревшая «Сожжением» сбросом не считается
+            A.discardWeakest = function discardWeakest(side, exceptId) {
+                if (!B) return;
+                const hand = side === "p" ? B.hand : B.eHand;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const scorch = B.scorch[side];
+                let wi = -1, ws = Infinity;
+                for (let i = 0; i < hand.length; i++) {
+                    if (hand[i] === exceptId) continue;
+                    const pv = aiCardPower(CARDS[hand[i]]);
+                    if (pv < ws) { ws = pv; wi = i; }
+                }
+                if (wi < 0) return;
+                const id = hand.splice(wi, 1)[0];
+                if (scorch && scorch.has(id)) {
+                    scorch.delete(id);
+                    floatText(960, side === "p" ? 840 : 240,
+                        `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
+                } else {
+                    discard.push(id);
+                    noteDiscard(1, side, [id]);
+                    const p = side === "p" ? { x: 960, y: 840 } : { x: 960, y: 240 };
+                    floatText(p.x, p.y, "⤓ " + GAME_LOC.t(`card.${id}.name`), 0xc9b98c);
+                }
+                if (side === "p") layoutHand();
+                refreshHud();
+            };
+            // Возврат карты по способности «Сброс разума» (decMind): карта,
+            // помеченная B.discardReplay {side, id}, вынимается из сброса
+            // СВОЕЙ стороны в руку (одна и та же карта может лежать в сбросах
+            // обеих сторон — сторону знает метка, а не поиск по сбросам).
+            // Зовётся из noteDiscard (заклинания: карта выходит в сброс
+            // ПОСЛЕ своего эффекта) и из точки постановки юнита игроком
+            // (карта выходит в сброс ДО эффекта dec146 — см. onCellTap)
+            A.discardReplayReturn = function discardReplayReturn(side, cardId) {
+                if (!B || !B.discardReplay || B.discardReplay.id !== cardId) return;
+                B.discardReplay = null;
+                const disc = side === "p" ? B.discard : B.eDiscard;
+                const i = disc.indexOf(cardId);
+                if (i < 0) return;
+                disc.splice(i, 1);
+                if (side === "p") { B.hand.push(cardId); layoutHand(); }
+                else B.eHand.push(cardId);
+                const p = side === "p" ? { x: 960, y: 840 } : { x: 960, y: 240 };
+                floatText(p.x, p.y, "↩ " + GAME_LOC.t(`card.${cardId}.name`), 0xb7d0ef);
+                sfx("up");
+                refreshHud();
+            };
             A.noteDiscard = function noteDiscard(n = 1, side = null, ids = null) {
                 if (!B) return;
+                // «Сброс разума» (decMind): первая за бой карта стороны, чьим
+                // ЭФФЕКТОМ сброшены карты (B.playCtx ставят точки розыгрыша
+                // вокруг исполнения эффектов), помечается — и после СВОЕГО
+                // выхода в сброс вернётся в руку. Выход самой разыгранной
+                // карты (ids из одной неё) эффектом не считается — это как
+                // раз момент возврата
+                if (B.playCtx && ids && ids.length) {
+                    const pc = B.playCtx;
+                    const selfOut = ids.length === 1 && ids[0] === pc.cardId;
+                    if (!selfOut && !B.heroFlags.discardReplay[pc.side]) {
+                        const hd = heroDefOf(pc.side);
+                        if (hd && hd.ability === "firstDiscardReplay") {
+                            B.heroFlags.discardReplay[pc.side] = true;
+                            B.discardReplay = { side: pc.side, id: pc.cardId };
+                            const bp = pc.side === "p"
+                                ? { x: 960, y: 840 } : { x: 960, y: 240 };
+                            floatText(bp.x, bp.y,
+                                "↩ " + GAME_LOC.t(`card.${pc.cardId}.name`), 0xb7d0ef);
+                        }
+                    }
+                }
+                if (ids && ids.length === 1 && B.discardReplay
+                    && B.discardReplay.id === ids[0]) {
+                    discardReplayReturn(B.discardReplay.side, ids[0]);
+                }
                 for (const v of B.units.slice()) {
                     if (!v.def.slimeGain || !B.units.includes(v)) continue;
                     v.bonusAtk = (v.bonusAtk || 0) + n;
