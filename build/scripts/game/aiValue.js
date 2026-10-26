@@ -232,7 +232,8 @@
                     // «Цветение кристаллов» — ускоритель: энергия за размер руки,
                     // разыгрывается первым, чтобы хватило и на остальные карты;
                     // «Извлечение тьмы» (dec153) — тоже энергодвижок
-                    if (s.energyPerHand || s.energyPerTrap || s.darkExtract) return 1;
+                    if (s.energyPerHand || s.energyPerTrap || s.darkExtract
+                        || s.bloodMoon) return 1;
                     if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
                         || s.sacrifice || s.copyLast || s.stormAll
                         || s.purge || s.stealEnergy || s.fireflies
@@ -631,6 +632,7 @@
                         && v.def.subtype === "skeleton").length;
                     if (d.acolyteCast) s += 0.5; // dec148: бесплатный каст из сброса
                     if (d.fatBelly) s += 0.9; // dec149: растёт от каждой своей смерти
+                    if (d.deathKnight) s += 0.7; // dec159: +1⚡ за каждое убийство
                     return s;
                 }
                 if (d.type === "building") {
@@ -647,7 +649,9 @@
                         + (d.relicVault ? 1.3 : 0) // dec138: копит сбросы
                         + (d.evilBrew ? 1.6 : 0) // dec139: давит базу всяким сбросом
                         + (d.boneField ? 1.6 : 0) // dec141: скелет каждый ход
-                        + (d.bonePile ? 1.4 : 0); // dec143: «Выкапливание» каждому призыву рядом
+                        + (d.bonePile ? 1.4 : 0) // dec143: «Выкапливание» каждому призыву рядом
+                        + (d.cryptPlay ? 1.5 : 0) // dec157: верх сброса играется каждый ход
+                        + (d.ghostPortal ? 1.6 : 0); // dec158: Призрак за каждый каст
                 }
                 if (d.type === "spell") {
                     const s = d.spell || {};
@@ -697,6 +701,8 @@
                             && u.def.type === "unit").length) * 0.2;
                     if (s.darkExtract) v += 1.5; // dec153: энергия = ⚔+♥ жертвы
                     if (s.mindControl) v += 2.4; // dec134: чужое существо — сильный ход
+                    if (s.terrainScout) v += 0.6; // dec156: поиск постройки в топ-6
+                    if (s.bloodMoon) v += 1.2; // dec160: жизни базы — в энергию
                     if (s.forbidden) v += 2.0
                         + Math.min(3, B ? B.eDeck.length : 0) * 0.1; // dec130: 3 карты
                     if (s.discardHandDraw) v += 1.0
@@ -712,6 +718,8 @@
                         v += Math.min(4, B.units.filter((u) =>
                             u.side === "e" && u.def.type === "unit").length) * 0.4;
                     if (d.trap.effect === "ghostGrave") v += 1.2; // dec152: смерть + призрак
+                    if (d.trap.effect === "darkOffering") v += 1.3; // dec154: смерть + бесплатный юнит с руки
+                    if (d.trap.effect === "tarStatue") v += 1.0; // dec155: −4⚔ жертве, −2⚔ соседям
                     return v;
                 }
                 return 1;

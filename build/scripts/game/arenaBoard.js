@@ -332,6 +332,19 @@
                 let kings = 0;
                 for (const u of B.units)
                     if (u.def.type === "unit" && u.def.skelKing) kings += u.def.skelKing;
+                // «Смоляная статуя» (dec155): каждое живое существо с
+                // меткой tarMark приглушает на 2⚔ соседние (верт/гориз)
+                // СУЩЕСТВА СВОЕЙ стороны («существа противника» со
+                // стороны владельца карты) — пока носитель жив
+                const tarDebuff = (w) => {
+                    let n = 0;
+                    for (const m of B.units) {
+                        if (m === w || !m.tarMark || m.side !== w.side
+                            || !B.units.includes(m)) continue;
+                        if (Math.abs(m.col - w.col) + Math.abs(m.row - w.row) === 1) n++;
+                    }
+                    return n * 2;
+                };
                 for (const side of ["p", "e"]) {
                     let atk = 0, hp = 0;
                     for (const u of B.units) if (u.side === side && u.def.type === "building") {
@@ -344,7 +357,7 @@
                         // atkZero — «Ловушка-пузырь» (wis119): урон ровно 0
                         const newAtk = u.atkZero ? 0
                             : Math.max(0, u.def.atk + (u.bonusAtk || 0)
-                                + (u.atkPenalty || 0) + atk
+                                + (u.atkPenalty || 0) + atk - tarDebuff(u)
                                 + (u.def.subtype === "skeleton" ? kings : 0));
                         if (u.curAtk !== newAtk) {
                             u.curAtk = newAtk;

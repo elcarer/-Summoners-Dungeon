@@ -897,6 +897,68 @@
                 refreshHud();
                 checkEnd();
             };
+
+            // «Кровавая луна» (dec160, просил юзер): потратьте от 1 до N жизней
+            // своей базы (на ваш выбор — кнопка на каждую трату) — получите
+            // столько же энергии. Кнопки дороже текущей базы потушены; тратить
+            // ВСЁ (0♥) можно — проигрыш свой выбор. ИИ панели не открывает —
+            // его ветка в enemyCastSpellEffect
+            A.moonPanel = null;
+            A.moonMax = 3;
+            A.closeMoonPanel = function closeMoonPanel() {
+                if (!moonPanel) return;
+                moonPanel.destroy({ children: true });
+                moonPanel = null;
+                if (B) B.picking = false;
+            };
+            A.openMoonPanel = function openMoonPanel(maxN) {
+                closeMoonPanel();
+                const cap = Math.min(maxN, B.playerBase | 0);
+                if (cap < 1) return; // тратить нечего — эффект вхолостую
+                moonMax = cap;
+                B.picking = true;
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("moon.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("moon.hint"), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                for (let k = 1; k <= cap; k++) {
+                    const x = cap === 1 ? 960 : 710 + (k - 1) * (500 / Math.max(1, cap - 1));
+                    node.addChild(globalThis.GAME_UI.button(ctx, {
+                        tex: "button_menu.png",
+                        label: t("moon.pay", { n: k }),
+                        x, y: 560, scale: 1,
+                        onTap: () => pickMoon(k),
+                    }));
+                }
+                root.addChild(node);
+                moonPanel = node;
+            };
+            A.pickMoon = function pickMoon(n) {
+                if (!B || !B.picking || !moonPanel) return;
+                closeMoonPanel();
+                const k = Math.min(n, moonMax, B.playerBase);
+                if (k < 1) return;
+                B.playerBase -= k; // «потратьте» — не урон: напрямую, без fxEvent урона
+                B.energy += k;
+                floatText(960, 840, `−${k}♥ +${k}⚡`, 0xef9f8c);
+                punch(root.hud);
+                refreshHud();
+                checkEnd();
+            };
         }
     };
 })();

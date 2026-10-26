@@ -411,6 +411,16 @@
                 if (s.mindControl && !spellTargets(B.units.filter((v) =>
                     v.side === "p" && v.def.type === "unit"
                     && aiThreat(v) >= 4)).length) return false;
+                // «Выбор местности» (dec156) — среди верхних 6 колоды должна
+                // быть постройка, иначе карте нечего принести
+                if (s.terrainScout && !aiTopCards(Math.min(s.terrainScout || 6,
+                    B.eDeck.length)).some((m) =>
+                    CARDS[m.id] && CARDS[m.id].type === "building")) return false;
+                // «Кровавая луна» (dec160) — только при низкой энергии (1⚡ и
+                // меньше) и запасе базы: ИИ оставляет себе минимум 2♥
+                if (s.bloodMoon
+                    && !(B.eEnergy <= 1
+                        && B.enemyBase - 2 >= 1)) return false;
                 // «Стена костров» — ряд должен окупаться (не на своих, просил
                 // юзер); всем рядам в убыток — карту держим до подходящего поля
                 if (s.firewall && aiFirewallRow() === null) return false;

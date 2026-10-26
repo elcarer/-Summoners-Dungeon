@@ -433,6 +433,28 @@
                         sfx("aqua");
                     }
                 }
+                if (s.terrainScout) { // «Выбор местности» (dec156): лучшая постройка топ-6 — в руку
+                    const top = aiTopCards(Math.min(s.terrainScout || 6, B.eDeck.length));
+                    const best = top.filter((m) => CARDS[m.id]
+                        && CARDS[m.id].type === "building")
+                        .sort((a, b) => aiCardPower(CARDS[b.id]) - aiCardPower(CARDS[a.id]))[0];
+                    if (best) {
+                        B.eDeck.splice(best.j, 1);
+                        B.eHand.push(best.id);
+                        floatText(960, 60, "⤒ " + GAME_LOC.t(`card.${best.id}.name`), 0xb7d0ef);
+                        sfx("chpoc");
+                    }
+                }
+                if (s.bloodMoon) { // «Кровавая луна» (dec160): жизни базы — в энергию, базе оставляем 2♥
+                    const n = Math.min(s.bloodMoon || 3, B.enemyBase - 2);
+                    if (n >= 1) {
+                        B.enemyBase -= n; // «потратьте» — не урон
+                        B.eEnergy += n;
+                        floatText(960, 240, `−${n}♥ +${n}⚡`, 0xef9f8c);
+                        punch(root.hud);
+                        sfx("aqua");
+                    }
+                }
                 if (s.mindControl) { // «Тёмный контроль» (dec134): забираем
                     // самое опасное существо игрока (реальные ценнее жетонов),
                     // платя 2♥ базы

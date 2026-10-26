@@ -96,8 +96,11 @@
                         killUnit(v, null);
                 }
                 // ауры строений умирают вместе с ними; «Король скелетов»
-                // (dec147) — юнит-аура, его смерть тоже снимает бонус
-                if (u.def.type === "building" || u.def.skelKing) recalcAuras();
+                // (dec147) — юнит-аура, его смерть тоже снимает бонус;
+                // «Смоляная статуя» (dec155): смерть носителя метки tarMark
+                // снимает −2⚔ его живым соседям — пересчёт обязателен
+                if (u.def.type === "building" || u.def.skelKing || u.tarMark)
+                    recalcAuras();
                 // «Рунный монолит»: на смерть существа постройка теряет 1 жизнь,
                 // а владелец берёт карту (просил юзер). Добор до урона — как у
                 // «Грибницы»: эффект срабатывает, даже если монолит гибнет сам;
@@ -214,7 +217,22 @@
                 heroDeathReplay(u); // «Гоблин-вождь»: первый погибший гоблин возвращается
                 heroBuildingReplay(u); // «Хранитель рощи»: первая погибшая постройка возвращается
                 lichRaiseGhost(killer, u); // «Лич»: призрак на клетку убитого
+                deathKnightGain(killer, u); // «Рыцарь смерти»: +1⚡ владельцу
                 exhumingReplay(u); // «Выкапливание»: существо возвращается после смерти
+            };
+
+            // «Рыцарь смерти» (dec159, просил юзер): убив СУЩЕСТВО (постройки
+            // не считаются), даёт владельцу 1 энергию. Образец — «Лич» выше:
+            // убийца должен быть жив (мог погибнуть от шипов/ответки)
+            A.deathKnightGain = function deathKnightGain(killer, u) {
+                if (!killer || killer === u || !killer.def || !killer.def.deathKnight
+                    || !B.units.includes(killer)) return;
+                if (!u || u.def.type !== "unit") return;
+                if (killer.side === "p") B.energy += 1; else B.eEnergy += 1;
+                const p = cellXY(killer.col, killer.row);
+                floatText(p.x, p.y - 66, "+1⚡", 0xffd98c);
+                punch(killer.node);
+                sfx("aqua");
             };
 
             // «Лич» (dec131, просил юзер): убив существо (любой стороны),
@@ -361,6 +379,7 @@
                 if (u.venom) { u.venom = 0; n++; }
                 if (u.poison) { u.poison = 0; n++; }
                 if (u.atkZero) { u.atkZero = false; n++; } // «Ловушка-пузырь» (wis119)
+                if (u.tarMark) { u.tarMark = false; n++; } // «Смоляная статуя» (dec155): метка-аура снята
                 if (u.entangle) { u.entangle = 0; n++; }
                 if (u.frozen) { u.frozen = 0; n++; }
                 if (u.spellWard) { u.spellWard = false; n++; removeWardMark(u); }

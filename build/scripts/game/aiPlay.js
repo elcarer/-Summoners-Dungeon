@@ -10,6 +10,7 @@
                 B.phase = "enemy";
                 B.selected = null;
                 B.spellTarget = false;
+                cryptRefund("p"); // «Склеп»: не разыгранная игроком карта — назад в сброс
                 layoutHand();
                 redrawHighlight();
                 refreshHud();
@@ -27,6 +28,7 @@
                 if (B.stopped || B.phase === "over") return;
                 await aiPlay();
                 if (B.stopped || B.phase === "over") return;
+                cryptRefund("e"); // «Склеп» врага: не разыгранная карта — назад в сброс
                 // шкала врага — мягкое правило добора (просил юзер), см. enemyDrawPlan
                 const eCards = enemyDrawPlan();
                 drawEnemy(eCards);
@@ -124,6 +126,31 @@
             // метрика, чтобы пожар/жертва/грибы считали одинаково с целями.
 
             A.aiPlay = async function aiPlay() {
+                // «Склеп» (dec157): верхняя карта своего сброса — в руку (как у
+                // игрока по клику постройки); ИИ разыграет её на общих
+                // основаниях, не разыграл — вернётся в сброс в конце хода.
+                // Гейт: карта вообще играбельна (юнит/постройка — есть клетка,
+                // заклинание — aiSpellPlayable, ловушка — есть) и по карману
+                if (!B.eCryptTaken && B.eDiscard.length && B.eHand.length < HAND_MAX) {
+                    const crypt = B.units.find((v) => v.side === "e"
+                        && v.def.type === "building" && v.def.cryptPlay);
+                    if (crypt) {
+                        const id = B.eDiscard[B.eDiscard.length - 1];
+                        const d = CARDS[id];
+                        const playable = d && (d.type === "unit" || d.type === "building"
+                            ? !bubbleBlocked("e", id)
+                                && freeCells(deployRows("e")).length > 0
+                            : true);
+                        if (playable && effCost(id, "e") <= B.eEnergy) {
+                            B.eDiscard.pop();
+                            B.eHand.push(id);
+                            B.eCryptTaken = id;
+                            const cp = cellXY(crypt.col, crypt.row);
+                            floatText(cp.x, cp.y - 96,
+                                "⤒ " + GAME_LOC.t(`card.${id}.name`), 0xb7d0ef);
+                        }
+                    }
+                }
                 // ИИ тратит энергию, пока есть чем. Если играть нечем (в руке всё
                 // слишком дорого или неприменимо — поле забито, целей нет), а
                 // энергии много — добирает карты и пробует снова: копить десятки
@@ -197,6 +224,7 @@
                                 B.eEnergy -= effCost(cardId, "e");
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 B.eDiscard.push(cardId);
+                                cryptSettle("e", cardId); // «Склеп»
                                 noteDiscard(1, "e", [cardId]);
                                 floatText(960, 500,
                                     "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
@@ -214,6 +242,7 @@
                             addUnit("e", cardId, col, row);
                             B.eDiscard.push(cardId); // как у игрока: карта в сброс (иначе цикл «Трусливого гоблина» не работает)
                             noteDiscard(1, "e", [cardId]);
+                            cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                             B.playCtx = null;
                             hideEnemyCard();
                             played = true;
@@ -236,12 +265,18 @@
                                 B.eHand.splice(pick.i, 1);
                                 B.eEnergy -= effCost(cardId, "e");
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
+                                cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                                 if (def.trap.effect === "sporeCurse") addSpores(pu);
                                 else armTrap("e", cardId, 0, 0, pu);
                                 hideEnemyCard();
                                 played = true;
                                 break;
                             }
+                            // «Посвящение тьме» (dec154): без юнит-карты в руке
+                            // ловушка — голое убийство за 5⚡; держим до карты
+                            if (def.trap.effect === "darkOffering"
+                                && !B.eHand.some((id) =>
+                                    CARDS[id] && CARDS[id].type === "unit")) continue;
                             // Ловушки — прежде всего на путь марша игрока: пустая
                             // клетка прямо ПЕРЕД его существом (шагнёт и наступит),
                             // и не просто «какая-то передняя», а на пути САМОГО
@@ -257,6 +292,7 @@
                             B.eHand.splice(pick.i, 1);
                             B.eEnergy -= effCost(cardId, "e");
                             consumeEpicDiscount(cardId, "e"); // «Архилич»
+                            cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                             armTrap("e", cardId, col, row);
                             hideEnemyCard();
                             played = true;
@@ -277,6 +313,7 @@
                                 noteDiscard(1, "e", [cardId]);
                                 B.eEnergy -= effCost(cardId, "e");
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
+                                cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                                 floatText(960, 500,
                                     "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                                 hideEnemyCard();
@@ -319,6 +356,7 @@
                                 floatText(960, 640, `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
                                 sfx("rocket");
                             } else { B.eDiscard.push(cardId); noteDiscard(1, "e", [cardId]); }
+                            cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                             heroStrReplay("e", cardId, def); // «Мастера огня»
                             B.lastSpell.e = cardId;
                             afterSpellPlayed(); // «Заклинатель клинков» на поле

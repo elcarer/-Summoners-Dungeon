@@ -212,6 +212,12 @@
                 torturePick(side) { pickTorture(side); },
                 // «Запретные знания» (dec130, тесты): панель и выбор стороны
                 forbiddenPick(side) { pickForbidden(side); },
+                // «Кровавая луна» (dec160, тесты): панель и выбор траты
+                moonState: () => ({ open: !!moonPanel, picking: !!(B && B.picking),
+                    cap: moonMax }),
+                moonPick(n) { pickMoon(n); },
+                // «Склеп» (dec157, тесты): замешивание сыгранной карты (ИИ-точка)
+                _cryptSettle(side, cardId) { cryptSettle(side, cardId); },
                 // тест-хуки поправок: свечение выбранной карты (п2) и сетка
                 // оверлея-просмотра (п3)
                 selGlow() {

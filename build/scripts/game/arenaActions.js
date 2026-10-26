@@ -44,7 +44,47 @@
                 B.hand.splice(handIdx, 1);
                 B.selected = null;
                 B.spellTarget = false;
+                cryptSettle("p", cardId); // «Склеп» (dec157): сыгранная из него карта — в колоду
                 return cardId;
+            };
+
+            // «Склеп» (dec157): карта, взятая из сброса постройки, после
+            // розыгрыша (выход в сброс) замешивается в колоду. Сожжённая
+            // («Сожжение») из боя удалена — не возвращаем; карточки нет в
+            // сбросе (вернул в руку «Мастером огня» и пр.) — не трогаем.
+            // ИИ симметрично: метка eCryptTaken, те же правила
+            A.cryptSettle = function cryptSettle(side, cardId) {
+                const mark = side === "p" ? B.cryptTaken : B.eCryptTaken;
+                if (!mark || mark !== cardId) return;
+                if (side === "p") B.cryptTaken = null; else B.eCryptTaken = null;
+                if (B.scorch[side].has(cardId)) return;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const deck = side === "p" ? B.deck : B.eDeck;
+                const di = discard.lastIndexOf(cardId);
+                if (di < 0) return;
+                discard.splice(di, 1);
+                deck.push(cardId);
+                shuffle(deck);
+                floatText(960, side === "p" ? 640 : 300,
+                    "⇵ " + GAME_LOC.t(`card.${cardId}.name`), 0xb7d0ef);
+                sfx("chpoc");
+            };
+
+            // Конец хода стороны: взятая из «Склепа», но не разыгранная
+            // карта возвращается в сброс (она формально из сброса и вышла)
+            A.cryptRefund = function cryptRefund(side) {
+                const mark = side === "p" ? B.cryptTaken : B.eCryptTaken;
+                if (!mark) return;
+                if (side === "p") B.cryptTaken = null; else B.eCryptTaken = null;
+                const hand = side === "p" ? B.hand : B.eHand;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const hi = hand.indexOf(mark);
+                if (hi < 0) return;
+                hand.splice(hi, 1);
+                discard.push(mark);
+                if (side === "p") { layoutHand(); refreshHud(); }
+                const p = cellXY(2, side === "p" ? 4 : 0);
+                floatText(p.x, p.y - 60, "⤓ " + GAME_LOC.t(`card.${mark}.name`), 0x8a7c5e);
             };
 
             // снять выбор карты: карты руки снова интерактивны
@@ -117,7 +157,28 @@
                     refreshHud();
                     return;
                 }
-                if (B.selected === null) return;
+                if (B.selected === null) {
+                    // «Склеп» (dec157): клик по своей постройке снимает ВЕРХНЮЮ
+                    // карту своего сброса в руку — игрок разыгрывает её как
+                    // обычную, после розыгрыша она замешивается в колоду
+                    // (cryptSettle в spendCard); не разыграл — вернётся в
+                    // сброс в конце хода (cryptRefund). Одна карта за раз
+                    const cb = unitAt(col, row);
+                    if (cb && cb.side === "p" && cb.def.type === "building"
+                        && cb.def.cryptPlay && B.discard.length
+                        && !B.cryptTaken && B.hand.length < HAND_MAX) {
+                        const cardId = B.discard.pop();
+                        B.hand.push(cardId);
+                        B.cryptTaken = cardId;
+                        layoutHand();
+                        redrawHighlight();
+                        refreshHud();
+                        floatText(cellXY(col, row).x, cellXY(col, row).y - 96,
+                            "⤒ " + GAME_LOC.t(`card.${cardId}.name`), 0xb7d0ef);
+                        sfx("chpoc");
+                    }
+                    return;
+                }
                 const def = CARDS[B.hand[B.selected]];
                 if (!def) return;
                 if (B.spellTarget) { // прицел: по врагу, любому существу или строению
@@ -536,6 +597,12 @@
                     floatText(960, 840, `+${n}⚡`, 0xffd98c);
                     punch(root.hud);
                     sfx("aqua");
+                }
+                if (def.spell.terrainScout) { // «Выбор местности» (dec156): верхние N карт колоды — взять 1 постройку
+                    openRunesPanel(def.spell.terrainScout, "building");
+                }
+                if (def.spell.bloodMoon) { // «Кровавая луна» (dec160): жизни базы — в энергию (выбор 1..N)
+                    openMoonPanel(def.spell.bloodMoon);
                 }
                 if (def.spell.target === "ownBuilding" && def.spell.excavate) { // «Раскопки»
                     if (!target || target.col === undefined) return false;

@@ -230,7 +230,26 @@
             // заклинания — любой стороной, включая повторы «Горящих рун» — он и
             // все соседние СУЩЕСТВА (строения не считаются) получают +1 к урону
             // навсегда (bonusAtk).
+            // «Портал духов» (dec158): каждый розыгрыш заклинания любой
+            // стороной призывает его Призрака 2/1 (жетон ghost) на первую
+            // пустую соседнюю (верт/гориз) клетку; все соседние заняты —
+            // призыва нет. Способности существ (руна, послушник) розыгрышем
+            // карты не считаются — их тут нет
             A.afterSpellPlayed = function afterSpellPlayed() {
+                for (const b of B.units.slice()) {
+                    if (!b.def.ghostPortal || !B.units.includes(b)) continue;
+                    for (const [dc, dr] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                        const c2 = b.col + dc, r2 = b.row + dr;
+                        if (c2 < 0 || c2 >= GRID || r2 < 0 || r2 >= GRID
+                            || unitAt(c2, r2)) continue;
+                        addUnit(b.side, "ghost", c2, r2, { token: true });
+                        const gp = cellXY(c2, r2);
+                        floatText(gp.x, gp.y - 108,
+                            GAME_LOC.t("card.ghost.name"), 0xb7d0ef);
+                        sfx("chpoc");
+                        break;
+                    }
+                }
                 for (const u of B.units.slice()) {
                     if (!u.def.spellBuffAura || !B.units.includes(u)) continue;
                     const near = B.units.filter((v) => v !== u && v.def.type === "unit"

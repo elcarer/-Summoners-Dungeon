@@ -135,7 +135,8 @@
                     const e = t.def.trap.effect;
                     if (e === "freezeSplash" || e === "rowShift"
                         || e === "bubble" || e === "alliesStrike"
-                        || e === "ghostGrave")
+                        || e === "ghostGrave" || e === "darkOffering"
+                        || e === "tarStatue")
                         return u.def.type === "unit";
                     return e === "cellDmg" || e === "ambush"
                         || e === "confuse" || e === "cellDebuff"
@@ -350,6 +351,53 @@
                     floatText(p2.x, p2.y - 108,
                         GAME_LOC.t("card.ghost.name"), 0xb7d0ef);
                     sfx("chpoc");
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
+                if (trap.def.trap.effect === "darkOffering") {
+                    // «Посвящение тьме» (dec154): вошедшее существо
+                    // противника уничтожается, затем ХОЗЯЙКА ловушки
+                    // разыгрывает существо с руки в эту клетку БЕЗ траты
+                    // энергии (первая юнит-карта руки — как у «Выросших
+                    // духов»; запрет «Ловушки-пузыря» уважаем). Клетку
+                    // успели занять (возврат героя) — разыграть некуда
+                    const p2 = cellXY(u.col, u.row);
+                    killUnit(u, null);
+                    floatText(p2.x, p2.y - 45, "☠", 0xef9f8c);
+                    const hand = side === "p" ? B.hand : B.eHand;
+                    const discard = side === "p" ? B.discard : B.eDiscard;
+                    const i = hand.findIndex((id) =>
+                        CARDS[id] && CARDS[id].type === "unit");
+                    if (i >= 0 && !unitAt(u.col, u.row)
+                        && !bubbleBlocked(side, hand[i])) {
+                        const cardId = hand.splice(i, 1)[0];
+                        discard.push(cardId);
+                        noteDiscard(1, side, [cardId]);
+                        addUnit(side, cardId, u.col, u.row);
+                        floatText(p2.x, p2.y - 108,
+                            GAME_LOC.t(`card.${cardId}.name`), 0xb7d0ef);
+                    }
+                    sfx("chpoc");
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
+                if (trap.def.trap.effect === "tarStatue") {
+                    // «Смоляная статуя» (dec155): вошедшее существо −4⚔
+                    // навсегда (урон не ниже нуля — кламп recalcAuras) и
+                    // метка tarMark: пока оно живо, соседние (верт/гориз)
+                    // СУЩЕСТВА ЕГО ЖЕ стороны («существа противника» со
+                    // стороны владельца карты) всегда имеют −2⚔ (аура
+                    // tarMark в recalcAuras)
+                    u.bonusAtk = (u.bonusAtk || 0) - 4;
+                    u.tarMark = true;
+                    recalcAuras();
+                    const p2 = cellXY(u.col, u.row);
+                    floatText(p2.x, p2.y - 39, "−4⚔", 0xef9f8c);
+                    fxEvent("debuff", { x: p2.x, y: p2.y - 12, scale: 0.72 });
+                    punch(u.node);
+                    sfx("acid");
                     refreshHud();
                     checkEnd();
                     return;
