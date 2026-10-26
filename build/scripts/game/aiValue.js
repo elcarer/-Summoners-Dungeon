@@ -624,6 +624,11 @@
                     if (d.vampHeal) s += 0.5; // dec132: отхил после каждой атаки
                     if (d.exhuming) s += 1.2; // dec146: вторая жизнь
                     if (d.summonDiscard) s -= 0.4; // dec146: платит картой при появлении
+                    // dec147: аура Короля кормит своих скелетов на поле
+                    if (d.skelKing) s += 1 + 0.5 * B.units.filter((v) =>
+                        v.side === "e" && v.def.type === "unit"
+                        && v.def.subtype === "skeleton").length;
+                    if (d.acolyteCast) s += 0.5; // dec148: бесплатный каст из сброса
                     return s;
                 }
                 if (d.type === "building") {

@@ -314,6 +314,13 @@
                 return n;
             };
             A.recalcAuras = function recalcAuras() {
+                // «Король скелетов» (dec147): все скелеты на поле боя
+                // (ОБЕ стороны — так в спеке юзера) наносят на 1 урона
+                // больше за каждого живого Короля; аура живёт, пока он
+                // на поле (смерть/Смыв пересчитывают — killUnit/bounce)
+                let kings = 0;
+                for (const u of B.units)
+                    if (u.def.type === "unit" && u.def.skelKing) kings += u.def.skelKing;
                 for (const side of ["p", "e"]) {
                     let atk = 0, hp = 0;
                     for (const u of B.units) if (u.side === side && u.def.type === "building") {
@@ -326,7 +333,8 @@
                         // atkZero — «Ловушка-пузырь» (wis119): урон ровно 0
                         const newAtk = u.atkZero ? 0
                             : Math.max(0, u.def.atk + (u.bonusAtk || 0)
-                                + (u.atkPenalty || 0) + atk);
+                                + (u.atkPenalty || 0) + atk
+                                + (u.def.subtype === "skeleton" ? kings : 0));
                         if (u.curAtk !== newAtk) {
                             u.curAtk = newAtk;
                             const n = u.node.getChildByName("atk");
@@ -448,14 +456,22 @@
                     }
                     // Врождённое «Выкапливание N» (dec146 «Восставший
                     // нетопырь»): счётчик общий с меткой/Мортисом/костями.
-                    // def.exhuming — способность КАРТЫ: работает при любом
-                    // появлении на поле, включая возврат выкапливанием
-                    if (def.exhuming) addExhuming(u, (u.exhuming || 0) + def.exhuming);
+                    // ОБЩЕЕ ПРАВИЛО (просил юзер): написанное на существе
+                    // «Выкапливание» НЕ работает при призыве этого существа
+                    // из сброса эффектом «Выкапливания» (opts.rebirth —
+                    // возврат exhumingReplay), иначе нетопырь бесконечен
+                    if (def.exhuming && !opts.rebirth)
+                        addExhuming(u, (u.exhuming || 0) + def.exhuming);
                     // «Восставший нетопырь» (dec146): после появления сбрасывает
                     // карту с руки (авто, наименее ценная — как «Дурное варево»;
                     // пустая рука — эффекта нет). Срабатывает при ЛЮБОМ
                     // появлении — розыгрыш и возврат выкапливанием
                     if (def.summonDiscard) discardWeakest(side, null);
+                    // «Скелет послушника» (dec148): после появления разыгрывает
+                    // случайное заклинание стоимостью ≤N из СВОЕГО сброса —
+                    // бесплатно (энергия не тратится); любое появление,
+                    // как у dec146
+                    if (def.acolyteCast) acolyteCast(side, def.acolyteCast);
                     // «Меч в алтаре» (wis104): существо, призванное рядом с
                     // этой постройкой, получает +1⚔ за каждую ЕЁ жизнь,
                     // после чего меч-постройка погибает (штатный killUnit:
@@ -563,6 +579,24 @@
                             floatText(sp.x, sp.y - 96,
                                 "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0xc9b98c);
                             sfx("up");
+                        }
+                    }
+                    // «Армия тьмы» (decArmy, просил юзер): первый призванный
+                    // стороной Скелет (жетоны Толпы/Поля костей — тоже
+                    // скелеты) наносит базе противника урон в размере
+                    // СВОЕГО урона (по текущим бонусам/аурам). Тест-хук
+                    // _spawn удар не триггерит
+                    if (def.type === "unit" && def.subtype === "skeleton"
+                        && !opts.testSummon && !B.heroFlags.skeletonStrike[side]) {
+                        const hdA = heroDefOf(side);
+                        if (hdA && hdA.ability === "firstSkeletonStrike") {
+                            B.heroFlags.skeletonStrike[side] = true;
+                            if (u.curAtk > 0) {
+                                damageBase(side === "p" ? "e" : "p", u.curAtk);
+                                const sp = cellXY(col, row);
+                                floatText(sp.x, sp.y - 108, `⚔${u.curAtk}`, 0xef9f8c);
+                                sfx("rocket");
+                            }
                         }
                     }
                     // «Свита вождя» (goblinChainSummon, просил юзер): гоблин

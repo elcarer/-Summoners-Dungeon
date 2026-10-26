@@ -894,13 +894,34 @@
                   color: 0x63424e, img: "decay/145" },
         // «Восставший нетопырь» (dec146): 6/2 с «Выкапливанием 1»; после
         // появления на поле (включая возврат выкапливанием) сбрасывает
-        // карту с руки (авто, наименее ценная)
+        // карту с руки (авто, наименее ценная). ОБЩЕЕ ПРАВИЛО (просил
+        // юзер): врождённое «Выкапливание» НЕ работает при возврате
+        // существа из сброса эффектом «Выкапливания» — иначе нетопырь
+        // возвращался бы бесконечно (addUnit opts.rebirth)
         dec146: { type: "unit", cost: 4, atk: 6, hp: 2, speed: 1,
                   creature: "goblin", // плейсхолдер листа поля боя (некр по стихии)
                   subtype: "animal", // подтип — по спеке юзера («Животное»)
                   exhuming: 1, summonDiscard: 1,
                   rarity: "rare", elem: "decay",
                   color: 0x504048, img: "decay/146" },
+        // «Король скелетов» (dec147): все скелеты на поле боя (ОБЕ
+        // стороны) наносят на 1 урона больше, пока Король жив (skelKing —
+        // глобальная аура в recalcAuras, уходит вместе с ним)
+        dec147: { type: "unit", cost: 3, atk: 2, hp: 3, speed: 1,
+                  creature: "goblin", // плейсхолдер листа поля боя (некр по стихии)
+                  subtype: "skeleton", // подтип — по спеке юзера (чат)
+                  skelKing: 1,
+                  rarity: "epic", elem: "decay",
+                  color: 0x504048, img: "decay/147" },
+        // «Скелет послушника» (dec148): после появления разыгрывает
+        // СЛУЧАЙНУЮ карту заклинания стоимостью ≤3 из СВОЕГО сброса —
+        // бесплатно (энергия не тратится; acolyteCast в arenaCombat)
+        dec148: { type: "unit", cost: 2, atk: 0, hp: 2, speed: 1,
+                  creature: "goblin", // плейсхолдер листа поля боя (некр по стихии)
+                  subtype: "skeleton", // подтип — по спеке юзера (чат)
+                  acolyteCast: 3,
+                  rarity: "rare", elem: "decay",
+                  color: 0x504048, img: "decay/148" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1121,6 +1142,12 @@
         decMind: { id: "decMind", rarity: "common", baseHp: 13,
                    elems: ["decay"], starter: "decay",
                    img: "28", ability: "firstDiscardReplay" },
+        // 5-й этаж (арт heroes/29.png): Тлен, 14♥, первый призванный
+        // в этом бою Скелет (включая жетоны Толпы/Поля костей) наносит
+        // базе противника урон в размере своего урона
+        decArmy: { id: "decArmy", rarity: "rare", baseHp: 14,
+                   elems: ["decay"], starter: "decay",
+                   img: "29", ability: "firstSkeletonStrike" },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1131,7 +1158,7 @@
         "grwControl", "grwBoss",
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
-        "decBones", "decBlack", "decUnder", "decMind"];
+        "decBones", "decBlack", "decUnder", "decMind", "decArmy"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

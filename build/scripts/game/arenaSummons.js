@@ -272,6 +272,9 @@
             // исчезает. Штатный addUnit: ловушки клетки/ауры/постройки
             // срабатывают, как на призыв. Смертью считается только killUnit —
             // «Смыв»/«Раскопки» (removeUnit без каскадов) не будят скелета.
+            // Возврат идёт с opts.rebirth: врождённое «Выкапливание» карты
+            // при нём НЕ ставится (общее правило юзера), остаток счётчика
+            // метки/Мортиса — восстанавливается ниже как раньше.
             A.addExhuming = function addExhuming(u, n) {
                 u.exhuming = n;
                 updateExhumingMark(u);
@@ -336,7 +339,7 @@
                     floatText(p.x, p.y - 118, "+1⚡ +1", 0xffd98c);
                     sfx("up");
                 }
-                const u2 = addUnit(side, id, cell[0], cell[1]);
+                const u2 = addUnit(side, id, cell[0], cell[1], { rebirth: true });
                 if (u2 && left > 0 && B.units.includes(u2)) addExhuming(u2, left);
             };
 

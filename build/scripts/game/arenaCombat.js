@@ -313,6 +313,76 @@
                 sfx("up");
                 refreshHud();
             };
+            // «Скелет послушника» (dec148): после появления разыгрывает
+            // СЛУЧАЙНУЮ карту заклинания стоимостью ≤maxCost из СВОЕГО
+            // сброса — бесплатно (энергия не тратится, карта остаётся
+            // в сбросе). Панельные заклинания (выбор игрока: Пытка разума,
+            // Запретные знания, поиски/варка/гримуар/поднятие) и сжигатели
+            // энергии (Огнешар/Гроза) не берём: бесплатный каст не должен
+            // открывать панели и жечь энергию. Цель — авто: врагу хватает
+            // его движка (enemyCastSpellEffect), игроку — applySpellP с
+            // acolyteTargetFor (вредоносные — в лучшего чужого, остальное —
+            // автоцель повтора «Горящих рун»)
+            A.acolyteTargetFor = function acolyteTargetFor(cardId) {
+                const d = CARDS[cardId];
+                const s = d.spell;
+                // вредоносные anyUnit-заклинания autoTargetFor наведёт на
+                // СВОЕГО лучшего — послушник должен бить чужого
+                if (s.target === "anyUnit" && (s.poison || s.destroy || s.debuffAtk
+                    || s.bounce || s.hydroPunch || s.iceStrike)) {
+                    if (s.iceStrike) {
+                        const pick = iceStrikePick("p");
+                        return pick ? { col: pick.unit.col, row: pick.unit.row } : null;
+                    }
+                    const foes = spellTargets(B.units
+                        .filter((v) => v.side !== "p" && v.def.type === "unit"));
+                    if (!foes.length) return null;
+                    const best = s.poison
+                        ? foes.slice().sort((a, b) => (b.hp - a.hp) || (b.curAtk - a.curAtk))[0]
+                        : foes.slice().sort((a, b) => (b.curAtk - a.curAtk) || (b.hp - a.hp))[0];
+                    return { col: best.col, row: best.row };
+                }
+                return autoTargetFor(cardId);
+            };
+            A.acolyteCast = function acolyteCast(side, maxCost) {
+                if (!B) return false;
+                const pile = side === "p" ? B.discard : B.eDiscard;
+                const cands = [];
+                const seen = {};
+                for (const id of pile) {
+                    if (seen[id]) continue;
+                    seen[id] = 1;
+                    const d = CARDS[id];
+                    if (!d || d.type !== "spell" || (d.cost || 0) > maxCost) continue;
+                    const s = d.spell;
+                    if (s.copyLast || s.drainAll || s.stormAll || s.excavate
+                        || s.sacrifice || s.search || s.searchUnit || s.seek
+                        || s.grim || s.journey || s.discardPick || s.raiseDead
+                        || s.mindTorture || s.forbidden) continue;
+                    cands.push(id);
+                }
+                if (!cands.length) return false;
+                for (let i = cands.length - 1; i > 0; i--) { // случайный порядок
+                    const j = (Math.random() * (i + 1)) | 0;
+                    [cands[i], cands[j]] = [cands[j], cands[i]];
+                }
+                for (const id of cands) {
+                    if (side === "e") {
+                        if (!aiSpellPlayable(CARDS[id])) continue;
+                        enemyCastSpellEffect(CARDS[id], true); // авто-цели ИИ
+                        refreshHud();
+                        return true;
+                    }
+                    const t = acolyteTargetFor(id);
+                    if (t === null && CARDS[id].spell.target !== "none") continue;
+                    if (applySpellP(id, t, true)) {
+                        fxSpellCast(id, t, "p");
+                        refreshHud();
+                        return true;
+                    }
+                }
+                return false;
+            };
             A.noteDiscard = function noteDiscard(n = 1, side = null, ids = null) {
                 if (!B) return;
                 // «Сброс разума» (decMind): первая за бой карта стороны, чьим
