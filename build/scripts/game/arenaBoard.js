@@ -647,6 +647,28 @@
                             sfx("up");
                         }
                     }
+                    // «Мятежники» (firstHonorDash, просил юзер): первое за
+                    // бой призванное стороной существо стихии Честь получает
+                    // «Скорость 1» — сразу шаг вперёд или удар по стоящему
+                    // впереди противнику (summonDash). У существа своя
+                    // «Скорость 1» (Разбойники) — рывок уже был при призыве,
+                    // второй не даём, но флаг тратится: способность выполнена.
+                    // Токен «Молебна» — тоже существо Чести. Тест-хук _spawn
+                    // подстройку героя не триггерит.
+                    if (def.type === "unit" && def.elem === "honor"
+                        && !opts.testSummon && !B.heroFlags.honorDash[side]) {
+                        const hdD = heroDefOf(side);
+                        if (hdD && hdD.ability === "firstHonorDash") {
+                            B.heroFlags.honorDash[side] = true;
+                            if (def.ability !== "dash1") {
+                                summonDash(u);
+                                const sp2 = cellXY(u.col, u.row);
+                                floatText(sp2.x, sp2.y - 96,
+                                    "» " + GAME_LOC.t("status.dash.name"), 0xb7d0ef);
+                                sfx("step");
+                            }
+                        }
+                    }
                     // «Армия тьмы» (decArmy, просил юзер): первый призванный
                     // стороной Скелет (жетоны Толпы/Поля костей — тоже
                     // скелеты) наносит базе противника урон в размере

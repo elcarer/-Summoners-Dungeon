@@ -155,6 +155,16 @@
                 "dec158",
                 "dec159",
                 "dec160"],
+        // Честь: все карты стихии (161–168) — все обычные, ×3 — для
+        // сундуков/магазина/наград «Залов Чести»
+        honor: ["hon161", "hon161", "hon161",
+                "hon162", "hon162", "hon162",
+                "hon163", "hon163", "hon163",
+                "hon164", "hon164", "hon164",
+                "hon165", "hon165", "hon165",
+                "hon166", "hon166", "hon166",
+                "hon167", "hon167", "hon167",
+                "hon168", "hon168", "hon168"],
     };
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
@@ -359,6 +369,16 @@
                        grow: ["dec135", "dec127", "dec136", "dec143",
                               "dec146", "dec147", "dec148", "dec149",
                               "dec150", "dec151"] },
+        // ── «Залы Чести» (пятое подземелье, стихия «Честь») ────────────────
+        // Пока 1 этаж без босса (просил юзер). 1-й этаж: «Мятежники» —
+        // база 10♥, ядро 11 карт по спеке (Ополченец ×2, Пехотинец ×2,
+        // Строй ×2, Молебен ×2, Яма-ловушка ×2, Разбойники). Герой врага —
+        // heroes/33.png, его способность firstHonorDash — первое существо
+        // Чести в бою получает «Скорость 1». Арена — scenes/5.png.
+        honRebels: { scene: 5, baseHp: 10, elem: "honor", hero: "honRebels",
+                     core: ["hon161", "hon161", "hon162", "hon162",
+                            "hon165", "hon165", "hon166", "hon166",
+                            "hon167", "hon167", "hon168"] },
     };
     // Подземелья открытого мира: стихия (пул наград/драфта) и кап глубины.
     // У «Подземных ключей» шесть этажей; главарь «Безумный маг» стоит на
@@ -368,6 +388,7 @@
         grw: { elem: "growth", maxFloor: 6, boss: "grwBoss" },     // Роща Роста
         wis: { elem: "wisdom", maxFloor: 6, boss: "wisBoss" },     // Подземные ключи
         dec: { elem: "decay", maxFloor: 6, boss: "decLichBoss" },  // Земли мёртвых — главарь «Архилич»
+        hon: { elem: "honor", maxFloor: 1 },                       // Залы Чести — пока 1 этаж без босса (просил юзер)
     };
     // Этаж → какой обычный враг на нём водится: на каждом этаже ОДИН архетип
     // (просил юзер: этаж N приводит N-й вид, без перемешивания — как в
@@ -413,8 +434,14 @@
         ["decArmy"],                            // 5
         ["decThirst"],                          // 6
     ];
+    // «Залы Чести»: пока один этаж — «Мятежники» (просил юзер); босса
+    // у данжа нет (CAVES.hon без `boss`), остальные стихии — по мере волн
+    const FLOOR_MOBS_HONOR = [
+        ["honRebels"],                          // 1
+    ];
     const MOB_TABLES = { gob: FLOOR_MOBS, grw: FLOOR_MOBS_GROWTH,
-                         wis: FLOOR_MOBS_WISDOM, dec: FLOOR_MOBS_DECAY };
+                         wis: FLOOR_MOBS_WISDOM, dec: FLOOR_MOBS_DECAY,
+                         hon: FLOOR_MOBS_HONOR };
     // Пул добора колоды врага по редкости. Панельные карты (str11 жертва,
     // str25 руны, str26 путешествие) ИИ теперь разыгрывает сам — цель он
     // выбирает по своим приоритетам, без экрана (просил юзер).
@@ -473,6 +500,15 @@
                      "dec153", "dec154", "dec157", "dec158", "dec159",
                      "dec160"],
         },
+        // Честь: пока все 8 карт обычные — добор (будущим боссам «Залов
+        // Чести») берёт обычные; редкие/эпические пусты — enemyDeck
+        // падает на common (просидеть кап 3 копий он не может)
+        honor: {
+            common: ["hon161", "hon162", "hon163", "hon164", "hon165",
+                     "hon166", "hon167", "hon168"],
+            rare:   [],
+            epic:   [],
+        },
     };
     // Колода врага: ядро архетипа; весь добор — только боссу (просил
     // юзер): с глубиной (floor ≥ 1) +2 карты из grow за этаж и 3..8 карт
@@ -514,7 +550,8 @@
         return deck;
     }
     // Обычный враг для этажа подземелья: архетип из таблицы этажа СВОЕГО
-    // данжа (пещеры / Роща Роста / Подземные ключи / Земли мёртвых).
+    // данжа (пещеры / Роща Роста / Подземные ключи / Земли мёртвых /
+    // Залы Чести).
     function mobForFloor(cave, floor) {
         const rows = MOB_TABLES[CAVES[cave] ? cave : "gob"];
         const table = rows[Math.min(Math.max(1, floor | 0) - 1, rows.length - 1)];
@@ -540,6 +577,7 @@
         deckMinFor, TRAP_SLOTS,
         DECK_COPIES, REWARD_POOL, REWARD_POOLS, ENCOUNTERS, FLOOR_MOBS,
         FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM, FLOOR_MOBS_DECAY,
+        FLOOR_MOBS_HONOR,
         MOB_TABLES, ENEMY_FILL, ENEMY_FILLS, CAVES,
         STARTER_DECKS, STARTER_COLLECTIONS, HEROES, HERO_ORDER, HERO_FOE_ORDER,
         enemyDeck, mobForFloor, ELEM_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,

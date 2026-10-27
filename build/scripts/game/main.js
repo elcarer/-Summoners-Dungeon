@@ -54,6 +54,8 @@
         uiTextures["scenes/3.png"] = await assets.loadTexture("./images/scenes/3.png");
         // арена «Земель мёртвых» (стихия Тлен)
         uiTextures["scenes/4.png"] = await assets.loadTexture("./images/scenes/4.png");
+        // арена «Залов Чести» (стихия Честь, просил юзер)
+        uiTextures["scenes/5.png"] = await assets.loadTexture("./images/scenes/5.png");
         // эффект поля «Стена костров» и рубашки колод по стихиям
         // (гоблины/природа/мудрость/тлен/честь)
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
@@ -65,7 +67,7 @@
         // тайлы подземелий юзера: images/dungeon_tiles/<данж>/<…>.png —
         // полы 64×64 (floor/0-9) и стены walls/* по маске соседей.
         // Свой набор на каждый данж: goblins_lair (Сила), growth_lair (Рост),
-        // water_lair (Мудрость)
+        // water_lair (Мудрость), necro_lair (Тлен), honor_lair (Честь)
         say("тайлы подземелья…");
         await frame();
         const TILE_FILES = ["floor/0", "floor/1", "floor/2", "floor/3",
@@ -76,7 +78,8 @@
             "walls/wall_cor2", "walls/wall_cor3", "walls/wall_cor4",
             "walls/wall_end1", "walls/wall_end2", "walls/wall_end3",
             "walls/wall_end4"];
-        for (const lair of ["goblins_lair", "growth_lair", "water_lair"]) {
+        for (const lair of ["goblins_lair", "growth_lair", "water_lair",
+                            "necro_lair", "honor_lair"]) {
             for (const f of TILE_FILES) {
                 uiTextures[`dungeon_tiles/${lair}/${f}.png`] =
                     await assets.loadTexture(`./images/dungeon_tiles/${lair}/${f}.png`);

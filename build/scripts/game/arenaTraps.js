@@ -138,7 +138,7 @@
                         || e === "ghostGrave" || e === "darkOffering"
                         || e === "tarStatue")
                         return u.def.type === "unit";
-                    return e === "cellDmg" || e === "ambush"
+                    return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
                         || e === "confuse" || e === "cellDebuff"
                         || e === "ancestor" || e === "entangle";
                 };
@@ -451,7 +451,13 @@
                     checkEnd();
                     return;
                 }
-                damageUnit(u, trap.def.trap.amount + altarBonus(side), null, "acid");
+                // «Яма-ловушка» (hon167): урон = МЕНЬШЕМУ из урона и жизней
+                // вошедшего существа (спека юзера) — сумму задаёт само
+                // существо, аура алтаря не добавляется
+                const dmg = trap.def.trap.effect === "cellDmgMin"
+                    ? Math.min(u.curAtk, u.hp)
+                    : trap.def.trap.amount + altarBonus(side);
+                damageUnit(u, dmg, null, "acid");
                 if (trap.def.trap.splash) for (const v of B.units.slice()) { // у ловушек без splash соседей не задевает
                     if (v !== u && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1) {
                         damageUnit(v, trap.def.trap.splash + altarBonus(side), null, "acid");

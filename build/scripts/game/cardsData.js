@@ -1078,6 +1078,22 @@
                   kind: "summon", // тип эффекта — по спеке юзера («Появление существ»)
                   rarity: "common", elem: "honor",
                   color: 0xd8d3c8, img: "honor/166" },
+        // «Яма-ловушка» (hon167): ловушка на пустую клетку; вошедшее/
+        // призванное на неё существо противника получает урон, равный
+        // МЕНЬШЕМУ из его урона и жизней (cellDmgMin — applyCellTrap)
+        hon167: { type: "trap", cost: 2,
+                  trap: { event: "onEnemyCell", effect: "cellDmgMin" },
+                  kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/167" },
+        // «Разбойники» (hon168): Человек 3/1 со «Скоростью 1» — после
+        // призыва сразу шаг на клетку вперёд или удар по стоящему впереди
+        // противнику (dash1 — summonDash)
+        hon168: { type: "unit", cost: 2, atk: 3, hp: 1, speed: 1,
+                  creature: "human", sheet: "knight", ability: "dash1",
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/168" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1335,6 +1351,14 @@
             baseHp: 15, elems: ["honor"], starter: "honor",
             img: "32", ability: "firstHonorGuard", abilityVal: 1,
         },
+        // «Мятежники» (1-й этаж «Залов Чести», просил юзер): Честь (белая),
+        // 10♥, первое призванное в бою существо стихии Честь получает
+        // «Скорость 1» (firstHonorDash — summonDash сразу после призыва;
+        // если у существа своя «Скорость 1», второй рывок не даём).
+        // Спрайт — heroes/33.png
+        honRebels: { id: "honRebels", rarity: "common", baseHp: 10,
+                     elems: ["honor"], starter: "honor",
+                     img: "33", ability: "firstHonorDash", abilityVal: 1 },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1346,7 +1370,8 @@
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
-        "decThirst", "decLich"]; // «Архилич» — ключ HEROES (enc.hero), не id энкаунтера
+        "decThirst", "decLich", // «Архилич» — ключ HEROES (enc.hero), не id энкаунтера
+        "honRebels"]; // «Залы Чести» (1-й этаж, просил юзер)
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

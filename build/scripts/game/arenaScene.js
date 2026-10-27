@@ -14,9 +14,10 @@
                 // фон и сетка поля — по подземелью: гоблинские пещеры —
                 // scenes/1.png, Роща Роста — scenes/2.png (просил юзер),
                 // Мудрость/«Подземные ключи» — scenes/3.png (подводная пещера),
-                // Тлен/«Земли мёртвых» — scenes/4.png
+                // Тлен/«Земли мёртвых» — scenes/4.png,
+                // Честь/«Залы Чести» — scenes/5.png (просил юзер)
                 curScene = enc.elem === "growth" ? 2 : enc.elem === "wisdom" ? 3
-                    : enc.elem === "decay" ? 4 : 1;
+                    : enc.elem === "decay" ? 4 : enc.elem === "honor" ? 5 : 1;
                 if (ctx.music) ctx.music("battle");
                 // колода врага хранится в враге подземелья (кидается при
                 // генерации этажа по глубине); для старых сейвов — генерим.
@@ -74,6 +75,7 @@
                         skeletonStrike: { p: false, e: false },
                         firstDeathHeal: { p: false, e: false },
                         honorGuard: { p: false, e: false },
+                        honorDash: { p: false, e: false },
                         epicDiscount: { p: false, e: false } },
                     enemyBase: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
                     enemyBaseMax: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,

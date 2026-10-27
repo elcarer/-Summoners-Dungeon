@@ -233,14 +233,20 @@
                 const victim = B.units.find((v) => v.side === "p"
                     && v.col === col && v.row === row + 1);
                 if (victim) score += aiThreat(victim) * 0.8;
-                if (tr.effect === "cellDmg" || tr.effect === "cellDmgAll") {
+                if (tr.effect === "cellDmg" || tr.effect === "cellDmgAll"
+                    || tr.effect === "cellDmgMin") {
                     if (victim) {
-                        if (victim.def.type === "unit") {
+                        if (victim.def.type === "unit" && tr.effect !== "cellDmgMin") {
                             const crowd = B.units.filter((o) => o.side === "p" && o !== victim
                                 && Math.abs(o.col - victim.col) + Math.abs(o.row - victim.row) === 1).length;
                             score += crowd * (tr.splash || 0) * 0.6;
                         }
-                        if (victim.hp <= (tr.amount || 0) + altarBonus("e")) score += 1.5;
+                        // «Яма-ловушка»: урон = меньшему из урона и жизней
+                        // жертвы — добивает, только если жизни не больше урона
+                        const dmg = tr.effect === "cellDmgMin"
+                            ? Math.min(victim.curAtk, victim.hp)
+                            : (tr.amount || 0) + altarBonus("e");
+                        if (victim.hp <= dmg) score += 1.5;
                     }
                 } else if (tr.effect === "confuse" || tr.effect === "entangle") {
                     if (victim) score += aiThreat(victim) * 1.0 + victim.curAtk * 0.2;
