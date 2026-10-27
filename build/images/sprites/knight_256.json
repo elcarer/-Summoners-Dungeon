@@ -1,0 +1,27 @@
+{
+  "size": 256,
+  "columns": 6,
+  "fps": 12,
+  "animations": [
+    {
+      "name": "walk_front",
+      "row": 0,
+      "frames": 6
+    },
+    {
+      "name": "walk_back",
+      "row": 1,
+      "frames": 6
+    },
+    {
+      "name": "walk_right",
+      "row": 2,
+      "frames": 6
+    },
+    {
+      "name": "walk_left",
+      "row": 3,
+      "frames": 6
+    }
+  ]
+}
