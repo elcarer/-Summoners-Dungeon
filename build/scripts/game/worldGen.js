@@ -16,10 +16,10 @@
 // (V — версия генератора: смена алгоритма инкрементирует её, старые
 // сейвы перегенерируются). Модуль чистый: PIXI не касается.
 (function () {
-    const V = 2;
-    const W = 144, H = 96;
+    const V = 3;
+    const W = 192, H = 128;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
-    // сетка зон 3×2: индекс k — колонка k%3, ряд (k/3|0), сектор 48×48
+    // сетка зон 3×2: индекс k — колонка k%3, ряд (k/3|0), сектор 64×64
     const ZONE_ADJ = [[0, 1], [1, 2], [3, 4], [4, 5], [0, 3], [1, 4], [2, 5]];
     // вход в подземелье стихии (id данжа из CAVES; hon/tim — «Скоро…»)
     const ELEM_CAVE = {
@@ -35,8 +35,9 @@
     // (gx,gy) POI — якорь-площадь: у города нижняя средняя клетка,
     // у столицы — центральная. Данж — 1×1
     const KIND_SIZE = { town: { w: 3, h: 2 }, capital: { w: 3, h: 3 }, dungeon: { w: 1, h: 1 } };
-    // минимальная дистанция между якорями POI зоны (просил юзер ×2)
-    const MIN_POI_DIST = 9;
+    // минимальная дистанция между якорями POI зоны (просил юзер: ×2,
+    // затем ещё ×1.7 — города должны стоять редко, «карта маловата»)
+    const MIN_POI_DIST = 15;
 
     // террен-коды клетки: земля/гора/лес/вода/дорога/мост
     const T_GROUND = 0, T_MOUNTAIN = 1, T_FOREST = 2, T_WATER = 3,
@@ -131,8 +132,8 @@
         // ── 1. центры зон (сектор 48×48 + дрожание) ───────────────────────
         const centers = ELEMS.map((elem, k) => ({
             elem,
-            x: 24.5 + (k % 3) * 48 + (rng() - 0.5) * 10,
-            y: 24.5 + ((k / 3) | 0) * 48 + (rng() - 0.5) * 10,
+            x: 32.5 + (k % 3) * 64 + (rng() - 0.5) * 14,
+            y: 32.5 + ((k / 3) | 0) * 64 + (rng() - 0.5) * 14,
         }));
         // «расстояние» до зоны с шумом — границы зон органичные
         const zoneDist = (x, y, k) =>
@@ -163,7 +164,7 @@
             const ridges = 1 + (rng() < 0.6 ? 1 : 0);
             for (let r = 0; r < ridges; r++) {
                 let x = 6 + (rng() * (W - 12)) | 0, y = 6 + (rng() * (H - 12)) | 0;
-                const len = 8 + (rng() * 10) | 0;
+                const len = 12 + (rng() * 12) | 0;
                 for (let s = 0; s < len; s++) {
                     const i = y * W + x;
                     if (zone[i] === k && ter[i] !== T_WATER) ter[i] = T_MOUNTAIN;
@@ -177,10 +178,10 @@
 
         // ── 3. чащи (блобы случайным блужданием по земле зоны) ────────────
         for (let k = 0; k < 6; k++) {
-            const blobs = 9 + (rng() * 6) | 0;
+            const blobs = 12 + (rng() * 7) | 0;
             for (let b = 0; b < blobs; b++) {
                 let x = 4 + (rng() * (W - 8)) | 0, y = 4 + (rng() * (H - 8)) | 0;
-                const size = 8 + (rng() * 13) | 0;
+                const size = 10 + (rng() * 16) | 0;
                 for (let s = 0; s < size; s++) {
                     const i = y * W + x;
                     if (zone[i] === k && ter[i] === T_GROUND) ter[i] = T_FOREST;
@@ -195,7 +196,7 @@
 
         // ── 4. реки (извилистые, сверху вниз / слева направо) и озёра ─────
         // река прорезает горы и чащи (каньон), но не рамку карты
-        const rivers = 4 + (rng() < 0.5 ? 1 : 0);
+        const rivers = 6 + (rng() < 0.5 ? 1 : 0);
         for (let r = 0; r < rivers; r++) {
             const vertical = rng() < 0.55;
             if (vertical) {
@@ -218,7 +219,7 @@
                 }
             }
         }
-        const lakes = 3 + (rng() * 3) | 0;
+        const lakes = 4 + (rng() * 3) | 0;
         for (let l = 0; l < lakes; l++) {
             let x = 6 + (rng() * (W - 12)) | 0, y = 6 + (rng() * (H - 12)) | 0;
             const size = 8 + (rng() * 10) | 0;
@@ -258,7 +259,7 @@
             zonePois.push({ kind: "capital", elem: c.elem,
                 gx: cap ? cap.x : (c.x | 0), gy: cap ? cap.y : (c.y | 0) });
             // подземелье — в 12–18 клетках от столицы, направление от сида
-            const ang = rng() * Math.PI * 2, dist = 12 + rng() * 6;
+            const ang = rng() * Math.PI * 2, dist = 18 + rng() * 8;
             const dg = spiral(
                 Math.round(zonePois[0].gx + Math.cos(ang) * dist),
                 Math.round(zonePois[0].gy + Math.sin(ang) * dist),
@@ -269,15 +270,15 @@
                 gx: dg.x, gy: dg.y, cave: ELEM_CAVE[c.elem] });
             ter[dg.y * W + dg.x] = T_GROUND; // арка стоит на свободной земле
             // города: сэмплинг с минимальной дистанцией между якорями
-            // (редкие неудачи упаковки ослабляют её до 8, теснее — стоп)
+            // (редкие неудачи упаковки ослабляют её до 13, теснее — стоп)
             const want = 9 + (rng() * 3) | 0;
             let minD = MIN_POI_DIST, tries = 0;
-            while (zonePois.length < 2 + want && minD >= 8) {
+            while (zonePois.length < 2 + want && minD >= 13) {
                 const x = 4 + (rng() * (W - 8)) | 0, y = 3 + (rng() * (H - 6)) | 0;
                 if (placePred("town", k)(x, y)
                     && !zonePois.some((p) => Math.hypot(p.gx - x, p.gy - y) < minD)) {
                     zonePois.push({ kind: "town", elem: c.elem, gx: x, gy: y });
-                } else if (++tries > 900) { minD -= 0.5; tries = 0; }
+                } else if (++tries > 2200) { minD -= 0.5; tries = 0; }
             }
             // стены зданий вокруг площадей (сами площади свободны)
             for (const p of zonePois) {

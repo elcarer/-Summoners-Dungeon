@@ -16,6 +16,8 @@
 // скажет «Скоро…» — данжи этих стихий ещё впереди.
 (function () {
     const TS = 40;
+    const HERO_SPEED = 170; // шаг героя по обычной местности (px/с)
+    const ROAD_SPEED = HERO_SPEED * 1.2; // по дорогам/мостам ×1.2 (просил юзер)
 
     // палитры зон: земля (3 оттенка на шахматный детерминированный хэш),
     // крыши городов и кроны чащ — у каждой стихии свой характер
@@ -482,7 +484,7 @@
                 heroSprite = sprite;
                 heroId = characters.spawn({
                     x: hp.x, y: hp.y, sprite, anims: ctx.heroSheet.animations,
-                    speed: 170, fps: ctx.heroSheet.fps, halfW: 7, halfH: 5,
+                    speed: HERO_SPEED, fps: ctx.heroSheet.fps, halfW: 7, halfH: 5,
                 });
                 ECS.addComponent(world, heroId, "ctrlVI", 0);
                 ECS.addComponent(world, heroId, "ctrlVJ", 0);
@@ -530,6 +532,14 @@
                 heroShadow.position.set(hx, hy - 0.7 * 5.5 * 2);
                 heroShadow.zIndex = hy - 0.5;
                 if (heroSprite) heroSprite.zIndex = hy;
+                // скорость по дорогам (просил юзер): дорога и мост дают
+                // ×1.2 к обычному шагу — переключается клеткой под ногами
+                {
+                    const t = G.world.map.ter[
+                        Math.floor(hy / TS) * G.world.map.w + Math.floor(hx / TS)];
+                    COMPONENTS.ctrlSpeed[heroId] =
+                        t === T.ROAD || t === T.BRIDGE ? ROAD_SPEED : HERO_SPEED;
+                }
                 // мини-карта: маркер героя живёт вместе с ним (пульс)
                 {
                     const mini = uiHud.userData.mini;
@@ -648,6 +658,10 @@
                         w: map ? map.w : 0, h: map ? map.h : 0,
                         seed: G.world.seed,
                         pois: map ? map.pois.length : 0,
+                        speed: heroId !== null ? COMPONENTS.ctrlSpeed[heroId] : null,
+                        onRoad: !!(map && heroId !== null
+                            && [T.ROAD, T.BRIDGE].includes(map.ter[
+                                Math.floor(hero.y / TS) * map.w + Math.floor(hero.x / TS)])),
                         walkTarget,
                     };
                 },
@@ -664,6 +678,7 @@
                     if (heroId === null) return false;
                     COMPONENTS.positionX[heroId] = x;
                     COMPONENTS.positionY[heroId] = y;
+                    path = null; // телепорт гасит маршрут клика
                     return true;
                 },
                 enterCave: (cave) => enterCave(cave),
