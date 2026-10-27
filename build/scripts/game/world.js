@@ -154,53 +154,50 @@
 
         function buildHud() {
             const c = new PIXI.Container();
-            const panel = new PIXI.Sprite(uiTex("panel_label.png"));
-            panel.scale.set(1.05);
-            panel.eventMode = "static"; // «хром» HUD: клики не двигают героя
-            c.addChild(panel);
-            const style = { fontFamily: "Kereru", fontSize: 27, fill: 0xf3e6c2 };
-            const titleT = new PIXI.Text({ text: GAME_LOC.t("world.title"), style });
-            titleT.position.set(39, 15);
-            globalThis.GAME_UI.fit(titleT, 165, 11); // не наезжает на HP
-            const hpT = new PIXI.Text({ text: "", style });
-            hpT.position.set(219, 15);
-            c.addChild(titleT, hpT);
+            // «хром» HUD без фонов panel_label (просил юзер): невидимая
+            // зона за золотом/квестом ловит клики — герой не идёт в угол
+            const chrome = new PIXI.Container();
+            chrome.eventMode = "static";
+            chrome.hitArea = new PIXI.Rectangle(8, -6, 200, 76);
+            c.addChild(chrome);
+            const hudStyle = { fontFamily: "Kereru", fontSize: 27, fill: 0xf3e6c2,
+                stroke: { color: 0x1c1207, width: 4 } };
+            const titleT = new PIXI.Text({ text: GAME_LOC.t("world.title"), style: hudStyle });
+            titleT.anchor.set(0.5, 0);
+            titleT.position.set(960, 12); // по середине экрана (просил юзер)
+            c.addChild(titleT);
+            // золото — около верхнего левого угла (просил юзер), без плашки
             const goldPlate = new PIXI.Container();
-            const gpanel = new PIXI.Sprite(uiTex("panel_label.png"));
-            gpanel.scale.set(0.62);
-            gpanel.eventMode = "static";
-            goldPlate.addChild(gpanel);
+            goldPlate.position.set(18, 14);
             const gicon = new PIXI.Sprite(uiTex("icon_gold.png"));
             gicon.anchor.set(0.5);
             gicon.scale.set(0.46);
-            gicon.position.set(27, 27);
+            gicon.position.set(17, 17);
             goldPlate.addChild(gicon);
-            const goldT = new PIXI.Text({ text: "0", style });
-            goldT.position.set(50, 13);
+            const goldT = new PIXI.Text({ text: "0", style: hudStyle });
+            goldT.position.set(38, 3);
             goldPlate.addChild(goldT);
-            goldPlate.position.set(0, 96);
-            c.addChild(goldPlate);
-            // активный квест сюжетной линии (просил юзер): иконка под золотом
-            // открывает текст задания; без квестов иконки нет
+            // активный квест сюжетной линии (просил юзер): иконка правее
+            // числа золота открывает текст задания; без квестов иконки нет
             if (G.quests && G.quests.active) {
-                c.addChild(hudIcon("icon_rune.png", 39, 196, () => {
+                goldPlate.addChild(hudIcon("icon_rune.png", 126, 17, () => {
                     globalThis.GAME_QUESTS.showReview(ctx);
-                }, 0.9));
+                }, 0.75));
             }
+            c.addChild(goldPlate);
             // настройки доступны и из мира; «Назад» вернёт сюда. Колода —
-            // только по карте героя (просил юзер): рубашку убрали, карта
-            // героя поднята на её место
+            // только по карте героя (просил юзер): карта под иконкой золота
             c.addChild(hudIcon("icon_setting.png", 1839, 66, () => {
                 G.uiReturn = "world";
                 scenes.go("settings");
             }));
-            // карточка героя (просил юзер): на месте бывшей рубашки, клик —
+            // карточка героя (просил юзер): под иконкой золота, клик —
             // в колоду, наведение — рост до натурального размера (ctx.heroHover)
             const wHero = globalThis.GAME_DATA.HEROES[G.heroId]
                 || globalThis.GAME_DATA.HEROES.gorbag;
             const heroHolder = new PIXI.Container();
-            heroHolder.position.set(1839, 162);
-            heroHolder.hitArea = new PIXI.Rectangle(-57.5, 0, 115, 169); // исходное место
+            heroHolder.position.set(58, 76);
+            heroHolder.hitArea = new PIXI.Rectangle(-57.5, 0, 115, 169); // 115×169
             const heroCard = new PIXI.Sprite(uiTex(`heroes/${wHero.img}.png`));
             heroCard.anchor.set(0.5, 0);
             heroCard.scale.set(0.5); // 230×338 → 115×169
@@ -211,7 +208,7 @@
                 G.uiReturn = "world";
                 scenes.go("deck");
             });
-            ctx.heroHover(heroHolder, heroCard, -35, 0); // большой вид: правый край 1919
+            ctx.heroHover(heroHolder, heroCard, 115, 0); // большой вид целиком на экране
             c.addChild(heroHolder);
             const hint = new PIXI.Text({
                 text: GAME_LOC.t("world.hint"),
@@ -220,7 +217,7 @@
             hint.anchor.set(0.5, 0);
             hint.position.set(960, 1050);
             c.addChild(hint);
-            c.userData = { hpT, goldT };
+            c.userData = { goldT };
             return c;
         }
 
@@ -401,9 +398,7 @@
                     }
                 }
 
-                uiHud.userData.hpT.text = GAME_LOC.t("dungeon.hp", { hp: G.hero.hp, max: G.hero.maxHp });
                 uiHud.userData.goldT.text = String(G.gold);
-                globalThis.GAME_UI.fit(uiHud.userData.hpT, 128, 11);
 
                 // входы в подземелья — касание арки (диалог открыт — молчат)
                 if (!ctx.questModal)
