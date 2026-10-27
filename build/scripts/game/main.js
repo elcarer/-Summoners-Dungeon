@@ -391,7 +391,13 @@
                 this.gold = 0;
                 this.run = { floor: 1, cave: "gob", floors: { gob: 1, grw: 1, wis: 1 } };
                 this.dungeon = null;
-                this.world = { heroPos: null, out: false };
+                // глобальная карта — каждый забег своя: сид крутится здесь,
+                // генерация детерминирована им (worldGen.js)
+                this.world = {
+                    v: globalThis.GAME_WORLDGEN.V,
+                    seed: (Math.random() * 0x7fffffff) | 0,
+                    heroPos: null, out: false,
+                };
                 this.dungeonStates = {};
                 this.activeEnemy = null;
                 this.battle = null;
@@ -424,6 +430,10 @@
                     dungeonStates: JSON.parse(JSON.stringify(this.dungeonStates || {})),
                     worldPos: this.world.heroPos,
                     worldOut: this.world.out,
+                    // глобальная карта: сейв хранит только сид — карта
+                    // регенерируется детерминированно (worldGen.js)
+                    worldV: globalThis.GAME_WORLDGEN.V,
+                    worldSeed: this.world.seed,
                     quests: this.quests ? {
                         active: this.quests.active,
                         done: { ...(this.quests.done || {}) },
@@ -622,7 +632,17 @@
             G.run.floors = r.floors && typeof r.floors === "object"
                 ? Object.fromEntries(caveIds.map((c) => [c, r.floors[c] || 1]))
                 : { gob: r.floor, grw: 1, wis: 1 };
-            G.world = { heroPos: r.worldPos || null, out: !!r.worldOut };
+            // глобальная карта: сид из сейва (той же версии генератора)
+            // восстанавливает ту же карту; позиция героя имеет смысл
+            // только на карте той же версии — иначе спавн у данжа стихии
+            G.world = {
+                v: globalThis.GAME_WORLDGEN.V,
+                seed: Number.isInteger(r.worldSeed) && r.worldV === globalThis.GAME_WORLDGEN.V
+                    ? r.worldSeed : (Math.random() * 0x7fffffff) | 0,
+                heroPos: r.worldV === globalThis.GAME_WORLDGEN.V ? (r.worldPos || null) : null,
+                out: !!r.worldOut,
+                map: null,
+            };
             // сюжетная линия забега (старые сейвы — без неё: первый
             // квест активен, но без окна-анонса)
             G.quests = globalThis.GAME_QUESTS.revive(r.quests);
@@ -987,7 +1007,12 @@
                     win: G.dungeon.win && G.dungeon.objects && G.dungeon.objects[G.dungeon.win.idx]
                         ? G.dungeon.objects[G.dungeon.win.idx].type : null,
                 } : null,
-                world: { heroPos: G.world.heroPos ? { ...G.world.heroPos } : null, out: !!G.world.out },
+                world: {
+                    heroPos: G.world.heroPos ? { ...G.world.heroPos } : null,
+                    out: !!G.world.out,
+                    seed: G.world.seed ?? null,
+                    pois: G.world.map ? G.world.map.pois.length : 0,
+                },
                 battle: G.battle ? arenaScene.api.state() : null,
                 error: window.__gameError || null,
             }),

@@ -30,6 +30,28 @@
             "world.caveGrowth": "Роща Роста",
             "world.caveWisdom": "Подземные ключи",
             "world.caveDecay": "Земли мёртвых",
+            "world.caveHonor": "Залы Чести",
+            "world.caveTime": "Пески Времени",
+            "world.soon": "Скоро…",
+            "world.capital.strength": "Громовой Бастион",
+            "world.capital.growth": "Вечная Роща",
+            "world.capital.wisdom": "Хрустальный Шпиль",
+            "world.capital.decay": "Чёрный Некрополь",
+            "world.capital.honor": "Белая Цитадель",
+            "world.capital.time": "Вечный Механизм",
+            // имена городов глобальной карты — слоги стихии
+            "world.townPre.strength": ["Гар", "Мор", "Дур", "Краг", "Ур", "Гром", "Баш", "Рок", "Жел", "Храт"],
+            "world.townSuf.strength": ["холм", "дол", "кряж", "стан", "град", "мар", "рок", "пик"],
+            "world.townPre.growth": ["Эль", "Лори", "Сил", "Мал", "Вир", "Тали", "Кел", "Бри"],
+            "world.townSuf.growth": ["вуд", "вен", "лис", "фен", "дэйл", "тир", "брук", "мир"],
+            "world.townPre.wisdom": ["Арк", "Ког", "Мира", "Сел", "Тер", "Ив", "Лор", "Нок"],
+            "world.townSuf.wisdom": ["ит", "ус", "арий", "онт", "эль", "ид", "ум", "ат"],
+            "world.townPre.decay": ["Мор", "Уг", "Гни", "Кос", "Чер", "Вур", "Мгла", "Тус"],
+            "world.townSuf.decay": ["хаф", "вич", "хольм", "мар", "коп", "фен"],
+            "world.townPre.honor": ["Вест", "Клей", "Ор", "Стер", "Бран", "Дар", "Лион", "Пал"],
+            "world.townSuf.honor": ["форд", "монт", "бург", "стед", "хольм", "филд", "гейт", "кросс"],
+            "world.townPre.time": ["Хро", "Тем", "Эон", "Клеп", "Санд", "Век", "Пес", "Цир"],
+            "world.townSuf.time": ["нум", "тис", "вех", "мера", "дра", "сар", "ход", "стек"],
             "dungeon.toastFloor": "Этаж {n} пройден!",
             "dungeon.tipDeck": "Колода",
             "dungeon.tipBase": "HP базы: {n}",
@@ -702,6 +724,27 @@
             "world.caveGrowth": "Growth Grove",
             "world.caveWisdom": "Underground Keys",
             "world.caveDecay": "Dead Lands",
+            "world.caveHonor": "Halls of Honor",
+            "world.caveTime": "Sands of Time",
+            "world.soon": "Coming soon…",
+            "world.capital.strength": "Thunder Bastion",
+            "world.capital.growth": "Evergrove",
+            "world.capital.wisdom": "Crystal Spire",
+            "world.capital.decay": "Black Necropolis",
+            "world.capital.honor": "White Citadel",
+            "world.capital.time": "Eternal Clockwork",
+            "world.townPre.strength": ["Gar", "Mor", "Dur", "Krag", "Ur", "Grom", "Bash", "Rok", "Zhe", "Khrat"],
+            "world.townSuf.strength": ["holm", "del", "crag", "stan", "grad", "march", "rock", "peak"],
+            "world.townPre.growth": ["El", "Lori", "Syl", "Mal", "Vir", "Tali", "Kel", "Bri"],
+            "world.townSuf.growth": ["wood", "ven", "lis", "fen", "dale", "tir", "brook", "mere"],
+            "world.townPre.wisdom": ["Ark", "Cog", "Mira", "Sel", "Ter", "Iv", "Lor", "Noc"],
+            "world.townSuf.wisdom": ["it", "us", "ari", "ont", "el", "id", "um", "at"],
+            "world.townPre.decay": ["Mor", "Ug", "Gna", "Oss", "Chern", "Vur", "Grim", "Dus"],
+            "world.townSuf.decay": ["hollow", "fen", "mound", "mere", "barrow", "wick"],
+            "world.townPre.honor": ["West", "Clay", "Or", "Ster", "Bran", "Dar", "Leon", "Pal"],
+            "world.townSuf.honor": ["ford", "mont", "burg", "stead", "holm", "field", "gate", "cross"],
+            "world.townPre.time": ["Chron", "Tem", "Aeon", "Klep", "Sand", "Vek", "Hor", "Cir"],
+            "world.townSuf.time": ["um", "tis", "vekh", "mere", "dra", "sar", "hod", "dial"],
             "dungeon.toastFloor": "Floor {n} cleared!",
             "dungeon.tipDeck": "Deck",
             "dungeon.tipBase": "Base HP: {n}",
@@ -1355,8 +1398,14 @@
         return s;
     }
 
+    // Значение-список текущего языка (fallback ru) — для генератора мира
+    function arr(key) {
+        const v = (STRINGS[lang] && STRINGS[lang][key]) ?? STRINGS.ru[key];
+        return Array.isArray(v) ? v : [];
+    }
+
     globalThis.GAME_LOC = {
-        t,
+        t, arr,
         setLang(l) { if (STRINGS[l]) lang = l; },
         get lang() { return lang; },
         langs: Object.keys(STRINGS),
