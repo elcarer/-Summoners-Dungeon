@@ -73,6 +73,7 @@
                         discardReplay: { p: false, e: false },
                         skeletonStrike: { p: false, e: false },
                         firstDeathHeal: { p: false, e: false },
+                        honorGuard: { p: false, e: false },
                         epicDiscount: { p: false, e: false } },
                     enemyBase: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
                     enemyBaseMax: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,

@@ -195,10 +195,33 @@
                 archerShot(u);
                 trapOnMoveAct(u); // «Выросшие духи»: ловушка из руки на соседнюю клетку
                 labyrinthAct(u); // «Мистический лабиринт»: дошёл до базы — перенос к постройке
+                chaplainHeal(u); // «Капеллан» (Честь): после перемещения лечит соседа
                 // руна/споры на существе ездят вместе с ним: маркер «?» и его
                 // точка наведения (tr.__mx/__my) должны переехать на новую клетку
                 if (B.traps.p.some((tr) => tr.unit === u)
                     || B.traps.e.some((tr) => tr.unit === u)) redrawTraps();
+            };
+
+            // «Лечение N» (hon163 Капеллан, просил юзер): после перемещения
+            // этого существа одно СЛУЧАЙНОЕ соседнее (верт/гориз) существо
+            // его стороны получает +N жизни (само себя не лечит; соседей
+            // нет или капеллан погиб по пути — эффекта нет). Постройки
+            // соседями не считаются («существо»). Работает у обеих сторон.
+            A.chaplainHeal = function chaplainHeal(u) {
+                if (!u || u.def.ability !== "healMove"
+                    || !B.units.includes(u) || u.def.type !== "unit") return;
+                const n = u.def.abilityVal || 1;
+                const allies = [];
+                for (const v of B.units) {
+                    if (v === u || v.side !== u.side || v.def.type !== "unit") continue;
+                    if (Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1)
+                        allies.push(v);
+                }
+                if (!allies.length) return;
+                const target = allies[(Math.random() * allies.length) | 0];
+                healUnit(target, n);
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 88, "♥", 0x9fd489);
             };
 
             // «Мистический лабиринт» (wis117): существо ПОДОШЛО (маршем/шагом)

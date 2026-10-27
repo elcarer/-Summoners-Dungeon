@@ -628,6 +628,25 @@
                             sfx("up");
                         }
                     }
+                    // «Леон фон Орэ» (firstHonorGuard, просил юзер): первое
+                    // за бой призванное стороной существо стихии Честь
+                    // получает «Защиту 1» (у.protect — урон режется в
+                    // damageUnit). Токен «Молебна» — тоже существо Чести.
+                    // Тест-хук _spawn подстройку героя не триггерит.
+                    if (def.type === "unit" && def.elem === "honor"
+                        && !opts.testSummon && !B.heroFlags.honorGuard[side]) {
+                        const hdL = heroDefOf(side);
+                        if (hdL && hdL.ability === "firstHonorGuard") {
+                            B.heroFlags.honorGuard[side] = true;
+                            u.protect = (u.protect || 0) + (hdL.abilityVal || 1);
+                            refreshProtectMark(u);
+                            const sp = cellXY(col, row);
+                            floatText(sp.x, sp.y - 96,
+                                "✦ " + GAME_LOC.t("status.protect.name"), 0x8cd0ef);
+                            fxEvent("ward", { x: sp.x, y: sp.y - 16, scale: 0.66 });
+                            sfx("up");
+                        }
+                    }
                     // «Армия тьмы» (decArmy, просил юзер): первый призванный
                     // стороной Скелет (жетоны Толпы/Поля костей — тоже
                     // скелеты) наносит базе противника урон в размере

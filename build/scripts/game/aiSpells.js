@@ -372,6 +372,9 @@
                     iceSwarmSpawn("e", s.iceSwarm);
                     sfx("use");
                 }
+                if (s.laySummon) { // «Молебен» (hon166): Человек 2/2 на случайную пустую клетку
+                    if (laySummonSpawn("e")) sfx("use");
+                }
                 if (s.aoeDmg) { // «Раскалённые обломки»: всем существам и постройкам игрока
                     const dmg = s.aoeDmg + altarBonus("e");
                     const fs = heroSpellBonus(def, "e", false, true); // первое уронное — всем ударам

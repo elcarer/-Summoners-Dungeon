@@ -243,6 +243,7 @@
                         || s.enchantFire || s.cocoon || s.venom) return 4;
                     if (s.baseHit || s.wolfVolley) return 4.5; // бьёт СВОИМ существом
                     if (s.iceSwarm || s.skeletonCrowd) return 3; // тела — как обычный призыв
+                    if (s.laySummon) return 3; // «Молебен»: тело 2/2 — как призыв
                     return 6; // поиск рун / гадание / поиск знаний / глубокое путешествие
                 }
                 // «Три монолита» — без спешки (просил юзер: не в приоритете):
@@ -692,6 +693,7 @@
                     if (s.hydroPunch) v += 1.2; // урон 1 + полезный сдвиг назад
                     if (s.iceSwarm) v += Math.min(5, s.iceSwarm) * 0.55; // 5 тел 1/1
                     if (s.skeletonCrowd) v += 3 * 0.65; // dec140: три Скелета 1/2
+                    if (s.laySummon) v += 1.2; // hon166: тело 2/2 за 1⚡
                     if (s.poison) v += 1.4; // dec144: растущий яд — тариф выше
                     if (s.destroy) v += 2.7; // dec145: убийство любого существа минус карта
                     // dec150: размен тела на серию случайных ударов (ценнее

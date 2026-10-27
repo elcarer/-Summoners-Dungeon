@@ -1038,6 +1038,46 @@
                   kind: "resource", // тип эффекта — по спеке юзера («Получение ресурсов»)
                   rarity: "epic", elem: "decay",
                   color: 0x63424e, img: "decay/160" },
+        // ── Стихия «Честь» (белые) — карты 161–166 юзера ──────────────────
+        // «Ополченец» (hon161): Человек 2/1 без способностей
+        hon161: { type: "unit", cost: 1, atk: 2, hp: 1, speed: 1,
+                  creature: "human", sheet: "knight", // Человек — лист рыцаря (пока один на стихию, просил юзер)
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/161" },
+        // «Пехотинец» (hon162): Человек 4/2 без способностей
+        hon162: { type: "unit", cost: 2, atk: 4, hp: 2, speed: 1,
+                  creature: "human", sheet: "knight",
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/162" },
+        // «Капеллан» (hon163): «Лечение 1» — после перемещения лечит
+        // случайное соседнее (верт/гориз) своё существо (healMove; хук в
+        // afterMoved)
+        hon163: { type: "unit", cost: 3, atk: 4, hp: 3, speed: 1,
+                  creature: "human", sheet: "knight", ability: "healMove",
+                  abilityVal: 1,
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/163" },
+        // «Молитва» (hon164): +2 к жизням любого существа
+        hon164: { type: "spell", cost: 0,
+                  spell: { target: "anyUnit", buffHp: 2 },
+                  kind: "buff", // тип эффекта — по спеке юзера («Усиление»)
+                  rarity: "common", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/164" },
+        // «Строй» (hon165): постройка 1⚡/5♥ — существо, атаковавшее её,
+        // получает 1 урон (counterSpike; хук в damageUnit)
+        hon165: { type: "building", cost: 1, atk: 0, hp: 5, counterSpike: 1,
+                  rarity: "common", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/165" },
+        // «Молебен» (hon166): призывает Человека 2/2 (служебная карта
+        // parishioner) на случайную пустую клетку поля (laySummon)
+        hon166: { type: "spell", cost: 1,
+                  spell: { target: "none", laySummon: 1 },
+                  kind: "summon", // тип эффекта — по спеке юзера («Появление существ»)
+                  rarity: "common", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/166" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1078,6 +1118,13 @@
                  subtype: "ghost", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "decay",
                  color: 0x504048 },
+        // Прихожанин из «Молебна» (hon166) — служебная карта без лица,
+        // как skel/ghost: Человек 2/2, спавнится только заклинанием
+        parishioner: { type: "unit", cost: 1, atk: 2, hp: 2, speed: 1,
+                       creature: "human", sheet: "knight",
+                       subtype: "human", // подтип — по спеке юзера (существо Человека)
+                       rarity: "common", elem: "honor",
+                       color: 0xcfc7b0 },
     };
     const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
 
@@ -1088,7 +1135,8 @@
     ];
     // Стартовые колоды по стихиям (выбор при «Новая игра»): Рост — карты
     // 41–46 юзера по 2 копии; Мудрость — карты 81–86 по 2 копии, стартер
-    // Миры (просил юзер); Тлен — карты 121–126 по 2 копии, стартер Мортиса.
+    // Миры (просил юзер); Тлен — карты 121–126 по 2 копии, стартер Мортиса;
+    // Честь — карты 161–166 по 2 копии, стартер Леона.
     const STARTER_DECKS = {
         strength: DEFAULT_DECK,
         growth: ["grw1", "grw1", "grw2", "grw2", "grw3", "grw3",
@@ -1097,6 +1145,8 @@
                  "wis84", "wis84", "wis85", "wis85", "wis86", "wis86"],
         decay: ["dec121", "dec121", "dec122", "dec122", "dec123", "dec123",
                 "dec124", "dec124", "dec125", "dec125", "dec126", "dec126"],
+        honor: ["hon161", "hon161", "hon162", "hon162", "hon163", "hon163",
+                "hon164", "hon164", "hon165", "hon165", "hon166", "hon166"],
     };
 
     // Лимита ловушек НЕТ (просил юзер: «если он есть — это и есть баг»).
@@ -1276,8 +1326,17 @@
         decLich: { id: "decLich", rarity: "epic", baseHp: 18,
                    elems: ["decay"], starter: "decay",
                    img: "31", ability: "epicDiscount", abilityVal: 2 },
+        // Леон фон Орэ (просил юзер): Честь (белая), 15♥, первое за бой
+        // призванное существо стихии Честь получает «Защиту 1»
+        // (firstHonorGuard — у.protect, режется в damageUnit). Спрайт героя
+        // и всех существ Чести — лист рыцаря knight_256 (пока один, просил юзер)
+        leon: {
+            id: "leon", rarity: "common",
+            baseHp: 15, elems: ["honor"], starter: "honor",
+            img: "32", ability: "firstHonorGuard", abilityVal: 1,
+        },
     };
-    const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis"];
+    const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
     // пещеры, затем Роща Роста, затем «Подземные ключи» (просил юзер)
     const HERO_FOE_ORDER = ["gob", "gobBig", "gobTrap", "gobFire", "gobElite",

@@ -55,12 +55,13 @@
         // арена «Земель мёртвых» (стихия Тлен)
         uiTextures["scenes/4.png"] = await assets.loadTexture("./images/scenes/4.png");
         // эффект поля «Стена костров» и рубашки колод по стихиям
-        // (гоблины/природа/мудрость/тлен)
+        // (гоблины/природа/мудрость/тлен/честь)
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
         uiTextures["card_goblin_back.png"] = await assets.loadTexture("./images/ui/card_goblin_back.png");
         uiTextures["card_nature_back.png"] = await assets.loadTexture("./images/ui/card_nature_back.png");
         uiTextures["card_wisdom_back.png"] = await assets.loadTexture("./images/ui/card_wisdom_back.png");
         uiTextures["card_decay_back.png"] = await assets.loadTexture("./images/ui/card_decay_back.png");
+        uiTextures["card_honor_back.png"] = await assets.loadTexture("./images/ui/card_honor_back.png");
         // тайлы подземелий юзера: images/dungeon_tiles/<данж>/<…>.png —
         // полы 64×64 (floor/0-9) и стены walls/* по маске соседей.
         // Свой набор на каждый данж: goblins_lair (Сила), growth_lair (Рост),
@@ -119,6 +120,7 @@
             growth: await assets.loadCharacter("./images/sprites/elf_256"),
             wisdom: await assets.loadCharacter("./images/sprites/sorca_256"), // Мира
             decay: await assets.loadCharacter("./images/sprites/necr_256"), // Мортис
+            honor: await assets.loadCharacter("./images/sprites/knight_256"), // Леон
         };
         // Листы существ поля боя. Стандарт: <имя>_256.png — сетка 256×256,
         // 4 ряда анимаций (спереди/сзади/справа/слева) по 6 кадров + json-манифест.
@@ -145,6 +147,9 @@
             // нетопыри — bat (dec123/132/146: Нетопырь, Вампир, Восставший нетопырь)
             zomb: await assets.loadCharacter("./images/sprites/zomb_256"),
             bat: await assets.loadCharacter("./images/sprites/bat_256"),
+            // лист Чести юзера (просил юзер): все существа стихии (Человек)
+            // пока ходят рыцарем knight_256
+            knight: await assets.loadCharacter("./images/sprites/knight_256"),
         };
 
         // ── UI-корень: базовое разрешение 1920×1080, вписывается в окно ────
@@ -769,62 +774,65 @@
                 const title = T(t("menu.pickHero"), 96, 0xf0c96a,
                     { stroke: { color: 0x241505, width: 9 } });
                 title.anchor.set(0.5, 0);
-                title.position.set(960, 44);
+                title.position.set(960, 26);
                 title.eventMode = "none";
                 epRoot.addChild(title);
                 const sub = T(t("menu.pickHeroSub"), 30, 0xd8c79d,
                     { stroke: { color: 0x1c1207, width: 7 } }); // обводка — читается на пёстрой карте
                 sub.anchor.set(0.5, 0);
-                sub.position.set(960, 190);
+                sub.position.set(960, 138);
                 sub.eventMode = "none";
                 epRoot.addChild(sub);
 
                 const cards = [];
-                // раскладка в 1 ряд: 2 героя — как раньше, 3+ — плотнее, чтобы
-                // панель (480px) влезала в экран; при 4 героях (Мортис) карточки
-                // встают вплотную — крайние панели ровно у кромок 1920
-                const gap = Math.min(720, 1440 / Math.max(1, GAME_DATA.HERO_ORDER.length - 1));
+                // Сетка 3×2 (просил юзер): 5 стартовых героев + пустой слот
+                // под будущего героя следующей стихии. Панель 410×430,
+                // ряды y=400/855, колонны x=480/960/1440 — всё в кадре 1920×1080
+                const PW = 410, PH = 430, GAPX = 70;
+                const colX = (k) => 960 + (k % 3 - 1) * (PW + GAPX);
+                const rowY = (k) => k < 3 ? 400 : 855;
                 GAME_DATA.HERO_ORDER.forEach((id, k) => {
                     const h = GAME_DATA.HEROES[id];
-                    const cx = 960 + (k - (GAME_DATA.HERO_ORDER.length - 1) / 2) * gap;
+                    const cx = colX(k);
+                    const cy = rowY(k);
                     const c = new PIXI.Container();
-                    c.position.set(cx, 610);
+                    c.position.set(cx, cy);
                     const panel = new PIXI.Graphics();
-                    panel.roundRect(-240, -330, 480, 700, 22);
+                    panel.roundRect(-PW / 2, -PH / 2, PW, PH, 22);
                     panel.fill({ color: 0x171310, alpha: 0.94 });
                     panel.stroke({ width: 4, color: 0x6b5c40 });
                     c.addChild(panel);
                     const face = new PIXI.Sprite(uiTex(`heroes/${h.img}.png`));
                     face.anchor.set(0.5, 0);
-                    face.scale.set(1.15); // 230×338 → ~264×389
-                    face.position.set(0, -305);
+                    face.scale.set(0.72); // 230×338 → ~166×244
+                    face.position.set(0, -200);
                     c.addChild(face);
-                    const name = T(t(`hero.${id}.name`), 44, 0xf0c96a,
-                        { stroke: { color: 0x241505, width: 7 } });
+                    const name = T(t(`hero.${id}.name`), 36, 0xf0c96a,
+                        { stroke: { color: 0x241505, width: 6 } });
                     name.anchor.set(0.5, 0);
-                    name.position.set(0, 112);
+                    name.position.set(0, 52);
                     name.eventMode = "none";
                     c.addChild(name);
                     const statLine = T(
                         `${t("hero.baseLine", { n: h.baseHp })}   ·   ${
                             t("hero.elemLine", { elems: h.elems.map((e) => t("elem." + e)).join(", ") })
                         }`,
-                        24, 0xd8c79d);
+                        20, 0xd8c79d);
                     statLine.anchor.set(0.5, 0);
-                    statLine.position.set(0, 170);
+                    statLine.position.set(0, 98);
                     statLine.eventMode = "none";
                     c.addChild(statLine);
                     const abil = T(t("hero.abilityLabel", { text: t(`hero.${id}.ability`) }),
-                        23, 0xbfd489, { wordWrap: true, wordWrapWidth: 430, align: "center" });
+                        19, 0xbfd489, { wordWrap: true, wordWrapWidth: 372, align: "center" });
                     abil.anchor.set(0.5, 0);
-                    abil.position.set(0, 214);
+                    abil.position.set(0, 130);
                     abil.eventMode = "none";
                     c.addChild(abil);
                     c.eventMode = "static";
                     // подсветка наведения — отдельная рамка с альфой (повторный
                     // Graphics.stroke дописывает команду, а не заменяет её)
                     const glow = new PIXI.Graphics();
-                    glow.roundRect(-240, -330, 480, 700, 22);
+                    glow.roundRect(-PW / 2, -PH / 2, PW, PH, 22);
                     glow.stroke({ width: 5, color: 0xf0c96a });
                     glow.alpha = 0;
                     c.addChild(glow);
@@ -838,8 +846,31 @@
                         G.saveRun(); // свежий забег сразу сохранён
                     });
                     epRoot.addChild(c);
-                    cards.push({ id, node: c, x: cx, y: 610 });
+                    cards.push({ id, node: c, x: cx, y: cy });
                 });
+                // Пустой слот 6 (просил юзер): под героя следующей стихии —
+                // приглушённая рамка с «?», без кликов
+                {
+                    const c = new PIXI.Container();
+                    c.position.set(colX(5), rowY(5));
+                    const panel = new PIXI.Graphics();
+                    panel.roundRect(-PW / 2, -PH / 2, PW, PH, 22);
+                    panel.fill({ color: 0x171310, alpha: 0.72 });
+                    panel.stroke({ width: 4, color: 0x6b5c40, alpha: 0.6 });
+                    c.addChild(panel);
+                    const q = T("?", 150, 0x6b5c40);
+                    q.anchor.set(0.5);
+                    q.position.set(0, -40);
+                    q.eventMode = "none";
+                    c.addChild(q);
+                    const soon = T(t("menu.pickHeroSoon"), 22, 0x8c7f60);
+                    soon.anchor.set(0.5, 0);
+                    soon.position.set(0, 96);
+                    soon.eventMode = "none";
+                    c.addChild(soon);
+                    c.eventMode = "none";
+                    epRoot.addChild(c);
+                }
                 epRoot.addChild(menuButton("button_menu.png", t("settings.back"), 165, 78, 1,
                     () => scenes.go("menu")));
                 window.__GAME.heroPick = {

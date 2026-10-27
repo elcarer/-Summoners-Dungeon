@@ -552,6 +552,8 @@
                 // «Рой ледо-пикси» — 4⚡ за 5 тел 1/1: держим, пока на поле
                 // есть хотя бы 3 свободные клетки (иначе призыв почти пуст)
                 if (s.iceSwarm && GRID * GRID - B.units.length < 3) return false;
+                // «Молебен» — нечего призывать, если поле забито целиком
+                if (s.laySummon && GRID * GRID - B.units.length < 1) return false;
                 // «Слабость» — есть чей-то урон, который стоит снять
                 if (s.debuffAtk && !spellTargets(B.units.filter((v) => v.side === "p"
                     && v.def.type === "unit" && v.curAtk > 0)).length) return false;

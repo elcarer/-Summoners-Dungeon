@@ -19,6 +19,7 @@
         growth: starterCollection(STARTER_DECKS.growth),
         wisdom: starterCollection(STARTER_DECKS.wisdom), // стартер Миры
         decay: starterCollection(STARTER_DECKS.decay), // стартер Мортиса
+        honor: starterCollection(STARTER_DECKS.honor), // стартер Леона
     };
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N

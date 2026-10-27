@@ -75,13 +75,15 @@
         };
         // Листы существ поля боя — по стихии карты: Рост — эльф, Мудрость —
         // сорка (плейсхолдер до арта элементалей), Тлен — некр (один лист на
+        // всех существ стихии, просил юзер), Честь — рыцарь (один лист на
         // всех существ стихии, просил юзер), Сила (и прочие) — гоблин.
         // Отдельный лист — полем def.sheet у карты.
         A.sheetOf = (u) => ctx.creatureSheets
             && (ctx.creatureSheets[u.def.sheet]
                 || ctx.creatureSheets[u.def.elem === "growth" ? "elf"
                     : u.def.elem === "wisdom" ? "wisdom"
-                    : u.def.elem === "decay" ? "necr" : "goblin"]);
+                    : u.def.elem === "decay" ? "necr"
+                    : u.def.elem === "honor" ? "knight" : "goblin"]);
         A.T = (text, size, fill, opts = {}) => new PIXI.Text({
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
         });

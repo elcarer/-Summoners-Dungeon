@@ -428,6 +428,21 @@
                 return n;
             };
 
+            // «Молебен» (hon166, просил юзер): призывает Человека 2/2
+            // (служебная карта parishioner — рыцарь knight_256) на СЛУЧАЙНУЮ
+            // пустую клетку поля боя (не только своей зоны призыва). Поле
+            // забито — существо не призывается. Возвращает true, если призвал.
+            A.laySummonSpawn = function laySummonSpawn(side) {
+                const empty = [];
+                for (let row = 0; row < GRID; row++)
+                    for (let col = 0; col < GRID; col++)
+                        if (!unitAt(col, row)) empty.push([col, row]);
+                if (!empty.length) return false;
+                const [col, row] = empty[(Math.random() * empty.length) | 0];
+                addUnit(side, "parishioner", col, row, { token: true });
+                return true;
+            };
+
             // Эффекты заклинаний игрока, валидация цели внутри (false — цель не
             // годится, тогда и оплаты/сброса/панелей не будет). Отделено от
             // оплаты карты, чтобы «Горящие руны» могли повторить эффект
@@ -730,6 +745,9 @@
                 if (def.spell.iceSwarm) { // «Рой ледо-пикси»: Элементали 1/1 на случайные пустые клетки
                     const n = iceSwarmSpawn("p", def.spell.iceSwarm);
                     if (n) sfx("use");
+                }
+                if (def.spell.laySummon) { // «Молебен»: Человек 2/2 на случайную пустую клетку
+                    if (laySummonSpawn("p")) sfx("use");
                 }
                 if (def.spell.aoeDmg) { // «Раскалённые обломки»: всем вражеским существам и постройкам
                     const dmg = def.spell.aoeDmg + altarBonus("p");

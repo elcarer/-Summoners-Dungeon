@@ -67,12 +67,13 @@
 
     // Рубашка колоды по стихии (просил юзер): Рост — природная
     // (card_nature_back), Мудрость — синяя (card_wisdom_back),
-    // Тлен — чёрная (card_decay_back), прочие — гоблинская
-    // (card_goblin_back)
+    // Тлен — чёрная (card_decay_back), Честь — белая (card_honor_back),
+    // прочие — гоблинская (card_goblin_back)
     function backTexOf(elem) {
         return elem === "growth" ? "card_nature_back.png"
             : elem === "wisdom" ? "card_wisdom_back.png"
             : elem === "decay" ? "card_decay_back.png"
+            : elem === "honor" ? "card_honor_back.png"
             : "card_goblin_back.png";
     }
 
