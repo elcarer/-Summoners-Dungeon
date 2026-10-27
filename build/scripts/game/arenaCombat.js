@@ -192,6 +192,7 @@
             A.afterMoved = function afterMoved(u) {
                 if (!B.units.includes(u) || u.def.type !== "unit") return;
                 triggerCellTraps(u);
+                roadPushAct(u); // «Тракт» (Честь): соседняя постройка гонит вперёд
                 archerShot(u);
                 trapOnMoveAct(u); // «Выросшие духи»: ловушка из руки на соседнюю клетку
                 labyrinthAct(u); // «Мистический лабиринт»: дошёл до базы — перенос к постройке
@@ -222,6 +223,34 @@
                 healUnit(target, n);
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 88, "♥", 0x9fd489);
+            };
+
+            // «Тракт» (hon171, просил юзер): когда существо владельца после
+            // перемещения оказывается по соседству (верт/гориз) с этой
+            // постройкой, оно едет вперёд, пока перед ним остаётся свободная
+            // клетка (занятая/край поля — стоп). Чужих постройка не гонит;
+            // призыв (не перемещение) не триггерит — roadPushAct зовётся
+            // только из afterMoved. Доехав, существо наступает на ловушку
+            // конечной клетки (это тоже перемещение, как у «Лабиринта»).
+            A.roadPushAct = function roadPushAct(u) {
+                if (!B.units.includes(u) || u.def.type !== "unit") return;
+                const near = B.units.some((b) => b.def.roadPush && b.side === u.side
+                    && Math.abs(b.col - u.col) + Math.abs(b.row - u.row) === 1);
+                if (!near) return;
+                const dir = u.side === "p" ? -1 : 1;
+                let moved = false;
+                for (;;) {
+                    const nr = u.row + dir;
+                    if (nr < 0 || nr >= GRID || unitAt(u.col, nr)) break;
+                    u.row = nr;
+                    moved = true;
+                }
+                if (!moved) return;
+                const p = cellXY(u.col, u.row);
+                glide(u, p.x, p.y);
+                setWalk(u, true);
+                sfx("step");
+                triggerCellTraps(u); // доехал до ловушки — она срабатывает
             };
 
             // «Мистический лабиринт» (wis117): существо ПОДОШЛО (маршем/шагом)

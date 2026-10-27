@@ -375,6 +375,26 @@
                 if (s.laySummon) { // «Молебен» (hon166): Человек 2/2 на случайную пустую клетку
                     if (laySummonSpawn("e")) sfx("use");
                 }
+                if (s.rebalance) { // «Снабжение» (hon170): у всех своих существ
+                    // меньшая из характеристик ⚔/♥ становится равной большей
+                    for (const v of B.units.slice()) {
+                        if (v.side !== "e" || v.def.type !== "unit"
+                            || v.curAtk === v.hp) continue;
+                        const a = v.curAtk;
+                        if (a < v.hp) {
+                            v.bonusAtk = (v.bonusAtk || 0) + (v.hp - a);
+                            recalcAuras();
+                        } else v.hp = a;
+                        const an = v.node.getChildByName("atk");
+                        if (an) an.text = String(v.curAtk);
+                        const hn = v.node.getChildByName("hp");
+                        if (hn) hn.text = String(v.hp);
+                        const vp = cellXY(v.col, v.row);
+                        floatText(vp.x, vp.y - 60, "⇔", 0xffd98c);
+                        punch(v.node);
+                    }
+                    sfx("up");
+                }
                 if (s.aoeDmg) { // «Раскалённые обломки»: всем существам и постройкам игрока
                     const dmg = s.aoeDmg + altarBonus("e");
                     const fs = heroSpellBonus(def, "e", false, true); // первое уронное — всем ударам

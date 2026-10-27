@@ -1094,6 +1094,34 @@
                   subtype: "human", // подтип — по спеке юзера (cards.txt)
                   rarity: "common", elem: "honor",
                   color: 0xcfc7b0, img: "honor/168" },
+        // «Конный рыцарь» (hon169): Человек 2/4 со «Скоростью 1» (dash1)
+        hon169: { type: "unit", cost: 3, atk: 2, hp: 4, speed: 1,
+                  creature: "human", sheet: "knight", ability: "dash1",
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/169" },
+        // «Снабжение» (hon170): у всех своих существ меньшая из ⚔/♥
+        // становится равной большей (rebalance — applySpellPInner/aiSpells)
+        hon170: { type: "spell", cost: 3,
+                  spell: { target: "none", rebalance: 1 },
+                  kind: "buff", // тип эффекта — по спеке юзера («Усиление»)
+                  rarity: "common", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/170" },
+        // «Тракт» (hon171): постройка 4⚡/4♥ — существо владельца, вставшее
+        // после перемещения по соседству, едет вперёд до препятствия
+        // (roadPush — roadPushAct в afterMoved)
+        hon171: { type: "building", cost: 4, atk: 0, hp: 4, roadPush: 1,
+                  rarity: "rare", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/171" },
+        // «Арбалетчик» (hon172): Человек 4/2 с «Выстрелом 2» — после
+        // перемещения бьёт ближайшее существо/постройку по вертикали
+        // вперёд, пустая вертикаль — 2 базе противника (archer/shotDmg)
+        hon172: { type: "unit", cost: 4, atk: 4, hp: 2, speed: 1,
+                  creature: "human", sheet: "knight", ability: "archer",
+                  shotDmg: 2,
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/172" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1354,11 +1382,18 @@
         // «Мятежники» (1-й этаж «Залов Чести», просил юзер): Честь (белая),
         // 10♥, первое призванное в бою существо стихии Честь получает
         // «Скорость 1» (firstHonorDash — summonDash сразу после призыва;
-        // если у существа своя «Скорость 1», второй рывок не даём).
-        // Спрайт — heroes/33.png
+        // если у существа своя «Скорость 1», геройский рывок даётся ПОВЕРХ
+        // — «Скорость» складывается, просил юзер). Спрайт — heroes/33.png
         honRebels: { id: "honRebels", rarity: "common", baseHp: 10,
                      elems: ["honor"], starter: "honor",
                      img: "33", ability: "firstHonorDash", abilityVal: 1 },
+        // «Конница» (2-й этаж «Залов Чести», просил юзер): первое
+        // призванное стороной существо СО СВОЕЙ «Скоростью» (dash1)
+        // получает при призыве +1 к урону (firstSpeedAtk — до рывка,
+        // удар рывком уже усиленный). Спрайт — heroes/34.png
+        honCavalry: { id: "honCavalry", rarity: "common", baseHp: 11,
+                      elems: ["honor"], starter: "honor",
+                      img: "34", ability: "firstSpeedAtk", abilityVal: 1 },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1371,7 +1406,7 @@
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
         "decThirst", "decLich", // «Архилич» — ключ HEROES (enc.hero), не id энкаунтера
-        "honRebels"]; // «Залы Чести» (1-й этаж, просил юзер)
+        "honRebels", "honCavalry"]; // «Залы Чести» (этажи 1–2, просил юзер)
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

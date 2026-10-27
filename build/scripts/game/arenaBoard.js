@@ -567,6 +567,26 @@
                         punch(o.node);
                         sfx("aqua");
                     }
+                    // «Конница» (firstSpeedAtk, просил юзер): первое за бой
+                    // призванное стороной существо СО СВОЕЙ «Скоростью»
+                    // (dash1) получает при призыве +N к урону. Ставим ДО
+                    // собственного рывка — удар рывком уже с бонусом.
+                    // Тест-хук _spawn подстройку героя не триггерит.
+                    if (def.type === "unit" && def.ability === "dash1"
+                        && !opts.testSummon && !B.heroFlags.speedAtk[side]) {
+                        const hdS = heroDefOf(side);
+                        if (hdS && hdS.ability === "firstSpeedAtk") {
+                            B.heroFlags.speedAtk[side] = true;
+                            u.bonusAtk = (u.bonusAtk || 0) + (hdS.abilityVal || 1);
+                            recalcAuras();
+                            const anS = u.node.getChildByName("atk");
+                            if (anS) anS.text = String(u.curAtk);
+                            const spS = cellXY(col, row);
+                            floatText(spS.x, spS.y - 96,
+                                `+${hdS.abilityVal || 1}⚔`, 0x9fd489);
+                            sfx("up");
+                        }
+                    }
                     if (def.ability === "dash1") summonDash(u); // «Скорость 1»
                     else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
                     else if (def.ability === "spiritSummoner") summonSpiritCaller(u); // призыватель духов
@@ -650,23 +670,22 @@
                     // «Мятежники» (firstHonorDash, просил юзер): первое за
                     // бой призванное стороной существо стихии Честь получает
                     // «Скорость 1» — сразу шаг вперёд или удар по стоящему
-                    // впереди противнику (summonDash). У существа своя
-                    // «Скорость 1» (Разбойники) — рывок уже был при призыве,
-                    // второй не даём, но флаг тратится: способность выполнена.
-                    // Токен «Молебна» — тоже существо Чести. Тест-хук _spawn
-                    // подстройку героя не триггерит.
+                    // впереди противнику (summonDash). «Скорость» СКЛАДЫВАЕТСЯ
+                    // (поправка юзера): у существа своя «Скорость 1»
+                    // (Разбойники/Конный рыцарь) — рывок уже был, геройский
+                    // даётся поверх, итого два. Токен «Молебна» — тоже
+                    // существо Чести. Тест-хук _spawn подстройку героя
+                    // не триггерит.
                     if (def.type === "unit" && def.elem === "honor"
                         && !opts.testSummon && !B.heroFlags.honorDash[side]) {
                         const hdD = heroDefOf(side);
                         if (hdD && hdD.ability === "firstHonorDash") {
                             B.heroFlags.honorDash[side] = true;
-                            if (def.ability !== "dash1") {
-                                summonDash(u);
-                                const sp2 = cellXY(u.col, u.row);
-                                floatText(sp2.x, sp2.y - 96,
-                                    "» " + GAME_LOC.t("status.dash.name"), 0xb7d0ef);
-                                sfx("step");
-                            }
+                            summonDash(u);
+                            const sp2 = cellXY(u.col, u.row);
+                            floatText(sp2.x, sp2.y - 96,
+                                "» " + GAME_LOC.t("status.dash.name"), 0xb7d0ef);
+                            sfx("step");
                         }
                     }
                     // «Армия тьмы» (decArmy, просил юзер): первый призванный

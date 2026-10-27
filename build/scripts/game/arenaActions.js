@@ -749,6 +749,27 @@
                 if (def.spell.laySummon) { // «Молебен»: Человек 2/2 на случайную пустую клетку
                     if (laySummonSpawn("p")) sfx("use");
                 }
+                if (def.spell.rebalance) { // «Снабжение» (hon170): у всех своих
+                    // существ меньшая из характеристик ⚔/♥ становится равной
+                    // большей (постройки — не существа; жетоны — существа)
+                    for (const v of B.units.slice()) {
+                        if (v.side !== "p" || v.def.type !== "unit"
+                            || v.curAtk === v.hp) continue;
+                        const a = v.curAtk;
+                        if (a < v.hp) {
+                            v.bonusAtk = (v.bonusAtk || 0) + (v.hp - a);
+                            recalcAuras();
+                        } else v.hp = a;
+                        const an = v.node.getChildByName("atk");
+                        if (an) an.text = String(v.curAtk);
+                        const hn = v.node.getChildByName("hp");
+                        if (hn) hn.text = String(v.hp);
+                        const vp = cellXY(v.col, v.row);
+                        floatText(vp.x, vp.y - 60, "⇔", 0xffd98c);
+                        punch(v.node);
+                    }
+                    sfx("up");
+                }
                 if (def.spell.aoeDmg) { // «Раскалённые обломки»: всем вражеским существам и постройкам
                     const dmg = def.spell.aoeDmg + altarBonus("p");
                     // первое уронное заклинание — +1 ко ВСЕМ ударам этого каста;

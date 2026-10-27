@@ -76,6 +76,7 @@
                         firstDeathHeal: { p: false, e: false },
                         honorGuard: { p: false, e: false },
                         honorDash: { p: false, e: false },
+                        speedAtk: { p: false, e: false },
                         epicDiscount: { p: false, e: false } },
                     enemyBase: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
                     enemyBaseMax: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
