@@ -951,12 +951,12 @@
             // повторно, бесплатно; затем то заклинание СЖИГАЕТСЯ — одна копия
             // уходит из своей текущей зоны (рука → колода → сброс) до конца боя
             // (в колоду при перетасовке она больше не вернётся).
-            A.replaySpell = function replaySpell(cardId) {
+            A.replaySpell = function replaySpell(cardId, origin) {
                 const def = CARDS[cardId];
                 if (!def || def.type !== "spell") return;
                 const target = autoTargetFor(cardId);
                 applySpellP(cardId, target, true);
-                fxSpellCast(cardId, target, "p");
+                fxSpellCast(cardId, target, "p", origin);
                 if (def.spell.drainAll || def.spell.stormAll) B.energy = 0; // огнешар/гроза и в повторе сжигают энергию
                 const hi = B.hand.indexOf(cardId);
                 if (hi >= 0) B.hand.splice(hi, 1);
@@ -978,6 +978,10 @@
                 if (!def || def.type !== "spell"
                     || effCost(cardId, "p", target) > B.energy) return false;
                 const resetHand = def.spell.discardHandDraw;
+                // центр разыгранной карты (просил юзер): эффект заклинания
+                // без позиции цели рождается на карте; считаем ДО эффектов —
+                // сбросы/доборы могли бы пересобрать руку и сдвинуть индексы
+                const origin = handCardCenter(handIdx);
                 // «Отмена заклинания» (wis83) врага: заклинание отменяется —
                 // карта и энергия потрачены, эффект не срабатывает (спека юзера)
                 const cTrap = counterTrapConsume("e", "counterSpell");
@@ -1003,7 +1007,7 @@
                     heroFirstSpellEnergy("p"); // «Дуновение опасности»
                     heroStrReplay("p", cardId, def); // «Мастера огня»
                     B.lastSpell.p = "str25"; // повтор самой себя — бесконечная цепочка
-                    replaySpell(last);
+                    replaySpell(last, origin);
                     afterSpellPlayed("p");
                     layoutHand();
                     redrawHighlight();
@@ -1020,7 +1024,7 @@
                     B.playCtx = null;
                     return false;
                 }
-                fxSpellCast(cardId, target, "p");
+                fxSpellCast(cardId, target, "p", origin);
                 B.energy = (def.spell.drainAll || def.spell.stormAll)
                     ? 0 : B.energy - effCost(cardId, "p", target);
                 consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты

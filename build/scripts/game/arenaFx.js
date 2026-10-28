@@ -675,7 +675,10 @@
             };
 
             // Удобный хелпер для кастов: позиция цели/базы/центра и цвет стихии.
-            A.fxSpellCast = function fxSpellCast(cardId, target, side) {
+            // origin — центр РАЗЫГРАННОЙ карты (просил юзер): заклинание
+            // без позиции цели рождается на карте в руке игрока или на
+            // показанной карте врага, а не в центре экрана
+            A.fxSpellCast = function fxSpellCast(cardId, target, side, origin) {
                 const def = typeof cardId === "string" ? CARDS[cardId] : cardId;
                 if (!def) return null;
                 let x = 960, y = 540;
@@ -684,6 +687,8 @@
                     x = p.x; y = p.y - 8;
                 } else if (target && target.base) {
                     x = 960; y = 70;
+                } else if (origin) {
+                    x = origin.x; y = origin.y;
                 }
                 return A.fxEvent("cast", {
                     x, y, color: A.fxColorOf(def.elem), scale: 0.9,

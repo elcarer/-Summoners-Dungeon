@@ -10,7 +10,12 @@
             // (u.spellWard, просил юзер)
             A.enemyCastSpellEffect = function enemyCastSpellEffect(def, free = false, focus = null, fromHand = false) {
                 A.spellCasting = true;
-                fxSpellCast(def, focus, "e");
+                // заклинание ИЗ РУКИ рождает эффект в центре показанной
+                // карты врага (просил юзер), не в центре экрана; руны и
+                // повторы без показанной карты — как раньше
+                const origin = fromHand && enemyCard && enemyCard.node
+                    ? { x: enemyCard.node.x, y: enemyCard.node.y } : null;
+                fxSpellCast(def, focus, "e", origin);
                 try {
                     enemyCastSpellEffectInner(def, free, focus, fromHand);
                 } finally { A.spellCasting = false; }

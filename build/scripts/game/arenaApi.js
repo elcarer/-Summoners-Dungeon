@@ -79,6 +79,10 @@
                             glow: f ? { w: Math.round(f.width), h: Math.round(f.height) } : null };
                     })()
                     : null),
+                // тест-хуки показа карты врага (как в aiPlay): позиция
+                // эффекта заклинания из руки проверяемо привязана к карте
+                _showEnemyCard(id) { if (B && CARDS[id]) { showEnemyCard(id); return true; } return false; },
+                _hideEnemyCard() { hideEnemyCard(); return true; },
                 // ловушки (тесты): у руны видно существо, на котором она висит
                 trapList: () => ({
                     p: B.traps.p.map((tr) => ({ eff: tr.def.trap.effect,
@@ -318,6 +322,7 @@
                     count: fxList.length,
                     seq: fxSeq,
                     kinds: fxList.map((e) => e.kind),
+                    xy: fxList.map((e) => [Math.round(e.x), Math.round(e.y)]),
                     parts: fxList.reduce((n, e) => n + e.parts.length, 0),
                     nodes: root && root.fx ? root.fx.children.length : 0,
                 }),

@@ -579,6 +579,18 @@
                     }
                     return best[(Math.random() * best.length) | 0];
                 }
+                // «Тракт» (hon171, просил юзер): НИКОГДА в ряд вплотную к
+                // своей базе — постройку триггерит существо, ВСТАВШЕЕ после
+                // перемещения на соседнюю клетку (призыв не считается), а из
+                // ряда у базы марш ни на одну соседнюю клетку не попадает.
+                // Ровно на 1 клетку впереди (следующий ряд деплоя) — марши
+                // мимо Тракта встают по соседству и уезжают вперёд.
+                if (def.roadPush) {
+                    const fwd = free.filter(([, r]) => rows.length > 1 && r === rows[1]);
+                    const pool = fwd.length ? fwd : free.filter(([, r]) => r !== rows[0]);
+                    const use = pool.length ? pool : free;
+                    return use[(Math.random() * use.length) | 0];
+                }
                 const back = free.filter(([, r]) => r === rows[0]);
                 const pool = back.length ? back : free;
                 return pool[(Math.random() * pool.length) | 0];

@@ -47,11 +47,20 @@
         const CAVES = globalThis.GAME_DATA.CAVES;
         return Object.keys(CAVES).find((k) => CAVES[k].elem === elem) || "gob";
     }
-    // Имя босса подземелья фракции игрока — подстановка в текст квеста
+    // Имя босса подземелья фракции игрока — подстановка в текст квеста.
+    // У данжа БЕЗ босса (пока «Залы Чести», босс будет позже) «самый
+    // страшный враг» — герой верхнего этажа (у Чести — «Конница»):
+    // прежде имя подставлялось пустым — «…по имени .» (баг юзера)
     function bossName(G) {
         const D = globalThis.GAME_DATA;
         const cave = caveOfElem(G.elem);
-        const encId = D.CAVES[cave] && D.CAVES[cave].boss;
+        const info = D.CAVES[cave];
+        let encId = info && info.boss;
+        if (!encId && info) {
+            const mobs = (D.MOB_TABLES && D.MOB_TABLES[cave]) || D.FLOOR_MOBS;
+            const top = mobs[Math.min(info.maxFloor || 1, mobs.length) - 1];
+            encId = top && top[0];
+        }
         const hero = encId && D.ENCOUNTERS[encId] ? D.ENCOUNTERS[encId].hero : null;
         return hero ? globalThis.GAME_UI.foeTitle(hero) : "";
     }
@@ -69,8 +78,14 @@
         if (!q) return null;
         const D = globalThis.GAME_DATA;
         const cave = (G.dungeon && G.dungeon.cave) || G.run.cave || "gob";
-        const own = !!(D.CAVES[cave] && D.CAVES[cave].elem === G.elem);
-        const hit = q.kind === "boss" ? own && !!boss : own;
+        const info = D.CAVES[cave];
+        const own = !!(info && info.elem === G.elem);
+        // в данже без босса (пока «Залы Чести») роль босса квеста играет
+        // главный враг верхнего этажа: победа на верхнем этаже СВОЕГО данжа
+        // засчитывается — иначе задание «по имени Конница» не выполнить
+        const topWin = !!(q.kind === "boss" && own && info && !info.boss
+            && G.dungeon && G.dungeon.floor >= info.maxFloor);
+        const hit = q.kind === "boss" ? (own && !!boss) || topWin : own;
         if (!hit) return null;
         G.quests.pending = q.id;
         if (G.saveRun) G.saveRun();
