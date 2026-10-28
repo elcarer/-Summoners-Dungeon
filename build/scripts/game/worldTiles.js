@@ -306,12 +306,14 @@
 
     // ── дороги (просил юзер): roads.png — 11 видов сеткой 4×3 по 32px
     // с поворотами и перекрёстками, прозрачный оверлей НА МЕСТНОСТЬ.
-        // вид по маске 4-соседей дороги/моста (через мост дорога
-    // продолжается): бит 1=N, 2=E, 4=S, 8=W; лист: 0 крест, 1 N-S,
-    // 2 E-W, 3 поворот N+E, 4 S+W, 5 N+W, 6 E+S, 7 T(N,S,W), 8 T(N,S,E),
-    // 9 T(N,E,W), 10 T(E,S,W), 11 пусто. Тупики (один сосед) — прямой
-    // в сторону соседа, изолированная клетка — вертикаль
-    const ROAD_TILE = [1, 1, 2, 3, 1, 1, 6, 8, 2, 5, 2, 9, 4, 7, 10, 0];
+    // вид по маске 4-соседей дороги/моста (через мост дорога
+    // продолжается): бит 1=N, 2=E, 4=S, 8=W. Таблица свержена ЗАМЕРОМ
+    // альфы краёв листа (просвет по краю тайла = нет открытия):
+    // 0 крест, 1 N-S, 2 E-W, 3 поворот N+E, 4 N+W, 5 S+W, 6 E+S,
+    // 7 T(N,E,S), 8 T(N,S,W), 9 T(E,S,W), 10 T(N,E,W), 11 пусто.
+    // Тупики (один сосед) — прямой в сторону соседа, изолированная
+    // клетка — вертикаль
+    const ROAD_TILE = [1, 1, 2, 3, 1, 1, 6, 7, 2, 4, 2, 10, 5, 8, 9, 0];
     function renderRoadsChunk(map, roadTex, TS, x0, y0, stats) {
         const GEN = globalThis.GAME_WORLDGEN, T = GEN.T;
         const W = map.w, H = map.h;
@@ -338,16 +340,17 @@
     }
 
     // ── горы (просил юзер): спрайты montain/1..6.png вместо заглушки,
-    // ТОТ ЖЕ СЛОЙ ОБЪЕКТОВ, что деревья (общий y-sort сцены). 1 спрайт
-    // на ~2-3 соседних горных тайла: якорь по hash2 с прореживанием —
-    // рядом (2 клетки слева, 1 сверху с диагоналями) якоря быть не
-    // должно; правило чисто хэшевое, чанковые границы не рвут раскладку
+    // ТОТ ЖЕ СЛОЙ ОБЪЕКТОВ, что деревья (общий y-sort сцены). ГУСТО
+    // (просил юзер: спрайтов больше, близко друг к другу — в хребте
+    // без просветов-дырок): ~75% горных клеток со спрайтом, БЕЗ
+    // прореживания — кроны 64–128px на шаге 32px смыкаются в массив.
+    // Правило чисто хэшевое, чанковые границы не рвут раскладку
     function mountAnchor(map, seed, x, y) {
         const GEN = globalThis.GAME_WORLDGEN, T = GEN.T;
         const W = map.w, H = map.h;
         if (x < 0 || y < 0 || x >= W || y >= H) return false;
         if (map.ter[y * W + x] !== T.MOUNTAIN) return false;
-        return GEN.hash2(x, y, seed ^ 0x4d71) < 0.45;
+        return GEN.hash2(x, y, seed ^ 0x4d71) < 0.75;
     }
     function renderMountainsChunk(map, mtnTex, TS, seed, x0, y0) {
         const GEN = globalThis.GAME_WORLDGEN;
@@ -356,11 +359,6 @@
         const xe = Math.min(W, x0 + CHUNK), ye = Math.min(H, y0 + CHUNK);
         for (let j = y0; j < ye; j++) for (let i = x0; i < xe; i++) {
             if (!mountAnchor(map, seed, i, j)) continue;
-            if (mountAnchor(map, seed, i - 1, j)
-                || mountAnchor(map, seed, i - 2, j)
-                || mountAnchor(map, seed, i, j - 1)
-                || mountAnchor(map, seed, i - 1, j - 1)
-                || mountAnchor(map, seed, i + 1, j - 1)) continue;
             const tex = mtnTex[(GEN.hash2(i, j, seed ^ 0x4d72)
                 * mtnTex.length) | 0];
             const spr = new PIXI.Sprite(tex);
@@ -377,8 +375,8 @@
     }
 
     globalThis.GAME_WORLDTILES = {
-        V: 5, CHUNK, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER, SWAMP,
-        NAME, ZONE_TERRAIN, PAIRS, MINI, terrainOf,
+        V: 6, CHUNK, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER, SWAMP,
+        NAME, ZONE_TERRAIN, PAIRS, MINI, terrainOf, ROAD_TILE,
         render, renderChunk, renderForest, renderForestChunk,
         renderSwamp, renderSwampChunk, renderRoadsChunk,
         renderTreesChunk, renderMountainsChunk, pairOK,
