@@ -588,8 +588,11 @@
                 if (def.roadPush) {
                     const fwd = free.filter(([, r]) => rows.length > 1 && r === rows[1]);
                     const pool = fwd.length ? fwd : free.filter(([, r]) => r !== rows[0]);
-                    const use = pool.length ? pool : free;
-                    return use[(Math.random() * use.length) | 0];
+                    // своё поле пустое — зона призыва сжалась в один ряд у базы,
+                    // ставить некуда: null = карту держим, после первого же
+                    // своего существа зона расширится и ряд впереди откроется
+                    if (!pool.length) return null;
+                    return pool[(Math.random() * pool.length) | 0];
                 }
                 const back = free.filter(([, r]) => r === rows[0]);
                 const pool = back.length ? back : free;
