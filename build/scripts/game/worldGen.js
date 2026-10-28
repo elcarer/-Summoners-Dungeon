@@ -17,7 +17,7 @@
 // (V — версия генератора: смена алгоритма инкрементирует её, старые
 // сейвы перегенерируются). Модуль чистый: PIXI не касается.
 (function () {
-    const V = 4;
+    const V = 5;
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // сетка зон 3×2: индекс k — колонка k%3, ряд (k/3|0), сектор 128×128
@@ -193,27 +193,57 @@
         }
         for (let i = 0; i < N; i++) if (ridge2[i]) ter[i] = T_MOUNTAIN;
 
-        // ── 3. чащи (блобы случайным блужданием по земле зоны) ────────────
-        // размер блоба ×2-3 и вдвое больше блобов в зоне Роста (просил
-        // юзер); старт — у центра СВОЕЙ зоны (прежде блуждали по всей
-        // карте и до своей зоны доживала ~1/6 блобов — рощи, не массивы)
+        // ── 3. чащи: ядро с ДРЕЙФОМ + РВАНЫЕ КРАЯ-ОТРОСТКИ (просил юзер:
+        // массивы были мелкие и «квадратные») — блоб ~×2 крупнее, форма —
+        // вытянутая клякса со щупальцами; старт — у центра СВОЕЙ зоны.
+        // В зоне Роста блобов больше (размер каждого вырос — количество
+        // чуть сбалансировано, чтобы зона не заросла целиком)
         for (let k = 0; k < 6; k++) {
             const grove = ELEMS[k] === "growth";
-            const blobs = (grove ? 26 : 13) + (rng() * (grove ? 14 : 7)) | 0;
+            const blobs = (grove ? 20 : 12) + (rng() * (grove ? 9 : 6)) | 0;
             for (let b = 0; b < blobs; b++) {
                 let x = Math.max(4, Math.min(W - 5,
                     (centers[k].x + (rng() - 0.5) * 116) | 0));
                 let y = Math.max(4, Math.min(H - 5,
                     (centers[k].y + (rng() - 0.5) * 116) | 0));
-                const size = 24 + (rng() * 36) | 0; // 24..59 (было 10..25)
-                for (let s = 0; s < size; s++) {
-                    const i = y * W + x;
+                const paint = (px, py) => {
+                    const i = py * W + px;
                     if (zone[i] === k && ter[i] === T_GROUND) ter[i] = T_FOREST;
-                    const dir = rng();
-                    if (dir < 0.25) x--; else if (dir < 0.5) x++;
-                    else if (dir < 0.75) y--; else y++;
+                };
+                // ядро: блуждание с доминирующим дрейфом — массив
+                // вытягивается, а не собирается «квадратом»
+                const drift = rng() * Math.PI * 2;
+                const dx = Math.abs(Math.cos(drift)) > Math.abs(Math.sin(drift))
+                    ? Math.sign(Math.cos(drift)) : 0;
+                const dy = dx === 0 ? Math.sign(Math.sin(drift)) : 0;
+                const size = 45 + (rng() * 40) | 0; // 45..84 (было 24..59)
+                for (let s = 0; s < size; s++) {
+                    paint(x, y);
+                    if (rng() < 0.35) { x += dx; y += dy; } // шаг по дрейфу
+                    else {
+                        const dir = rng();
+                        if (dir < 0.25) x--; else if (dir < 0.5) x++;
+                        else if (dir < 0.75) y--; else y++;
+                    }
                     x = Math.max(3, Math.min(W - 4, x));
                     y = Math.max(3, Math.min(H - 4, y));
+                }
+                // отростки из тела ядра — рваные края (просил юзер)
+                const twigs = 2 + (rng() * 2) | 0;
+                for (let tw = 0; tw < twigs; tw++) {
+                    let ang = rng() * Math.PI * 2;
+                    const len = 8 + (rng() * 12) | 0;
+                    for (let s = 0; s < len; s++) {
+                        if (rng() < 0.45) ang += (rng() - 0.5) * 1.6; // виляет
+                        x += Math.abs(Math.cos(ang)) > 0.4
+                            ? Math.sign(Math.cos(ang)) : 0;
+                        y += Math.abs(Math.sin(ang)) > 0.4
+                            ? Math.sign(Math.sin(ang)) : 0;
+                        x = Math.max(3, Math.min(W - 4, x));
+                        y = Math.max(3, Math.min(H - 4, y));
+                        paint(x, y);
+                        if (rng() < 0.3) paint(x + 1, y); // утолщение
+                    }
                 }
             }
         }
@@ -255,6 +285,97 @@
                 x = Math.max(3, Math.min(W - 4, x));
                 y = Math.max(3, Math.min(H - 4, y));
             }
+        }
+        // ── 4b. речная сеть зоны Мудрости (просил юзер: рек, притоков и
+        // устьев больше, чем в других областях): магистраль через зону +
+        // 5–7 притоков с устьями-расширениями + малые протоки + пруды;
+        // русла по 2 клетки, как у больших рек. Вся сеть держится ВНУТРИ
+        // сектора зоны (±58 от центра) — иначе блуждания уводили воду в
+        // чужие зоны и Мудрость не была самой речной. Реки кладутся ДО
+        // выбора POI — города/данж встанут на сухую землю, дороги
+        // прорежут мосты
+        let wisdomPond = null; // финальный добор — ПОСЛЕ дорог (шаг 6b)
+        const poiMask = new Uint8Array(N); // клетки POI — прудам нельзя
+        {
+            const k = 2; // ELEMS[2] === "wisdom"
+            const cx = centers[k].x | 0, cy = centers[k].y | 0;
+            const R = 58; // полукабарит сектора зоны Мудрости
+            const clampX = (x) => Math.max(Math.max(3, cx - R),
+                Math.min(Math.min(W - 4, cx + R), x));
+            const clampY = (y) => Math.max(Math.max(3, cy - R),
+                Math.min(Math.min(H - 4, cy + R), y));
+            // извилистое русло от точки; возвращает пройденные клетки
+            const carve = (x0, y0, len, dir0, wide, cells) => {
+                let x = x0, y = y0, ang = dir0;
+                for (let s = 0; s < len; s++) {
+                    if (rng() < 0.4) ang += (rng() - 0.5) * 1.1; // извилина
+                    x = clampX(x + (Math.abs(Math.cos(ang)) > 0.4
+                        ? Math.sign(Math.cos(ang)) : 0));
+                    y = clampY(y + (Math.abs(Math.sin(ang)) > 0.4
+                        ? Math.sign(Math.sin(ang)) : 0));
+                    ter[y * W + x] = T_WATER;
+                    if (wide) { // вторая параллельная протока — русло от 2 клеток
+                        if (Math.abs(Math.cos(ang)) > Math.abs(Math.sin(ang)))
+                            ter[y * W + clampX(x + 1)] = T_WATER;
+                        else
+                            ter[clampY(y + 1) * W + x] = T_WATER;
+                    }
+                    if (cells) cells.push({ x, y });
+                }
+                return cells;
+            };
+            // магистрали: вертикальная И горизонтальная через сектор —
+            // пересекаются, много устьев для притоков
+            const mainV = [], mainH = [];
+            carve(clampX(cx + ((rng() - 0.5) * 20 | 0)), clampY(cy - R),
+                2 * R - 8, Math.PI / 2, true, mainV);
+            carve(clampX(cx - R), clampY(cy + ((rng() - 0.5) * 20 | 0)),
+                2 * R - 8, 0, true, mainH);
+            // притоки: перпендикулярно своей магистрали; устье в месте
+            // впадения расширяется (дельта)
+            const tribCells = [];
+            const trib = 6 + (rng() * 3) | 0; // 6..8 притоков
+            for (let t = 0; t < trib; t++) {
+                const fromV = rng() < mainV.length / (mainV.length + mainH.length);
+                const main = fromV ? mainV : mainH;
+                if (!main.length) { t--; continue; }
+                const m = main[(rng() * main.length) | 0];
+                ter[m.y * W + clampX(m.x + 1)] = T_WATER; // устье-расширение
+                ter[clampY(m.y - 1) * W + m.x] = T_WATER;
+                const cells = [];
+                carve(m.x, m.y, 20 + (rng() * 24) | 0,
+                    fromV ? (rng() < 0.5 ? 0 : Math.PI)
+                        : (rng() < 0.5 ? Math.PI / 2 : -Math.PI / 2),
+                    true, cells);
+                tribCells.push(...cells);
+            }
+            // малые протоки второго порядка — из середины притоков
+            const brooks = 2 + (rng() * 2) | 0;
+            for (let t = 0; t < brooks && tribCells.length; t++) {
+                const c = tribCells[(tribCells.length / 2
+                    + (rng() - 0.5) * tribCells.length / 2) | 0];
+                carve(c.x, c.y, 10 + (rng() * 8) | 0, rng() * Math.PI * 2, false, null);
+            }
+            // пруды Мудрости — короткие широкие заводи; красят ТОЛЬКО
+            // землю: дорога/мост/площадь водой не накрываются
+            const pond = () => {
+                let x = clampX(cx + ((rng() - 0.5) * 90) | 0);
+                let y = clampY(cy + ((rng() - 0.5) * 90) | 0);
+                const size = 10 + (rng() * 8) | 0;
+                for (let s = 0; s < size; s++) {
+                    const i0 = y * W + x, i1 = y * W + clampX(x + 1);
+                    if (ter[i0] === T_GROUND && !poiMask[i0]) ter[i0] = T_WATER;
+                    if (ter[i1] === T_GROUND && !poiMask[i1]) ter[i1] = T_WATER;
+                    const dir = rng();
+                    if (dir < 0.25) x--; else if (dir < 0.5) x++;
+                    else if (dir < 0.75) y--; else y++;
+                    x = clampX(x);
+                    y = clampY(y);
+                }
+            };
+            const ponds = 3 + (rng() * 2) | 0;
+            for (let l = 0; l < ponds; l++) pond();
+            wisdomPond = pond;
         }
         // рамка мира — скалы по периметру (2 клетки)
         for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
@@ -307,8 +428,10 @@
             }
             // стены зданий вокруг площадей (сами площади свободны)
             for (const p of zonePois) {
-                for (const [fx, fy, isAnchor] of footCells(p.kind, p.gx, p.gy))
+                for (const [fx, fy, isAnchor] of footCells(p.kind, p.gx, p.gy)) {
                     if (!isAnchor) blocked[fy * W + fx] = 1;
+                    poiMask[fy * W + fx] = 1; // прудам Мудрости нельзя
+                }
                 pois.push(p);
             }
         }
@@ -411,6 +534,23 @@
             for (const i of path) {
                 if (blocked[i]) continue; // стены не красятся, площадь — да
                 ter[i] = ter[i] === T_WATER ? T_BRIDGE : T_ROAD;
+            }
+        }
+
+        // ── 6b. финальный добор воды Мудрости — ПОСЛЕ дорог: мосты
+        // превращали часть рек в T_BRIDGE, и «речность» зоны меряется
+        // честно (вода+мост). Глобальные реки иногда дают чужой зоне
+        // больше воды, чем сеть Мудрости — добираем прудами (только по
+        // земле, POI/дороги/мосты не трогаем) до гарантированного
+        // превосходства (просил юзер: Мудрость — самая речная)
+        if (wisdomPond) {
+            const riverOf = (i) => ter[i] === T_WATER || ter[i] === T_BRIDGE;
+            for (let guard = 0; guard < 40; guard++) {
+                const wz = new Array(6).fill(0);
+                for (let i = 0; i < N; i++) if (riverOf(i)) wz[zone[i]]++;
+                const other = Math.max(...wz.filter((_, z) => z !== 2));
+                if (wz[2] >= other * 1.15 + 30) break;
+                wisdomPond();
             }
         }
 

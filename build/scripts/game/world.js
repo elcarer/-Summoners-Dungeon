@@ -337,14 +337,24 @@
         }
 
         // ── мини-карта всего мира (просил юзер): правый нижний угол, ──────
-        // 2px на клетку (144×96 → 288×192). Статична: рельеф/дороги/POI
-        // рисуются один раз при входе; поверх — живой пульсирующий маркер
-        // героя (update). Клики по ней поглощаются — герой не бегает в угол
+        // 1px на клетку (384×256 — вдвое меньше прежней, просил юзер).
+        // Статична: рельеф/дороги/POI рисуются один раз при входе; поверх —
+        // живой пульсирующий маркер героя (update). Клики по ней
+        // поглощаются — герой не бегает в угол.
+        // Угол привязан к КРАЮ ОКНА, а не UI-канваса 1920×1080: при окне
+        // шире 16:9 letterbox-полосы справа сдвигали угол UI к центру
+        // (баг, просил юзер пофиксить) — позиция пересчитывается каждый
+        // кадр (fit) от реального размера экрана
         function buildMinimap() {
             const map = G.world.map;
-            const MS = 2, MW = map.w * MS, MH = map.h * MS;
+            const MS = 1, MW = map.w * MS, MH = map.h * MS;
             const box = new PIXI.Container();
-            box.position.set(1920 - 12 - MW, 1080 - 12 - MH);
+            const fit = () => {
+                const c = ctx.ui.toLocal({
+                    x: ctx.app.screen.width, y: ctx.app.screen.height });
+                box.position.set(c.x - 12 - MW, c.y - 12 - MH);
+            };
+            fit();
             box.eventMode = "static"; // ловит клики — не пускает их в мир
             box.hitArea = new PIXI.Rectangle(0, 0, MW, MH);
             const bg = new PIXI.Graphics();
@@ -381,7 +391,7 @@
             dot.fill({ color: 0xffffff });
             dot.stroke({ width: 1.5, color: 0x1c1207 });
             box.addChild(dot);
-            return { box, dot, MW, MH };
+            return { box, dot, MW, MH, fit };
         }
 
         // Вход в подземелье: продолжить текущий этаж ЭТОГО данжа (состояния
@@ -561,10 +571,12 @@
                     COMPONENTS.ctrlSpeed[heroId] =
                         t === T.ROAD || t === T.BRIDGE ? ROAD_SPEED : HERO_SPEED;
                 }
-                // мини-карта: маркер героя живёт вместе с ним (пульс)
+                // мини-карта: угол прижат к краю окна (letterbox), маркер
+                // героя живёт вместе с ним (пульс)
                 {
                     const mini = uiHud.userData.mini;
                     if (mini && G.world.map) {
+                        mini.fit();
                         mini.dot.position.set(
                             hx / (G.world.map.w * TS) * mini.MW,
                             hy / (G.world.map.h * TS) * mini.MH);
@@ -679,6 +691,7 @@
                         w: map ? map.w : 0, h: map ? map.h : 0,
                         ts: TS,
                         zoom: camera.cam.zoom,
+                        roundPixels: !!ctx.app.renderer.roundPixels, // рябь-фикс
                         heroScale: heroSprite ? heroSprite.scale.x : null,
                         seed: G.world.seed,
                         pois: map ? map.pois.length : 0,

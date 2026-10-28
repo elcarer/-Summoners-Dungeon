@@ -509,6 +509,10 @@ async function init() {
         resolution: Math.min(window.devicePixelRatio || 1, 2),
         autoDensity: true, // CSS-размер канваса не меняется — вёрстка та же
         antialias: false, //отключаем сглаживание пиксельарта (???)
+        // пиксель-арт: финальные экранные позиции спрайтов/графики
+        // округляются до целых пикселей — без субпиксельной ряби при
+        // скролле (дробные damp-координаты камеры «дрожали» на nearest)
+        roundPixels: true,
         preference: "webgpu" // предпочитаемый рендерер: нет WebGPU — PixiJS сам откатится на WebGL
     });
     document.body.appendChild(app.canvas);

@@ -83,10 +83,18 @@ function createCamera({ app, container, addSystem }) {
             ox = (Math.random() * 2 - 1) * shakePower * falloff;
             oy = (Math.random() * 2 - 1) * shakePower * falloff;
         }
-        // 4. Применяем трансформацию: центр экрана смотрит в точку (cam.x, cam.y)
+        // 4. Применяем трансформацию: центр экрана смотрит в точку (cam.x, cam.y).
+        // Пивот и позиция округляются до ЦЕЛЫХ ЭКРАННЫХ пикселей (позиция —
+        // на случай нечётного размера окна, когда screen/2 даёт .5): иначе
+        // весь мир уезжает на субпиксельные позиции и пиксель-арт «рябит»
+        // при скролле (просил юзер пофиксить)
         container.scale.set(cam.zoom);
-        container.pivot.set(cam.x, cam.y);
-        container.position.set(app.screen.width / 2 + ox, app.screen.height / 2 + oy);
+        container.pivot.set(
+            Math.round(cam.x * cam.zoom) / cam.zoom,
+            Math.round(cam.y * cam.zoom) / cam.zoom);
+        container.position.set(
+            Math.round(app.screen.width / 2 + ox),
+            Math.round(app.screen.height / 2 + oy));
     }
     if (addSystem) addSystem(update);
 
