@@ -23,7 +23,10 @@
 // (V — версия генератора: смена алгоритма инкрементирует её, старые
 // сейвы перегенерируются). Модуль чистый: PIXI не касается.
 (function () {
-    const V = 8;
+    // V9: воды в зоне Тлена нет вовсе (русла обрываются у его границ),
+    // болота отступают на клетку от границ зоны — без стыков с чужими
+    // биомами
+    const V = 9;
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // сетка зон 3×2: индекс k — колонка k%3, ряд (k/3|0), сектор 128×128
@@ -433,30 +436,49 @@
                 for (let i = 0; i < N; i++)
                     if (!out[i] && ter[i] === T_GROUND) ter[i] = T_SWAMP;
             }
+            // болота — строго в глубине Тлена (просил юзер: болото —
+            // спрайт на прозрачном фоне ПОВЕРХ чёрного тлена, никаких
+            // переходных колец): клетка с чужой зоной в чебышёв-1
+            // срезается, чтобы болото не стыковалось с другим биомом
+            for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+                const i = y * W + x;
+                if (ter[i] !== T_SWAMP) continue;
+                let inner = true;
+                for (let dy = -1; dy <= 1 && inner; dy++)
+                    for (let dx = -1; dx <= 1; dx++)
+                        if (zone[(y + dy) * W + x + dx] !== k) {
+                            inner = false;
+                            break;
+                        }
+                if (!inner) ter[i] = T_GROUND;
+            }
         }
 
         // ── 4. реки (извилистые, сверху вниз / слева направо) и озёра ─────
         // русло ОТ 3 КЛЕТКИ (просил юзер: ещё на 1 толще прежних двух) —
         // вторая и третья параллельные протоки всегда;
-        // река прорезает горы и чащи (каньон), но не рамку карты
+        // река прорезает горы и чащи (каньон), но не рамку карты.
+        // ВОДЫ В ТЛЕНЕ НЕТ (просил юзер): putW не красит зону Тлена —
+        // русла и озёра обрываются у его границ
+        const putW = (i) => { if (zone[i] !== 3) ter[i] = T_WATER; };
         const rivers = 6 + (rng() < 0.5 ? 1 : 0);
         for (let r = 0; r < rivers; r++) {
             const vertical = rng() < 0.55;
             if (vertical) {
                 let x = 8 + (rng() * (W - 16)) | 0;
                 for (let y = 2; y < H - 2; y++) {
-                    ter[y * W + x] = T_WATER;
-                    if (x + 1 < W - 2) ter[y * W + x + 1] = T_WATER;
-                    if (x + 2 < W - 2) ter[y * W + x + 2] = T_WATER;
+                    putW(y * W + x);
+                    if (x + 1 < W - 2) putW(y * W + x + 1);
+                    if (x + 2 < W - 2) putW(y * W + x + 2);
                     x += (rng() < 0.55 ? 0 : rng() < 0.5 ? -1 : 1);
                     x = Math.max(4, Math.min(W - 5, x));
                 }
             } else {
                 let y = 8 + (rng() * (H - 16)) | 0;
                 for (let x = 2; x < W - 2; x++) {
-                    ter[y * W + x] = T_WATER;
-                    if (y + 1 < H - 2) ter[(y + 1) * W + x] = T_WATER;
-                    if (y + 2 < H - 2) ter[(y + 2) * W + x] = T_WATER;
+                    putW(x + y * W);
+                    if (y + 1 < H - 2) putW(x + (y + 1) * W);
+                    if (y + 2 < H - 2) putW(x + (y + 2) * W);
                     y += (rng() < 0.55 ? 0 : rng() < 0.5 ? -1 : 1);
                     y = Math.max(4, Math.min(H - 5, y));
                 }
@@ -467,7 +489,7 @@
             let x = 6 + (rng() * (W - 12)) | 0, y = 6 + (rng() * (H - 12)) | 0;
             const size = 8 + (rng() * 10) | 0;
             for (let s = 0; s < size; s++) {
-                ter[y * W + x] = T_WATER;
+                putW(y * W + x);
                 const dir = rng();
                 if (dir < 0.25) x--; else if (dir < 0.5) x++;
                 else if (dir < 0.75) y--; else y++;
@@ -502,14 +524,14 @@
                         ? Math.sign(Math.cos(ang)) : 0));
                     y = clampY(y + (Math.abs(Math.sin(ang)) > 0.4
                         ? Math.sign(Math.sin(ang)) : 0));
-                    ter[y * W + x] = T_WATER;
+                    putW(y * W + x);
                     if (wide) { // русло от 3 клеток (просил юзер: толще)
                         if (Math.abs(Math.cos(ang)) > Math.abs(Math.sin(ang))) {
-                            ter[y * W + clampX(x + 1)] = T_WATER;
-                            ter[y * W + clampX(x + 2)] = T_WATER;
+                            putW(y * W + clampX(x + 1));
+                            putW(y * W + clampX(x + 2));
                         } else {
-                            ter[clampY(y + 1) * W + x] = T_WATER;
-                            ter[clampY(y + 2) * W + x] = T_WATER;
+                            putW(clampY(y + 1) * W + x);
+                            putW(clampY(y + 2) * W + x);
                         }
                     }
                     if (cells) cells.push({ x, y });
@@ -532,8 +554,8 @@
                 const main = fromV ? mainV : mainH;
                 if (!main.length) { t--; continue; }
                 const m = main[(rng() * main.length) | 0];
-                ter[m.y * W + clampX(m.x + 1)] = T_WATER; // устье-расширение
-                ter[clampY(m.y - 1) * W + m.x] = T_WATER;
+                putW(m.y * W + clampX(m.x + 1)); // устье-расширение
+                putW(clampY(m.y - 1) * W + m.x);
                 const cells = [];
                 carve(m.x, m.y, 20 + (rng() * 24) | 0,
                     fromV ? (rng() < 0.5 ? 0 : Math.PI)

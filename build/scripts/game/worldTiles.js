@@ -34,7 +34,10 @@
 // Сила-земля, Рост-трава, Мудрость-магия, Тлен-тлен, Честь-песок,
 // Время-снег; реки и озёра — вода (мосты стоят на воде, доски поверх).
 (function () {
-    // коды местности тер-слоя (0-5 суша, 6 вода, 7 болото; dirt=0 — буфер суши)
+    // коды местности тер-слоя (0-5 суша, 6 вода, 7 болото; dirt=0 —
+    // буфер суши). Болото — ОВЕРЛЕЙНАЯ местность: в базовые тайлы не
+    // попадает (рендер рисует под ним тлен, спрайт кладёт renderSwamp),
+    // участвует только в миникарте
     const DIRT = 0, GRASS = 1, SNOW = 2, SAND = 3, WASTE = 4, MAGIC = 5,
         WATER = 6, SWAMP = 7;
     const NAME = ["dirt", "grass", "snow", "sand", "waste", "magic", "water",
@@ -45,7 +48,8 @@
         decay: WASTE, honor: SAND, time: SNOW,
     };
     // СОЧЕТАЕМОСТЬ = пара с готовым листом: ключ a*8+b (a<b — коды
-    // местностей), feature — «фича» этого листа
+    // местностей), feature — «фича» этого листа. Болота в таблице нет:
+    // оно не рисуется тайлами местности — рендер кладёт под него тлен
     const PAIRS = {
         1: { sheet: "grass_dirt", feature: DIRT },   // земля|трава
         2: { sheet: "snow_dirt", feature: SNOW },    // земля|снег
@@ -53,7 +57,6 @@
         4: { sheet: "waste_dirt", feature: WASTE },  // земля|тлен
         5: { sheet: "magic_dirt", feature: MAGIC },  // земля|магия
         14: { sheet: "grass_water", feature: WATER }, // трава|вода (1·8+6)
-        15: { sheet: "swamp", feature: SWAMP },      // трава|болото (1·8+7)
     };
     // сплошные тайлы одной местности: лист, где она есть (бит фичи)
     const SOLID = [
@@ -64,7 +67,7 @@
         { sheet: "waste_dirt", feature: WASTE },
         { sheet: "magic_dirt", feature: MAGIC },
         { sheet: "grass_water", feature: WATER },
-        { sheet: "swamp", feature: SWAMP },
+        { sheet: "waste_dirt", feature: WASTE }, // болото — подложка тлена
     ];
     // цвета мини-карты (в тон тайлам; земля/трава/снег/песок/тлен/магия/
     // вода/болото)
@@ -91,11 +94,14 @@
     // сочетаемы = для пары есть переходный лист (таблица выше)
     const pairOK = (a, b) => a === b || !!PAIRS[pairKey(a, b)];
 
-    // ── местность клетки мира: Uint8Array(w*h) кодов 0..6 ───────────────
+    // ── местность клетки мира: Uint8Array(w*h) кодов 0..7 ───────────────
     // Правила идут по таблице сочетаемости: сначала берега (вода только
     // с травой), затем полосы-буферы суши (несовместимая пара → земля
     // на не-травяной стороне). Оба прохода читают снимок предыдущего
     // шага и пишут в t — параллельная семантика, детерминизм по сиду.
+    // Болото в правилах не участвует (просил юзер: спрайты болот на
+    // прозрачном фоне кладутся ПОВЕРХ чёрного тлена, никаких колец
+    // грязи/травы вокруг — генератор сам держит их в глубине Тлена)
     function terrainOf(map) {
         const GEN = globalThis.GAME_WORLDGEN, T = GEN.T;
         const W = map.w, H = map.h, N = W * H;
@@ -115,28 +121,27 @@
             }
             return false;
         };
-        // 1. ЛУГОВЫЕ/ЗАМШЕЛЫЕ БЕРЕГА: вода и болото сочетаются только
-        // с травой — вся суша в чебышёв-1 от воды/болота, кроме травы,
-        // становится травяной кромкой (река режет снег/песок/тлен/магию
-        // лугом; болото по краям мшисто-луговое). Само болото у воды
-        // уходит в луг (болото с водой напрямую не стыкуется)
+        // 1. ЛУГОВЫЕ БЕРЕГА: вода сочетается только с травой — вся суша
+        // в чебышёв-1 от воды, кроме травы, становится травяной кромкой
+        // (река режет снег/песок/тлен/магию лугом)
         let src = t.slice();
         for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
             const a = src[y * W + x];
-            if (a === WATER || a === GRASS) continue;
-            if (a === SWAMP) {
-                if (cheb(x, y, (b) => b === WATER)) t[y * W + x] = GRASS;
-            } else if (cheb(x, y, (b) => b === WATER || b === SWAMP))
-                t[y * W + x] = GRASS;
+            if (a === WATER || a === GRASS || a === SWAMP) continue;
+            if (cheb(x, y, (b) => b === WATER)) t[y * W + x] = GRASS;
         }
         // 2. ЗЕМЛЯНЫЕ ПОЛОСЫ: несовместимая пара суша-суша в чебышёв-1 →
         // не-травяная сторона уходит в землю (трава — фон базового листа,
-        // её не режем; снег|песок обращаются обе стороны — полоса в 2 клетки)
+        // её не режем; снег|песок обращаются обе стороны — полоса в 2
+        // клетки). Болото игнорируется обеими сторонами: под ним всё
+        // равно рисуется тлен
         src = t.slice();
         for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
             const a = src[y * W + x];
-            if (a === DIRT || a === GRASS || a === WATER) continue;
-            if (cheb(x, y, (b) => b !== WATER && b !== a && !pairOK(a, b)))
+            if (a === DIRT || a === GRASS || a === WATER || a === SWAMP)
+                continue;
+            if (cheb(x, y, (b) => b !== WATER && b !== SWAMP && b !== a
+                && !pairOK(a, b)))
                 t[y * W + x] = DIRT;
         }
         return t;
@@ -153,8 +158,14 @@
         const W = map.w, H = map.h, s32 = sheets.grass_dirt.ts;
         const st = stats || { tiles: 0, fallback: 0, odd: 0, bySheet: {} };
         const c = new PIXI.Container();
-        const at = (x, y) =>
-            (x < 0 || y < 0 || x >= W || y >= H) ? DIRT : t[y * W + x];
+        // болото не рисуется тайлами местности: под спрайтом swamp.png
+        // (renderSwampChunk) лежит чёрный тлен (просил юзер), поэтому
+        // в углах выбора тайла болото считается тленом
+        const at = (x, y) => {
+            if (x < 0 || y < 0 || x >= W || y >= H) return DIRT;
+            const v = t[y * W + x];
+            return v === SWAMP ? WASTE : v;
+        };
         const xe = Math.min(W, x0 + CHUNK), ye = Math.min(H, y0 + CHUNK);
         for (let j = y0; j < ye; j++) for (let i = x0; i < xe; i++) {
             const tl = at(i - 1, j - 1), tr = at(i, j - 1);
@@ -270,7 +281,8 @@
     }
 
     // ── болота (просил юзер): swamp.png — прозрачный dual-grid оверлей
-    // 4×4 по 32px (конвенция TILE_CORNERS, как wood) поверх местности,
+    // 4×4 по 32px (конвенция TILE_CORNERS, как wood) поверх чёрного
+    // тлена (подложку кладёт renderChunk, болото в тайлы не попадает),
     // маска — болота worldGen (ter===SWAMP). Безлесные тайлы (ключ 0)
     // не спрайтятся. Рисуется ДО дорог/мостов (гать поверх болота)
     function renderSwampChunk(map, sheets, TS, x0, y0, stats) {
@@ -375,7 +387,10 @@
     }
 
     globalThis.GAME_WORLDTILES = {
-        V: 6, CHUNK, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER, SWAMP,
+        // V7: болота — оверлей поверх тлена (без кромок terrainOf,
+        // подложка waste в renderChunk); пара трава|болото из PAIRS
+        // убрана
+        V: 7, CHUNK, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER, SWAMP,
         NAME, ZONE_TERRAIN, PAIRS, MINI, terrainOf, ROAD_TILE,
         render, renderChunk, renderForest, renderForestChunk,
         renderSwamp, renderSwampChunk, renderRoadsChunk,
