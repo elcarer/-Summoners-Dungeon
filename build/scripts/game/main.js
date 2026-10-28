@@ -88,13 +88,14 @@
         // Листы местности глобальной карты (просил юзер, волна тайлов
         // мира): images/tiles/*.png — dual-grid 4×4 по 32px, нарезка и
         // конвенция углов — из движкового dualgrid.js (TILE_CORNERS).
-        // Пары: grass_dirt, grass_water и снег/песок/тлен/магия поверх земли
+        // Пары: grass_dirt, grass_water и снег/песок/тлен/магия поверх
+        // земли; wood — прозрачный оверлей лесных массивов (renderForest)
         say("тайлы мира…");
         await frame();
         const dual = globalThis.createDualGrid();
         const worldSheets = {};
         for (const name of ["grass_dirt", "grass_water", "sand_dirt",
-                            "snow_dirt", "waste_dirt", "magic_dirt"]) {
+                            "snow_dirt", "waste_dirt", "magic_dirt", "wood"]) {
             worldSheets[name] = dual.sliceTileset(
                 await assets.loadTexture(`./images/tiles/${name}.png`));
         }

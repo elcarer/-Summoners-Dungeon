@@ -15,12 +15,17 @@
 // маркером героя. Подземелье Времени на карте есть, но вход скажет
 // «Скоро…» — данж этой стихии ещё впереди (Залы Чести открыты).
 (function () {
-    const TS = 40;
-    const HERO_SPEED = 170; // шаг героя по обычной местности (px/с)
+    // клетка мира 32px (просил юзер: общий стандарт + нативный размер
+    // тайлсета images/tiles — листы 4×4 по 32px идут в масштабе 1:1).
+    // Вид — БЕЗ зума (просил юзер): спрайты тайлов в натуральную
+    // величину, зум портил и пикселизировал графику; камера ×1
+    const TS = 32;
+    const HERO_SPEED = 136; // 4.25 кл/с — прежний темп в клетках
     const ROAD_SPEED = HERO_SPEED * 1.2; // по дорогам/мостам ×1.2 (просил юзер)
 
-    // палитры зон: крыши городов и кроны чащ — у каждой стихии свой
-    // характер (земля зон теперь — тайлы местности worldTiles.js,
+    // палитры зон: крыши городов и цвет чащ на мини-карте — у каждой
+    // стихии свой характер (земля зон и ЛЕСНЫЕ МАССИВЫ — тайлы
+    // worldTiles.js: местность + прозрачный оверлей wood.png поверх,
     // цвета мини-карты — в GAME_WORLDTILES.MINI)
     const ROOF = {
         strength: 0x8a3f2e, growth: 0x4f7a3a, wisdom: 0x3f6d8a,
@@ -39,6 +44,7 @@
         let layer = null, heroId = null, heroShadow = null, heroSprite = null;
         let worldTerr = null; // коды местности клетки (слой worldTiles)
         let terrStats = null; // статистика слоя (тесты: fallback/odd)
+        let woodStats = null; // статистика лесного оверлея wood.png (тесты)
         let uiHud = null;
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
         let floaties = []; // всплывающие подписи («Скоро…» у арки)
@@ -110,39 +116,38 @@
             G.world.map.pois.find((p) => p.kind === "dungeon" && p.cave === caveId);
 
         // ── рендер карты: плоские тайлы-заглушки в духе подземелья ────────
-        // (земля зон и вода — теперь dual-grid тайлы worldTiles.js ПОД этим
-        // слоем; здесь остаются только горы, чащи, дороги и мосты поверх)
+        // (земля зон, вода и лесные массивы — dual-grid тайлы worldTiles.js
+        // ПОД этим слоем; здесь остаются только горы, дороги и мосты поверх)
         function buildMapGfx(map) {
             const g = new PIXI.Graphics();
             const W = map.w, H = map.h;
+            const stone = 2; // камешек дороги (заглушка)
+            const plank = 2; // доска моста (заглушка)
+            const edge = 4; // кант моста, ~TS/8 (заглушка)
+            const plankGap = (TS - 2 * edge - plank) / 3;
             for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
                 const t = map.ter[j * W + i];
                 const x = i * TS, y = j * TS;
                 if (t === T.MOUNTAIN) {
                     g.rect(x, y, TS, TS); g.fill(0x3b3831);
                     g.rect(x + 2, y + 2, TS - 4, TS - 4); g.fill(0x4a463f);
-                    g.poly([x + 8, y + 30, x + 20, y + 8, x + 32, y + 30]);
+                    g.poly([x + TS * 0.2, y + TS * 0.75, x + TS * 0.5, y + TS * 0.2,
+                        x + TS * 0.8, y + TS * 0.75]);
                     g.fill(0x6a655a); // вершина
-                } else if (t === T.FOREST) {
-                    const zone = map.zone[j * W + i];
-                    const elem = GEN.ELEMS[zone];
-                    g.rect(x, y, TS, TS); g.fill(0x20301b);
-                    g.rect(x + 2, y + 2, TS - 4, TS - 4); g.fill(FOREST[elem]);
-                    g.circle(x + TS / 2, y + TS / 2 - 3, 9); g.fill(0x2c3f22);
-                    g.circle(x + TS / 2 - 4, y + TS / 2 + 2, 6); g.fill(0x26361d);
-                    g.circle(x + TS / 2 + 5, y + TS / 2 + 3, 6); g.fill(0x26361d);
                 } else if (t === T.ROAD || t === T.BRIDGE) {
                     g.rect(x, y, TS, TS); g.fill(0x8a744f);
                     g.rect(x + 1, y + 1, TS - 2, TS - 2); g.fill(0x94805c);
                     if (t === T.BRIDGE) { // доски и кант поверх воды
-                        g.rect(x, y, TS, 5); g.fill(0x6e5233);
-                        g.rect(x, y + TS - 5, TS, 5); g.fill(0x6e5233);
+                        g.rect(x, y, TS, edge); g.fill(0x6e5233);
+                        g.rect(x, y + TS - edge, TS, edge); g.fill(0x6e5233);
                         for (let b = 0; b < 4; b++) {
-                            g.rect(x + 3, y + 6 + b * 8, TS - 6, 2); g.fill(0x7c5c36);
+                            g.rect(x + 3, y + edge + b * plankGap,
+                                TS - 6, plank);
+                            g.fill(0x7c5c36);
                         }
                     } else if ((i * 5 + j * 11) % 4 === 0) {
-                        g.circle(x + 12, y + 26, 2); g.fill(0x7a6543); // камешки
-                        g.circle(x + 27, y + 14, 2); g.fill(0x7a6543);
+                        g.circle(x + TS * 0.3, y + TS * 0.65, stone); g.fill(0x7a6543);
+                        g.circle(x + TS * 0.68, y + TS * 0.35, stone); g.fill(0x7a6543);
                     }
                 }
             }
@@ -178,8 +183,11 @@
             b.rect(38, 18, 10, 18); b.fill(0x3a2f22);
             b.rect(-46, 2, 7, 7); b.rect(-6, 2, 7, 7); b.fill(0x3a2f22); // окна
             c.addChild(b);
-            c.addChild(label(poi.name, 13, 0xf3e6c2, -40));
+            c.addChild(label(poi.name, 16, 0xf3e6c2, -40));
             c.position.set(p.x, p.y);
+            // заглушка 120px ужата под footprint 3×2 клетки (96×64) —
+            // не жалеть: заменится финальной графикой (просил юзер)
+            c.scale.set(0.8);
             c.zIndex = (poi.gy + 1) * TS; // низ footprint
             return c;
         }
@@ -207,8 +215,10 @@
             logo.position.set(0, -86);
             logo.eventMode = "none";
             c.addChild(logo);
-            c.addChild(label(poi.name, 16, 0xf0c96a, -88));
+            c.addChild(label(poi.name, 20, 0xf0c96a, -88));
             c.position.set(p.x, p.y);
+            // заглушка 120px ужата под footprint 3×3 клетки (96×96)
+            c.scale.set(0.8);
             c.zIndex = (poi.gy + 2) * TS; // низ footprint
             return c;
         }
@@ -223,8 +233,9 @@
             sp.anchor.set(0.5);
             sp.scale.set(0.66);
             c.addChild(sp);
-            c.addChild(label(poi.name, 13, 0xffe9b0, -26));
+            c.addChild(label(poi.name, 16, 0xffe9b0, -26));
             c.position.set(p.x, p.y);
+            c.scale.set(0.8); // заглушка: иконка ~34px на клетку 32
             c.zIndex = p.y;
             return c;
         }
@@ -454,8 +465,10 @@
                 // стихии (Сила-земля, Рост-трава, Мудрость-магия, Тлен-
                 // тлен, Честь-песок, Время-снег) + вода рек/озёр;
                 // несовместимые стыки расходятся земляной полосой
-                // (см. worldTiles.js). Горы, чащи и дороги остаются
-                // СВЕРХУ — их рисует buildMapGfx
+                // (см. worldTiles.js). Лесные массивы — прозрачный
+                // оверлей wood.png ПОВЕРХ местности (просил юзер),
+                // но ПОД дорогами/горами/мостами (-98): дороги прорезают
+                // чащи, мосты — над водой
                 worldTerr = globalThis.GAME_WORLDTILES.terrainOf(map);
                 const terr = globalThis.GAME_WORLDTILES.render(
                     map, worldTerr, ctx.worldSheets, TS);
@@ -463,6 +476,11 @@
                 terr.container.zIndex = -99;
                 zone.zIndex = -100;
                 layer.addChild(terr.container);
+                const wood = globalThis.GAME_WORLDTILES.renderForest(
+                    map, ctx.worldSheets, TS);
+                woodStats = wood.stats;
+                wood.container.zIndex = -98.5;
+                layer.addChild(wood.container);
                 const mapGfx = buildMapGfx(map);
                 mapGfx.zIndex = -98;
                 layer.addChild(mapGfx);
@@ -477,7 +495,7 @@
                 ctx.heroSheet = ctx.heroSheets[G.elem] || ctx.heroSheets.strength;
                 const sprite = new PIXI.AnimatedSprite(ctx.heroSheet.animations.walk_front, false);
                 sprite.anchor.set(0.5, 1);
-                sprite.scale.set(0.25); // лист 256px — рост как у рыцаря 64px
+                sprite.scale.set(0.25); // 64×64 — четверть листа 256 (просил юзер)
                 sprite.zIndex = hp.y; // y-sort: герой между зданиями/арками
                 heroSprite = sprite;
                 heroId = characters.spawn({
@@ -500,7 +518,9 @@
                     get y() { return heroId !== null ? COMPONENTS.positionY[heroId] : hp.y; },
                 }, 8);
                 camera.setBounds({ x: 0, y: 0, width: map.w * TS, height: map.h * TS });
-                camera.setZoom(2.1);
+                // БЕЗ зума (просил юзер): тайлы 32px в натуральную величину;
+                // камера общая со сценами данжа (там 1.3125) — сбрасываем
+                camera.setZoom(1);
                 camera.centerOn(hp.x, hp.y);
                 uiHud = buildHud();
                 ctx.ui.addChild(uiHud);
@@ -520,6 +540,7 @@
                 heroSprite = null;
                 worldTerr = null;
                 terrStats = null;
+                woodStats = null;
                 path = null;
                 floaties = [];
                 if (layer) { layer.destroy({ children: true }); layer = null; }
@@ -656,6 +677,9 @@
                         keys: caveOf("wis"), dead: caveOf("dec"),
                         honorCave: caveOf("hon"), timeCave: caveOf("tim"),
                         w: map ? map.w : 0, h: map ? map.h : 0,
+                        ts: TS,
+                        zoom: camera.cam.zoom,
+                        heroScale: heroSprite ? heroSprite.scale.x : null,
                         seed: G.world.seed,
                         pois: map ? map.pois.length : 0,
                         speed: heroId !== null ? COMPONENTS.ctrlSpeed[heroId] : null,
@@ -675,11 +699,13 @@
                     };
                 },
                 // слой местности (тайлы images/tiles): коды клеток 0..5
-                // (земля/трава/снег/песок/тлен/вода) и статистика рендера
+                // (земля/трава/снег/песок/тлен/вода), статистика рендера
+                // и лесной оверлей wood.png (тайлы по маске чащ)
                 terrain: () => ({
                     v: globalThis.GAME_WORLDTILES.V,
                     terr: worldTerr ? Array.from(worldTerr) : null,
                     stats: terrStats,
+                    forest: woodStats ? { ...woodStats } : null,
                 }),
                 setHeroPos(x, y) {
                     if (heroId === null) return false;

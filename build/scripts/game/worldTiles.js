@@ -5,7 +5,8 @@
 // images/tiles/*.png — 4×4 тайла по 32px, каждый описывает ПАРУ местностей:
 // grass_dirt (фон трава/фича земля), grass_water (фон трава/фича вода),
 // snow_dirt / sand_dirt / waste_dirt / magic_dirt (фон земля, фича —
-// снег/песок/тлен/магия).
+// снег/песок/тлен/магия); wood — ПРОЗРАЧНЫЙ оверлей лесных массивов
+// поверх местности (фича — чаща, безлесные тайлы прозрачны целиком).
 //
 // ── ТАБЛИЦА СОЧЕТАЕМОСТИ (просил юзер) ──────────────────────────────────
 // Напрямую соседствовать могут только пары с готовым переходным листом.
@@ -167,8 +168,36 @@
         return { container: c, stats };
     }
 
+    // ── оверлей ЛЕСНЫХ МАССИВОВ (просил юзер): wood.png поверх тайлов ─────
+    // местности. Лист — прозрачный dual-grid 4×4 по 32px (фича = чаща:
+    // индекс 12 без углов полностью прозрачен, 6 полон — конвенция
+    // TILE_CORNERS как у местности). Маска — чащи worldGen (ter===FOREST,
+    // чащи непроходимы, дороги их прорезают → под дорогами леса нет);
+    // рендер-тайл (i,j) накрывает углы 4 клеток данных, безлесные тайлы
+    // (ключ 0) не спрайтятся вовсе — сплошной лес = плотная крона
+    function renderForest(map, sheets, TS) {
+        const GEN = globalThis.GAME_WORLDGEN, T = GEN.T;
+        const W = map.w, H = map.h, s32 = sheets.wood.ts; // тайл листа
+        const c = new PIXI.Container();
+        const stats = { tiles: 0, skipped: 0, scale: TS / s32 };
+        const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0
+            : (map.ter[y * W + x] === T.FOREST ? 1 : 0);
+        for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+            const key = at(i - 1, j - 1) * 8 + at(i, j - 1) * 4
+                + at(i - 1, j) * 2 + at(i, j);
+            if (!key) { stats.skipped++; continue; }
+            const spr = new PIXI.Sprite(sheets.wood.textures[LOOKUP[key]]);
+            spr.position.set(i * TS, j * TS);
+            spr.scale.set(TS / s32);
+            c.addChild(spr);
+            stats.tiles++;
+        }
+        return { container: c, stats };
+    }
+
     globalThis.GAME_WORLDTILES = {
-        V: 2, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER,
-        NAME, ZONE_TERRAIN, PAIRS, MINI, terrainOf, render, pairOK,
+        V: 3, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER,
+        NAME, ZONE_TERRAIN, PAIRS, MINI, terrainOf, render, renderForest,
+        pairOK,
     };
 })();
