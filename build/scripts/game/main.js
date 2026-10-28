@@ -99,6 +99,11 @@
             worldSheets[name] = dual.sliceTileset(
                 await assets.loadTexture(`./images/tiles/${name}.png`));
         }
+        // деревья лесных массивов: images/tiles/trees/<n>.png — спрайты
+        // юзера 96px (слой объектов над тайлами чащи, просил юзер)
+        const treeTex = [];
+        for (let n = 1; n <= 10; n++)
+            treeTex.push(await assets.loadTexture(`./images/tiles/trees/${n}.png`));
         // лица карт стихий: images/cards/<elem>/<№>.png (def.img в dataCards)
         say("карты…");
         await frame();
@@ -588,6 +593,7 @@
             assets, uiTex, scheduler, input, camera, characters, charInput,
             heroSheet: heroSheets.strength, heroSheets, creatureSheets, G, ui, audio, collide,
             worldSheets, // нарезки листов местности images/tiles (карта мира)
+            treeTex,     // спрайты деревьев images/tiles/trees (лесные массивы)
             sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
             heroHover,        // ctx.heroHover(держатель, спрайт, bigX, bigY)

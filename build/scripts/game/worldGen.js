@@ -5,7 +5,7 @@
 // мира 32px → 12288×8192; вдвое больше — города редкие, якоря ≥30
 // клеток, просил юзер), 6 зон по стихиям сеткой 3×2: верхний ряд
 // Сила/Рост/Мудрость, нижний Тлен/Честь/Время. В каждой зоне: столица
-// 3×3 клетки, 9–11 городов 3×2 клетки и вход в подземелье стихии
+// 5×4 клетки, 9–11 городов 5×3 клетки и вход в подземелье стихии
 // (1 клетка). Города стоят редко — минимум ~9 клеток между якорями
 // (просил юзер ×2 к прежнему). Путь преграждают горные хребты по
 // границам зон, чащи, реки и озёра; населённые пункты связывают дороги
@@ -17,7 +17,7 @@
 // (V — версия генератора: смена алгоритма инкрементирует её, старые
 // сейвы перегенерируются). Модуль чистый: PIXI не касается.
 (function () {
-    const V = 5;
+    const V = 6;
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // сетка зон 3×2: индекс k — колонка k%3, ряд (k/3|0), сектор 128×128
@@ -32,10 +32,10 @@
         wisdom: "world.caveWisdom", decay: "world.caveDecay",
         honor: "world.caveHonor", time: "world.caveTime",
     };
-    // габариты зданий в клетках (просил юзер): город 3×2, столица 3×3;
+    // габариты зданий в клетках (просил юзер): город 5×3, столица 5×4;
     // (gx,gy) POI — якорь-площадь: у города нижняя средняя клетка,
     // у столицы — центральная. Данж — 1×1
-    const KIND_SIZE = { town: { w: 3, h: 2 }, capital: { w: 3, h: 3 }, dungeon: { w: 1, h: 1 } };
+    const KIND_SIZE = { town: { w: 5, h: 3 }, capital: { w: 5, h: 4 }, dungeon: { w: 1, h: 1 } };
     // минимальная дистанция между якорями POI зоны (просил юзер ×2 к
     // редкости на карте вдвое больше: было 15 на карте 192×128)
     const MIN_POI_DIST = 30;
@@ -193,11 +193,13 @@
         }
         for (let i = 0; i < N; i++) if (ridge2[i]) ter[i] = T_MOUNTAIN;
 
-        // ── 3. чащи: ядро с ДРЕЙФОМ + РВАНЫЕ КРАЯ-ОТРОСТКИ (просил юзер:
-        // массивы были мелкие и «квадратные») — блоб ~×2 крупнее, форма —
-        // вытянутая клякса со щупальцами; старт — у центра СВОЕЙ зоны.
-        // В зоне Роста блобов больше (размер каждого вырос — количество
-        // чуть сбалансировано, чтобы зона не заросла целиком)
+        // ── 3. чащи: «острова»-пятна с РВАНЫМИ КРАЯМИ (просил юзер: прежние
+        // блуждания с дрейфом давали ленты и кольца с дырами — не похоже на
+        // лес). Ядро растёт КОМПАКТНО — новая клетка только по соседству с
+        // уже покрашенной (клякса без дыр и без лент), отростки-языки
+        // выступают НАРУЖУ короткими кончиками. Полости, окружённые чащей,
+        // заливаются лесом — дырок внутри массивов нет. В зоне Роста блобов
+        // больше (количество сбалансировано, чтобы зона не заросла целиком)
         for (let k = 0; k < 6; k++) {
             const grove = ELEMS[k] === "growth";
             const blobs = (grove ? 20 : 12) + (rng() * (grove ? 9 : 6)) | 0;
@@ -210,42 +212,86 @@
                     const i = py * W + px;
                     if (zone[i] === k && ter[i] === T_GROUND) ter[i] = T_FOREST;
                 };
-                // ядро: блуждание с доминирующим дрейфом — массив
-                // вытягивается, а не собирается «квадратом»
-                const drift = rng() * Math.PI * 2;
-                const dx = Math.abs(Math.cos(drift)) > Math.abs(Math.sin(drift))
-                    ? Math.sign(Math.cos(drift)) : 0;
-                const dy = dx === 0 ? Math.sign(Math.sin(drift)) : 0;
-                const size = 45 + (rng() * 40) | 0; // 45..84 (было 24..59)
-                for (let s = 0; s < size; s++) {
-                    paint(x, y);
-                    if (rng() < 0.35) { x += dx; y += dy; } // шаг по дрейфу
-                    else {
-                        const dir = rng();
-                        if (dir < 0.25) x--; else if (dir < 0.5) x++;
-                        else if (dir < 0.75) y--; else y++;
+                // ядро-клякса: рост по краю (edge-набор соседей покрашенного)
+                // — остров растёт «пятном», ленты исключены по построению
+                const size = 55 + (rng() * 35) | 0; // 55..89
+                const edge = [];
+                const addEdge = (px, py) => {
+                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        const nx = px + dx, ny = py + dy;
+                        if (nx < 3 || ny < 3 || nx >= W - 3 || ny >= H - 3) continue;
+                        const ni = ny * W + nx;
+                        if (ter[ni] !== T_FOREST) edge.push([nx, ny]);
                     }
-                    x = Math.max(3, Math.min(W - 4, x));
-                    y = Math.max(3, Math.min(H - 4, y));
+                };
+                paint(x, y);
+                addEdge(x, y);
+                for (let s = 0; s < size && edge.length; s++) {
+                    const e = (rng() * edge.length) | 0;
+                    const [ex, ey] = edge[e];
+                    edge.splice(e, 1);
+                    const ei = ey * W + ex;
+                    if (ter[ei] === T_FOREST) continue; // обросла из другого края
+                    paint(ex, ey);
+                    addEdge(ex, ey);
                 }
-                // отростки из тела ядра — рваные края (просил юзер)
-                const twigs = 2 + (rng() * 2) | 0;
+                // отростки-кончики из периметра ядра — рваные края
+                // (просил юзер: «выступающие наружу кончики пятен леса»)
+                const twigs = 2 + (rng() * 3) | 0; // 2..4
                 for (let tw = 0; tw < twigs; tw++) {
-                    let ang = rng() * Math.PI * 2;
-                    const len = 8 + (rng() * 12) | 0;
+                    // старт — покрашенная клетка с не-лесным соседом
+                    let sx = -1, sy = -1;
+                    for (let tries = 0; tries < 40; tries++) {
+                        const tx = 3 + (rng() * (W - 6)) | 0;
+                        const ty = 3 + (rng() * (H - 6)) | 0;
+                        if (zone[ty * W + tx] !== k || ter[ty * W + tx] !== T_FOREST)
+                            continue;
+                        const near = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(
+                            ([dx, dy]) => {
+                                const ni = (ty + dy) * W + tx + dx;
+                                return zone[ni] === k && ter[ni] === T_GROUND;
+                            });
+                        if (near) { sx = tx; sy = ty; break; }
+                    }
+                    if (sx < 0) continue;
+                    let ang = Math.atan2(sy - centers[k].y, sx - centers[k].x);
+                    const len = 5 + (rng() * 7) | 0; // 5..11 — короткий язык
+                    let cx2 = sx, cy2 = sy;
                     for (let s = 0; s < len; s++) {
-                        if (rng() < 0.45) ang += (rng() - 0.5) * 1.6; // виляет
-                        x += Math.abs(Math.cos(ang)) > 0.4
+                        if (rng() < 0.5) ang += (rng() - 0.5) * 1.0; // виляет
+                        cx2 += Math.abs(Math.cos(ang)) > 0.4
                             ? Math.sign(Math.cos(ang)) : 0;
-                        y += Math.abs(Math.sin(ang)) > 0.4
+                        cy2 += Math.abs(Math.sin(ang)) > 0.4
                             ? Math.sign(Math.sin(ang)) : 0;
-                        x = Math.max(3, Math.min(W - 4, x));
-                        y = Math.max(3, Math.min(H - 4, y));
-                        paint(x, y);
-                        if (rng() < 0.3) paint(x + 1, y); // утолщение
+                        cx2 = Math.max(3, Math.min(W - 4, cx2));
+                        cy2 = Math.max(3, Math.min(H - 4, cy2));
+                        paint(cx2, cy2);
+                        if (rng() < 0.45) // язык в 2 клетки толщиной
+                            paint(cx2 + (rng() < 0.5 ? 1 : -1), cy2);
                     }
                 }
             }
+        }
+        // заливка дыр (просил юзер: дырок внутри лесных массивов быть не
+        // должно): всё не-лес, НЕдостижимое от рамки карты по не-лесу, —
+        // полость внутри чащи, красится лесом (горы полостей не трогаем)
+        {
+            const out = new Uint8Array(N);
+            const q = [];
+            const push = (i) => {
+                if (!out[i] && ter[i] !== T_FOREST) { out[i] = 1; q.push(i); }
+            };
+            for (let x = 0; x < W; x++) { push(x); push((H - 1) * W + x); }
+            for (let y = 0; y < H; y++) { push(y * W); push(y * W + W - 1); }
+            for (let qi = 0; qi < q.length; qi++) {
+                const c = q[qi], cx = c % W, cy = (c / W) | 0;
+                if (cx > 0) push(c - 1);
+                if (cx < W - 1) push(c + 1);
+                if (cy > 0) push(c - W);
+                if (cy < H - 1) push(c + W);
+            }
+            for (let i = 0; i < N; i++)
+                if (!out[i] && ter[i] === T_GROUND) ter[i] = T_FOREST;
         }
 
         // ── 4. реки (извилистые, сверху вниз / слева направо) и озёра ─────
@@ -641,7 +687,7 @@
     }
 
     globalThis.GAME_WORLDGEN = {
-        V, W, H, ELEMS, ELEM_CAVE, KIND_SIZE, namePois, generate,
+        V, W, H, ELEMS, ELEM_CAVE, KIND_SIZE, namePois, generate, hash2,
         T: { GROUND: T_GROUND, MOUNTAIN: T_MOUNTAIN, FOREST: T_FOREST,
             WATER: T_WATER, ROAD: T_ROAD, BRIDGE: T_BRIDGE },
     };
