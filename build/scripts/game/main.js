@@ -85,6 +85,19 @@
                     await assets.loadTexture(`./images/dungeon_tiles/${lair}/${f}.png`);
             }
         }
+        // Листы местности глобальной карты (просил юзер, волна тайлов
+        // мира): images/tiles/*.png — dual-grid 4×4 по 32px, нарезка и
+        // конвенция углов — из движкового dualgrid.js (TILE_CORNERS).
+        // Пары: grass_dirt, grass_water и снег/песок/тлен/магия поверх земли
+        say("тайлы мира…");
+        await frame();
+        const dual = globalThis.createDualGrid();
+        const worldSheets = {};
+        for (const name of ["grass_dirt", "grass_water", "sand_dirt",
+                            "snow_dirt", "waste_dirt", "magic_dirt"]) {
+            worldSheets[name] = dual.sliceTileset(
+                await assets.loadTexture(`./images/tiles/${name}.png`));
+        }
         // лица карт стихий: images/cards/<elem>/<№>.png (def.img в dataCards)
         say("карты…");
         await frame();
@@ -573,6 +586,7 @@
             app, world, ECS, COMPONENTS, DATA, worldContainer, addSystem,
             assets, uiTex, scheduler, input, camera, characters, charInput,
             heroSheet: heroSheets.strength, heroSheets, creatureSheets, G, ui, audio, collide,
+            worldSheets, // нарезки листов местности images/tiles (карта мира)
             sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
             heroHover,        // ctx.heroHover(держатель, спрайт, bigX, bigY)

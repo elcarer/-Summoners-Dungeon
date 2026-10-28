@@ -19,16 +19,9 @@
     const HERO_SPEED = 170; // шаг героя по обычной местности (px/с)
     const ROAD_SPEED = HERO_SPEED * 1.2; // по дорогам/мостам ×1.2 (просил юзер)
 
-    // палитры зон: земля (3 оттенка на шахматный детерминированный хэш),
-    // крыши городов и кроны чащ — у каждой стихии свой характер
-    const GROUND = {
-        strength: [0x5a4632, 0x614c36, 0x52402d], // выжженные степи
-        growth: [0x4a5c33, 0x516339, 0x455630], // луга (как раньше)
-        wisdom: [0x3c4a57, 0x42525f, 0x364350], // стальные пустоши
-        decay: [0x46404b, 0x4d4652, 0x3f3a44], // серые топи
-        honor: [0x8a8168, 0x938a71, 0x807860], // паломнические равнины
-        time: [0x6d5c36, 0x75633b, 0x645530], // охристые пески
-    };
+    // палитры зон: крыши городов и кроны чащ — у каждой стихии свой
+    // характер (земля зон теперь — тайлы местности worldTiles.js,
+    // цвета мини-карты — в GAME_WORLDTILES.MINI)
     const ROOF = {
         strength: 0x8a3f2e, growth: 0x4f7a3a, wisdom: 0x3f6d8a,
         decay: 0x5f4a6e, honor: 0xd8d2c0, time: 0xb08a3f,
@@ -44,6 +37,8 @@
         const GEN = globalThis.GAME_WORLDGEN;
         const T = GEN.T;
         let layer = null, heroId = null, heroShadow = null, heroSprite = null;
+        let worldTerr = null; // коды местности клетки (слой worldTiles)
+        let terrStats = null; // статистика слоя (тесты: fallback/odd)
         let uiHud = null;
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
         let floaties = []; // всплывающие подписи («Скоро…» у арки)
@@ -115,6 +110,8 @@
             G.world.map.pois.find((p) => p.kind === "dungeon" && p.cave === caveId);
 
         // ── рендер карты: плоские тайлы-заглушки в духе подземелья ────────
+        // (земля зон и вода — теперь dual-grid тайлы worldTiles.js ПОД этим
+        // слоем; здесь остаются только горы, чащи, дороги и мосты поверх)
         function buildMapGfx(map) {
             const g = new PIXI.Graphics();
             const W = map.w, H = map.h;
@@ -126,12 +123,6 @@
                     g.rect(x + 2, y + 2, TS - 4, TS - 4); g.fill(0x4a463f);
                     g.poly([x + 8, y + 30, x + 20, y + 8, x + 32, y + 30]);
                     g.fill(0x6a655a); // вершина
-                } else if (t === T.WATER) {
-                    g.rect(x, y, TS, TS); g.fill(0x2c4a63);
-                    g.rect(x + 3, y + 3, TS - 6, TS - 6); g.fill(0x38607c);
-                    if ((i * 7 + j * 13) % 5 === 0) { // блики-волны
-                        g.rect(x + 8, y + 18, 14, 3); g.fill(0x4a7a99);
-                    }
                 } else if (t === T.FOREST) {
                     const zone = map.zone[j * W + i];
                     const elem = GEN.ELEMS[zone];
@@ -152,15 +143,6 @@
                     } else if ((i * 5 + j * 11) % 4 === 0) {
                         g.circle(x + 12, y + 26, 2); g.fill(0x7a6543); // камешки
                         g.circle(x + 27, y + 14, 2); g.fill(0x7a6543);
-                    }
-                } else { // земля зоны — чередование оттенков (детерминиро-
-                    // ванное, карта не «мерцает»), редкие камешки/кочки
-                    const elem = GEN.ELEMS[map.zone[j * W + i]];
-                    const pal = GROUND[elem];
-                    const v = (i * 7 + j * 13) % 3;
-                    g.rect(x, y, TS, TS); g.fill(pal[v]);
-                    if ((i * 3 + j * 5) % 11 === 0) {
-                        g.rect(x + 16, y + 20, 5, 4); g.fill(pal[(v + 1) % 3]);
                     }
                 }
             }
@@ -368,7 +350,7 @@
                 else if (t === T.WATER) col = 0x2c4a63;
                 else if (t === T.MOUNTAIN) col = 0x3b3831;
                 else if (t === T.FOREST) col = FOREST[GEN.ELEMS[map.zone[i]]];
-                else col = GROUND[GEN.ELEMS[map.zone[i]]][0];
+                else col = globalThis.GAME_WORLDTILES.MINI[worldTerr[i]];
                 g.rect(x * MS, y * MS, MS, MS);
                 g.fill(col);
             }
@@ -467,7 +449,23 @@
                     if (next) path = next;
                 });
                 layer.addChild(zone);
-                layer.addChild(buildMapGfx(map));
+                // слой МЕСТНОСТИ — dual-grid тайлы юзера (images/tiles),
+                // самый низ картинки (просил юзер): преобладающий тип зоны
+                // стихии (Сила-земля, Рост-трава, Мудрость-магия, Тлен-
+                // тлен, Честь-песок, Время-снег) + вода рек/озёр;
+                // несовместимые стыки расходятся земляной полосой
+                // (см. worldTiles.js). Горы, чащи и дороги остаются
+                // СВЕРХУ — их рисует buildMapGfx
+                worldTerr = globalThis.GAME_WORLDTILES.terrainOf(map);
+                const terr = globalThis.GAME_WORLDTILES.render(
+                    map, worldTerr, ctx.worldSheets, TS);
+                terrStats = terr.stats;
+                terr.container.zIndex = -99;
+                zone.zIndex = -100;
+                layer.addChild(terr.container);
+                const mapGfx = buildMapGfx(map);
+                mapGfx.zIndex = -98;
+                layer.addChild(mapGfx);
                 for (const poi of map.pois) {
                     if (poi.kind === "capital") layer.addChild(makeCapital(poi));
                     else if (poi.kind === "town") layer.addChild(makeTown(poi));
@@ -520,6 +518,8 @@
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
                 heroShadow = null;
                 heroSprite = null;
+                worldTerr = null;
+                terrStats = null;
                 path = null;
                 floaties = [];
                 if (layer) { layer.destroy({ children: true }); layer = null; }
@@ -674,6 +674,13 @@
                         pois: m.pois.map((p) => ({ ...p })),
                     };
                 },
+                // слой местности (тайлы images/tiles): коды клеток 0..5
+                // (земля/трава/снег/песок/тлен/вода) и статистика рендера
+                terrain: () => ({
+                    v: globalThis.GAME_WORLDTILES.V,
+                    terr: worldTerr ? Array.from(worldTerr) : null,
+                    stats: terrStats,
+                }),
                 setHeroPos(x, y) {
                     if (heroId === null) return false;
                     COMPONENTS.positionX[heroId] = x;
