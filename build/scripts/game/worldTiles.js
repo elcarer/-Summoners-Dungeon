@@ -5,13 +5,17 @@
 // images/tiles/*.png — 4×4 тайла по 32px, каждый описывает ПАРУ местностей:
 // grass_dirt (фон трава/фича земля), grass_water (фон трава/фича вода),
 // snow_dirt / sand_dirt / waste_dirt / magic_dirt (фон земля, фича —
-// снег/песок/тлен/магия); wood — ПРОЗРАЧНЫЙ оверлей лесных массивов
-// поверх местности (фича — чаща, безлесные тайлы прозрачны целиком).
+// снег/песок/тлен/магия); wood и swamp — ПРОЗРАЧНЫЕ оверлеи лесных
+// массивов и болот поверх местности (фича — чаща/болото, пустые тайлы
+// прозрачны целиком); roads — прозрачный тайлсет дорог, 11 видов
+// сеткой 4×3 по 32px (повороты и перекрёстки, просил юзер).
 //
 // ── ТАБЛИЦА СОЧЕТАЕМОСТИ (просил юзер) ──────────────────────────────────
 // Напрямую соседствовать могут только пары с готовым переходным листом.
 // Несовместимые местности разводятся переходным типом: любые две сухие
-// местности — через ЗЕМЛЮ (dirt), вода — только с ТРАВОЙ (луговые берега).
+// местности — через ЗЕМЛЮ (dirt), вода и БОЛОТО — только с ТРАВОЙ
+// (луговые/замшелые берега; болото — прозрачный оверлей swamp.png по
+// маске T_SWAMP, просил юзер).
 //              земля трава  снег  песок  тлен  магия  вода
 // земля         —    ЛИСТ   ЛИСТ  ЛИСТ  ЛИСТ  ЛИСТ   нет¹
 // трава        ЛИСТ   —     нет²   нет²  нет²  нет²  ЛИСТ
@@ -30,10 +34,11 @@
 // Сила-земля, Рост-трава, Мудрость-магия, Тлен-тлен, Честь-песок,
 // Время-снег; реки и озёра — вода (мосты стоят на воде, доски поверх).
 (function () {
-    // коды местности тер-слоя (0-5 суша, 6 вода; dirt=0 — буфер суши)
+    // коды местности тер-слоя (0-5 суша, 6 вода, 7 болото; dirt=0 — буфер суши)
     const DIRT = 0, GRASS = 1, SNOW = 2, SAND = 3, WASTE = 4, MAGIC = 5,
-        WATER = 6;
-    const NAME = ["dirt", "grass", "snow", "sand", "waste", "magic", "water"];
+        WATER = 6, SWAMP = 7;
+    const NAME = ["dirt", "grass", "snow", "sand", "waste", "magic", "water",
+        "swamp"];
     // преобладающий тип зоны (Мудрость — магия: лист magic_dirt юзера)
     const ZONE_TERRAIN = {
         strength: DIRT, growth: GRASS, wisdom: MAGIC,
@@ -48,6 +53,7 @@
         4: { sheet: "waste_dirt", feature: WASTE },  // земля|тлен
         5: { sheet: "magic_dirt", feature: MAGIC },  // земля|магия
         14: { sheet: "grass_water", feature: WATER }, // трава|вода (1·8+6)
+        15: { sheet: "swamp", feature: SWAMP },      // трава|болото (1·8+7)
     };
     // сплошные тайлы одной местности: лист, где она есть (бит фичи)
     const SOLID = [
@@ -58,10 +64,12 @@
         { sheet: "waste_dirt", feature: WASTE },
         { sheet: "magic_dirt", feature: MAGIC },
         { sheet: "grass_water", feature: WATER },
+        { sheet: "swamp", feature: SWAMP },
     ];
-    // цвета мини-карты (в тон тайлам; земля/трава/снег/песок/тлен/магия/вода)
+    // цвета мини-карты (в тон тайлам; земля/трава/снег/песок/тлен/магия/
+    // вода/болото)
     const MINI = [0x6a4828, 0x467622, 0xe8eef2, 0xe2d58b, 0x1c1a20, 0x9999ff,
-        0x2c4a63];
+        0x2c4a63, 0x3a3140];
 
     // углы 16 тайлов листа (конвенция dualgrid.js TILE_CORNERS):
     // [TL,TR,BL,BR], 1 — угол фичи; индекс = строка*4+столбец
@@ -95,6 +103,7 @@
         for (let i = 0; i < N; i++) {
             const ter = map.ter[i];
             t[i] = (ter === T.WATER || ter === T.BRIDGE) ? WATER
+                : ter === T.SWAMP ? SWAMP
                 : ZONE_TERRAIN[GEN.ELEMS[map.zone[i]]];
         }
         const cheb = (x, y, pred) => { // есть ли сосед чебышёв-1 с условием
@@ -106,14 +115,19 @@
             }
             return false;
         };
-        // 1. ЛУГОВЫЕ БЕРЕГА: вода сочетается только с травой — вся суша
-        // в чебышёв-1 от воды, кроме травы, становится травяной кромкой
-        // (река режет снег/песок/тлен/магию лугом, без земляных обрывов)
+        // 1. ЛУГОВЫЕ/ЗАМШЕЛЫЕ БЕРЕГА: вода и болото сочетаются только
+        // с травой — вся суша в чебышёв-1 от воды/болота, кроме травы,
+        // становится травяной кромкой (река режет снег/песок/тлен/магию
+        // лугом; болото по краям мшисто-луговое). Само болото у воды
+        // уходит в луг (болото с водой напрямую не стыкуется)
         let src = t.slice();
         for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
             const a = src[y * W + x];
             if (a === WATER || a === GRASS) continue;
-            if (cheb(x, y, (b) => b === WATER)) t[y * W + x] = GRASS;
+            if (a === SWAMP) {
+                if (cheb(x, y, (b) => b === WATER)) t[y * W + x] = GRASS;
+            } else if (cheb(x, y, (b) => b === WATER || b === SWAMP))
+                t[y * W + x] = GRASS;
         }
         // 2. ЗЕМЛЯНЫЕ ПОЛОСЫ: несовместимая пара суша-суша в чебышёв-1 →
         // не-травяная сторона уходит в землю (трава — фон базового листа,
@@ -224,22 +238,22 @@
     }
 
     // ── деревья лесных массивов (просил юзер: спрайты images/tiles/trees
-    // поверх тайлов чащи, слой объектов над тайлами). Раскладка детерми-
-    // нирована сидом карты (hash2 клетки: есть/нет, номер спрайта, флип,
-    // сдвиг) — считается при построении чанка, в сейв не пишется.
-    // Дерево стоит в центре клетки (анкер в низу — ствол на земле),
-    // ~60% клеток чащи заняты; строки рисуются сверху вниз, кроны
-    // нижних деревьев накрывают верхние — как в изометрии
+    // поверх тайлов чащи). Раскладка детерминирована сидом карты (hash2
+    // клетки: есть/нет, номер спрайта, флип, сдвиг) — считается при
+    // построении чанка, в сейв не пишется. Дерево стоит в центре клетки
+    // (анкер в низу — ствол на земле), ~48% клеток чащи заняты (просил
+    // юзер: на 20% реже прежних 60%). СПИСОК СПРАЙТОВ, не контейнер:
+    // деревья живут в общем y-sort слое объектов сцены вместе с горами,
+    // городами, подземельями и героем (просил юзер: z-order по Y)
     function renderTreesChunk(map, treeTex, TS, seed, x0, y0) {
         const GEN = globalThis.GAME_WORLDGEN, T = GEN.T;
         const W = map.w, H = map.h;
-        const c = new PIXI.Container();
-        let trees = 0;
+        const sprites = [];
         const xe = Math.min(W, x0 + CHUNK), ye = Math.min(H, y0 + CHUNK);
         for (let j = y0; j < ye; j++) for (let i = x0; i < xe; i++) {
             if (map.ter[j * W + i] !== T.FOREST) continue;
             const roll = GEN.hash2(i, j, seed ^ 0x51ab);
-            if (roll >= 0.6) continue; // ~60% клеток чащи с деревом
+            if (roll >= 0.48) continue; // ~48% клеток чащи с деревом
             const tex = treeTex[(GEN.hash2(i, j, seed ^ 0x77d2)
                 * treeTex.length) | 0];
             const spr = new PIXI.Sprite(tex);
@@ -249,16 +263,124 @@
                 (i + 0.5) * TS + (GEN.hash2(i, j, seed ^ 0xbb3f) - 0.5)
                     * TS * 0.6,
                 (j + 1) * TS + 3);
-            c.addChild(spr);
-            trees++;
+            spr.zIndex = spr.position.y; // y-sort: низ ствола
+            sprites.push(spr);
         }
-        return { container: c, trees };
+        return { sprites, trees: sprites.length };
+    }
+
+    // ── болота (просил юзер): swamp.png — прозрачный dual-grid оверлей
+    // 4×4 по 32px (конвенция TILE_CORNERS, как wood) поверх местности,
+    // маска — болота worldGen (ter===SWAMP). Безлесные тайлы (ключ 0)
+    // не спрайтятся. Рисуется ДО дорог/мостов (гать поверх болота)
+    function renderSwampChunk(map, sheets, TS, x0, y0, stats) {
+        const GEN = globalThis.GAME_WORLDGEN, T = GEN.T;
+        const W = map.w, H = map.h, s32 = sheets.swamp.ts;
+        const st = stats || { tiles: 0, skipped: 0, scale: TS / s32 };
+        const c = new PIXI.Container();
+        const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0
+            : (map.ter[y * W + x] === T.SWAMP ? 1 : 0);
+        const xe = Math.min(W, x0 + CHUNK), ye = Math.min(H, y0 + CHUNK);
+        for (let j = y0; j < ye; j++) for (let i = x0; i < xe; i++) {
+            const key = at(i - 1, j - 1) * 8 + at(i, j - 1) * 4
+                + at(i - 1, j) * 2 + at(i, j);
+            if (!key) { st.skipped++; continue; }
+            const spr = new PIXI.Sprite(sheets.swamp.textures[LOOKUP[key]]);
+            spr.position.set(i * TS, j * TS);
+            spr.scale.set(TS / s32);
+            c.addChild(spr);
+            st.tiles++;
+        }
+        return { container: c, stats: st };
+    }
+    function renderSwamp(map, sheets, TS) {
+        const W = map.w, H = map.h;
+        const c = new PIXI.Container();
+        const stats = { tiles: 0, skipped: 0, scale: TS / sheets.swamp.ts };
+        for (let cy = 0; cy < H; cy += CHUNK)
+            for (let cx = 0; cx < W; cx += CHUNK)
+                c.addChild(renderSwampChunk(map, sheets, TS,
+                    cx, cy, stats).container);
+        return { container: c, stats };
+    }
+
+    // ── дороги (просил юзер): roads.png — 11 видов сеткой 4×3 по 32px
+    // с поворотами и перекрёстками, прозрачный оверлей НА МЕСТНОСТЬ.
+        // вид по маске 4-соседей дороги/моста (через мост дорога
+    // продолжается): бит 1=N, 2=E, 4=S, 8=W; лист: 0 крест, 1 N-S,
+    // 2 E-W, 3 поворот N+E, 4 S+W, 5 N+W, 6 E+S, 7 T(N,S,W), 8 T(N,S,E),
+    // 9 T(N,E,W), 10 T(E,S,W), 11 пусто. Тупики (один сосед) — прямой
+    // в сторону соседа, изолированная клетка — вертикаль
+    const ROAD_TILE = [1, 1, 2, 3, 1, 1, 6, 8, 2, 5, 2, 9, 4, 7, 10, 0];
+    function renderRoadsChunk(map, roadTex, TS, x0, y0, stats) {
+        const GEN = globalThis.GAME_WORLDGEN, T = GEN.T;
+        const W = map.w, H = map.h;
+        const st = stats || { tiles: 0, skipped: 0 };
+        const c = new PIXI.Container();
+        const cn = (x, y) => {
+            if (x < 0 || y < 0 || x >= W || y >= H) return 0;
+            const t = map.ter[y * W + x];
+            return t === T.ROAD || t === T.BRIDGE ? 1 : 0;
+        };
+        const s32 = roadTex[0].width;
+        const xe = Math.min(W, x0 + CHUNK), ye = Math.min(H, y0 + CHUNK);
+        for (let j = y0; j < ye; j++) for (let i = x0; i < xe; i++) {
+            if (map.ter[j * W + i] !== T.ROAD) { st.skipped++; continue; }
+            const mask = cn(i, j - 1) | cn(i + 1, j) << 1
+                | cn(i, j + 1) << 2 | cn(i - 1, j) << 3;
+            const spr = new PIXI.Sprite(roadTex[ROAD_TILE[mask]]);
+            spr.position.set(i * TS, j * TS);
+            spr.scale.set(TS / s32);
+            c.addChild(spr);
+            st.tiles++;
+        }
+        return { container: c, stats: st };
+    }
+
+    // ── горы (просил юзер): спрайты montain/1..6.png вместо заглушки,
+    // ТОТ ЖЕ СЛОЙ ОБЪЕКТОВ, что деревья (общий y-sort сцены). 1 спрайт
+    // на ~2-3 соседних горных тайла: якорь по hash2 с прореживанием —
+    // рядом (2 клетки слева, 1 сверху с диагоналями) якоря быть не
+    // должно; правило чисто хэшевое, чанковые границы не рвут раскладку
+    function mountAnchor(map, seed, x, y) {
+        const GEN = globalThis.GAME_WORLDGEN, T = GEN.T;
+        const W = map.w, H = map.h;
+        if (x < 0 || y < 0 || x >= W || y >= H) return false;
+        if (map.ter[y * W + x] !== T.MOUNTAIN) return false;
+        return GEN.hash2(x, y, seed ^ 0x4d71) < 0.45;
+    }
+    function renderMountainsChunk(map, mtnTex, TS, seed, x0, y0) {
+        const GEN = globalThis.GAME_WORLDGEN;
+        const W = map.w, H = map.h;
+        const sprites = [];
+        const xe = Math.min(W, x0 + CHUNK), ye = Math.min(H, y0 + CHUNK);
+        for (let j = y0; j < ye; j++) for (let i = x0; i < xe; i++) {
+            if (!mountAnchor(map, seed, i, j)) continue;
+            if (mountAnchor(map, seed, i - 1, j)
+                || mountAnchor(map, seed, i - 2, j)
+                || mountAnchor(map, seed, i, j - 1)
+                || mountAnchor(map, seed, i - 1, j - 1)
+                || mountAnchor(map, seed, i + 1, j - 1)) continue;
+            const tex = mtnTex[(GEN.hash2(i, j, seed ^ 0x4d72)
+                * mtnTex.length) | 0];
+            const spr = new PIXI.Sprite(tex);
+            spr.anchor.set(0.5, 1);
+            spr.scale.x = GEN.hash2(i, j, seed ^ 0x4d73) < 0.5 ? -1 : 1;
+            spr.position.set(
+                (i + 0.5) * TS + (GEN.hash2(i, j, seed ^ 0x4d74) - 0.5)
+                    * TS * 0.5,
+                (j + 1) * TS + 2);
+            spr.zIndex = spr.position.y;
+            sprites.push(spr);
+        }
+        return { sprites, mountains: sprites.length };
     }
 
     globalThis.GAME_WORLDTILES = {
-        V: 4, CHUNK, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER,
+        V: 5, CHUNK, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER, SWAMP,
         NAME, ZONE_TERRAIN, PAIRS, MINI, terrainOf,
-        render, renderChunk, renderForest, renderForestChunk, renderTreesChunk,
-        pairOK,
+        render, renderChunk, renderForest, renderForestChunk,
+        renderSwamp, renderSwampChunk, renderRoadsChunk,
+        renderTreesChunk, renderMountainsChunk, pairOK,
     };
 })();

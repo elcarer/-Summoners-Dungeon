@@ -11,9 +11,13 @@
 // мир): карта порезана на блоки 32×32 клетки — в сцене живут только
 // чанки видимого экрана плюс запас по краям, остальные достраиваются,
 // когда камера до них доезжает (кэш LRU переживает развороты камеры).
-// Чанк = тайлы местности + лес-оверлей + ДЕРЕВЬЯ (images/tiles/trees
-// поверх чащи, просил юзер) + горы/дороги/мосты; POI и герой не
-// чанкируются (их мало), но вне экрана отключаются.
+// Чанк = тайлы местности + болота (swamp.png) + лес-оверлей + дороги
+// (roads.png, 11 видов) + мосты; ДЕРЕВЬЯ и ГОРЫ (спрайты юзера) живут
+// в ОБЩЕМ слое объектов с городами, подземельями и героем с сортиров-
+// кой по Y (просил юзер: кроны поверх дорог/мостов, z-order по
+// координате Y) — чанки отдают их списком, слой включается/выключается
+// вместе с чанком. POI и герой не чанкируются (их мало), но вне экрана
+// отключаются.
 // Передвижение — как в подземелье: WASD/стрелки и клик по земле (BFS-
 // путь с ведением героя виртуальными осями). Вход в пещеру — триггер по
 // касанию: продолжает текущий этаж забега (G.dungeonStates) или начинает
@@ -52,13 +56,17 @@
         let worldTerr = null; // коды местности клетки (слой worldTiles)
         let terrStats = null; // статистика слоя (тесты: fallback/odd)
         let woodStats = null; // статистика лесного оверлея wood.png (тесты)
+        let swampStats = null; // статистика болот swamp.png (тесты)
+        let roadStats = null; // статистика дорог roads.png (тесты)
+        let objLayer = null; // общий y-sort слой: деревья/горы/POI/герой
         let chunkHolder = null; // контейнер активных чанков рендера
-        let chunkCache = null; // Map: ключ чанка → {node, active, used}
+        let chunkCache = null; // Map: ключ чанка → {node, objs, active, used}
         let chunkRect = ""; // набор активных чанков — «cx0,cy0,cx1,cy1»
         let chunkClock = 0; // часы LRU (свежесть использования чанка)
         let mapFrame = null; // рамка карты (не чанкируется)
         let poiNodes = null; // [{node,x,y}] — видимость POI вне экрана
         let treeCount = 0; // деревьев построено (тесты)
+        let mtnCount = 0; // спрайтов гор построено (тесты)
         let uiHud = null;
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
         let floaties = []; // всплывающие подписи («Скоро…» у арки)
@@ -131,11 +139,13 @@
 
         // ── ЧАНКОВЫЙ CULLING (просил юзер: рендерится только видимый экран
         // плюс запас по краям, остальное достраивается, когда камера до
-        // него доезжает). Чанк = местность + лес-оверлей + деревья +
-        // горы/дороги одного блока 32×32 клетки (1024px). Активный набор —
+        // него доезжает). Чанк = местность + болота + лес-оверлей + дороги
+        // + мосты одного блока 32×32 клетки (1024px); ДЕРЕВЬЯ и ГОРЫ
+        // чанка живут в общем y-sort слое (objLayer) вместе с POI и
+        // героем (просил юзер: z-order по Y, кроны поверх дорог) — при
+        // выключении чанка его спрайты уходят из слоя. Активный набор —
         // прямоугольник экрана + полчанка запаса; кэш LRU переживает
-        // развороты камеры (18 чанков), дальние разрушаются (текстуры
-        // общие — разрушаются только спрайты). POI и герой не чанкируются
+        // развороты камеры (18 чанков). POI и герой не чанкируются
         // (их десятки), но вне экрана с запасом отключаются
         const CHUNK_CELLS = globalThis.GAME_WORLDTILES.CHUNK;
         const CHUNK_PX = CHUNK_CELLS * TS; // 1024px
@@ -147,16 +157,29 @@
             const map = G.world.map;
             c.addChild(globalThis.GAME_WORLDTILES.renderChunk(
                 map, worldTerr, ctx.worldSheets, TS, x0, y0, terrStats).container);
+            if (ctx.worldSheets.swamp)
+                c.addChild(globalThis.GAME_WORLDTILES.renderSwampChunk(
+                    map, ctx.worldSheets, TS, x0, y0, swampStats).container);
             c.addChild(globalThis.GAME_WORLDTILES.renderForestChunk(
                 map, ctx.worldSheets, TS, x0, y0, woodStats).container);
+            if (ctx.roadsTex && ctx.roadsTex.length)
+                c.addChild(globalThis.GAME_WORLDTILES.renderRoadsChunk(
+                    map, ctx.roadsTex, TS, x0, y0, roadStats).container);
+            c.addChild(buildMapGfxChunk(map, x0, y0)); // мосты-настил
+            const objs = [];
             if (ctx.treeTex && ctx.treeTex.length) {
                 const tr = globalThis.GAME_WORLDTILES.renderTreesChunk(
                     map, ctx.treeTex, TS, G.world.seed, x0, y0);
-                c.addChild(tr.container);
+                objs.push(...tr.sprites);
                 treeCount += tr.trees;
             }
-            c.addChild(buildMapGfxChunk(map, x0, y0));
-            return c;
+            if (ctx.mountainTex && ctx.mountainTex.length) {
+                const mt = globalThis.GAME_WORLDTILES.renderMountainsChunk(
+                    map, ctx.mountainTex, TS, G.world.seed, x0, y0);
+                objs.push(...mt.sprites);
+                mtnCount += mt.mountains;
+            }
+            return { node: c, objs };
         }
         // честный видимый прямоугольник мира — из обратного трансформа
         // контейнера камеры (не зависим от внутренностей camera)
@@ -193,14 +216,22 @@
             for (const [k, ch] of chunkCache)
                 if (ch.active && !want.has(k)) {
                     chunkHolder.removeChild(ch.node);
+                    for (const o of ch.objs) objLayer.removeChild(o);
                     ch.active = false;
                 }
             for (const k of want) {
-                if (!chunkCache.has(k)) chunkCache.set(k, {
-                    node: buildChunk(k % 64, (k / 64) | 0), active: false,
-                    used: chunkClock });
+                if (!chunkCache.has(k)) {
+                    const built = buildChunk(k % 64, (k / 64) | 0);
+                    chunkCache.set(k, {
+                        node: built.node, objs: built.objs,
+                        active: false, used: chunkClock });
+                }
                 const ch = chunkCache.get(k);
-                if (!ch.active) { chunkHolder.addChild(ch.node); ch.active = true; }
+                if (!ch.active) {
+                    chunkHolder.addChild(ch.node);
+                    for (const o of ch.objs) objLayer.addChild(o);
+                    ch.active = true;
+                }
                 ch.used = chunkClock;
             }
             if (chunkCache.size > CHUNK_LRU) {
@@ -210,6 +241,7 @@
                     .slice(0, chunkCache.size - CHUNK_LRU);
                 for (const [k, ch] of dead) {
                     ch.node.destroy({ children: true });
+                    for (const o of ch.objs) o.destroy();
                     chunkCache.delete(k);
                 }
             }
@@ -223,43 +255,26 @@
                     && pn.y > ry0 - 256 && pn.y < ry1 + 320;
         }
 
-        // ── рендер карты: плоские тайлы-заглушки в духе подземелья ────────
-        // (земля зон, вода и лесные массивы — dual-grid тайлы worldTiles.js
-        // ПОД этим слоем; здесь остаются только горы, дороги и мосты
-        // поверх). Строится ЧАНКАМИ 32×32 клетки — culling (см. ниже)
-        // собирает сцену из видимых чанков, не из всей карты
+        // ── мосты чанка: настил-заглушка поверх воды (доски и кант).
+        // Дороги рисует тайлсет roads.png (renderRoadsChunk, ПОД этим
+        // слоем объектов), горы — спрайты montain (renderMountainsChunk,
+        // общий y-sort слой) — см. worldTiles.js. Строится ЧАНКАМИ
+        // 32×32 клетки — culling собирает сцену из видимых чанков
         function buildMapGfxChunk(map, x0, y0) {
             const g = new PIXI.Graphics();
             const W = map.w, H = map.h, CH = globalThis.GAME_WORLDTILES.CHUNK;
-            const stone = 2; // камешек дороги (заглушка)
             const plank = 2; // доска моста (заглушка)
             const edge = 4; // кант моста, ~TS/8 (заглушка)
             const plankGap = (TS - 2 * edge - plank) / 3;
             const xe = Math.min(W, x0 + CH), ye = Math.min(H, y0 + CH);
             for (let j = y0; j < ye; j++) for (let i = x0; i < xe; i++) {
-                const t = map.ter[j * W + i];
+                if (map.ter[j * W + i] !== T.BRIDGE) continue;
                 const x = i * TS, y = j * TS;
-                if (t === T.MOUNTAIN) {
-                    g.rect(x, y, TS, TS); g.fill(0x3b3831);
-                    g.rect(x + 2, y + 2, TS - 4, TS - 4); g.fill(0x4a463f);
-                    g.poly([x + TS * 0.2, y + TS * 0.75, x + TS * 0.5, y + TS * 0.2,
-                        x + TS * 0.8, y + TS * 0.75]);
-                    g.fill(0x6a655a); // вершина
-                } else if (t === T.ROAD || t === T.BRIDGE) {
-                    g.rect(x, y, TS, TS); g.fill(0x8a744f);
-                    g.rect(x + 1, y + 1, TS - 2, TS - 2); g.fill(0x94805c);
-                    if (t === T.BRIDGE) { // доски и кант поверх воды
-                        g.rect(x, y, TS, edge); g.fill(0x6e5233);
-                        g.rect(x, y + TS - edge, TS, edge); g.fill(0x6e5233);
-                        for (let b = 0; b < 4; b++) {
-                            g.rect(x + 3, y + edge + b * plankGap,
-                                TS - 6, plank);
-                            g.fill(0x7c5c36);
-                        }
-                    } else if ((i * 5 + j * 11) % 4 === 0) {
-                        g.circle(x + TS * 0.3, y + TS * 0.65, stone); g.fill(0x7a6543);
-                        g.circle(x + TS * 0.68, y + TS * 0.35, stone); g.fill(0x7a6543);
-                    }
+                g.rect(x, y, TS, edge); g.fill(0x6e5233);
+                g.rect(x, y + TS - edge, TS, edge); g.fill(0x6e5233);
+                for (let b = 0; b < 4; b++) {
+                    g.rect(x + 3, y + edge + b * plankGap, TS - 6, plank);
+                    g.fill(0x7c5c36);
                 }
             }
             return g;
@@ -340,21 +355,19 @@
             c.zIndex = (poi.gy + 1) * TS; // низ footprint
             return c;
         }
-        // арка-спуск (та же, что выход этажа), с именем подземелья сверху
+        // пещера-подземелье: спрайт юзера cave.png (192×136 ≈ 6×4 клетки,
+        // просил юзер), анкер в низ footprint, имя данжа над сводом.
+        // Триггер входа — якорь-клетка (нижняя средняя, перед входом)
         function makeCave(poi) {
             const c = new PIXI.Container();
-            const p = px(poi);
-            const sh = new PIXI.Graphics();
-            sh.circle(0, 0, 21); sh.fill({ color: 0x0d130a, alpha: 0.55 });
-            c.addChild(sh);
-            const sp = new PIXI.Sprite(uiTex("icon_down.png"));
-            sp.anchor.set(0.5);
-            sp.scale.set(0.66);
+            const s = GEN.KIND_SIZE.dungeon;
+            const x0 = poi.gx - ((s.w - 1) >> 1), y0 = poi.gy - (s.h - 1);
+            const sp = new PIXI.Sprite(ctx.caveTex);
+            sp.anchor.set(0.5, 1);
             c.addChild(sp);
-            c.addChild(label(poi.name, 16, 0xffe9b0, -26));
-            c.position.set(p.x, p.y);
-            c.scale.set(0.8); // заглушка: иконка ~34px на клетку 32
-            c.zIndex = p.y;
+            c.addChild(label(poi.name, 16, 0xffe9b0, -140));
+            c.position.set((x0 + s.w / 2) * TS, (y0 + s.h) * TS);
+            c.zIndex = (y0 + s.h) * TS; // низ footprint — y-sort общий
             return c;
         }
 
@@ -366,7 +379,7 @@
             t.anchor.set(0.5);
             t.position.set(x, y - 40);
             t.zIndex = y + 10;
-            layer.addChild(t);
+            objLayer.addChild(t);
             floaties.push({ node: t, t: 0 });
         }
 
@@ -593,16 +606,21 @@
                 // стихии (Сила-земля, Рост-трава, Мудрость-магия, Тлен-
                 // тлен, Честь-песок, Время-снег) + вода рек/озёр;
                 // несовместимые стыки расходятся земляной полосой
-                // (см. worldTiles.js). Лесные массивы — прозрачный
-                // оверлей wood.png ПОВЕРХ местности, над ними ДЕРЕВЬЯ
-                // (images/tiles/trees, просил юзер), дороги/горы/мосты —
-                // поверх; всё живёт ЧАНКАМИ (culling — см. выше): в сцене
+                // (см. worldTiles.js). Поверх — прозрачные оверлеи:
+                // болота swamp.png (Тлен), лесные массивы wood.png,
+                // дороги roads.png (11 видов) и мосты; ДЕРЕВЬЯ и ГОРЫ —
+                // спрайты в общем y-sort слое объектов (objLayer выше).
+                // Всё живёт ЧАНКАМИ (culling — см. выше): в сцене
                 // только чанки экрана + запас (просил юзер)
                 worldTerr = globalThis.GAME_WORLDTILES.terrainOf(map);
                 terrStats = { tiles: 0, fallback: 0, odd: 0, bySheet: {} };
                 woodStats = { tiles: 0, skipped: 0,
                     scale: TS / ctx.worldSheets.wood.ts };
+                swampStats = { tiles: 0, skipped: 0,
+                    scale: TS / (ctx.worldSheets.swamp || ctx.worldSheets.wood).ts };
+                roadStats = { tiles: 0, skipped: 0 };
                 treeCount = 0;
+                mtnCount = 0;
                 chunkCache = new Map();
                 chunkRect = "";
                 chunkHolder = new PIXI.Container();
@@ -612,12 +630,18 @@
                 mapFrame = buildMapFrame(map);
                 mapFrame.zIndex = -97;
                 layer.addChild(mapFrame);
+                // общий y-sort слой объектов (просил юзер): деревья/горы
+                // чанков + города/подземелья + герой сортируются по низу
+                objLayer = new PIXI.Container();
+                objLayer.sortableChildren = true;
+                objLayer.zIndex = -96; // над чанками и рамкой
+                layer.addChild(objLayer);
                 poiNodes = [];
                 for (const poi of map.pois) {
                     const node = poi.kind === "capital" ? makeCapital(poi)
                         : poi.kind === "town" ? makeTown(poi) : makeCave(poi);
                     poiNodes.push({ node, x: node.x, y: node.y });
-                    layer.addChild(node);
+                    objLayer.addChild(node);
                 }
                 worldContainer.addChild(layer);
 
@@ -640,8 +664,8 @@
                 heroShadow.fill({ color: 0x0e140c, alpha: 0.45 });
                 heroShadow.position.set(hp.x, hp.y - 0.7 * 7 * 2); // приподнята на 0.7 высоты (просил юзер)
                 heroShadow.zIndex = hp.y - 0.5;
-                layer.addChild(heroShadow);
-                layer.addChild(sprite);
+                objLayer.addChild(heroShadow);
+                objLayer.addChild(sprite);
                 worldContainer.visible = true;
                 camera.follow({
                     get x() { return heroId !== null ? COMPONENTS.positionX[heroId] : hp.x; },
@@ -670,16 +694,21 @@
                 globalThis.GAME_QUESTS.forcedClose(ctx); // диалог не сиротеет
                 // забег сохраняется и из мира (вход в пещеру/меню/настройки)
                 if (G.saveRun) G.saveRun();
-                // неактивные чанки (лежат в кэше, но не в layer) — вручную;
-                // активные разрушит layer.destroy вместе со сценой
+                // неактивные чанки (лежат в кэше, но не в layer) — вручную,
+                // вместе с их спрайтами в y-sort слое; активные разрушит
+                // layer.destroy вместе со сценой
                 if (chunkCache) {
                     for (const [, ch] of chunkCache)
-                        if (!ch.active) ch.node.destroy({ children: true });
+                        if (!ch.active) {
+                            ch.node.destroy({ children: true });
+                            for (const o of ch.objs) o.destroy();
+                        }
                     chunkCache = null;
                 }
                 chunkHolder = null;
                 chunkRect = "";
                 mapFrame = null;
+                objLayer = null;
                 poiNodes = null;
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
                 heroShadow = null;
@@ -687,6 +716,8 @@
                 worldTerr = null;
                 terrStats = null;
                 woodStats = null;
+                swampStats = null;
+                roadStats = null;
                 path = null;
                 floaties = [];
                 if (layer) { layer.destroy({ children: true }); layer = null; }
@@ -852,6 +883,7 @@
                                     .map(([k]) => (k % 64) + ":" + ((k / 64) | 0)) }
                             : null,
                         trees: treeCount,
+                        mountains: mtnCount,
                     };
                 },
                 map: () => {
@@ -863,14 +895,17 @@
                         pois: m.pois.map((p) => ({ ...p })),
                     };
                 },
-                // слой местности (тайлы images/tiles): коды клеток 0..5
-                // (земля/трава/снег/песок/тлен/вода), статистика рендера
-                // и лесной оверлей wood.png (тайлы по маске чащ)
+                // слой местности (тайлы images/tiles): коды клеток 0..7
+                // (земля/трава/снег/песок/тлен/вода/болото), статистика
+                // рендера, лесной оверлей wood.png, болота swamp.png и
+                // дороги roads.png (тайлы по маскам)
                 terrain: () => ({
                     v: globalThis.GAME_WORLDTILES.V,
                     terr: worldTerr ? Array.from(worldTerr) : null,
                     stats: terrStats,
                     forest: woodStats ? { ...woodStats } : null,
+                    swamp: swampStats ? { ...swampStats } : null,
+                    roads: roadStats ? { ...roadStats } : null,
                 }),
                 setHeroPos(x, y) {
                     if (heroId === null) return false;

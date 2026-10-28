@@ -95,10 +95,28 @@
         const dual = globalThis.createDualGrid();
         const worldSheets = {};
         for (const name of ["grass_dirt", "grass_water", "sand_dirt",
-                            "snow_dirt", "waste_dirt", "magic_dirt", "wood"]) {
+                            "snow_dirt", "waste_dirt", "magic_dirt", "wood",
+                            "swamp"]) {
             worldSheets[name] = dual.sliceTileset(
                 await assets.loadTexture(`./images/tiles/${name}.png`));
         }
+        // дороги: roads.png юзера — 11 видов сеткой 4×3 по 32px (12-й
+        // слот пуст), прозрачные тайлы с поворотами и перекрёстками
+        const roadsSrc = await assets.loadTexture("./images/tiles/roads.png");
+        const roadsTex = [];
+        for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++)
+            roadsTex.push(new PIXI.Texture({
+                source: roadsSrc.source,
+                frame: new PIXI.Rectangle(c * 32, r * 32, 32, 32),
+            }));
+        // горы: images/tiles/montain/<n>.png — спрайты юзера на слой
+        // объектов (общий y-sort с деревьями, просил юзер)
+        const mountainTex = [];
+        for (let n = 1; n <= 6; n++)
+            mountainTex.push(await assets.loadTexture(
+                `./images/tiles/montain/${n}.png`));
+        // пещера подземелий: images/tiles/cave.png — 192×136 ≈ 6×4 клетки
+        const caveTex = await assets.loadTexture("./images/tiles/cave.png");
         // деревья лесных массивов: images/tiles/trees/<n>.png — спрайты
         // юзера 96px (слой объектов над тайлами чащи, просил юзер)
         const treeTex = [];
@@ -594,6 +612,9 @@
             heroSheet: heroSheets.strength, heroSheets, creatureSheets, G, ui, audio, collide,
             worldSheets, // нарезки листов местности images/tiles (карта мира)
             treeTex,     // спрайты деревьев images/tiles/trees (лесные массивы)
+            roadsTex,    // тайлы дорог images/tiles/roads.png (11 видов)
+            mountainTex, // спрайты гор images/tiles/montain (слой объектов)
+            caveTex,     // спрайт пещеры подземелий images/tiles/cave.png
             sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
             heroHover,        // ctx.heroHover(держатель, спрайт, bigX, bigY)
