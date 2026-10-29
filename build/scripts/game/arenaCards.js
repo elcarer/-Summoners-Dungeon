@@ -26,6 +26,11 @@
                     if (hd && hd.ability === "firstBuildingDiscount"
                         && !B.heroFlags.firstBuilding[side]) d += hd.abilityVal || 2;
                 }
+                // «Деревня» (hon173): все ПОСТРОЙКИ стороны на 1 энергию
+                // дешевле, пока их Деревня на поле (считаем по живым
+                // постройкам — гибель снимает скидку, как аура)
+                if (def.type === "building" && B
+                    && B.units.some((u) => u.side === side && u.def.village)) d += 1;
                 // «Архилич» (decLich): ПЕРВАЯ сыгранная Эпическая карта
                 // стороны стоит на 2 энергии дешевле. Флаг тратится в момент
                 // реальной оплаты (consumeEpicDiscount), поэтому скидка видна

@@ -464,17 +464,25 @@
                     if (refl > 0) damageBase(target.side === "p" ? "e" : "p", refl,
                         { x: 960, y: target.side === "p" ? 240 : 840, fill: 0xb07ad5 });
                 }
-                // «Строй» (hon165, просил юзер): после атаки существа на эту
-                // постройку атакующее существо получает 1 урон — даже если
-                // постройка от удара погибла (атака состоялась). Заклинания
-                // и ловушки бьют без killer-существа — не триггерят. Урон
-                // шипов режется «Защитой» атакующего.
-                if (target.def.counterSpike && killer && killer.def
+                // «Строй» (hon165) + «Вымпел империи» (hon177): «Ответ» —
+                // после атаки существа на объект атакующее существо получает
+                // урон шипов — даже если цель от удара погибла (атака
+                // состоялась). Встроенные шипы («Строй») и аура Вымпела
+                // («все ваши существа и постройки имеют Ответ 1»)
+                // СКЛАДЫВАЮТСЯ — способности в этой игре стакаются.
+                // Заклинания и ловушки бьют без killer-существа — не
+                // триггерят. Урон шипов режется «Защитой» атакующего.
+                let spike = target.def.counterSpike || 0;
+                // Вымпел даёт «Ответ 1» КАЖДОМУ объекту стороны — у кого
+                // шипов не было, теперь 1; у «Строя» — 2
+                if (B.units.some((b) => b.side === target.side
+                    && b.def.banner && B.units.includes(b))) spike += 1;
+                if (spike && killer && killer.def
                     && killer.def.type === "unit" && killer.side !== target.side
                     && B.units.includes(killer)) {
                     const kp = cellXY(killer.col, killer.row);
-                    floatText(kp.x, kp.y - 66, `${target.def.counterSpike}⚔`, 0x8cd0ef);
-                    damageUnit(killer, target.def.counterSpike, null, "dam");
+                    floatText(kp.x, kp.y - 66, `${spike}⚔`, 0x8cd0ef);
+                    damageUnit(killer, spike, null, "dam");
                 }
                 if (target.hp <= 0) { killUnit(target, killer); return; }
                 // «Гоблин-асассин»: существо, оставшееся после его урона

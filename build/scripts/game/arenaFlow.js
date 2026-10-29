@@ -87,7 +87,8 @@
                     : hd.ability === "startDrawAnimal" ? "animal"
                     : hd.ability === "startDrawPlant" ? "plant"
                     : hd.ability === "startDrawSkeleton" ? "skeleton"
-                    : hd.ability === "startDrawDecaySpell" ? "decaySpell" : null;
+                    : hd.ability === "startDrawDecaySpell" ? "decaySpell"
+                    : hd.ability === "startDrawBuilding" ? "building" : null;
                 if (!want) return;
                 const deck = side === "p" ? B.deck : B.eDeck;
                 const hand = side === "p" ? B.hand : B.eHand;
@@ -100,6 +101,7 @@
                             ? x.def.type === "unit" && x.def.subtype === "skeleton"
                         : want === "decaySpell"
                             ? x.def.type === "spell" && x.def.elem === "decay"
+                        : want === "building" ? x.def.type === "building"
                             : !!x.def.plant); // растение — существо или постройка
                 if (!pool.length) return;
                 const pick = pool[(Math.random() * pool.length) | 0];
@@ -231,6 +233,36 @@
                 afterMoved(u); // перемещение — ловушки врага
                 return true;
             };
+            // «Крепость» (hon176, просил юзер): живая крепость ПРОТИВНИКА
+            // по соседству (верт/гориз) с существом или null — марш существа
+            // стоит, атака идёт только в крепость (fortressPin вызывают
+            // marchSide-ветки шагов и берсерка). Несколько крепостей —
+            // первая по списку поля.
+            A.fortressPin = function fortressPin(u) {
+                if (!u || u.def.type !== "unit" || !B.units.includes(u)) return null;
+                for (const b of B.units) {
+                    if (b.side === u.side || !b.def.fortress
+                        || !B.units.includes(b)) continue;
+                    if (Math.abs(b.col - u.col) + Math.abs(b.row - u.row) === 1) return b;
+                }
+                return null;
+            };
+            // Атака существа по цели с полным набором хуков атаки (марш и
+            // берсерк дублируют этот список) — вынесено для «Крепости»,
+            // чья жертва может стоять сбоку, а не прямо на пути
+            A.attackMarchTarget = function attackMarchTarget(u, occ) {
+                const hpBefore = occ.hp;
+                damageUnit(occ, u.curAtk, u, "sword");
+                crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
+                thicketSplash(u, occ); // «Древоброд глухой чащи»: всплеск
+                venomApply(u, occ); // «Ядовитость»
+                frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
+                frostNeighbors(u); // «Старший ледовик»: лёд соседям-существам
+                afterAttackPush(u, occ); // «Проросший кабан»
+                triggerAttackTraps(u); // руна: существо атаковало
+                vampireHeal(u); // «Вампир»: после атаки
+            };
+
             A.marchSide = async function marchSide(side) {
                 const dir = side === "p" ? -1 : 1;
                 const order = B.units.filter((u) => u.side === side && u.def.type === "unit")
@@ -282,6 +314,20 @@
                         }
                     } else for (let step = 0; step < u.def.speed; step++) {
                         if (B.stopped || !B.units.includes(u)) break;
+                        // «Крепость» (hon176): существо по соседству с чужой
+                        // крепостью не перемещается — весь марш уходит в
+                        // атаку крепости (даже стоящей сбоку; выпад в базу
+                        // тоже закрыт). Погибла — соседство исчезло, остаток
+                        // шагов проходит свободно.
+                        const fort = fortressPin(u);
+                        if (fort) {
+                            const fp = cellXY(u.col, u.row);
+                            floatText(fp.x, fp.y - 60, "⚔", 0xffb26e);
+                            attackMarchTarget(u, fort);
+                            refreshHud();
+                            if (checkEnd()) return;
+                            break;
+                        }
                         const ahead = u.row + dir;
                         if (ahead < 0 || ahead >= GRID) {
                             // выпад в базу на полклетки + пауза: атака базы
@@ -367,6 +413,14 @@
                         if (B.stopped || !B.units.includes(u)) break;
                         await delay(0.3 / animK()); // отделяем доб. атаку от маршевой
                         if (B.stopped || !B.units.includes(u)) break;
+                        // «Крепость» (hon176): доб. атаки берсерка — тоже
+                        // только в крепость («атакуют только крепость»)
+                        const fortK = fortressPin(u);
+                        if (fortK) {
+                            const kp = cellXY(u.col, u.row);
+                            floatText(kp.x, kp.y - 60, "⚔", 0xffb26e);
+                            attackMarchTarget(u, fortK);
+                        } else {
                         const ahead = u.row + dir;
                         if (ahead < 0 || ahead >= GRID) {
                             await delay(0.5 / animK()); // атака базы дольше (просил юзер)
@@ -378,16 +432,8 @@
                             if (!occ || occ.side === u.side) break;
                             const p = cellXY(u.col, u.row);
                             floatText(p.x, p.y - 60, "⚔", 0xffb26e);
-                            const hpBefore = occ.hp;
-                            damageUnit(occ, u.curAtk, u, "sword");
-                            crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
-                            thicketSplash(u, occ); // «Древоброд глухой чащи»: всплеск вокруг себя
-                            venomApply(u, occ); // «Ядовитость»
-                            frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
-                            frostNeighbors(u); // «Старший ледовик»: лёд соседям-существам
-                            afterAttackPush(u, occ); // «Проросший кабан»
-                            triggerAttackTraps(u);
-                            vampireHeal(u); // «Вампир»: после атаки
+                            attackMarchTarget(u, occ);
+                        }
                         }
                         refreshHud();
                         if (checkEnd()) return;

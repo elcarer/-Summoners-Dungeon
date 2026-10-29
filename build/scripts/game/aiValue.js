@@ -594,6 +594,15 @@
                     if (!pool.length) return null;
                     return pool[(Math.random() * pool.length) | 0];
                 }
+                // «Крепость»/«Краевой камень» (hon176/174): держат ряд — лучше
+                // ряд впереди (куда доходят марш-существа), но соседство по
+                // вертикали работает и из ряда у базы, поэтому при пустом
+                // своём поле ставятся как есть (в отличие от «Тракта»)
+                if (def.fortress || def.edgeStone) {
+                    const fwd = free.filter(([, r]) => rows.length > 1 && r === rows[1]);
+                    const pool = fwd.length ? fwd : free;
+                    return pool[(Math.random() * pool.length) | 0];
+                }
                 const back = free.filter(([, r]) => r === rows[0]);
                 const pool = back.length ? back : free;
                 return pool[(Math.random() * pool.length) | 0];
@@ -667,7 +676,14 @@
                         + (d.boneField ? 1.6 : 0) // dec141: скелет каждый ход
                         + (d.bonePile ? 1.4 : 0) // dec143: «Выкапливание» каждому призыву рядом
                         + (d.cryptPlay ? 1.5 : 0) // dec157: верх сброса играется каждый ход
-                        + (d.ghostPortal ? 1.6 : 0); // dec158: Призрак за каждый каст
+                        + (d.ghostPortal ? 1.6 : 0) // dec158: Призрак за каждый каст
+                        // Честь (hon173–178, просил юзер): движки и контроль
+                        + (d.village ? 1.4 : 0) // скидка постройкам — ценнее с постройками в руке/колоде
+                        + (d.edgeStone ? 1.3 : 0) // вынос прорвавшихся со своего ряда
+                        + (d.moat ? 1.4 : 0) // обдирание подходящих к постройкам
+                        + (d.fortress ? 1.8 : 0) // замирает чужой марш, тянет удары на себя
+                        + (d.banner ? 1.5 : 0) // Ответ всем своим — ценнее с существами на поле
+                        + (d.trebuchet ? 1.7 : 0); // −2 базы врага каждый ход
                 }
                 if (d.type === "spell") {
                     const s = d.spell || {};

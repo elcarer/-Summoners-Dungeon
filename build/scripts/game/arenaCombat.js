@@ -192,7 +192,9 @@
             A.afterMoved = function afterMoved(u) {
                 if (!B.units.includes(u) || u.def.type !== "unit") return;
                 triggerCellTraps(u);
+                moatAct(u); // «Крепостной ров» (Честь): подошёл к постройке — 1 урона
                 roadPushAct(u); // «Тракт» (Честь): соседняя постройка гонит вперёд
+                edgeStoneAct(u); // «Краевой камень» (Честь): ряд камня — вынос вперёд
                 archerShot(u);
                 trapOnMoveAct(u); // «Выросшие духи»: ловушка из руки на соседнюю клетку
                 labyrinthAct(u); // «Мистический лабиринт»: дошёл до базы — перенос к постройке
@@ -201,6 +203,48 @@
                 // точка наведения (tr.__mx/__my) должны переехать на новую клетку
                 if (B.traps.p.some((tr) => tr.unit === u)
                     || B.traps.e.some((tr) => tr.unit === u)) redrawTraps();
+            };
+
+            // «Крепостной ров» (hon175, просил юзер): существо противника,
+            // вставшее ПОСЛЕ ПЕРЕМЕЩЕНИЯ на клетку по соседству (верт/гориз)
+            // с ЛЮБОЙ постройкой владельца (ров сам — тоже постройка),
+            // теряет 1 жизнь. Один раз за перемещение, даже если соседних
+            // построек несколько (текст карты — «теряет 1 жизнь»). Урон —
+            // штатный damageUnit: «Защита» существа его режет.
+            A.moatAct = function moatAct(u) {
+                if (!B.units.includes(u) || u.def.type !== "unit") return;
+                const near = B.units.some((b) => b.side !== u.side && b.def.moat
+                    && Math.abs(b.col - u.col) + Math.abs(b.row - u.row) === 1);
+                if (!near) return;
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 66, "−1♥", 0xef9f8c);
+                damageUnit(u, 1, null, "dam");
+            };
+
+            // «Краевой камень» (hon174, просил юзер): существо противника,
+            // переместившееся на клетку в одном ГОРИЗОНТАЛЬНОМ ряду с камнем,
+            // переносится на пустую клетку ПЕРЕД камнем (сторона противника
+            // владельца). Своих камень не трогает; клетка занята или за краем
+            // — эффекта нет. Перенос — перемещение: ловушки новой клетки
+            // срабатывают (как у «Лабиринта»); призыв не триггерит —
+            // edgeStoneAct зовётся только из afterMoved.
+            A.edgeStoneAct = function edgeStoneAct(u) {
+                if (!B.units.includes(u) || u.def.type !== "unit") return;
+                for (const b of B.units) {
+                    if (!b.def.edgeStone || b.side === u.side
+                        || !B.units.includes(b)) continue;
+                    if (b.row !== u.row) continue;
+                    const nr = b.row + (b.side === "p" ? -1 : 1); // перед камнем
+                    if (nr < 0 || nr >= GRID || unitAt(b.col, nr)) continue;
+                    u.col = b.col;
+                    u.row = nr;
+                    const p = cellXY(u.col, u.row);
+                    glide(u, p.x, p.y);
+                    fxEvent("cast", { x: p.x, y: p.y - 24, color: 0xcfc7b0 });
+                    sfx("chpoc");
+                    triggerCellTraps(u); // перенесли на ловушку — она срабатывает
+                    return; // один камень за перемещение
+                }
             };
 
             // «Лечение N» (hon163 Капеллан, просил юзер): после перемещения

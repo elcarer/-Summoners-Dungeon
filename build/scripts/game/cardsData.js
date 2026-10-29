@@ -1122,6 +1122,43 @@
                   subtype: "human", // подтип — по спеке юзера (cards.txt)
                   rarity: "common", elem: "honor",
                   color: 0xcfc7b0, img: "honor/172" },
+        // «Деревня» (hon173): постройка 5⚡/7♥ — все ПОСТРОЙКИ владельца
+        // стоят на 1 энергию дешевле (village — effCost в arenaCards;
+        // ИИ получает скидку тем же effCost)
+        hon173: { type: "building", cost: 5, atk: 0, hp: 7, village: 1,
+                  rarity: "rare", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/173" },
+        // «Краевой камень» (hon174): постройка 1⚡/6♥ — существо противника,
+        // переместившееся на клетку в одном ГОРИЗОНТАЛЬНОМ ряду с камнем,
+        // переносится на пустую клетку ПЕРЕД ним (edgeStone — edgeStoneAct
+        // в afterMoved)
+        hon174: { type: "building", cost: 1, atk: 0, hp: 6, edgeStone: 1,
+                  rarity: "common", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/174" },
+        // «Крепостной ров» (hon175): постройка 3⚡/4♥ — существо противника,
+        // переместившееся на клетку по соседству (верт/гориз) с ЛЮБОЙ
+        // постройкой владельца, теряет 1 жизнь (moat — moatAct в afterMoved)
+        hon175: { type: "building", cost: 3, atk: 0, hp: 4, moat: 1,
+                  rarity: "rare", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/175" },
+        // «Крепость» (hon176): постройка 4⚡/10♥ — соседние с ней существа
+        // противника не перемещаются и во время своей атаки бьют ТОЛЬКО
+        // крепость (fortress — fortressPin в marchSide)
+        hon176: { type: "building", cost: 4, atk: 0, hp: 10, fortress: 1,
+                  rarity: "epic", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/176" },
+        // «Вымпел империи» (hon177): постройка 2⚡/3♥ — все существа И
+        // ПОСТРОЙКИ владельца имеют «Ответ 1»: после атаки на такой объект
+        // атакующий получает 1 урон (banner — в damageUnit рядом со «Строем»;
+        // складывается со встроенными шипами, как «Скорость»)
+        hon177: { type: "building", cost: 2, atk: 0, hp: 3, banner: 1,
+                  rarity: "epic", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/177" },
+        // «Требушет империи» (hon178): постройка 6⚡/5♥ — в начале хода
+        // владельца база противника получает 2 урона (trebuchet — upkeep)
+        hon178: { type: "building", cost: 6, atk: 0, hp: 5, trebuchet: 2,
+                  rarity: "rare", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/178" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1394,6 +1431,13 @@
         honCavalry: { id: "honCavalry", rarity: "common", baseHp: 11,
                       elems: ["honor"], starter: "honor",
                       img: "34", ability: "firstSpeedAtk", abilityVal: 1 },
+        // «Укрепления» (3-й этаж «Залов Чести», просил юзер): Честь
+        // (белая), 12♥, начиная бой берёт дополнительную случайную карту
+        // ПОСТРОЙКИ из колоды (startDrawBuilding — heroStartDraw в
+        // arenaFlow). Спрайт — heroes/35.png
+        honRampart: { id: "honRampart", rarity: "common", baseHp: 12,
+                      elems: ["honor"], starter: "honor",
+                      img: "35", ability: "startDrawBuilding" },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1406,7 +1450,7 @@
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
         "decThirst", "decLich", // «Архилич» — ключ HEROES (enc.hero), не id энкаунтера
-        "honRebels", "honCavalry"]; // «Залы Чести» (этажи 1–2, просил юзер)
+        "honRebels", "honCavalry", "honRampart"]; // «Залы Чести» (этажи 1–3)
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.
