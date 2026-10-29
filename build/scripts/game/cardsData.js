@@ -1191,6 +1191,64 @@
                   subtype: "human", // подтип — по спеке юзера (cards.txt)
                   rarity: "rare", elem: "honor",
                   color: 0xcfc7b0, img: "honor/182" },
+        // «Торговец» (hon183): Человек 0/1 — в начале хода владельца тот
+        // берёт карту, затем сбрасывает карту с руки по своему выбору
+        // (tradeDraw — tradeDrawTick в upkeep; игрок выбирает в панели
+        // сброса после марша, ИИ сбрасывает наименее ценную)
+        hon183: { type: "unit", cost: 1, atk: 0, hp: 1, speed: 1,
+                  creature: "human", sheet: "knight", tradeDraw: 1,
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "rare", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/183" },
+        // «Баллиста» (hon184): Человек 0/4 — «Выстрел 2» после перемещения
+        // (archer/shotDmg), после выстрела откатывается на клетку назад
+        // (shotRetreat — shotRetreatAct в afterMoved)
+        hon184: { type: "unit", cost: 4, atk: 0, hp: 4, speed: 1,
+                  creature: "human", sheet: "knight", ability: "archer",
+                  shotDmg: 2, shotRetreat: 1,
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "rare", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/184" },
+        // «Святой Грааль» (hon185): постройка 7⚡/7♥ — все СУЩЕСТВА владельца
+        // имеют +2 к урону и +2 к жизням (aura — recalcAuras; первые ауры
+        // +X/+X в игре: сумму по своим постройкам считает штатный пересчёт)
+        hon185: { type: "building", cost: 7, atk: 0, hp: 7,
+                  aura: { atk: 2, hp: 2 },
+                  rarity: "epic", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/185" },
+        // «Алебардщик» (hon186): Человек 2/4 — «Ответ 2»: после атаки на
+        // него атакующий получает 2 урона (counterSpike — damageUnit;
+        // складывается с аурой «Вымпела империи», как у «Строя»)
+        hon186: { type: "unit", cost: 3, atk: 2, hp: 4, speed: 1,
+                  creature: "human", sheet: "knight", counterSpike: 2,
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "rare", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/186" },
+        // «Колесница» (hon187): Человек 2/5 — «Скорость 2»: после призыва
+        // сразу два действия (шаг вперёд или удар по впереди стоящему;
+        // комбинации шаг/удар — summonDashN); в марш идёт на 2 клетки
+        // (speed: 2 — значки скорости на жетоне)
+        hon187: { type: "unit", cost: 4, atk: 2, hp: 5, speed: 2,
+                  creature: "human", sheet: "knight", ability: "dashN",
+                  abilityVal: 2,
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "rare", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/187" },
+        // «Осадная башня» (hon188): постройка 5⚡/6♥ — «Выстрел 1» (siegeShot)
+        // после перемещения; выстрел в ПОСТРОЙКУ ПРОТИВНИКА уничтожает её;
+        // когда по соседству передвигается существо владельца, башня едет
+        // на 1 клетку вперёд (siegeFollow — siegeFollowAct из шага марша)
+        hon188: { type: "building", cost: 5, atk: 0, hp: 6,
+                  siegeShot: 1, shotDmg: 1, siegeFollow: 1,
+                  rarity: "rare", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/188" },
+        // «Нищий» (hon189): Человек 0/1 — умирая, сбрасывает 1 случайную
+        // карту с руки противника (dyingDiscard — killUnit/randomDiscard)
+        hon189: { type: "unit", cost: 0, atk: 0, hp: 1, speed: 1,
+                  creature: "human", sheet: "knight", dyingDiscard: 1,
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/189" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1475,6 +1533,13 @@
         honZealot: { id: "honZealot", rarity: "common", baseHp: 13,
                      elems: ["honor"], starter: "honor",
                      img: "36", ability: "startDrawHonorSpell" },
+        // «Отряд соседа» (5-й этаж «Залов Чести», просил юзер): первая за
+        // бой способность СУЩЕСТВА ЧЕСТИ стороны активируется дополнительный
+        // раз (honorRelay — honorRelayAct в arenaCards, образец «Безумный
+        // маг»). Спрайт — heroes/37.png
+        honNeighbor: { id: "honNeighbor", rarity: "rare", baseHp: 14,
+                       elems: ["honor"], starter: "honor",
+                       img: "37", ability: "honorRelay" },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1487,7 +1552,8 @@
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
         "decThirst", "decLich", // «Архилич» — ключ HEROES (enc.hero), не id энкаунтера
-        "honRebels", "honCavalry", "honRampart", "honZealot"]; // «Залы Чести» (этажи 1–4)
+        "honRebels", "honCavalry", "honRampart", "honZealot",
+        "honNeighbor"]; // «Залы Чести» (этажи 1–5)
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

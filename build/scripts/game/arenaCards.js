@@ -214,6 +214,30 @@
                 fn();
                 return true;
             };
+            // «Отряд соседа» (honNeighbor, heroes/37, просил юзер): ПЕРВАЯ за
+            // бой реально сработавшая способность СУЩЕСТВА СТИХИИ Честь
+            // стороны разрешается дважды. Образец — «Безумный маг» выше:
+            // fn возвращает false, если эффект не разрешился (нет цели/
+            // соседей/карт) — тогда флаг не тратится. opts.dead — носитель
+            // уже удалён с поля («Нищий»: способность на смерть), позиция
+            // для надписи — у базы его стороны.
+            A.honorRelayAct = function honorRelayAct(u, fn, opts = {}) {
+                if (!B || !u || !u.def) return fn();
+                if (u.def.type !== "unit" || u.def.elem !== "honor") return fn();
+                if (!opts.dead && !B.units.includes(u)) return fn();
+                const first = fn();
+                if (first === false) return false;
+                const hd = heroDefOf(u.side);
+                if (!hd || hd.ability !== "honorRelay"
+                    || B.heroFlags.honorRelay[u.side]) return first;
+                B.heroFlags.honorRelay[u.side] = true;
+                const p = opts.dead ? { x: 960, y: 0 } : cellXY(u.col, u.row);
+                floatText(p.x, (opts.dead ? (u.side === "p" ? 640 : 300)
+                    : p.y - 96), "×2", 0xffd98c);
+                sfx("up");
+                fn();
+                return first;
+            };
             // Итоговый урон заклинания по цели: у «Роя светлячков» (grw30) он
             // равен числу СВОИХ существ на поле (+ аура алтаря), у «Выстрела
             // стихией» (grw32) — числу карт Роста в руке, у прочих — spellDmg
@@ -274,21 +298,26 @@
                 // разыгрывает заклинание, существо получает +N к урону и +N к
                 // жизням. Повторы «Горящих рун» тоже зовут хук со стороной —
                 // растут вместе с повтором; касты противника не считают.
+                // Рост — способность существа Чести: герой-релей («Отряд
+                // соседа») может разрешить её дважды.
                 for (const u of B.units.slice()) {
                     if (!u.def.spellGrow || u.side !== side
                         || !B.units.includes(u)) continue;
-                    u.bonusAtk = (u.bonusAtk || 0) + u.def.spellGrow;
-                    u.hp += u.def.spellGrow;
-                    recalcAuras();
-                    const an = u.node.getChildByName("atk");
-                    if (an) an.text = String(u.curAtk);
-                    const hn = u.node.getChildByName("hp");
-                    if (hn) hn.text = String(u.hp);
-                    const p = cellXY(u.col, u.row);
-                    floatText(p.x, p.y - 75,
-                        `+${u.def.spellGrow}⚔ +${u.def.spellGrow}♥`, 0x9fd489);
-                    punch(u.node);
-                    sfx("up");
+                    honorRelayAct(u, () => {
+                        u.bonusAtk = (u.bonusAtk || 0) + u.def.spellGrow;
+                        u.hp += u.def.spellGrow;
+                        recalcAuras();
+                        const an = u.node.getChildByName("atk");
+                        if (an) an.text = String(u.curAtk);
+                        const hn = u.node.getChildByName("hp");
+                        if (hn) hn.text = String(u.hp);
+                        const p = cellXY(u.col, u.row);
+                        floatText(p.x, p.y - 75,
+                            `+${u.def.spellGrow}⚔ +${u.def.spellGrow}♥`, 0x9fd489);
+                        punch(u.node);
+                        sfx("up");
+                        return true;
+                    });
                 }
             };
         }

@@ -195,10 +195,15 @@
                 moatAct(u); // «Крепостной ров» (Честь): подошёл к постройке — 1 урона
                 roadPushAct(u); // «Тракт» (Честь): соседняя постройка гонит вперёд
                 edgeStoneAct(u); // «Краевой камень» (Честь): ряд камня — вынос вперёд
-                archerShot(u);
+                if (u.def.ability === "archer") {
+                    // «Выстрел N» — способность существа: герой-релей
+                    // («Отряд соседа») может разрешить её дважды
+                    honorRelayAct(u, () => { archerShot(u); return true; });
+                    if (u.def.shotRetreat) shotRetreatAct(u); // Баллиста: откат после выстрела(-ов)
+                }
                 trapOnMoveAct(u); // «Выросшие духи»: ловушка из руки на соседнюю клетку
                 labyrinthAct(u); // «Мистический лабиринт»: дошёл до базы — перенос к постройке
-                chaplainHeal(u); // «Капеллан» (Честь): после перемещения лечит соседа
+                honorRelayAct(u, () => chaplainHeal(u)); // «Капеллан» (Честь): после перемещения лечит соседа
                 // руна/споры на существе ездят вместе с ним: маркер «?» и его
                 // точка наведения (tr.__mx/__my) должны переехать на новую клетку
                 if (B.traps.p.some((tr) => tr.unit === u)
@@ -252,9 +257,11 @@
             // его стороны получает +N жизни (само себя не лечит; соседей
             // нет или капеллан погиб по пути — эффекта нет). Постройки
             // соседями не считаются («существо»). Работает у обеих сторон.
+            // Возвращает true, если полечил (герой-релей: «дважды» —
+            // флаг не тратится на несработавшее лечение).
             A.chaplainHeal = function chaplainHeal(u) {
                 if (!u || u.def.ability !== "healMove"
-                    || !B.units.includes(u) || u.def.type !== "unit") return;
+                    || !B.units.includes(u) || u.def.type !== "unit") return false;
                 const n = u.def.abilityVal || 1;
                 const allies = [];
                 for (const v of B.units) {
@@ -262,11 +269,12 @@
                     if (Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1)
                         allies.push(v);
                 }
-                if (!allies.length) return;
+                if (!allies.length) return false;
                 const target = allies[(Math.random() * allies.length) | 0];
                 healUnit(target, n);
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 88, "♥", 0x9fd489);
+                return true;
             };
 
             // «Тракт» (hon171, просил юзер): когда существо владельца после
@@ -685,6 +693,54 @@
                         : { x: cellXY(u.col, GRID - 1).x, y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff5f4e });
                 refreshHud();
                 checkEnd();
+            };
+
+            // «Осадная башня» (hon188): «Выстрел 1» после перемещения
+            // (следования за своим существом). Выстрел в ПОСТРОЙКУ ПРОТИВНИКА
+            // уничтожает её сразу (спека юзера); иная цель (существо, своя
+            // постройка) — обычный урон; пустая вертикаль — 1 базе противника
+            // (как у лучника).
+            A.siegeShot = function siegeShot(u) {
+                if (!B.units.includes(u) || !u.def.siegeShot) return;
+                const dmg = u.def.shotDmg || 1;
+                const dir = u.side === "p" ? -1 : 1;
+                for (let r = u.row + dir; r >= 0 && r < GRID; r += dir) {
+                    const o = unitAt(u.col, r);
+                    if (!o) continue;
+                    if (o.side !== u.side && o.def.type === "building") {
+                        const sp = cellXY(o.col, o.row);
+                        floatText(sp.x, sp.y - 66, "✖", 0xffb26e);
+                        killUnit(o, u);
+                    } else damageUnit(o, dmg, u, "dam");
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
+                sfx("crash");
+                damageBase(u.side === "p" ? "e" : "p", dmg,
+                    u.side === "p"
+                        ? { x: cellXY(u.col, 0).x, y: cellXY(u.col, 0).y - 15, fill: 0xff8f6e }
+                        : { x: cellXY(u.col, GRID - 1).x, y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff5f4e });
+                refreshHud();
+                checkEnd();
+            };
+
+            // «Баллиста» (hon184): после выстрела откатывается на клетку назад
+            // (к своей базе), если та в поле и свободна; наступила на чужую
+            // ловушку — она срабатывает (это тоже перемещение). Откат — часть
+            // «Выстрела», не отдельная способность: герой-релей дублирует
+            // выстрел, откат после него один.
+            A.shotRetreatAct = function shotRetreatAct(u) {
+                if (!B.units.includes(u) || u.def.type !== "unit") return;
+                const back = u.row + (u.side === "p" ? 1 : -1);
+                if (back < 0 || back >= GRID || unitAt(u.col, back)) return;
+                u.row = back;
+                u.node.zIndex = u.row;
+                const p = cellXY(u.col, u.row);
+                glide(u, p.x, p.y);
+                setWalk(u, true);
+                sfx("step");
+                triggerCellTraps(u);
             };
 
             // «Атака духами волков» (grw33): выбранное существо делает Выстрел —

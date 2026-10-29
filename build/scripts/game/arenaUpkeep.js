@@ -225,6 +225,14 @@
                         || !B.units.includes(u)) continue;
                     stormerTick(u);
                 }
+                // «Торговец» (hon183): добор + сброс по выбору; способность
+                // существа Чести — герой-релей может разрешить её дважды
+                // (две очереди панели сброса у игрока, два сброса у ИИ)
+                for (const u of B.units.slice()) {
+                    if (u.side !== side || !u.def.tradeDraw
+                        || !B.units.includes(u)) continue;
+                    honorRelayAct(u, () => tradeDrawTick(u));
+                }
                 // «Песчаный дух» (wis109): в начале хода владельца теряет
                 // 1 урон и 1 жизнь. Урон — постоянная убыль (atkPenalty),
                 // жизнь снимается напрямую (не «входящий урон»: защита и
@@ -260,6 +268,44 @@
             // чужой или своей колоды — сильную карту игрока (цена 4+ или
             // эпическая) сбрасывает, свою слабую (цена ≤ 1 и мелкое существо)
             // тоже; иную карту оставляет наверху, как было
+            // «Торговец» (hon183, просил юзер): в начале хода владельца
+            // берёт карту, затем владелец сбрасывает карту с руки по своему
+            // выбору. ИГРОК выбирает в панели (откроется после марша —
+            // playerTurnStart; панель заморозила бы марш), ИИ сбрасывает
+            // наименее ценную (aiCardPower, как «Дурное варево»). Колода и
+            // сброс пусты — добора нет, способность не разрешилась.
+            A.tradeDrawTick = function tradeDrawTick(u) {
+                if (!u || !B.units.includes(u)) return false;
+                const side = u.side;
+                if (side === "p") {
+                    if (!B.deck.length && !B.discard.length) return false;
+                    drawCards(1);
+                } else {
+                    if (!B.eDeck.length && !B.eDiscard.length
+                        && (!B.eDeckBase || !B.eDeckBase.length)) return false;
+                    drawEnemy(1);
+                }
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 84, "+1", 0x9fd489);
+                sfx("chpoc");
+                const hand = side === "p" ? B.hand : B.eHand;
+                if (hand.length) {
+                    if (side === "p") {
+                        B.pendingDiscard = (B.pendingDiscard || 0) + 1; // выбор после марша
+                    } else {
+                        let wi = 0, ws = Infinity;
+                        for (let i = 0; i < hand.length; i++) {
+                            const pv = aiCardPower(CARDS[hand[i]]);
+                            if (pv < ws) { ws = pv; wi = i; }
+                        }
+                        const id = hand.splice(wi, 1)[0];
+                        if (B.scorch.e.has(id)) B.scorch.e.delete(id);
+                        else { B.eDiscard.push(id); noteDiscard(1, "e", [id]); }
+                        floatText(960, 300, "⤓ " + GAME_LOC.t(`card.${id}.name`), 0xc9b98c);
+                    }
+                }
+                return true;
+            };
             A.riteStumpTick = function riteStumpTick(side) {
                 const stump = B.units.find((b) => b.side === side
                     && b.def.type === "building" && b.def.riteStump);

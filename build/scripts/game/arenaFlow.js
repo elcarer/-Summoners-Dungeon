@@ -367,6 +367,7 @@
                                 const over = ahead + dir;
                                 if (unitHasFly(u) && occ.def.type === "unit"
                                     && over >= 0 && over < GRID && !unitAt(u.col, over)) {
+                                    const flyFromCol = u.col, flyFromRow = u.row;
                                     u.row = over;
                                     heroElementalDraw(u); // «Сонм духов»: способность элементаля (Полёт)
                                     const p = cellXY(u.col, u.row);
@@ -376,6 +377,7 @@
                                     await delay(0.52 / animK()); // глиссада: полный шаг
                                     if (B.stopped) return;
                                     afterMoved(u); // перемещение — ловушки врага
+                                    siegeFollowAct(u, flyFromCol, flyFromRow);
                                     if (checkEnd()) return;
                                     break;
                                 }
@@ -397,6 +399,7 @@
                         const dest = lureRedirect(u, u.col, u.row, u.col, ahead);
                         if (!B.units.includes(u)) break; // приманка убила шагнувшего
                         const ddx = dest[0] - u.col; // боковой шаг (приманка) — боковая походка
+                        const fromCol = u.col, fromRow = u.row; // куда встаёт «Осадная башня»
                         u.col = dest[0];
                         u.row = dest[1];
                         const p = cellXY(u.col, u.row);
@@ -406,6 +409,7 @@
                         await delay(0.52 / animK()); // глиссада + пауза: полный шаг походки
                         if (B.stopped) return;
                         afterMoved(u); // перемещение — ловушки врага
+                        siegeFollowAct(u, fromCol, fromRow); // башня едет следом и стреляет
                         if (checkEnd()) return;
                     }
                     // «Берсерк» («Двойная атака»): в начале хода владельца —

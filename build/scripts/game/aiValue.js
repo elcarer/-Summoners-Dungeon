@@ -74,6 +74,11 @@
                 if (d.trapOnMove) v += 0.3; // «Выросшие духи»: ловушка с руки
                 if (d.leaderAura || d.plantEcho || d.druidEnergy
                     || d.sisterDraw || d.spellAura || d.campAura) v += 0.8;
+                if (d.aura) v += 1.4; // «Святой Грааль»: +2/+2 всем своим
+                if (d.tradeDraw) v += 1.0; // «Торговец»: карта каждый ход
+                if (d.counterSpike) v += 0.4 * d.counterSpike; // «Ответ»
+                if (d.siegeFollow) v += 1.2; // «Осадная башня»: ездит и стреляет
+                if (d.ability === "dashN") v += 0.5 * (d.abilityVal || 2);
                 if (d.altarSword) v += 0.9 + 0.25 * Math.max(0, (u.hp || 0) - 1);
                 if (d.starTower) v += 1.2;
                 if (d.cloudSpire) v += 1.8;
@@ -100,9 +105,12 @@
                 if (d.ability === "pushBack") s += 0.6;
                 if (unitHasFly(u)) s += 0.5;
                 if (d.ability === "dash1") s += 0.4;
+                if (d.ability === "dashN") s += 0.7;
+                if (d.counterSpike) s += 0.5 * d.counterSpike; // «Ответ»: атаковать больно
                 if (d.frostNeighbors) s += 0.8;
                 if (d.leaderAura || d.plantEcho || d.druidEnergy || d.sisterDraw
                     || d.spellAura || d.campAura || d.monolith) s += 0.9;
+                if (d.aura) s += 1.2; // «Святой Грааль»: усиливает всю сторону
                 if (d.altarSword) s += 0.7;
                 if (d.starTower) s += 0.8;
                 if (d.cloudSpire) s += 1.4;
@@ -127,6 +135,8 @@
                 if (d.thicket) s += 1.0;
                 if (d.leaderAura || d.plantEcho || d.druidEnergy || d.sisterDraw
                     || d.spellBuffAura || d.spellAura || d.campAura) s += 1.1;
+                if (d.aura) s += 1.3; // «Святой Грааль»
+                if (d.tradeDraw) s += 1.0; // «Торговец»
                 if (d.altarSword) s += 0.7;
                 if (d.starTower) s += 0.9;
                 if (d.cloudSpire) s += 1.6;
@@ -146,7 +156,8 @@
             A.aiUnitRole = function aiUnitRole(def) {
                 if (def.ability === "coward") return "wall";
                 if (def.leaderAura || def.plantEcho || def.druidEnergy
-                    || def.sisterDraw || def.spellBuffAura) return "support";
+                    || def.sisterDraw || def.spellBuffAura || def.tradeDraw
+                    || def.aura) return "support";
                 if (def.keeperScale) return "scaling";
                 if (def.energyToStats) return "finisher";
                 if (def.ability === "archer" || def.ability === "assassin") return "striker";
@@ -386,6 +397,15 @@
                         score += 2.6 + aiThreat(ahead) * 0.35;
                     else if (ahead && ahead.side === "p") score += 0.9;
                     else if (!ahead) score += 0.7; // сразу шагнёт вперёд
+                }
+                if (def.ability === "dashN") {
+                    // «Скорость N» (Колесница): две попытки — убить дважды
+                    // бьющего или пройти свободную колонку дальше
+                    const n = def.abilityVal || 2;
+                    if (ahead && ahead.side === "p" && ahead.def.type === "unit" && atk * n >= ahead.hp)
+                        score += 2.6 + aiThreat(ahead) * 0.35;
+                    else if (ahead && ahead.side === "p") score += 1.1;
+                    else if (!ahead) score += 0.8 + 0.25 * n;
                 }
                 if (def.ability === "archer") {
                     const t = aiNearestInCol("e", col, row);
@@ -667,6 +687,11 @@
                     // «Скелет-лучник» (dec135): «Выстрел 2» дороже обычного
                     if (d.ability === "archer") s += ((d.shotDmg || 1) - 1) * 0.55;
                     if (d.ability === "dash1") s += 0.2;
+                    // «Скорость N» (Колесница) и «Торговец» (карта каждый ход)
+                    if (d.ability === "dashN") s += 0.5 * (d.abilityVal || 2);
+                    if (d.tradeDraw) s += 1.0;
+                    if (d.counterSpike) s += 0.4 * d.counterSpike; // «Ответ»
+                    if (d.dyingDiscard) s += 0.4; // «Нищий»: бесплатная мелочь с эффектом
                     if (d.lichRaise) s += 1.0; // dec131: Призрак 2/1 за каждое убийство
                     if (d.vampHeal) s += 0.5; // dec132: отхил после каждой атаки
                     if (d.exhuming) s += 1.2; // dec146: вторая жизнь
@@ -704,7 +729,9 @@
                         + (d.moat ? 1.4 : 0) // обдирание подходящих к постройкам
                         + (d.fortress ? 1.8 : 0) // замирает чужой марш, тянет удары на себя
                         + (d.banner ? 1.5 : 0) // Ответ всем своим — ценнее с существами на поле
-                        + (d.trebuchet ? 1.7 : 0); // −2 базы врага каждый ход
+                        + (d.trebuchet ? 1.7 : 0) // −2 базы врага каждый ход
+                        + (d.aura ? 2.2 : 0) // hon185 «Грааль»: +2/+2 всем своим
+                        + (d.siegeShot ? (d.siegeFollow ? 1.8 : 0.8) : 0); // hon188: ездит и стреляет
                 }
                 if (d.type === "spell") {
                     const s = d.spell || {};

@@ -76,6 +76,7 @@
                         firstDeathHeal: { p: false, e: false },
                         honorGuard: { p: false, e: false },
                         honorDash: { p: false, e: false },
+                        honorRelay: { p: false, e: false },
                         speedAtk: { p: false, e: false },
                         epicDiscount: { p: false, e: false } },
                     enemyBase: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
@@ -87,6 +88,10 @@
                     units: [], traps: { p: [], e: [] }, firewalls: [],
                     selected: null, spellTarget: false, result: null,
                     discarding: false, picking: false, brewCasts: 0,
+                    // «Торговец» (hon183): очередь панелей сброса после его
+                    // добора в начале хода игрока (несколько Торговцев —
+                    // несколько сбросов подряд)
+                    pendingDiscard: 0, discardMode: "overflow",
                     // последнее разыгранное заклинание каждой стороны («Горящие
                     // руны»); journeySummon — карта призыва из «Глубокого
                     // путешествия», ждёт бесплатной постановки на клетку;

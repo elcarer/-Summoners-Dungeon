@@ -25,6 +25,11 @@
                 layoutHand();
                 redrawHighlight();
                 refreshHud();
+                // «Торговец» (hon183): добрал в начале хода — теперь выбор
+                // карты для сброса (панель поверх; несколько Торговцев —
+                // несколько очередей). Открытие ПОСЛЕ марша: панель
+                // заморозила бы анимации боя
+                if (B.pendingDiscard > 0) buildDiscardPanel("trade");
                 // «Пень обряда»: в начале хода — взгляд на верхнюю карту колоды
                 if (B.units.some((b) => b.side === "p" && b.def.type === "building"
                     && b.def.riteStump)) openStumpPanel();

@@ -101,6 +101,19 @@
                 // снимает −2⚔ его живым соседям — пересчёт обязателен
                 if (u.def.type === "building" || u.def.skelKing || u.tarMark)
                     recalcAuras();
+                // «Нищий» (hon189, просил юзер): умирая, сбрасывает 1
+                // случайную карту с руки ПРОТИВНИКА (randomDiscard; карты
+                // под «Сожжением» сгорают). Способность на смерть — носитель
+                // уже удалён с поля, релей героя зовётся с opts.dead
+                if (u.def.type === "unit" && u.def.dyingDiscard) {
+                    const foe = u.side === "p" ? "e" : "p";
+                    const np = cellXY(u.col, u.row);
+                    honorRelayAct(u, () => {
+                        const n = randomDiscard(foe, u.def.dyingDiscard);
+                        if (n) floatText(np.x, np.y - 66, "⤓", 0xc9b98c);
+                        return n > 0;
+                    }, { dead: true });
+                }
                 // «Рунный монолит»: на смерть существа постройка теряет 1 жизнь,
                 // а владелец берёт карту (просил юзер). Добор до урона — как у
                 // «Грибницы»: эффект срабатывает, даже если монолит гибнет сам;
@@ -482,7 +495,13 @@
                     && B.units.includes(killer)) {
                     const kp = cellXY(killer.col, killer.row);
                     floatText(kp.x, kp.y - 66, `${spike}⚔`, 0x8cd0ef);
-                    damageUnit(killer, spike, null, "dam");
+                    // «Ответ» — способность объекта: у существа Чести герой-
+                    // релей («Отряд соседа») может разрешить её дважды
+                    // (второй урон шипов по тому же атакующему)
+                    honorRelayAct(target, () => {
+                        damageUnit(killer, spike, null, "dam");
+                        return true;
+                    });
                 }
                 if (target.hp <= 0) { killUnit(target, killer); return; }
                 // «Гоблин-асассин»: существо, оставшееся после его урона

@@ -222,13 +222,15 @@
             // цифрой по её центру; при каждом обновлении текста (числа растут
             // до двух знаков) центр пересчитывается — текст «text» перехвачен
             // сеттером, позиции считаются от якоря и текущей ширины.
-            const numBg = (t, tex) => {
+            const numBg = (t, tex, dx = 0) => {
                 const s = new PIXI.Sprite(tex);
                 s.anchor.set(0.5);
                 s.eventMode = "none";
                 s.name = t.name + "Bg";
+                // dx — сдвиг подложки от центра цифры (поправка юзера: текст
+                // числа ЖИЗНЕЙ существа на 2px правее подложки, dx = -2)
                 const sync = () => s.position.set(
-                    t.x + (t.anchor.x === 1 ? -t.width / 2 : t.width / 2),
+                    t.x + (t.anchor.x === 1 ? -t.width / 2 : t.width / 2) + dx,
                     t.y + (t.anchor.y === 1 ? -t.height / 2 : t.height / 2));
                 // аксессор «text» в Pixi v8 объявлен в AbstractText — ищем
                 // дескриптор по цепочке прототипов (на Text.prototype его нет)
@@ -311,8 +313,10 @@
                 hp.anchor.set(1, spr ? 1 : 0);
                 hp.position.set(spr ? 41 : 34, spr ? 44 : -52);
                 hp.name = "hp";
-                c.addChild(numBg(atk, uiTex("attack.png")), numBg(hp, uiTex("heals.png")),
-                    atk, hp);
+                // у существа цифра жизней на 2px правее своей подложки
+                // (поправка юзера); у постройки — по центру, как было
+                c.addChild(numBg(atk, uiTex("attack.png")),
+                    numBg(hp, uiTex("heals.png"), spr ? -2 : 0), atk, hp);
                 if (u.def.speed > 1) {
                     for (let k = 0; k < u.def.speed; k++) {
                         const pip = new PIXI.Graphics();
@@ -622,7 +626,9 @@
                             sfx("up");
                         }
                     }
-                    if (def.ability === "dash1") summonDash(u); // «Скорость 1»
+                    if (def.ability === "dash1") honorRelayAct(u, () => summonDash(u)); // «Скорость 1»
+                    else if (def.ability === "dashN") // «Скорость N» (Колесница hon187)
+                        honorRelayAct(u, () => summonDashN(u, def.abilityVal || 2));
                     else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
                     else if (def.ability === "spiritSummoner") summonSpiritCaller(u); // призыватель духов
                     else if (def.ability === "bombling") summonBombling(u); // бомблинг
@@ -842,41 +848,82 @@
                 if (on) body.gotoAndPlay(0); else body.gotoAndStop(0);
             };
 
-            // «Скорость 1»: сразу после призыва — шаг на клетку вперёд; если там
-            // противник — удар по нему (урон с текущими бонусами). Своим не пройти,
-            // своих не бить — стоим.
-            A.summonDash = function summonDash(u) {
-                if (!B.units.includes(u)) return; // мог умереть от мины при призыве
+            // «Скорость N»: сразу после призыва — до N действий; каждое —
+            // удар по стоящему впереди противнику, а если клетка впереди
+            // пуста — шаг на неё (комбинации шаг/удар сами складываются:
+            // противник погиб от удара — следующий шаг проходит на его
+            // клетку). Своим не пройти, своих не бить — стоим. Возвращает
+            // true, если хоть одно действие состоялось (для героя-релея:
+            // «первая способность Чести — дважды»).
+            // «Скорость 1» (Разбойники/Конный рыцарь) и «Скорость 2»
+            // (Колесница hon187) — одна механика.
+            A.summonDashN = function summonDashN(u, n) {
+                if (!B.units.includes(u)) return false; // мог умереть от мины при призыве
                 const dir = u.side === "p" ? -1 : 1;
-                const ahead = u.row + dir;
-                if (ahead < 0 || ahead >= GRID) return;
-                const occ = unitAt(u.col, ahead);
-                if (occ) {
-                    if (occ.side !== u.side) {
+                let acted = false;
+                for (let k = 0; k < n; k++) {
+                    if (!B.units.includes(u)) break; // погиб от шипов Ответа
+                    const ahead = u.row + dir;
+                    if (ahead < 0 || ahead >= GRID) break;
+                    const occ = unitAt(u.col, ahead);
+                    if (occ) {
+                        if (occ.side === u.side) break; // своим не пройти
                         const hpBefore = occ.hp;
                         damageUnit(occ, u.curAtk, u, "sword");
                         crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
-                        thicketSplash(u, occ); // «Древоброд глухой чащи»: всплеск вокруг себя
+                        thicketSplash(u, occ); // «Древоброд глухой чащи»: всплеск
                         venomApply(u, occ); // «Ядовитость»
                         frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
-                        frostNeighbors(u); // «Старший ледовик»: лёд соседям-существам
+                        frostNeighbors(u); // «Старший ледовик»: лёд соседям
                         afterAttackPush(u, occ); // «Проросший кабан»
                         vampireHeal(u); // «Вампир»: после атаки
                         refreshHud();
                         checkEnd();
+                        acted = true;
+                        continue; // цель могла умереть — следующий шаг на её клетку
                     }
-                    return;
+                    const dest = lureRedirect(u, u.col, u.row, u.col, ahead);
+                    if (!B.units.includes(u)) break; // приманка убила шагнувшего
+                    const ddx = dest[0] - u.col; // боковой шаг (приманка)
+                    u.col = dest[0];
+                    u.row = dest[1];
+                    u.node.zIndex = u.row;
+                    const p = cellXY(u.col, u.row);
+                    glide(u, p.x, p.y);
+                    setWalk(u, true, ddx < 0 ? "walk_left" : ddx > 0 ? "walk_right" : undefined);
+                    sfx("step");
+                    afterMoved(u); // перемещение — вражеские ловушки могут сработать
+                    acted = true;
                 }
-                const dest = lureRedirect(u, u.col, u.row, u.col, ahead);
-                if (!B.units.includes(u)) return; // приманка убила шагнувшего
-                const ddx = dest[0] - u.col; // боковой шаг (приманка) — боковая походка
-                u.col = dest[0];
-                u.row = dest[1];
-                const p = cellXY(u.col, u.row);
-                glide(u, p.x, p.y);
-                setWalk(u, true, ddx < 0 ? "walk_left" : ddx > 0 ? "walk_right" : undefined);
+                return acted;
+            };
+            A.summonDash = function summonDash(u) {
+                return summonDashN(u, 1);
+            };
+
+            // «Осадная башня» (hon188, поправка юзера): когда по соседству
+            // (верт/гориз) с башней передвигается СУЩЕСТВО её владельца
+            // (соседство — по клетке, с которой существо шагнуло), башня
+            // передвигается на 1 клетку вперёд к базе противника; клетка
+            // занята или край поля — стоит. После перемещения — «Выстрел 1»
+            // (siegeShot). Ловушки на свою постройку не триггерят (ловушки
+            // ловят только врага). Зовётся из шага марша и «Полёта» существа.
+            A.siegeFollowAct = function siegeFollowAct(u, fromCol, fromRow) {
+                if (!B.units.includes(u) || u.def.type !== "unit") return;
+                const dir = u.side === "p" ? -1 : 1;
+                const b = B.units.find((o) => o.side === u.side
+                    && o.def.siegeFollow && o.def.type === "building"
+                    && B.units.includes(o)
+                    && Math.abs(o.col - fromCol) + Math.abs(o.row - fromRow) === 1);
+                if (!b) return;
+                const nr = b.row + dir;
+                if (nr < 0 || nr >= GRID || unitAt(b.col, nr)) return;
+                b.row = nr;
+                b.node.zIndex = b.row;
+                const p = cellXY(b.col, b.row);
+                glide(b, p.x, p.y);
                 sfx("step");
-                afterMoved(u); // перемещение — вражеские ловушки могут сработать
+                siegeShot(b); // выстрел после перемещения
             };
         }
     };

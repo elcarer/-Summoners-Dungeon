@@ -126,6 +126,8 @@
                         spheres: { total: spheresTotal(), split: B.split },
                         hand: [...B.hand],
                         discarding: !!B.discarding,
+                        discardMode: B.discardMode || "overflow",
+                        pendingDiscard: B.pendingDiscard || 0,
                         picking: !!B.picking,
                         lastSpell: B.lastSpell.p,
                         journeySummon: B.journeySummon,
@@ -373,6 +375,9 @@
                 _trap(side, cardId, col, row) { return armTrap(side, cardId, col, row); },
                 // тест-хук: upkeep стороны (начало её хода: грибницы, костры)
                 _upkeep(side) { upkeep(side); return true; },
+                // тест-хуки «Торговца» (hon183): панель сброса по выбору
+                _openTradePanel() { buildDiscardPanel("trade"); return true; },
+                _pickDiscard(idx) { pickDiscard(idx); return true; },
                 // тест-хуки боевых хуков атаки: марш одной стороны и тик яда
                 // (проба сокрушения/чащи/ядовитости без полного хода ИИ)
                 async _march(side) { await marchSide(side); return true; },

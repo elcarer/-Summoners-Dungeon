@@ -575,10 +575,13 @@
                 refreshSlider();
             };
 
-            // ── Панель сброса лишних карт (конец хода при руке > 7) ─────────────
-            // Лимит руки проверяется только здесь: игрок кликами сбрасывает
-            // карты по своему выбору, пока в руке не останется 7 — тогда ход
-            // переходит врагу.
+            // ── Панель сброса карт ────────────────────────────────────────────
+            // Режим "overflow" (по умолчанию): лимит руки проверяется только
+            // здесь — игрок кликами сбрасывает карты по своему выбору, пока
+            // в руке не останется 7, тогда ход переходит врагу.
+            // Режим "trade": «Торговец» (hon183) — сброс ОДНОЙ карты по
+            // выбору после его добора (несколько Торговцев — несколько
+            // очередей B.pendingDiscard); ход не передаётся.
             A.discardPanel = null;
             A.closeDiscardPanel = function closeDiscardPanel() {
                 if (!discardPanel) return;
@@ -586,9 +589,10 @@
                 discardPanel = null;
                 if (B) B.discarding = false;
             };
-            A.buildDiscardPanel = function buildDiscardPanel() {
+            A.buildDiscardPanel = function buildDiscardPanel(mode = "overflow") {
                 closeDiscardPanel();
                 B.discarding = true;
+                B.discardMode = mode;
                 const node = new PIXI.Container();
                 node.eventMode = "static";
                 const dim = new PIXI.Graphics();
@@ -601,12 +605,15 @@
                 frame.fill({ color: 0x171310, alpha: 0.96 });
                 frame.stroke({ width: 3, color: 0x6b5c40 });
                 node.addChild(frame);
-                const title = T(t("discard.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                const title = T(t(mode === "trade" ? "trade.discard.title" : "discard.title"),
+                    39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
                 title.anchor.set(0.5, 0);
                 title.position.set(960, 273);
                 title.eventMode = "none";
                 node.addChild(title);
-                const hint = T(t("discard.hint", { n: B.hand.length - HAND_MAX }), 25, 0xd8c79d);
+                const hint = T(mode === "trade"
+                    ? t("trade.discard.hint")
+                    : t("discard.hint", { n: B.hand.length - HAND_MAX }), 25, 0xd8c79d);
                 hint.anchor.set(0.5, 0);
                 hint.position.set(960, 339);
                 hint.eventMode = "none";
@@ -648,6 +655,20 @@
                     B.scorch.p.delete(cardId); // метка ушла вместе с этой картой
                 }
                 sfx("chpoc");
+                if (B.discardMode === "trade") {
+                    // «Торговец»: ровно один сброс за очередь; остались ещё
+                    // Торговцы в этом начале хода — следующая очередь
+                    B.pendingDiscard = Math.max(0, (B.pendingDiscard || 0) - 1);
+                    if (B.pendingDiscard > 0) {
+                        layoutHand();
+                        buildDiscardPanel("trade");
+                    } else {
+                        closeDiscardPanel();
+                        layoutHand();
+                        refreshHud();
+                    }
+                    return;
+                }
                 if (B.hand.length <= HAND_MAX) {
                     closeDiscardPanel();
                     layoutHand();
