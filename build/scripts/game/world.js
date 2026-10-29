@@ -431,10 +431,11 @@
             c.addChild(goldPlate);
             // настройки доступны и из мира; «Назад» вернёт сюда. Колода —
             // только по карте героя (просил юзер): карта под иконкой золота
-            c.addChild(hudIcon("icon_setting.png", 1839, 66, () => {
+            const settingsBtn = hudIcon("icon_setting.png", 1839, 66, () => {
                 G.uiReturn = "world";
                 scenes.go("settings");
-            }));
+            });
+            c.addChild(settingsBtn);
             // карточка героя (просил юзер): под иконкой золота, клик —
             // в колоду, наведение — рост до натурального размера (ctx.heroHover)
             const wHero = globalThis.GAME_DATA.HEROES[G.heroId]
@@ -463,7 +464,11 @@
             c.addChild(hint);
             const mini = buildMinimap();
             c.addChild(mini.box);
-            c.userData = { goldT, mini };
+            // краевые элементы HUD — ссылки для ежекадрового прижатия
+            // к краям ОКНА по горизонтали (просил юзер: при переходе
+            // из полноэкранного в оконный letterbox-полосы канваса
+            // отодвигали золото/карточку героя и настройки от краёв)
+            c.userData = { goldT, mini, goldPlate, heroHolder, settingsBtn };
             return c;
         }
 
@@ -760,6 +765,22 @@
                     }
                 }
 
+                // краевые элементы HUD прижаты к краям ОКНА по горизонтали
+                // (просил юзер): при окне шире/уже 16:9 letterbox-полосы
+                // канваса UI отодвигали золото/карточку героя и настройки
+                // от краёв к центру — позиции пересчитываются каждый кадр
+                // от реального размера экрана (как у мини-карты выше).
+                // Вертикаль не трогаем — по горизонтали только (спека)
+                {
+                    const lt = ctx.ui.toLocal({ x: 0, y: 0 });
+                    const rt = ctx.ui.toLocal({
+                        x: ctx.app.screen.width, y: 0 });
+                    const ud = uiHud.userData;
+                    ud.goldPlate.position.set(lt.x + 18, 14);
+                    ud.heroHolder.position.set(lt.x + 58, 76);
+                    ud.settingsBtn.position.set(rt.x - 81, 66);
+                }
+
                 // всплывающие подписи («Скоро…») — вверх и растворение
                 for (let i = floaties.length - 1; i >= 0; i--) {
                     const f = floaties[i];
@@ -932,6 +953,21 @@
                             x: hx / (G.world.map.w * TS),
                             y: hy / (G.world.map.h * TS),
                         },
+                    };
+                },
+                // краевые элементы HUD: позиции в локальных координатах
+                // канваса UI и края окна (тест прижатия к краям окна —
+                // просил юзер, оконный режим с letterbox-полосами)
+                hudEdges: () => {
+                    if (!uiHud) return null;
+                    const ud = uiHud.userData;
+                    const lt = ctx.ui.toLocal({ x: 0, y: 0 });
+                    const rt = ctx.ui.toLocal({
+                        x: ctx.app.screen.width, y: 0 });
+                    return {
+                        left: lt.x, right: rt.x,
+                        goldX: ud.goldPlate.x, heroX: ud.heroHolder.x,
+                        settingsX: ud.settingsBtn.x,
                     };
                 },
                 path: () => path,

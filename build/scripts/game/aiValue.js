@@ -79,6 +79,7 @@
                 if (d.counterSpike) v += 0.4 * d.counterSpike; // «Ответ»
                 if (d.siegeFollow) v += 1.2; // «Осадная башня»: ездит и стреляет
                 if (d.ability === "dashN") v += 0.5 * (d.abilityVal || 2);
+                if (d.undying) v += 2.0; // «Снизошедший»: переживает смертельный удар
                 if (d.altarSword) v += 0.9 + 0.25 * Math.max(0, (u.hp || 0) - 1);
                 if (d.starTower) v += 1.2;
                 if (d.cloudSpire) v += 1.8;
@@ -107,6 +108,7 @@
                 if (d.ability === "dash1") s += 0.4;
                 if (d.ability === "dashN") s += 0.7;
                 if (d.counterSpike) s += 0.5 * d.counterSpike; // «Ответ»: атаковать больно
+                if (d.undying) s += 1.8; // «Снизошедший»: урон в лоб его не убивает
                 if (d.frostNeighbors) s += 0.8;
                 if (d.leaderAura || d.plantEcho || d.druidEnergy || d.sisterDraw
                     || d.spellAura || d.campAura || d.monolith) s += 0.9;
@@ -137,6 +139,7 @@
                     || d.spellBuffAura || d.spellAura || d.campAura) s += 1.1;
                 if (d.aura) s += 1.3; // «Святой Грааль»
                 if (d.tradeDraw) s += 1.0; // «Торговец»
+                if (d.undying) s += 1.2; // «Снизошедший»: своё терять дороже
                 if (d.altarSword) s += 0.7;
                 if (d.starTower) s += 0.9;
                 if (d.cloudSpire) s += 1.6;
@@ -704,6 +707,7 @@
                     if (d.fatBelly) s += 0.9; // dec149: растёт от каждой своей смерти
                     if (d.deathKnight) s += 0.7; // dec159: +1⚡ за каждое убийство
                     if (d.spellGrow) s += 1.0; // hon182: растёт от каждого своего заклинания
+                    if (d.undying) s += 1.5; // hon190: переживает смертельный удар
                     return s;
                 }
                 if (d.type === "building") {
@@ -803,6 +807,9 @@
                     if (d.trap.effect === "ghostGrave") v += 1.2; // dec152: смерть + призрак
                     if (d.trap.effect === "darkOffering") v += 1.3; // dec154: смерть + бесплатный юнит с руки
                     if (d.trap.effect === "tarStatue") v += 1.0; // dec155: −4⚔ жертве, −2⚔ соседям
+                    if (d.trap.effect === "tarKettles") v += 1.2; // hon191: 4 урона всему ряду у базы
+                    if (d.trap.effect === "grandParley") v += 0.6; // hon192: размен рук — ценен при пустой руке ИИ
+                    if (d.trap.effect === "garrisonRise") v += 1.6; // hon194: до 10 Прихожан 2/2 за удар по базе
                     return v;
                 }
                 return 1;

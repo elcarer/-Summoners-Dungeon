@@ -170,6 +170,14 @@
                 ctx.ui.addChild(root);
                 heroStartDraw("p"); // способность героя: добор в начале боя
                 heroStartDraw("e");
+                // «Великая битва» (honGreatBattle): способность героя хотя бы
+                // у одной из сторон — в начале боя призываются ОБА
+                // (случайное существо из колоды, без энергии)
+                if (heroDef.ability === "greatBattle"
+                    || (eHeroDef && eHeroDef.ability === "greatBattle")) {
+                    greatBattleSummon("p");
+                    greatBattleSummon("e");
+                }
                 layoutHand();
                 refreshHud();
                 banner(t("arena.yourTurn"));

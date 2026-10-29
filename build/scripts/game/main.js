@@ -990,7 +990,7 @@
 
         // ── Хендл для консоли и автотестов ─────────────────────────────────
         window.__GAME = {
-            scenes, G, ui, loc: GAME_LOC,
+            scenes, G, ui, app, loc: GAME_LOC,
             dungeon: dungeonScene, arena: arenaScene, world: worldScene,
             arenaApi: arenaScene.api, deckApi: deckScene.api,
             rewardApi: rewardScene.api, settingsApi: settingsScene.api,

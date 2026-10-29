@@ -436,6 +436,20 @@
                 // споры/огненное дыхание реагируют на ФАКТИЧЕСКИ прошедший урон
                 let amt = amount;
                 let blocked = 0;
+                // «Снизошедший» (hon190): страж — если ПРОТИВНИК атакует это
+                // существо (удар существом: марш, «Скорость», «Тёмные цепи»)
+                // и урон должен его убить, а жизней больше 1, — смерти нет:
+                // списывается ровно до 1 жизни (спека: «жизни становятся
+                // равными 1»). «Ответ» атакующему срабатывает, как при любой
+                // атаке; «Гоблин-асассин» добивание не делает — существо
+                // «не умирает» (undyingGuard ниже)
+                let undyingGuard = false;
+                if (amt > 0 && target.def.undying && target.hp > 1
+                    && killer && killer.def && killer.def.type === "unit"
+                    && killer.side !== target.side && amt >= target.hp) {
+                    undyingGuard = true;
+                    amt = target.hp - 1;
+                }
                 const protect = A.unitProtectTotal(target);
                 if (protect && amt > 0) {
                     blocked = Math.min(protect, amt);
@@ -454,6 +468,8 @@
                 if (n) n.text = String(Math.max(0, target.hp));
                 const p = cellXY(target.col, target.row);
                 floatText(p.x, p.y - 36, `−${amt}`, 0xffb26e);
+                if (undyingGuard) // страж «Снизошедшего»: уцелел с 1 жизнью
+                    floatText(p.x, p.y - 78, "⇒1♥", 0x8cd0ef);
                 if (amt > 0) {
                     fxEvent("impact", {
                         x: p.x, y: p.y - 16,
@@ -505,8 +521,9 @@
                 }
                 if (target.hp <= 0) { killUnit(target, killer); return; }
                 // «Гоблин-асассин»: существо, оставшееся после его урона
-                // с 1 жизнью, добивается
-                if (target.hp === 1 && target.def.type === "unit"
+                // с 1 жизнью, добивается; страж «Снизошедшего» добивания не
+                // даёт — существо «не умирает» (undyingGuard)
+                if (target.hp === 1 && !undyingGuard && target.def.type === "unit"
                     && killer && killer.def.ability === "assassin") {
                     floatText(p.x, p.y - 66, "☠", 0xef9f8c);
                     killUnit(target, killer);
@@ -552,7 +569,7 @@
                 if (house) {
                     damageUnit(house, amount, null, "crash");
                     punch(root.hud);
-                    return;
+                    return; // урон ушёл в «Дома на деревьях» — база не тронута
                 }
                 if (side === "p") B.playerBase -= amount; else B.enemyBase -= amount;
                 if (where) floatText(where.x, where.y, `−${amount}`, where.fill);
@@ -562,6 +579,10 @@
                     color: side === "p" ? 0xff7a5e : 0xffb26e,
                 });
                 punch(root.hud);
+                // «Неусыпный гарнизон» (hon194): база получила урон — ловушка
+                // снимается и заселяет два ближайших к базе ряда Прихожанами
+                // (arenaTraps/garrisonRise)
+                garrisonRise(side);
             };
 
 

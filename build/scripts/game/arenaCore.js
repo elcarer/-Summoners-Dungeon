@@ -34,7 +34,8 @@
         "lakeMaid", "leaderAura", "lichRaise", "monolith", "mycelium", "plantEcho",
         "riteStump", "sandDecay", "spellBuffAura", "sprout", "sisterDraw",
         "starTower", "stormer", "berserkSummon", "portalLeap", "targetDiscount",
-        "thicket", "trapGrow", "trapOnMove", "vampHeal", "waterMage", "wolfSummon"];
+        "thicket", "trapGrow", "trapOnMove", "undying", "vampHeal",
+        "waterMage", "wolfSummon"];
 
     NS.createContext = function createContext(ctx) {
         const { scenes, G, uiTex, scheduler } = ctx;

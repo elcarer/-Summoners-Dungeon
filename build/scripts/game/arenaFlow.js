@@ -116,6 +116,34 @@
                     `+ ${GAME_LOC.t(`card.${pick.id}.name`)}`, 0xffd98c);
             };
 
+            // ── «Великая битва» (honGreatBattle, просил юзер): в начале боя
+            // ОБА игрока призывают случайное существо из своей колоды — в
+            // ряд, ближайший к своей базе, в случайную пустую клетку, без
+            // траты энергии (карта уходит в сброс). Способность героя
+            // срабатывает, если она есть хотя бы у ОДНОЙ стороны. Вызывается
+            // в enter() рядом с добором героя — после сборки root
+            // (всплывающие тексты рисуются в root.fx)
+            A.greatBattleSummon = function greatBattleSummon(side) {
+                const deck = side === "p" ? B.deck : B.eDeck;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const pool = deck.map((id, i) => ({ id, i }))
+                    .filter((x) => CARDS[x.id] && CARDS[x.id].type === "unit");
+                const row = side === "p" ? GRID - 1 : 0;
+                const cols = [];
+                for (let c = 0; c < GRID; c++) if (!unitAt(c, row)) cols.push(c);
+                if (!pool.length || !cols.length) return;
+                const pick = pool[(Math.random() * pool.length) | 0];
+                const col = cols[(Math.random() * cols.length) | 0];
+                deck.splice(pick.i, 1);
+                discard.push(pick.id);
+                noteDiscard(1, side, [pick.id]);
+                addUnit(side, pick.id, col, row);
+                const p = cellXY(col, row);
+                floatText(p.x, p.y - 108,
+                    GAME_LOC.t(`card.${pick.id}.name`), 0xffd98c);
+                sfx("chpoc");
+            };
+
             // ── «Запутанность N» (ловушка «Путь грибов», просил юзер) ─────────
             // Запутанное существо вместо своего перемещения/атаки (всего марша,
             // включая доб. атаки берсерка) идёт на клетку НАЗАД — к своей базе —

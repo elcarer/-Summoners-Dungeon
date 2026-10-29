@@ -373,6 +373,9 @@
                 },
                 // тест-хук: взвести ловушку стороны (как розыгрыш карты ловушки)
                 _trap(side, cardId, col, row) { return armTrap(side, cardId, col, row); },
+                // тест-хук: урон базе стороны (проба «Неусыпного гарнизона»
+                // hon194 — триггер «ваша база получает урон» живёт в damageBase)
+                _damageBase(side, amount) { damageBase(side, amount); return true; },
                 // тест-хук: upkeep стороны (начало её хода: грибницы, костры)
                 _upkeep(side) { upkeep(side); return true; },
                 // тест-хуки «Торговца» (hon183): панель сброса по выбору

@@ -89,6 +89,82 @@
                 return true;
             };
 
+            // «Неусыпный гарнизон» (hon194, просил юзер): как только база
+            // ВЛАДЕЛЬЦА получает урон (редирект «Домам на деревьях» базу не
+            // касается — не считается), ловушка снимается и на каждую пустую
+            // клетку в двух рядах, ближайших к базе, является Прихожанин 2/2
+            // (жетон parishioner — служебная карта «Молебна»). «Роща лоз»
+            // применяет заселение дополнительный раз — пустые клетки уже
+            // заняты, повтор безвреден. Вызывается из damageBase
+            A.garrisonRise = function garrisonRise(side) {
+                if (!B || !B.traps) return;
+                const i = B.traps[side].findIndex((t) =>
+                    t.def.trap && t.def.trap.effect === "garrisonRise");
+                if (i < 0) return;
+                const trap = B.traps[side].splice(i, 1)[0];
+                redrawTraps();
+                trapTriggered(side); // «Зимние духи»/«Путь воды»: сработала ловушка
+                const p = cellXY(trap.col, trap.row);
+                floatText(p.x, p.y - 60, "?!", 0xe08cd0);
+                fxEvent("trap", { x: p.x, y: p.y - 8, scale: 0.9 });
+                sfx("mine");
+                const echo = trapEchoOnce(side); // «Роща лоз»: флаг первого срабатывания
+                const rows = side === "p" ? [GRID - 1, GRID - 2] : [0, 1];
+                const rise = () => {
+                    for (const r of rows)
+                        for (let c = 0; c < GRID; c++) {
+                            if (unitAt(c, r)) continue;
+                            addUnit(side, "parishioner", c, r, { token: true });
+                        }
+                };
+                rise();
+                if (echo) rise();
+                refreshHud();
+                checkEnd();
+            };
+
+            // «Переговоры» (hon192, просил юзер): в начале хода ВЛАДЕЛЬЦА
+            // (тик — в начале upkeep, до эффектов построек) ловушка
+            // снимается: ОБА игрока сбрасывают ВСЕ карты с руки (карты под
+            // «Сожжением» сгорают, как при любом сбросе) и теряют ВСЮ
+            // энергию. «Роща лоз» применяет размен дополнительный раз —
+            // руки уже пусты, повтор безвреден
+            A.parleyTick = function parleyTick(side) {
+                if (!B || !B.traps) return;
+                const i = B.traps[side].findIndex((t) =>
+                    t.def.trap && t.def.trap.effect === "grandParley");
+                if (i < 0) return;
+                const trap = B.traps[side].splice(i, 1)[0];
+                redrawTraps();
+                trapTriggered(side); // «Зимние духи»/«Путь воды»: сработала ловушка
+                const p = cellXY(trap.col, trap.row);
+                floatText(p.x, p.y - 60, "?!", 0xe08cd0);
+                fxEvent("trap", { x: p.x, y: p.y - 8, scale: 0.9 });
+                sfx("mine");
+                const echo = trapEchoOnce(side); // «Роща лоз»: флаг первого срабатывания
+                const parley = () => {
+                    for (const s of ["p", "e"]) {
+                        const hand = s === "p" ? B.hand : B.eHand;
+                        const discard = s === "p" ? B.discard : B.eDiscard;
+                        const scorch = B.scorch[s];
+                        const dropped = [];
+                        for (const id of hand.splice(0)) {
+                            if (scorch && scorch.has(id)) scorch.delete(id);
+                            else { discard.push(id); dropped.push(id); }
+                        }
+                        if (dropped.length) noteDiscard(dropped.length, s, dropped);
+                        if (s === "p") B.energy = 0; else B.eEnergy = 0;
+                    }
+                    floatText(960, 520,
+                        GAME_LOC.t(`card.hon192.name`), 0xd0b0ef);
+                    layoutHand();
+                };
+                parley();
+                if (echo) parley();
+                refreshHud();
+                checkEnd();
+            };
+
             // «Отмена заклинания» (wis83) / «Отмена призыва» (wis84): ловушки
             // без клетки — срабатывают, когда ПРОТИВНИК разыгрывает заклинание
             // или карту призыва, и отменяют это: эффект не происходит, существо
@@ -128,15 +204,16 @@
                 if (u.def.ability === "noTraps") return;
                 const foe = u.side === "p" ? "e" : "p";
                 let side = foe;
-                // клеточные ловушки-существа (freezeSplash/rowShift) срабатывают
-                // только на СУЩЕСТВ, как и написано в спеке; мины/засады и
-                // нейтральные ловушки по-прежнему ловят и строения
+                // клеточные ловушки-существа (freezeSplash/rowShift/tarKettles)
+                // срабатывают только на СУЩЕСТВ, как и написано в спеке;
+                // мины/засады и нейтральные ловушки по-прежнему ловят и
+                // строения
                 const cellEffect = (t) => {
                     const e = t.def.trap.effect;
                     if (e === "freezeSplash" || e === "rowShift"
                         || e === "bubble" || e === "alliesStrike"
                         || e === "ghostGrave" || e === "darkOffering"
-                        || e === "tarStatue")
+                        || e === "tarStatue" || e === "tarKettles")
                         return u.def.type === "unit";
                     return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
                         || e === "confuse" || e === "cellDebuff"
@@ -147,11 +224,14 @@
                 if (i < 0) {
                     // «Решётка с шипами», «Шипастые лозы» и «Опутывание корней»
                     // нейтральны: срабатывают на ЛЮБОЕ существо, оказавшееся на
-                    // клетке, — включая хозяина ловушки
+                    // клетке, — включая хозяина ловушки («Котлы со смолой» —
+                    // на любое СУЩЕСТВО: перемещение/призыв, спека hon191)
                     side = u.side;
                     i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                         && (t.def.trap.effect === "cellDmgAll" || t.def.trap.effect === "cellDebuff"
-                            || t.def.trap.effect === "entangle"));
+                            || t.def.trap.effect === "entangle"
+                            || (t.def.trap.effect === "tarKettles"
+                                && u.def.type === "unit")));
                 }
                 if (i < 0) return;
                 const trap = B.traps[side].splice(i, 1)[0];
@@ -447,6 +527,23 @@
                         if (spot) break;
                     }
                     if (spot) addUnit(side, trap.def.trap.spawn, spot[0], spot[1], { token: true });
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
+                if (trap.def.trap.effect === "tarKettles") {
+                    // «Котлы со смолой» (hon191): все СУЩЕСТВА впритык перед
+                    // базой ВЛАДЕЛЬЦА ловушки (ряд у базы: игрок — последний
+                    // ряд, противник — первый; обе стороны) получают 4 урона
+                    // (+ аура алтаря, как у клеточных уронных ловушек);
+                    // постройки — не существа, урона не получают
+                    const baseRow = side === "p" ? GRID - 1 : 0;
+                    const dmg = (trap.def.trap.amount || 4) + altarBonus(side);
+                    for (const v of B.units.slice()) {
+                        if (v.row !== baseRow || v.def.type !== "unit"
+                            || !B.units.includes(v)) continue;
+                        damageUnit(v, dmg, null, "acid");
+                    }
                     refreshHud();
                     checkEnd();
                     return;

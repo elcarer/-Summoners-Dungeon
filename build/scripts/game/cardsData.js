@@ -1249,6 +1249,50 @@
                   subtype: "human", // подтип — по спеке юзера (cards.txt)
                   rarity: "common", elem: "honor",
                   color: 0xcfc7b0, img: "honor/189" },
+        // «Снизошедший» (hon190): Человек 6/6 с «Полётом» (flyOver, как
+        // «Мини-фея») и стражем: если ПРОТИВНИК атакует это существо,
+        // урон должен его убить, а жизней больше 1 — оно не умирает,
+        // его жизни становятся 1 (undying — damageUnit)
+        hon190: { type: "unit", cost: 6, atk: 6, hp: 6, speed: 1,
+                  creature: "human", sheet: "knight",
+                  ability: "flyOver", undying: 1,
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "epic", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/190" },
+        // «Котлы со смолой» (hon191): ловушка на пустую клетку — когда
+        // существо перемещается или призывается на эту клетку (любоё,
+        // включая хозяина — нейтральная, как «Решётка с шипами»), все
+        // СУЩЕСТВА впритык перед базой владельца получают 4 урона
+        // (tarKettles — applyCellTrap)
+        hon191: { type: "trap", cost: 3,
+                  trap: { event: "onCell", effect: "tarKettles", amount: 4 },
+                  kind: "damage", // тип эффекта — по спеке юзера
+                  rarity: "common", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/191" },
+        // «Переговоры» (hon192): ловушка на пустую клетку — в начале хода
+        // владельца и он, и противник сбрасывают ВСЕ карты с руки и
+        // теряют ВСЮ энергию (grandParley — тик в начале upkeep)
+        hon192: { type: "trap", cost: 1,
+                  trap: { event: "onOwnUpkeep", effect: "grandParley" },
+                  kind: "damage", // тип эффекта — по спеке юзера
+                  rarity: "epic", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/192" },
+        // «Боевой слон» (hon193): Человек 8/7 с «Сокрушением» (crush —
+        // лишний урон атаки переходит в базу противника, crushHit)
+        hon193: { type: "unit", cost: 7, atk: 8, hp: 7, speed: 1,
+                  creature: "human", sheet: "knight", crush: true,
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "rare", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/193" },
+        // «Неусыпный гарнизон» (hon194): ловушка на пустую клетку — когда
+        // база владельца получает урон, на каждую пустую клетку в двух
+        // рядах, ближайших к базе, становится Прихожанин 2/2 (жетон
+        // parishioner, как у «Молебна»; garrisonRise — damageBase)
+        hon194: { type: "trap", cost: 1,
+                  trap: { event: "onBaseDamage", effect: "garrisonRise" },
+                  kind: "damage", // тип эффекта — по спеке юзера
+                  rarity: "epic", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/194" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1540,6 +1584,15 @@
         honNeighbor: { id: "honNeighbor", rarity: "rare", baseHp: 14,
                        elems: ["honor"], starter: "honor",
                        img: "37", ability: "honorRelay" },
+        // «Великая битва» (6-й этаж «Залов Чести», просил юзер): Честь
+        // (белая), 15♥, в начале боя ОБА игрока призывают случайное
+        // существо из своей колоды — в ряд, ближайший к своей базе, в
+        // случайную пустую клетку, без траты энергии (greatBattle —
+        // greatBattleSummon в arenaCards, вызов из enter арены).
+        // Спрайт — heroes/38.png
+        honGreatBattle: { id: "honGreatBattle", rarity: "rare", baseHp: 15,
+                          elems: ["honor"], starter: "honor",
+                          img: "38", ability: "greatBattle" },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1553,7 +1606,7 @@
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
         "decThirst", "decLich", // «Архилич» — ключ HEROES (enc.hero), не id энкаунтера
         "honRebels", "honCavalry", "honRampart", "honZealot",
-        "honNeighbor"]; // «Залы Чести» (этажи 1–5)
+        "honNeighbor", "honGreatBattle"]; // «Залы Чести» (этажи 1–6)
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.
