@@ -195,6 +195,26 @@
                 }
                 return best;
             };
+            // «Испепеляющий луч» (hon180): колонка с максимальной выгодой
+            // урона по СУЩЕСТВАМ (обе стороны, как в спеке) — урон + шанс
+            // добить у существ игрока, убыток по своим почти такой же;
+            // выгодной колонки нет → null: карту держим (как у стены костров)
+            A.aiColumnPick = function aiColumnPick(dmg) {
+                const hit = dmg + altarBonus("e");
+                let best = null, bestScore = 0;
+                for (let c = 0; c < GRID; c++) {
+                    let score = 0;
+                    for (const v of B.units) {
+                        if (v.col !== c || v.def.type !== "unit") continue;
+                        const w = aiVal(v);
+                        if (v.side === "p")
+                            score += w + (v.hp <= hit ? 2 : 0); // убиваемое жирнее
+                        else score -= w * 0.8;
+                    }
+                    if (score > bestScore) { bestScore = score; best = c; }
+                }
+                return best;
+            };
             // «Гоблинская мина» (str6): сплэш 1 (+алтарь) бьёт соседей клетки —
             // своих убиваемых рядом с миной ИИ не подставляет. Порог считаем
             // с аурой алтаря: она усиливает и сплэш.
@@ -658,6 +678,7 @@
                     if (d.acolyteCast) s += 0.5; // dec148: бесплатный каст из сброса
                     if (d.fatBelly) s += 0.9; // dec149: растёт от каждой своей смерти
                     if (d.deathKnight) s += 0.7; // dec159: +1⚡ за каждое убийство
+                    if (d.spellGrow) s += 1.0; // hon182: растёт от каждого своего заклинания
                     return s;
                 }
                 if (d.type === "building") {
@@ -700,6 +721,8 @@
                     if (s.sacrifice) v += 1.4;
                     if (s.buffAtk) v += 0.5 + s.buffAtk * 0.4;
                     if (s.buffHp) v += 0.3 + s.buffHp * 0.3;
+                    if (s.healPlayer) v += 0.6; // hon179: лечение своей базы
+                    if (s.columnDmg) v += s.columnDmg * 1.3; // hon180: урон колонке
                     if (s.buffAtkByHp) v += 0.8;
                     if (s.berserk) v += 0.8;
                     if (s.enchantFire) v += 0.8;

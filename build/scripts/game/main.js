@@ -40,6 +40,8 @@
             "panel_down", "panel_label", "panel_minimap", "panel_skill", "panel_top",
             "portrate_hero", "sign_mana", "sign_shield", "start_back",
             "UI_cards_hand", "UI_energy",
+            // подложки чисел на жетонах поля боя (просил юзер)
+            "attack", "heals",
         ];
         say("арт интерфейса…");
         await frame();

@@ -270,6 +270,26 @@
                     punch(u.node);
                     sfx("up");
                 }
+                // «Паладин света» (hon182, просил юзер): когда ВЛАДЕЛЕЦ
+                // разыгрывает заклинание, существо получает +N к урону и +N к
+                // жизням. Повторы «Горящих рун» тоже зовут хук со стороной —
+                // растут вместе с повтором; касты противника не считают.
+                for (const u of B.units.slice()) {
+                    if (!u.def.spellGrow || u.side !== side
+                        || !B.units.includes(u)) continue;
+                    u.bonusAtk = (u.bonusAtk || 0) + u.def.spellGrow;
+                    u.hp += u.def.spellGrow;
+                    recalcAuras();
+                    const an = u.node.getChildByName("atk");
+                    if (an) an.text = String(u.curAtk);
+                    const hn = u.node.getChildByName("hp");
+                    if (hn) hn.text = String(u.hp);
+                    const p = cellXY(u.col, u.row);
+                    floatText(p.x, p.y - 75,
+                        `+${u.def.spellGrow}⚔ +${u.def.spellGrow}♥`, 0x9fd489);
+                    punch(u.node);
+                    sfx("up");
+                }
             };
         }
     };

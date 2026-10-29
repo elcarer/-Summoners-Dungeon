@@ -382,6 +382,14 @@
                 // тест-хуки волны «Тлен 144–146»: текущая сцена поля и лист
                 // существ по стихии карты (фолбэк sheetOf)
                 _scene() { return { curScene }; },
+                // тест-хук: всплывающие надписи (проба времени жизни/затухания)
+                _fxFloats() {
+                    return floats.map((f) => ({
+                        a: Math.round(f.node.alpha * 100) / 100,
+                        life: Math.round(f.life * 100) / 100,
+                        total: Math.round(f.total * 100) / 100,
+                    }));
+                },
                 _sheetName(id) {
                     const def = CARDS[id];
                     if (!def) return null;

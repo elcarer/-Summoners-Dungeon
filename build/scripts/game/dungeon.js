@@ -1372,7 +1372,11 @@
                     }
                 }
                 // ── лестница у старта: наверх; на 1-м этаже — в открытый мир ──
+                // первые 2с после входа в подземелье лестница «остывает» —
+                // герой прибывает к ней вплотную, без паузы выход срабатывал
+                // от первого же клика (просил юзер)
                 if (!st.win && !ctx.questModal && st.ladder
+                    && !(st.ladderCool && performance.now() < st.ladderCool)
                     && Math.hypot(st.ladder.x - hx, st.ladder.y - hy) < TS * 0.85) {
                     const from = st.floor;
                     st.heroPos = { x: hx, y: hy };

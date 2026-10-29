@@ -552,6 +552,16 @@
                             if (hn) hn.text = String(u.hp);
                             floatText(p.x, p.y - 75, `+${def.spell.buffHp}♥`, 0x9fd489);
                         }
+                        // «Луч света» (hon179): «выбранный игрок» — владелец
+                        // заклинания (второй цели в игре нет, как у
+                        // «Негативного потока»), получает 1 жизнь
+                        if (def.spell.healPlayer) {
+                            const n = def.spell.healPlayer;
+                            B.playerBase = Math.min(B.playerBaseMax, B.playerBase + n);
+                            floatText(960, 840, `+${n}`, 0x9fd489);
+                            fxEvent("heal", { x: 960, y: 830, scale: 1.15 });
+                            punch(root.hud);
+                        }
                         if (def.spell.buffAtkByHp) { // «Природная мощь»: +урона = жизням
                             u.bonusAtk = (u.bonusAtk || 0) + u.hp;
                             recalcAuras();
@@ -615,8 +625,23 @@
                         if (skeletonCrowdSpawn("p", target.col, target.row)) sfx("use");
                     } else cultRowSpawn("p", target.row);
                 }
-                if (def.spell.target === "anyCell") { // стена костров: ряд горит N ходов владельца
+                if (def.spell.target === "anyCell") { // стена костров: ряд горит N ходов владельца;
+                    // «Испепеляющий луч»: все существа вертикального ряда клетки
                     if (!target || target.col === undefined) return false;
+                    if (def.spell.columnDmg) { // hon180: СУЩЕСТВА (обе стороны)
+                        // в колонке выбранной клетки; урон как у массовых —
+                        // алтарь и геройский бонус добавляются к каждому удару
+                        // (первое уронное — на всю серию, по образцу aoeDmg)
+                        const dmg = def.spell.columnDmg + altarBonus("p");
+                        const fs = heroSpellBonus(def, "p", false, true);
+                        for (const v of B.units.slice()) {
+                            if (v.col !== target.col || v.def.type !== "unit") continue;
+                            damageUnit(v, dmg + fs
+                                + heroSpellBonus(def, "p", true), null, "rocket");
+                        }
+                        sfx("rocket");
+                        return true;
+                    }
                     B.firewalls.push({ col: target.col, row: target.row, side: "p",
                         left: def.spell.turns, dmg: def.spell.firewall });
                     redrawFirewalls();

@@ -550,6 +550,10 @@
             st.cave = caveId;
             if (st.spawn) st.heroPos = { ...st.spawn }; // прибытие к лестнице
             st.exitCool = false;
+            // лестница наверх (выход) 2с не работает после входа: герой
+            // прибывает к ней вплотную, и первый же клик выкидывал в мир
+            // (просил юзер)
+            st.ladderCool = performance.now() + 2000;
             G.dungeon = st;
             if (ctx.sfx) ctx.sfx();
             scenes.go("dungeon");

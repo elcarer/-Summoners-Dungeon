@@ -226,7 +226,9 @@
                     if (f.node.destroyed) { floats.splice(i, 1); continue; } // узел снесён вне анимации
                     f.life -= dt;
                     f.node.y -= 36 * f.k * dt; // путь тот же — дольше и медленнее
-                    f.node.alpha = Math.max(0, f.life / f.total);
+                    // полностью видна, затухает только в последние 0.5с
+                    // (поправка юзера; life в тех же единицах, что dt)
+                    f.node.alpha = Math.max(0, Math.min(1, f.life / 0.5));
                     if (f.life <= 0) { f.node.destroy(); floats.splice(i, 1); }
                 }
                 for (let i = punches.length - 1; i >= 0; i--) {

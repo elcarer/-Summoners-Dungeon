@@ -182,6 +182,13 @@
                             const p = cellXY(best.col, best.row);
                             floatText(p.x, p.y - 75, `+${s.buffHp}♥`, 0x9fd489);
                         }
+                        if (s.healPlayer) { // «Луч света» (hon179): своя база тоже
+                            const n = s.healPlayer;
+                            B.enemyBase = Math.min(B.enemyBaseMax, B.enemyBase + n);
+                            floatText(960, 60, `+${n}`, 0x9fd489);
+                            fxEvent("heal", { x: 960, y: 70, scale: 1.15 });
+                            punch(root.hud);
+                        }
                         if (s.buffAtkByHp) { // «Природная мощь»: +урона = жизням
                             best.bonusAtk = (best.bonusAtk || 0) + best.hp;
                             recalcAuras();
@@ -251,7 +258,22 @@
                         if (s.freeze && B.units.includes(best)) addFrozen(best, s.freeze, "e");
                     }
                 }
-                if (s.target === "anyCell") { // стена костров — ряд, где огонь окупается
+                if (s.target === "anyCell") { // «Испепеляющий луч»: колонка,
+                    // где удар по существам окупается; стена костров — ряд,
+                    // где огонь окупается
+                    if (s.columnDmg) {
+                        const col = aiColumnPick(s.columnDmg);
+                        if (col === null) return; // невыгодной колонки нет
+                        const dmg = s.columnDmg + altarBonus("e");
+                        const fs = heroSpellBonus(def, "e", false, true);
+                        for (const v of B.units.slice()) {
+                            if (v.col !== col || v.def.type !== "unit") continue;
+                            damageUnit(v, dmg + fs
+                                + heroSpellBonus(def, "e", true), null, "rocket");
+                        }
+                        sfx("rocket");
+                        return;
+                    }
                     const row = aiFirewallRow();
                     if (row === null) return; // невыгодного ряда нет — гейт держал карту
                     B.firewalls.push({ col: 2, row, side: "e",

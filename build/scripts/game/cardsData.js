@@ -1159,6 +1159,38 @@
         hon178: { type: "building", cost: 6, atk: 0, hp: 5, trebuchet: 2,
                   rarity: "rare", elem: "honor",
                   color: 0xcfc7b0, img: "honor/178" },
+        // «Луч света» (hon179): заклинание 1⚡ — выбранное существо и
+        // «выбранный игрок» получают по 1 жизни. Второй цели в игре нет,
+        // как у «Негативного потока»: игрок = владелец заклинания
+        // (healPlayer — applySpellPInner/aiSpells)
+        hon179: { type: "spell", cost: 1,
+                  spell: { target: "anyUnit", buffHp: 1, healPlayer: 1 },
+                  kind: "heal", // тип эффекта — по спеке юзера («Усиление, Получение жизни»)
+                  rarity: "common", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/179" },
+        // «Испепеляющий луч» (hon180): заклинание 3⚡ — все СУЩЕСТВА в
+        // клетках вертикального ряда выбранной клетки (обе стороны) получают
+        // по 2 урона (columnDmg — applySpellPInner/aiSpells, цель anyCell)
+        hon180: { type: "spell", cost: 3,
+                  spell: { target: "anyCell", columnDmg: 2 },
+                  kind: "damage", // тип эффекта — по спеке юзера («Нанесение урона»)
+                  rarity: "rare", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/180" },
+        // «Праведный гнев» (hon181): заклинание 5⚡ — выбранное существо
+        // получает +6 к урону и +6 к жизням (buffAtk+buffHp — штатный путь)
+        hon181: { type: "spell", cost: 5,
+                  spell: { target: "anyUnit", buffAtk: 6, buffHp: 6 },
+                  kind: "buff", // тип эффекта — по спеке юзера («Усиление»)
+                  rarity: "common", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/181" },
+        // «Паладин света» (hon182): Человек 4/4 — когда владелец разыгрывает
+        // заклинание, это существо получает +1 к урону и +1 к жизням
+        // (spellGrow — afterSpellPlayed)
+        hon182: { type: "unit", cost: 5, atk: 4, hp: 4, speed: 1,
+                  creature: "human", sheet: "knight", spellGrow: 1,
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "rare", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/182" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1438,6 +1470,11 @@
         honRampart: { id: "honRampart", rarity: "common", baseHp: 12,
                       elems: ["honor"], starter: "honor",
                       img: "35", ability: "startDrawBuilding" },
+        // «Святость» (4-й этаж «Залов Чести», просил юзер): начиная бой
+        // берёт случайную карту заклинания стихии Честь из колоды
+        honZealot: { id: "honZealot", rarity: "common", baseHp: 13,
+                     elems: ["honor"], starter: "honor",
+                     img: "36", ability: "startDrawHonorSpell" },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1450,7 +1487,7 @@
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
         "decThirst", "decLich", // «Архилич» — ключ HEROES (enc.hero), не id энкаунтера
-        "honRebels", "honCavalry", "honRampart"]; // «Залы Чести» (этажи 1–3)
+        "honRebels", "honCavalry", "honRampart", "honZealot"]; // «Залы Чести» (этажи 1–4)
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

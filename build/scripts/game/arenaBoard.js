@@ -218,6 +218,34 @@
             // eventMode="none" на весь контейнер): клики всегда уходят в зону
             // поля под ним — иначе спрайт/подписи на клетке съедали pointertap
             // и клетка «не выбиралась» (баг юзера).
+            // Подложка под числом (heals/attack.png юзера, 32×32): стоит под
+            // цифрой по её центру; при каждом обновлении текста (числа растут
+            // до двух знаков) центр пересчитывается — текст «text» перехвачен
+            // сеттером, позиции считаются от якоря и текущей ширины.
+            const numBg = (t, tex) => {
+                const s = new PIXI.Sprite(tex);
+                s.anchor.set(0.5);
+                s.eventMode = "none";
+                s.name = t.name + "Bg";
+                const sync = () => s.position.set(
+                    t.x + (t.anchor.x === 1 ? -t.width / 2 : t.width / 2),
+                    t.y + (t.anchor.y === 1 ? -t.height / 2 : t.height / 2));
+                // аксессор «text» в Pixi v8 объявлен в AbstractText — ищем
+                // дескриптор по цепочке прототипов (на Text.prototype его нет)
+                let proto = Object.getPrototypeOf(t), d = null;
+                while (proto && proto !== Object.prototype && !(d
+                    && d.set)) {
+                    const desc = Object.getOwnPropertyDescriptor(proto, "text");
+                    if (desc && desc.set) d = desc;
+                    proto = Object.getPrototypeOf(proto);
+                }
+                if (d && d.set) Object.defineProperty(t, "text", {
+                    get() { return d.get.call(t); },
+                    set(v) { d.set.call(t, v); sync(); },
+                });
+                sync();
+                return s;
+            };
             A.makeUnitNode = function makeUnitNode(u) {
                 const c = new PIXI.Container();
                 const sheet = sheetOf(u);
@@ -239,10 +267,13 @@
                     aura.position.set(0, -3);
                     aura.name = "auraMark";
                     c.addChild(aura);
+                    // у постройки только жизни: подложка heals, урона нет
+                    // (поправка юзера); числа — на 5px к центру и на 10px выше
                     const hp = T(String(u.hp), 25, 0xff9c8c, { stroke: { color: 0x1c1207, width: 4.5 } });
                     hp.anchor.set(1, 1);
-                    hp.position.set(39, 39);
+                    hp.position.set(34, 29);
                     hp.name = "hp";
+                    c.addChild(numBg(hp, uiTex("heals.png")));
                     c.addChild(hp);
                     return finishNode(c, u);
                 }
@@ -269,15 +300,19 @@
                     g.stroke({ width: 3.75, color: u.side === "p" ? 0x9fc4ef : 0xef9f8c });
                     c.addChild(g);
                 }
+                // числа существа: урон слева, жизни справа, оба — на подложках
+                // attack/heals; сдвинуты на 5px к центру и на 10px выше
+                // (поправка юзера)
                 const atk = T(String(u.curAtk), 25, 0xffe9b0, { stroke: { color: 0x1c1207, width: 4.5 } });
                 atk.anchor.set(0, spr ? 1 : 0);
-                atk.position.set(spr ? -46 : -39, spr ? 54 : -42);
+                atk.position.set(spr ? -41 : -34, spr ? 44 : -52);
                 atk.name = "atk";
                 const hp = T(String(u.hp), 25, 0xff9c8c, { stroke: { color: 0x1c1207, width: 4.5 } });
                 hp.anchor.set(1, spr ? 1 : 0);
-                hp.position.set(spr ? 46 : 39, spr ? 54 : -42);
+                hp.position.set(spr ? 41 : 34, spr ? 44 : -52);
                 hp.name = "hp";
-                c.addChild(atk, hp);
+                c.addChild(numBg(atk, uiTex("attack.png")), numBg(hp, uiTex("heals.png")),
+                    atk, hp);
                 if (u.def.speed > 1) {
                     for (let k = 0; k < u.def.speed; k++) {
                         const pip = new PIXI.Graphics();
@@ -774,7 +809,9 @@
                 tt.eventMode = "none"; // всплывающий текст не ест клики поля
                 root.fx.addChild(tt);
                 const k = animK();
-                floats.push({ node: tt, life: 0.9 / k, total: 0.9 / k, k });
+                // 1.4с (было 0.9с): надпись дольше видна, затухает только в
+                // последние 0.5с (поправка юзера — обработка в update сцены)
+                floats.push({ node: tt, life: 1.4 / k, total: 1.4 / k, k });
             };
             A.punch = function punch(node) {
                 punches.push({ node, life: 0.22 / animK(), total: 0.22 / animK() });

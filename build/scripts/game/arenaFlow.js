@@ -76,7 +76,8 @@
             // карту … из колоды» (просил юзер): «Банда гоблинов» — карту
             // гоблина, «Засада гоблинов» — карту ловушки, «Лесные звери» —
             // карту животного, «Буйная растительность» — карту растения,
-            // «Живые кости» — карту Скелета (подтип skeleton).
+            // «Живые кости» — карту Скелета (подтип skeleton), «Укрепления» —
+            // карту постройки, «Святость» — заклинание стихии Честь.
             // Вызывается в enter() ПОСЛЕ сборки root (всплывающий текст
             // рисуется в root.fx).
             A.heroStartDraw = function heroStartDraw(side) {
@@ -88,7 +89,8 @@
                     : hd.ability === "startDrawPlant" ? "plant"
                     : hd.ability === "startDrawSkeleton" ? "skeleton"
                     : hd.ability === "startDrawDecaySpell" ? "decaySpell"
-                    : hd.ability === "startDrawBuilding" ? "building" : null;
+                    : hd.ability === "startDrawBuilding" ? "building"
+                    : hd.ability === "startDrawHonorSpell" ? "honorSpell" : null;
                 if (!want) return;
                 const deck = side === "p" ? B.deck : B.eDeck;
                 const hand = side === "p" ? B.hand : B.eHand;
@@ -101,6 +103,8 @@
                             ? x.def.type === "unit" && x.def.subtype === "skeleton"
                         : want === "decaySpell"
                             ? x.def.type === "spell" && x.def.elem === "decay"
+                        : want === "honorSpell"
+                            ? x.def.type === "spell" && x.def.elem === "honor"
                         : want === "building" ? x.def.type === "building"
                             : !!x.def.plant); // растение — существо или постройка
                 if (!pool.length) return;
