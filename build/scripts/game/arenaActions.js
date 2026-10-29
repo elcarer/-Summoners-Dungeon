@@ -12,6 +12,7 @@
                 refreshHud();
                 firewallTick("e"); // стена костров врага — конец хода врага
                 sproutTick("e");   // ростки врага подросли — конец его хода
+                auraLightTick("e"); // «Аура света» врага — конец его хода
                 if (B.stopped || B.phase === "over") return;
                 banner(t("arena.yourTurn"));
                 fxEvent("turn", { side: "p", color: 0xffd98c });
@@ -211,9 +212,13 @@
 
             A.onCellTap = function onCellTap(col, row) {
                 if (B.phase !== "player" || B.discarding || B.picking) return;
-                if (B.journeySummon) { // «Глубокое путешествие»: бесплатный призыв
+                if (B.journeySummon || B.resurrectSummon) { // бесплатный призыв:
+                    // «Глубокое путешествие» (карта из колоды) и «Воскрешение»
+                    // hon200 (карта, выбранная в панели из СВОЕГО сброса — она
+                    // уже изъята из сброса и вернётся в него как разыгранная)
                     if (!deployRows("p").includes(row) || unitAt(col, row)) return;
-                    const cardId = B.journeySummon;
+                    const cardId = B.journeySummon || B.resurrectSummon;
+                    const wasRes = !B.journeySummon && !!B.resurrectSummon;
                     // «Ловушка-пузырь» (wis119) врага: призыв того же существа
                     // под пузырём не проходит — заклинание не тратится, игрок
                     // выбирает другую карту/клетку
@@ -223,8 +228,11 @@
                         return;
                     }
                     B.journeySummon = null;
+                    B.resurrectSummon = null;
                     // «Отмена призыва» (wis84) врага: бесплатный призыв — тоже
                     // призыв; карта уходит в сброс, существо не появляется
+                    // (карта «Воскрешения» из сброса — возвращается туда же,
+                    // как разыгранная и отменённая)
                     if (counterTrapConsume("e", "counterSummon")) {
                         B.discard.push(cardId);
                         noteDiscard(1, "p", [cardId]);
@@ -233,6 +241,10 @@
                             "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                     } else {
                         addUnit("p", cardId, col, row); // энергия не тратится
+                        // «Глубокое путешествие»: карта «превращается» в существо
+                        // и из зон уходит; «Воскрешение»: разыгранная карта
+                        // призыва возвращается в сброс (как любой розыгрыш)
+                        if (wasRes) B.discard.push(cardId);
                     }
                     layoutHand();
                     redrawHighlight();
@@ -309,6 +321,29 @@
                                     "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                             } else addSpores(u);
                         } else if (!armTrap("p", cardId, 0, 0, u)) {
+                            const sp = cellXY(u.col, u.row);
+                            floatText(sp.x, sp.y - 60,
+                                "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                        }
+                        deselect();
+                        layoutHand();
+                        redrawHighlight();
+                        refreshHud();
+                        return;
+                    }
+                    // «Засадный отряд» (hon196) — на СВОЮ ПОСТРОЙКУ (вторая
+                    // ловушка-«на объект» после руны): когда она умирает,
+                    // сработает засада (ambushRiseAct из killUnit)
+                    if (def.trap.effect === "ambushRise") {
+                        const u = unitAt(col, row);
+                        if (!u || u.side !== "p" || u.def.type !== "building") {
+                            deselect();
+                            return;
+                        }
+                        B.energy -= effCost(B.hand[B.selected]); // цена ловушки
+                        const cardId = spendCard(B.selected);
+                        consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
+                        if (!armTrap("p", cardId, 0, 0, u)) {
                             const sp = cellXY(u.col, u.row);
                             floatText(sp.x, sp.y - 60,
                                 "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
@@ -486,6 +521,13 @@
                 if (def.spell.raiseDead && !unitsInDiscard("p").length) return false;
                 // «Пытка разума» (dec125): обе руки пусты — сбрасывать нечего
                 if (def.spell.mindTorture && !B.hand.length && !B.eHand.length) return false;
+                // «Плен» (hon197): в руке противника нет карты призыва —
+                // выбирать нечего, заклинание не разыгрывается (как выше)
+                if (def.spell.captivate && !B.eHand.some((id) =>
+                    CARDS[id] && CARDS[id].type === "unit")) return false;
+                // «Воскрешение» (hon200): в своём сбросе нет карты призыва —
+                // воскрешать нечего (как у «Поднятия мёртвых»)
+                if (def.spell.resurrect && !unitsInDiscard("p").length) return false;
                 if (tg === "anyUnit") { // усиление/Смыв/Слабость
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
@@ -560,13 +602,9 @@
                         // «Луч света» (hon179): «выбранный игрок» — владелец
                         // заклинания (второй цели в игре нет, как у
                         // «Негативного потока»), получает 1 жизнь
-                        if (def.spell.healPlayer) {
-                            const n = def.spell.healPlayer;
-                            B.playerBase = Math.min(B.playerBaseMax, B.playerBase + n);
-                            floatText(960, 840, `+${n}`, 0x9fd489);
-                            fxEvent("heal", { x: 960, y: 830, scale: 1.15 });
-                            punch(root.hud);
-                        }
+                        // (healBase — единая точка, внутри гейт
+                        // «Претендента на трон»)
+                        if (def.spell.healPlayer) healBase("p", def.spell.healPlayer);
                         if (def.spell.buffAtkByHp) { // «Природная мощь»: +урона = жизням
                             u.bonusAtk = (u.bonusAtk || 0) + u.hp;
                             recalcAuras();
@@ -602,10 +640,7 @@
                         && (u.def.type !== "building" || def.spell.noBuildings))) return false;
                     if (def.spell.purge) { // «Извлечение духа»: снять все свойства, база лечится за каждое
                         const n = purgeUnit(u);
-                        B.playerBase = Math.min(B.playerBaseMax, B.playerBase + n);
-                        floatText(960, 840, `+${n}`, 0x9fd489);
-                        fxEvent("heal", { x: 960, y: 830, scale: 1.15 });
-                        punch(root.hud);
+                        healBase("p", n);
                         sfx("up");
                     } else if (def.spell.cocoon) { // «Защитный кокон»: «Защита 1» цели
                         addProtect(u);
@@ -696,6 +731,25 @@
                     fxEvent("seal", { x: p.x, y: p.y - 8, color: 0xc9a0ef, scale: 0.85 });
                     punch(u.node);
                     sfx("chpoc");
+                }
+                if (def.spell.target === "ownUnit" && def.spell.lightAura) { // «Аура света» (hon199): световая метка
+                    if (!target || target.col === undefined) return false;
+                    const u = unitAt(target.col, target.row);
+                    if (!u || u.side !== "p" || u.def.type !== "unit") return false;
+                    // в конце хода владельца соседние СУЩЕСТВА противника
+                    // теряют 1 жизнь (auraLightTick); метка умирает вместе
+                    // с носителем
+                    u.lightAura = true;
+                    const mark = new PIXI.Graphics();
+                    mark.circle(0, 0, 9);
+                    mark.fill({ color: 0xffe9b0 });
+                    mark.stroke({ width: 3, color: 0xf0c96a });
+                    mark.position.set(-36, -54);
+                    mark.name = "auraMark";
+                    mark.eventMode = "none";
+                    u.node.addChild(mark);
+                    const p = cellXY(u.col, u.row);
+                    floatText(p.x, p.y - 60, "☀", 0xffe9b0);
                 }
                 if (def.spell.target === "ownUnit" && def.spell.darkExtract) { // «Извлечение тьмы» (dec153): своё гибнет — энергия = сумма ⚔+♥
                     if (!target || target.col === undefined) return false;
@@ -869,6 +923,10 @@
                 // «Поднятие мёртвых»: существа своего сброса — в руку (гейт
                 // выше: пусто в сбросе → карта не разыгрывается)
                 if (def.spell.raiseDead) openRaisePanel();
+                // «Плен» (hon197): панель руки противника — удалить карту призыва
+                if (def.spell.captivate) openCaptivatePanel();
+                // «Воскрешение» (hon200): панель своего сброса — разыграть карту
+                if (def.spell.resurrect) openResurrectPanel();
                 // «Пытка разума»: панель «кто сбрасывает случайные карты»
                 if (def.spell.mindTorture) openTorturePanel(def.spell.mindTorture);
                 // «Запретные знания» (dec130): панель «кто берёт 3 карты

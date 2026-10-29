@@ -80,6 +80,8 @@
                 if (d.siegeFollow) v += 1.2; // «Осадная башня»: ездит и стреляет
                 if (d.ability === "dashN") v += 0.5 * (d.abilityVal || 2);
                 if (d.undying) v += 2.0; // «Снизошедший»: переживает смертельный удар
+                if (d.medicHeal) v += 1.3; // «Полевой медик»: +1♥ случайному каждый ход
+                if (d.pillarEnergy) v += 1.0; // «Опорник»: +1⚡ за каждую атаку по нему
                 if (d.altarSword) v += 0.9 + 0.25 * Math.max(0, (u.hp || 0) - 1);
                 if (d.starTower) v += 1.2;
                 if (d.cloudSpire) v += 1.8;
@@ -109,6 +111,7 @@
                 if (d.ability === "dashN") s += 0.7;
                 if (d.counterSpike) s += 0.5 * d.counterSpike; // «Ответ»: атаковать больно
                 if (d.undying) s += 1.8; // «Снизошедший»: урон в лоб его не убивает
+                if (d.medicHeal) s += 1.0; // «Полевой медик»: подлечивает сторону
                 if (d.frostNeighbors) s += 0.8;
                 if (d.leaderAura || d.plantEcho || d.druidEnergy || d.sisterDraw
                     || d.spellAura || d.campAura || d.monolith) s += 0.9;
@@ -140,6 +143,8 @@
                 if (d.aura) s += 1.3; // «Святой Грааль»
                 if (d.tradeDraw) s += 1.0; // «Торговец»
                 if (d.undying) s += 1.2; // «Снизошедший»: своё терять дороже
+                if (d.medicHeal) s += 1.0; // «Полевой медик»: движок хила
+                if (d.pillarEnergy) s += 0.8; // «Опорник»: энергия за атаку по себе
                 if (d.altarSword) s += 0.7;
                 if (d.starTower) s += 0.9;
                 if (d.cloudSpire) s += 1.6;
@@ -161,6 +166,7 @@
                 if (def.leaderAura || def.plantEcho || def.druidEnergy
                     || def.sisterDraw || def.spellBuffAura || def.tradeDraw
                     || def.aura) return "support";
+                if (def.medicHeal) return "support"; // «Полевой медик» — в тыл
                 if (def.keeperScale) return "scaling";
                 if (def.energyToStats) return "finisher";
                 if (def.ability === "archer" || def.ability === "assassin") return "striker";
@@ -278,6 +284,9 @@
                     if (s.baseHit || s.wolfVolley) return 4.5; // бьёт СВОИМ существом
                     if (s.iceSwarm || s.skeletonCrowd) return 3; // тела — как обычный призыв
                     if (s.laySummon) return 3; // «Молебен»: тело 2/2 — как призыв
+                    if (s.captivate) return 2; // hon197: вынос карты призыва — контроль
+                    if (s.resurrect) return 3; // hon200: бесплатное тело — как призыв
+                    if (s.lightAura) return 4; // hon199: метка — как усиление
                     return 6; // поиск рун / гадание / поиск знаний / глубокое путешествие
                 }
                 // «Три монолита» — без спешки (просил юзер: не в приоритете):
@@ -287,15 +296,19 @@
                     // «Отмена заклинания»/«Отмена призыва» (wis83/wis84) и
                     // «Отражение» (wis120): реактивные ловушки — чем раньше
                     // висят, тем больше шансов поймать розыгрыш (контроль)
-                    return def.trap.effect === "counterSpell"
+                    if (def.trap.effect === "counterSpell"
                         || def.trap.effect === "counterSummon"
                         || def.trap.effect === "counterBuilding"
-                        || def.trap.effect === "reflectSpell" ? 1.2 : 5;
+                        || def.trap.effect === "reflectSpell") return 1.2;
+                    // «Засадный отряд» (hon196) — висит на своей постройке до
+                    // её смерти: не срочная (5 — общий порядок ловушек)
+                    return 5;
                 }
                 // вождь / заклинатель клинков / пастух / друид / сестра — двигатели
                 // связок: ставим до существ, чьи способности они усилят/оплатят
                 if (def.leaderAura || def.spellBuffAura || def.plantEcho
                     || def.druidEnergy || def.sisterDraw) return 1;
+                if (def.medicHeal) return 1.5; // «Полевой медик»: движок хила — рано
                 // «Хранитель леса»: тело = числу своих Животных при призыве —
                 // с двумя и больше зверями играет в общий поток, иначе ждёт
                 if (def.keeperScale) return B.units.filter((v) => v.side === "e"
@@ -708,6 +721,7 @@
                     if (d.deathKnight) s += 0.7; // dec159: +1⚡ за каждое убийство
                     if (d.spellGrow) s += 1.0; // hon182: растёт от каждого своего заклинания
                     if (d.undying) s += 1.5; // hon190: переживает смертельный удар
+                    if (d.medicHeal) s += 1.2; // hon195: +1♥ случайному объекту каждый ход
                     return s;
                 }
                 if (d.type === "building") {
@@ -735,7 +749,8 @@
                         + (d.banner ? 1.5 : 0) // Ответ всем своим — ценнее с существами на поле
                         + (d.trebuchet ? 1.7 : 0) // −2 базы врага каждый ход
                         + (d.aura ? 2.2 : 0) // hon185 «Грааль»: +2/+2 всем своим
-                        + (d.siegeShot ? (d.siegeFollow ? 1.8 : 0.8) : 0); // hon188: ездит и стреляет
+                        + (d.siegeShot ? (d.siegeFollow ? 1.8 : 0.8) : 0) // hon188: ездит и стреляет
+                        + (d.pillarEnergy ? 1.2 : 0); // hon198: +1⚡ за атаку по себе
                 }
                 if (d.type === "spell") {
                     const s = d.spell || {};
@@ -779,6 +794,9 @@
                     if (s.iceSwarm) v += Math.min(5, s.iceSwarm) * 0.55; // 5 тел 1/1
                     if (s.skeletonCrowd) v += 3 * 0.65; // dec140: три Скелета 1/2
                     if (s.laySummon) v += 1.2; // hon166: тело 2/2 за 1⚡
+                    if (s.captivate) v += 1.6; // hon197: удаление карты призыва из руки
+                    if (s.resurrect) v += 1.8; // hon200: бесплатный призыв из сброса
+                    if (s.lightAura) v += 1.0; // hon199: −1♥ соседям каждый ход
                     if (s.poison) v += 1.4; // dec144: растущий яд — тариф выше
                     if (s.destroy) v += 2.7; // dec145: убийство любого существа минус карта
                     // dec150: размен тела на серию случайных ударов (ценнее
@@ -810,6 +828,7 @@
                     if (d.trap.effect === "tarKettles") v += 1.2; // hon191: 4 урона всему ряду у базы
                     if (d.trap.effect === "grandParley") v += 0.6; // hon192: размен рук — ценен при пустой руке ИИ
                     if (d.trap.effect === "garrisonRise") v += 1.6; // hon194: до 10 Прихожан 2/2 за удар по базе
+                    if (d.trap.effect === "ambushRise") v += 1.4; // hon196: Прихожанин + карта в руку за смерть постройки
                     return v;
                 }
                 return 1;

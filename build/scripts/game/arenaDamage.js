@@ -87,6 +87,20 @@
                         scale: u.def.type === "building" ? 1.2 : 1,
                     });
                 }
+                // «Засадный отряд» (hon196): ловушка висит на СВОЕЙ постройке
+                // (unit-привязка armTrap, как руна) — постройка умирает, засада
+                // срабатывает: Прихожанин 2/2 в клетку погибшей, карта — в руку.
+                // Ловушка снимается в removeUnit вместе с постройкой — запоминаем
+                // ДО него и разыгрываем после (клетка к тому моменту свободна)
+                let ambush = null;
+                if (u && u.def.type === "building") {
+                    const ti = B.traps[u.side].findIndex((t) => t.unit === u
+                        && t.def.trap && t.def.trap.effect === "ambushRise");
+                    if (ti >= 0) {
+                        ambush = { side: u.side, trap: B.traps[u.side][ti],
+                                   col: u.col, row: u.row };
+                    }
+                }
                 removeUnit(u);
                 sfx("die");
                 // «Иллюзия» (wis108): погибает вместе с существом, чьи статы
@@ -185,15 +199,7 @@
                     if (hd && hd.ability === "firstDeathHeal"
                         && !B.heroFlags.firstDeathHeal[u.side]) {
                         B.heroFlags.firstDeathHeal[u.side] = true;
-                        if (u.side === "p") {
-                            B.playerBase = Math.min(B.playerBaseMax, B.playerBase + 3);
-                        } else {
-                            B.enemyBase = Math.min(B.enemyBaseMax, B.enemyBase + 3);
-                        }
-                        floatText(960, u.side === "p" ? 840 : 60, "+3♥", 0x9fd489);
-                        fxEvent("heal", { x: 960, y: u.side === "p" ? 830 : 70,
-                            scale: 1.15 });
-                        punch(root.hud);
+                        healBase(u.side, 3);
                         sfx("up");
                     }
                 }
@@ -232,6 +238,8 @@
                 lichRaiseGhost(killer, u); // «Лич»: призрак на клетку убитого
                 deathKnightGain(killer, u); // «Рыцарь смерти»: +1⚡ владельцу
                 exhumingReplay(u); // «Выкапливание»: существо возвращается после смерти
+                if (ambush) ambushRiseAct(ambush.side, ambush.trap,
+                    ambush.col, ambush.row); // «Засадный отряд»
             };
 
             // «Рыцарь смерти» (dec159, просил юзер): убив СУЩЕСТВО (постройки
@@ -393,6 +401,7 @@
                 if (u.poison) { u.poison = 0; n++; }
                 if (u.atkZero) { u.atkZero = false; n++; } // «Ловушка-пузырь» (wis119)
                 if (u.tarMark) { u.tarMark = false; n++; } // «Смоляная статуя» (dec155): метка-аура снята
+                if (u.lightAura) { u.lightAura = false; n++; } // «Аура света» (hon199): свет снят
                 if (u.entangle) { u.entangle = 0; n++; }
                 if (u.frozen) { u.frozen = 0; n++; }
                 if (u.spellWard) { u.spellWard = false; n++; removeWardMark(u); }
@@ -400,8 +409,9 @@
                 // «Иллюзия» (wis108): без способности связь с источником
                 // больше не действует — смерть источника её не убивает
                 if (u.illusionOf) u.illusionOf = null;
-                for (const m of ["sporeMark", "enchMark", "protectMark", "berserkMark", "confuseMark",
-                    "venomMark", "poisonMark", "entangleMark", "frozenMark", "exhumingMark"]) {
+                for (const m of ["sporeMark", "enchMark", "auraMark", "protectMark", "berserkMark",
+                    "confuseMark", "venomMark", "poisonMark", "entangleMark", "frozenMark",
+                    "exhumingMark"]) {
                     const node = u.node.getChildByName(m);
                     if (node) node.destroy({ children: true });
                 }
@@ -519,6 +529,17 @@
                         return true;
                     });
                 }
+                // «Опорник» (hon198): когда ЭТУ ПОСТРОЙКУ атакуют, владелец
+                // получает 1 энергию — даже если атака постройку убила
+                // (атака состоялась); заклинания и ловушки бьют без
+                // killer-существа — не «атака» (как у «Ответа»)
+                if (amt > 0 && target.def.pillarEnergy && killer && killer.def
+                    && killer.def.type === "unit" && killer.side !== target.side) {
+                    if (target.side === "p") B.energy += 1; else B.eEnergy += 1;
+                    const op = cellXY(target.col, target.row);
+                    floatText(op.x, op.y - 84, "+1⚡", 0x8cd0ef);
+                    sfx("aqua");
+                }
                 if (target.hp <= 0) { killUnit(target, killer); return; }
                 // «Гоблин-асассин»: существо, оставшееся после его урона
                 // с 1 жизнью, добивается; страж «Снизошедшего» добивания не
@@ -549,6 +570,29 @@
                 fxEvent("heal", { x: p.x, y: p.y - 10, scale: 0.78 });
                 punch(u.node);
                 sfx("up");
+            };
+
+            // Лечение базы стороны — единая точка для всех источников
+            // (заклинания «Луч света»/«Извлечение духа», «Полевой медик»).
+            // Кап — начальные жизни базы, как в прежних прямых точках.
+            // «Претендент на трон» (honThrone, просил юзер): когда у базы
+            // ВЛАДЕЛЬЦА меньше 10 жизней и она получает жизни, она получает
+            // на 1 жизнь больше (проверка по жизням ДО лечения).
+            A.healBase = function healBase(side, n) {
+                if (!B || !(n > 0)) return;
+                const hd = heroDefOf(side);
+                if (hd && hd.ability === "throneGuard") {
+                    const cur = side === "p" ? B.playerBase : B.enemyBase;
+                    if (cur < 10) n += 1;
+                }
+                const y = side === "p" ? 840 : 60;
+                if (side === "p")
+                    B.playerBase = Math.min(B.playerBaseMax, B.playerBase + n);
+                else
+                    B.enemyBase = Math.min(B.enemyBaseMax, B.enemyBase + n);
+                floatText(960, y, `+${n}`, 0x9fd489);
+                fxEvent("heal", { x: 960, y: side === "p" ? 830 : 70, scale: 1.15 });
+                punch(root.hud);
             };
 
             // Урон базе стороны — единая точка для всех источников. «Дома на

@@ -35,7 +35,7 @@
         "riteStump", "sandDecay", "spellBuffAura", "sprout", "sisterDraw",
         "starTower", "stormer", "berserkSummon", "portalLeap", "targetDiscount",
         "thicket", "trapGrow", "trapOnMove", "undying", "vampHeal",
-        "waterMage", "wolfSummon"];
+        "waterMage", "wolfSummon", "medicHeal", "pillarEnergy"];
 
     NS.createContext = function createContext(ctx) {
         const { scenes, G, uiTex, scheduler } = ctx;

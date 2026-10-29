@@ -123,6 +123,42 @@
                 checkEnd();
             };
 
+            // «Засадный отряд» (hon196, просил юзер): ловушка висит на СВОЕЙ
+            // постройке (unit-привязка armTrap, как руна). Когда постройка
+            // умирает (killUnit), в её клетку является Прихожанин 2/2 (жетон
+            // parishioner, как у «Молебна»), а сама карта возвращается в
+            // руку владельца — из сброса, иначе из колоды (returnCardToHand,
+            // как у «Смыва»; карты нигде нет — вернётся копией, как там).
+            // «Роща лоз» тратит флаг первого срабатывания, но повтор не
+            // клонирует возврат карты — засада, в отличие от клеточных,
+            // частично «одноразовая» (второй Прихожанин некуда ставить).
+            // Зовётся из killUnit ПОСЛЕ гибели постройки — ловушка к этому
+            // моменту уже снята (removeUnit чистит unit-привязки)
+            A.ambushRiseAct = function ambushRiseAct(side, trap, col, row) {
+                if (!B || !B.traps) return;
+                trapTriggered(side); // «Зимние духи»/«Путь воды»: сработала ловушка
+                trapEchoOnce(side); // «Роща лоз»: флаг тратится, повтор не клонирует карту
+                const p = cellXY(col, row);
+                floatText(p.x, p.y - 60, "?!", 0xe08cd0);
+                fxEvent("trap", { x: p.x, y: p.y - 8, scale: 0.9 });
+                sfx("mine");
+                if (!unitAt(col, row)) {
+                    addUnit(side, trap.def.trap.spawn || "parishioner", col, row,
+                        { token: true });
+                    floatText(p.x, p.y - 108,
+                        GAME_LOC.t("card.parishioner.name"), 0xb7d0ef);
+                    sfx("chpoc");
+                }
+                const id = cardIdOf(trap.def);
+                if (returnCardToHand(side, id)) {
+                    floatText(960, side === "p" ? 640 : 300,
+                        "↩ " + GAME_LOC.t(`card.${id}.name`), 0x9fd489);
+                    sfx("chpoc");
+                }
+                refreshHud();
+                checkEnd();
+            };
+
             // «Переговоры» (hon192, просил юзер): в начале хода ВЛАДЕЛЬЦА
             // (тик — в начале upkeep, до эффектов построек) ловушка
             // снимается: ОБА игрока сбрасывают ВСЕ карты с руки (карты под

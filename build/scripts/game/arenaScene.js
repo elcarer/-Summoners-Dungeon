@@ -94,10 +94,13 @@
                     pendingDiscard: 0, discardMode: "overflow",
                     // последнее разыгранное заклинание каждой стороны («Горящие
                     // руны»); journeySummon — карта призыва из «Глубокого
-                    // путешествия», ждёт бесплатной постановки на клетку;
-                    // scorch — «Сожжение» (Варка зелий): id карт в руке стороны,
-                    // которые после розыгрыша удаляются из боя, а не в сброс
+                    // путешествия», resurrectSummon — карта призыва, выбранная
+                    // в панели «Воскрешения» из своего сброса: обе ждут
+                    // бесплатной постановки на клетку; scorch — «Сожжение»
+                    // (Варка зелий): id карт в руке стороны, которые после
+                    // розыгрыша удаляются из боя, а не в сброс
                     lastSpell: { p: null, e: null }, journeySummon: null,
+                    resurrectSummon: null,
                     scorch: { p: new Set(), e: new Set() },
                 };
                 G.battle = B;
@@ -125,6 +128,8 @@
                 brewPanel = null; brewPile = null;
                 raisePanel = null;
                 torturePanel = null;
+                captivatePanel = null;
+                resurrectPanel = null;
                 unitCard = null;
                 sfx("openRoom"); // начало боя
 
@@ -165,6 +170,15 @@
                     }
                     if (e.target === root && B.phase === "player" && B.journeySummon) {
                         cancelJourneySummon(); // клик мимо поля — призыв в руку
+                    }
+                    if (e.target === root && B.phase === "player" && B.resurrectSummon) {
+                        // клик мимо поля — карта «Воскрешения» возвращается
+                        // в сброс (она из него и была выбрана)
+                        B.discard.push(B.resurrectSummon);
+                        B.resurrectSummon = null;
+                        layoutHand();
+                        redrawHighlight();
+                        refreshHud();
                     }
                 });
                 ctx.ui.addChild(root);
@@ -303,6 +317,8 @@
                     else if (brewPanel) closeBrewPanel(); // «Варка зелий» — без выбора
                     else if (raisePanel) closeRaisePanel(); // «Поднятие мёртвых» — без выбора
                     else if (torturePanel) closeTorturePanel(); // «Пытка разума» — без выбора
+                    else if (captivatePanel) closeCaptivatePanel(); // «Плен» — без удаления
+                    else if (resurrectPanel) closeResurrectPanel(); // «Воскрешение» — без выбора
                     else if (seekPanel) finishSeek(); // «Поиск знаний» — взять, что выбрано
                     else if (grimPanel) closeGrimPanel(); // «Гримуар инея» — выбор сделан, просто закрыть
                     else closeRunesPanel(); // «Поиск рун» — отмена выбора

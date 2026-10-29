@@ -16,6 +16,7 @@
                 refreshHud();
                 firewallTick("p"); // стена костров игрока — конец хода игрока
                 sproutTick("p");   // ростки игрока подросли — конец его хода
+                auraLightTick("p"); // «Аура света» игрока — конец его хода
                 if (B.stopped || B.phase === "over") return;
                 banner(t("arena.enemyTurn"));
                 fxEvent("turn", { side: "e", color: 0xff8a5e });
@@ -279,6 +280,26 @@
                             if (def.trap.effect === "darkOffering"
                                 && !B.eHand.some((id) =>
                                     CARDS[id] && CARDS[id].type === "unit")) continue;
+                            // «Засадный отряд» (hon196) — на СВОЮ постройку
+                            // (переднюю — её чаще атакуют); построек нет —
+                            // карту держим
+                            if (def.trap.effect === "ambushRise") {
+                                const blds = B.units.filter((v) => v.side === "e"
+                                    && v.def.type === "building")
+                                    .sort((a, b) => b.row - a.row);
+                                if (!blds.length) continue;
+                                showEnemyBack();
+                                await delay(enemyPlayDelay());
+                                const cardId = B.eHand[pick.i];
+                                B.eHand.splice(pick.i, 1);
+                                B.eEnergy -= effCost(cardId, "e");
+                                consumeEpicDiscount(cardId, "e"); // «Архилич»
+                                cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
+                                armTrap("e", cardId, 0, 0, blds[0]);
+                                hideEnemyCard();
+                                played = true;
+                                break;
+                            }
                             // Ловушки — прежде всего на путь марша игрока: пустая
                             // клетка прямо ПЕРЕД его существом (шагнёт и наступит),
                             // и не просто «какая-то передняя», а на пути САМОГО

@@ -1293,6 +1293,61 @@
                   kind: "damage", // тип эффекта — по спеке юзера
                   rarity: "epic", elem: "honor",
                   color: 0xd8d3c8, img: "honor/194" },
+        // «Полевой медик» (hon195): Человек 1/3 — в начале хода владельца
+        // случайно выбирается один объект из «все его существа + база»
+        // (база наравне с каждым существом) и получает +1 жизнь
+        // (medicHeal — medicHealTick в upkeep)
+        hon195: { type: "unit", cost: 3, atk: 1, hp: 3, speed: 1,
+                  creature: "human", sheet: "knight", medicHeal: 1,
+                  subtype: "human", // подтип — по спеке юзера (cards.txt)
+                  rarity: "rare", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/195" },
+        // «Засадный отряд» (hon196): ловушка на СВОЮ ПОСТРОЙКУ (вторая
+        // ловушка-«на объект» после руны — unit-привязка armTrap): когда
+        // выбранная постройка умирает, в её клетку является Прихожанин 2/2
+        // (жетон parishioner, как у «Молебна»), а сама карта возвращается
+        // в руку владельца (из сброса или колоды — returnCardToHand;
+        // ambushRise — killUnit/ambushRiseAct)
+        hon196: { type: "trap", cost: 1,
+                  trap: { event: "onOwnBuildingDeath", effect: "ambushRise",
+                          spawn: "parishioner" },
+                  kind: "summon", // тип эффекта — по спеке юзера
+                  rarity: "epic", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/196" },
+        // «Плен» (hon197): заклинание 1⚡ без клетки — посмотреть руку
+        // противника и удалить из неё карту призыва ДО КОНЦА БОЯ (не в
+        // сброс; игрок выбирает в панели captivatePanel, ИИ — самую
+        // ценную). Руки призыва нет — карта и энергия целы (гейт как у
+        // «Поднятия мёртвых»)
+        hon197: { type: "spell", cost: 1,
+                  spell: { target: "none", captivate: 1 },
+                  kind: "discard", // тип эффекта — по спеке юзера
+                  rarity: "epic", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/197" },
+        // «Опорник» (hon198): постройка 2⚡/3♥ — когда её атакуют, владелец
+        // получает 1 энергию (pillarEnergy — damageUnit; урон от заклинаний
+        // и ловушек «атакой» не считается, как у «Ответа»)
+        hon198: { type: "building", cost: 2, atk: 0, hp: 3, pillarEnergy: 1,
+                  rarity: "epic", elem: "honor",
+                  color: 0xcfc7b0, img: "honor/198" },
+        // «Аура света» (hon199): заклинание 3⚡ — выбранное СВОЁ существо
+        // получает световую метку (lightAura): в конце хода владельца все
+        // соседние с ним СУЩЕСТВА противника теряют 1 жизнь (снятие
+        // напрямую, как у «Тёмного алтаря»; auraLightTick — конец хода)
+        hon199: { type: "spell", cost: 3,
+                  spell: { target: "ownUnit", lightAura: 1 },
+                  kind: "buff", // тип эффекта — по спеке юзера («Усиление»)
+                  rarity: "epic", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/199" },
+        // «Воскрешение» (hon200): заклинание 5⚡ без клетки — выбрать карту
+        // призыва в своём сбросе (панель resurrectPanel) и разыграть её
+        // без траты энергии (постановка на пустую клетку зоны призыва —
+        // механизм journeySummon; resurrectSummon)
+        hon200: { type: "spell", cost: 5,
+                  spell: { target: "none", resurrect: 1 },
+                  kind: "summon", // тип эффекта — по спеке юзера
+                  rarity: "epic", elem: "honor",
+                  color: 0xd8d3c8, img: "honor/200" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1593,6 +1648,13 @@
         honGreatBattle: { id: "honGreatBattle", rarity: "rare", baseHp: 15,
                           elems: ["honor"], starter: "honor",
                           img: "38", ability: "greatBattle" },
+        // «Претендент на трон» (босс «Залов Чести», 7-й этаж, просил юзер):
+        // Честь (белая), 18♥, Эпическая. Способность throneGuard: когда у
+        // базы ВЛАДЕЛЬЦА меньше 10 жизней и она получает жизни, она
+        // получает на 1 жизнь больше (healBase). Спрайт — heroes/39.png
+        honThrone: { id: "honThrone", rarity: "epic", baseHp: 18,
+                     elems: ["honor"], starter: "honor",
+                     img: "39", ability: "throneGuard" },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1606,7 +1668,7 @@
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
         "decThirst", "decLich", // «Архилич» — ключ HEROES (enc.hero), не id энкаунтера
         "honRebels", "honCavalry", "honRampart", "honZealot",
-        "honNeighbor", "honGreatBattle"]; // «Залы Чести» (этажи 1–6)
+        "honNeighbor", "honGreatBattle", "honThrone"]; // «Залы Чести» (этажи 1–7)
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

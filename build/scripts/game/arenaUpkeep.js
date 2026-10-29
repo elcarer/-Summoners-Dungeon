@@ -260,7 +260,35 @@
                     heroElementalDraw(u);
                     if (u.hp <= 0) killUnit(u, null);
                 }
+                // «Полевой медик» (hon195): в начале хода владельца случайно
+                // выбирается ОДИН объект из «все его существа + база» (база
+                // наравне с каждым существом, спека юзера) и получает +1
+                // жизнь. Способность существа Чести — герой-релей («Отряд
+                // соседа») может разрешить её дважды
+                for (const u of B.units.slice()) {
+                    if (u.side !== side || !u.def.medicHeal
+                        || !B.units.includes(u)) continue;
+                    honorRelayAct(u, () => medicHealTick(u));
+                }
                 refreshHud();
+            };
+
+            // «Полевой медик» (hon195): раз разрешённого тика. false —
+            // разыгрывать нечего (пусто даже с базой — не бывает: база жива,
+            // пока бой идёт). Хил юнита — healUnit, базы — healBase
+            // (гейт «Претендента на трон» внутри)
+            A.medicHealTick = function medicHealTick(u) {
+                if (!u || !B.units.includes(u)) return false;
+                const side = u.side;
+                const pool = B.units.filter((v) => v.side === side
+                    && v.def.type === "unit");
+                const pick = (Math.random() * (pool.length + 1)) | 0; // база — последний билет
+                if (pick >= pool.length) {
+                    healBase(side, 1);
+                } else {
+                    healUnit(pool[pick], 1);
+                }
+                return true;
             };
 
             // «Пень обряда» (grw11), начало хода ИИ: подсматривает верхнюю карту
@@ -354,6 +382,35 @@
                     punch(b.node);
                     sfx("up");
                 }
+            };
+
+            // «Аура света» (hon199), конец хода владельца: каждое его существо
+            // со световой меткой бьёт соседних (верт/гориз) СУЩЕСТВ противника
+            // снятием 1 жизни — напрямую, не «входящим уроном» (как у
+            // «Тёмного алтаря»: защита и «Ответ» не срабатывают), на 0♥
+            // жертва погибает. Тик зовётся там же, где «Стена костров»/
+            // «Росток» конца хода стороны
+            A.auraLightTick = function auraLightTick(side) {
+                for (const u of B.units.slice()) {
+                    if (u.side !== side || !u.lightAura || !B.units.includes(u)) continue;
+                    const foes = B.units.filter((v) => v.side !== side
+                        && v.def.type === "unit"
+                        && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
+                    for (const v of foes) {
+                        if (!B.units.includes(v)) continue;
+                        v.hp -= 1;
+                        recalcAuras();
+                        const hn = v.node.getChildByName("hp");
+                        if (hn) hn.text = String(Math.max(0, v.hp));
+                        const vp = cellXY(v.col, v.row);
+                        floatText(vp.x, vp.y - 60, "−1♥", 0xef9f8c);
+                        punch(v.node);
+                        sfx("acid");
+                        if (v.hp <= 0) killUnit(v, null);
+                    }
+                }
+                refreshHud();
+                checkEnd();
             };
 
             // ── Ловушки ─────────────────────────────────────────────────────────

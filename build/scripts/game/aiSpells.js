@@ -145,6 +145,38 @@
                         sfx("aqua");
                         return;
                     }
+                    // «Аура света» (hon199): световая метка на своё существо —
+                    // на то, у которого больше соседей-врагов (свету есть кого
+                    // жечь в конце хода); при равенстве — опаснейшее
+                    if (s.lightAura) {
+                        const own = spellTargets(B.units.filter((v) => v.side === "e"
+                            && v.def.type === "unit" && !v.lightAura));
+                        let best = null, bs = -1;
+                        for (const v of own) {
+                            const foes = B.units.filter((w) => w.side !== "e"
+                                && w.def.type === "unit"
+                                && Math.abs(w.col - v.col) + Math.abs(w.row - v.row) === 1);
+                            const sc = foes.length * 10 + aiThreat(v);
+                            if (sc > bs) { bs = sc; best = v; }
+                        }
+                        if (focus && own.includes(focus)) best = focus;
+                        if (!best) return;
+                        aimOff(best);
+                        best.lightAura = true;
+                        const mark = new PIXI.Graphics();
+                        mark.circle(0, 0, 9);
+                        mark.fill({ color: 0xffe9b0 });
+                        mark.stroke({ width: 3, color: 0xf0c96a });
+                        mark.position.set(-36, -54);
+                        mark.name = "auraMark";
+                        mark.eventMode = "none";
+                        best.node.addChild(mark);
+                        const ap = cellXY(best.col, best.row);
+                        floatText(ap.x, ap.y - 60, "☀", 0xffe9b0);
+                        punch(best.node);
+                        sfx("up");
+                        return;
+                    }
                     const own = spellTargets(B.units.filter((v) => v.side === "e"
                         && v.def.type === "unit"
                         && (!s.enchantFire || !v.enchantFire)
@@ -183,11 +215,7 @@
                             floatText(p.x, p.y - 75, `+${s.buffHp}♥`, 0x9fd489);
                         }
                         if (s.healPlayer) { // «Луч света» (hon179): своя база тоже
-                            const n = s.healPlayer;
-                            B.enemyBase = Math.min(B.enemyBaseMax, B.enemyBase + n);
-                            floatText(960, 60, `+${n}`, 0x9fd489);
-                            fxEvent("heal", { x: 960, y: 70, scale: 1.15 });
-                            punch(root.hud);
+                            healBase("e", s.healPlayer);
                         }
                         if (s.buffAtkByHp) { // «Природная мощь»: +урона = жизням
                             best.bonusAtk = (best.bonusAtk || 0) + best.hp;
@@ -230,10 +258,7 @@
                         if (best) {
                             best = reflectAim("p", best); // «Отражение» (wis120) игрока
                             const n = purgeUnit(best);
-                            B.enemyBase = Math.min(B.enemyBaseMax, B.enemyBase + n);
-                            floatText(960, 60, `+${n}`, 0x9fd489);
-                            fxEvent("heal", { x: 960, y: 70, scale: 1.15 });
-                            punch(root.hud);
+                            healBase("e", n);
                             sfx("up");
                         }
                     } else if (s.cocoon) { // «Защитный кокон» — своему под удар
@@ -334,6 +359,43 @@
                         B.eDiscard.splice(B.eDiscard.indexOf(best), 1);
                         B.eHand.push(best);
                         sfx("chpoc");
+                        refreshHud();
+                    }
+                }
+                if (s.captivate) { // «Плен» (hon197): карта призыва игрока
+                    // удаляется ДО КОНЦА БОЯ (не в сброс) — самая ценная
+                    const units = B.hand.map((id, i) => ({ id, i }))
+                        .filter((m) => CARDS[m.id] && CARDS[m.id].type === "unit")
+                        .sort((a, b) => (aiCardPower(CARDS[b.id]) - aiCardPower(CARDS[a.id]))
+                            || (b.i - a.i));
+                    if (units.length) {
+                        const pick = units[0];
+                        B.hand.splice(pick.i, 1);
+                        floatText(960, 640,
+                            "✕ " + GAME_LOC.t(`card.${pick.id}.name`), 0x8cd0ef);
+                        sfx("rocket");
+                        refreshHud();
+                    }
+                }
+                if (s.resurrect) { // «Воскрешение» (hon200): лучшая карта
+                    // призыва сброса разыгрывается БЕСПЛАТНО (правилами
+                    // связок призыва); карты «Ловушки-пузыря» не призываются
+                    const units = B.eDiscard.filter((id) => CARDS[id]
+                        && CARDS[id].type === "unit" && !bubbleBlocked("e", id));
+                    const best = units.length ? units.slice()
+                        .sort((a, b) => aiCardPower(CARDS[b]) - aiCardPower(CARDS[a]))[0]
+                        : null;
+                    if (best) {
+                        const spot = aiUnitSpot(CARDS[best]);
+                        B.eDiscard.splice(B.eDiscard.indexOf(best), 1);
+                        if (spot) {
+                            addUnit("e", best, spot[0], spot[1]);
+                            floatText(cellXY(spot[0], spot[1]).x,
+                                cellXY(spot[0], spot[1]).y - 108,
+                                GAME_LOC.t(`card.${best}.name`), 0xb7d0ef);
+                            sfx("chpoc");
+                        }
+                        B.eDiscard.push(best); // разыгранная — обратно в сброс
                         refreshHud();
                     }
                 }
@@ -521,6 +583,38 @@
                     fxEvent("seal", { x: p2.x, y: p2.y - 8, color: 0xc9a0ef, scale: 0.85 });
                     punch(best.node);
                     sfx("chpoc");
+                }
+                if (s.lightAura) { // «Аура света» (hon199): световая метка на
+                    // своё существо — на то, у которого больше соседей-врагов
+                    // (свету есть кого жечь в конце хода); при равенстве —
+                    // опаснейшее
+                    const own = spellTargets(B.units.filter((v) => v.side === "e"
+                        && v.def.type === "unit" && !v.lightAura));
+                    let best = null, bs = -1;
+                    for (const v of own) {
+                        const foes = B.units.filter((w) => w.side !== "e"
+                            && w.def.type === "unit"
+                            && Math.abs(w.col - v.col) + Math.abs(w.row - v.row) === 1);
+                        const sc = foes.length * 10 + aiThreat(v);
+                        if (sc > bs) { bs = sc; best = v; }
+                    }
+                    if (focus && own.includes(focus)) best = focus;
+                    if (best) {
+                        aimOff(best);
+                        best.lightAura = true;
+                        const mark = new PIXI.Graphics();
+                        mark.circle(0, 0, 9);
+                        mark.fill({ color: 0xffe9b0 });
+                        mark.stroke({ width: 3, color: 0xf0c96a });
+                        mark.position.set(-36, -54);
+                        mark.name = "auraMark";
+                        mark.eventMode = "none";
+                        best.node.addChild(mark);
+                        const ap = cellXY(best.col, best.row);
+                        floatText(ap.x, ap.y - 60, "☀", 0xffe9b0);
+                        punch(best.node);
+                        sfx("up");
+                    }
                 }
                 if (s.baseHit) { // «Бросок валуна»: своё сильнейшее бьёт базу героя — это его атака
                     const own = spellTargets(B.units.filter((v) => v.side === "e"

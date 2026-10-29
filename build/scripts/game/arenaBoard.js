@@ -197,6 +197,15 @@
                         }
                         return;
                     }
+                    if (selDef.trap.effect === "ambushRise") { // hon196: свои постройки
+                        for (const u of B.units) {
+                            if (u.side !== "p" || u.def.type !== "building") continue;
+                            const rc = cellRect(u.col, u.row);
+                            hi.rect(rc.x, rc.y, rc.w, rc.h);
+                            hi.fill({ color: 0xb07ad5, alpha: 0.3 });
+                        }
+                        return;
+                    }
                     // мина: любая пустая клетка
                     for (let r = 0; r < GRID; r++) for (let col = 0; col < GRID; col++) {
                         if (unitAt(col, r)) continue;

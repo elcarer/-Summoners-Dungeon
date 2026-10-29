@@ -791,6 +791,151 @@
                 refreshHud();
             };
 
+            // ── Панель «Плена» (hon197): рука ПРОТИВНИКА целиком — выбрать
+            // карту призыва и удалить её ДО КОНЦА БОЯ (не в сброс). Непригодные
+            // карты видны, но не кликабельны (как в «Поиске рун»). Карт призыва
+            // в руке врага нет — панель не открывается вовсе (гейт в
+            // applySpellPInner: карта и энергия целы)
+            A.captivatePanel = null;
+            A.closeCaptivatePanel = function closeCaptivatePanel() {
+                if (!captivatePanel) return;
+                captivatePanel.destroy({ children: true });
+                captivatePanel = null;
+                if (B) B.picking = false;
+            };
+            A.openCaptivatePanel = function openCaptivatePanel() {
+                closeCaptivatePanel();
+                if (!B.eHand.some((id) => CARDS[id] && CARDS[id].type === "unit")) {
+                    return; // страховка гейта applySpellPInner
+                }
+                B.picking = true;
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("captivate.title"), 39, 0xf0c96a,
+                    { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("captivate.hint"), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const hand = [...B.eHand];
+                const m = hand.length;
+                const spread = Math.min(210, 1260 / Math.max(1, m));
+                hand.forEach((cardId, idx) => {
+                    const ok = CARDS[cardId] && CARDS[cardId].type === "unit";
+                    const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                    c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                    if (!ok) c.alpha = 0.5; // не призвание — взять нельзя
+                    else c.on("pointertap", () => pickCaptivate(idx));
+                    node.addChild(c);
+                });
+                node.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("captivate.back"), x: 960, y: 762,
+                    scale: 1,
+                    onTap: closeCaptivatePanel, // отказ: карта ушла в сброс, эффект вхолостую
+                }));
+                root.addChild(node);
+                captivatePanel = node;
+            };
+            A.pickCaptivate = function pickCaptivate(idx) { // idx — среди руки врага
+                if (!B || !B.picking || !captivatePanel) return;
+                const cardId = B.eHand[idx];
+                if (!cardId || !CARDS[cardId] || CARDS[cardId].type !== "unit") return;
+                B.eHand.splice(idx, 1); // удаление до конца боя: не в сброс, не в колоду
+                sfx("rocket");
+                const p = cellXY(2, 0);
+                floatText(p.x, p.y - 60, "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                closeCaptivatePanel();
+                layoutHand();
+                refreshHud();
+                checkEnd();
+            };
+
+            // ── Панель «Воскрешения» (hon200): карты СУЩЕСТВ из СВОЕГО сброса
+            // — выбрать одну и РАЗЫГРАТЬ её без траты энергии (механизм
+            // journeySummon: resurrectSummon ждёт клика по клетке зоны
+            // призыва; отказ/клик мимо поля — карта возвращается в сброс).
+            // Существ в сбросе нет — панель не открывается (гейт в
+            // applySpellPInner: карта и энергия целы)
+            A.resurrectPanel = null;
+            A.closeResurrectPanel = function closeResurrectPanel() {
+                if (!resurrectPanel) return;
+                resurrectPanel.destroy({ children: true });
+                resurrectPanel = null;
+                if (B) B.picking = false;
+            };
+            A.openResurrectPanel = function openResurrectPanel() {
+                closeResurrectPanel();
+                if (!unitsInDiscard("p").length) return; // страховка гейта
+                B.picking = true;
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("resurrect.title"), 39, 0xf0c96a,
+                    { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("resurrect.hint"), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const units = unitsInDiscard("p");
+                const m = units.length;
+                const spread = Math.min(210, 1260 / m);
+                units.forEach((cardId, idx) => {
+                    const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
+                    c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
+                    c.eventMode = "static";
+                    c.on("pointertap", () => pickResurrect(idx));
+                    node.addChild(c);
+                });
+                node.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("resurrect.back"), x: 960, y: 762,
+                    scale: 1,
+                    onTap: closeResurrectPanel, // отказ: карта остаётся в сбросе
+                }));
+                root.addChild(node);
+                resurrectPanel = node;
+            };
+            A.pickResurrect = function pickResurrect(idx) { // idx — среди существ сброса
+                if (!B || !B.picking || !resurrectPanel) return;
+                const units = unitsInDiscard("p");
+                const cardId = units[idx];
+                if (!cardId) return;
+                // изъятие из сброса на время постановки: разыгранная карта
+                // вернётся в сброс сама (путь journeySummon в onCellTap);
+                // постановить некуда — карта хотя бы вернётся в сброс
+                B.discard.splice(B.discard.indexOf(cardId), 1);
+                closeResurrectPanel();
+                if (freeCells(deployRows("p")).length && !bubbleBlocked("p", cardId)) {
+                    B.resurrectSummon = cardId;
+                    redrawHighlight();
+                    refreshHud();
+                    return;
+                }
+                B.discard.push(cardId); // поле забито / «Ловушка-пузырь» — в сброс
+                layoutHand();
+                refreshHud();
+            };
+
             // ── Панель «Пытки разума» (dec125): выбрать, КТО сбрасывает
             // 2 случайные карты с руки — вы или противник. Сторона с пустой
             // рукой не выбирается (эффект по ней пуст); у обеих пусто —

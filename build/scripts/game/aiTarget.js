@@ -473,6 +473,26 @@
                 // хотя бы одно своё существо выигрывает (⚔ ≠ ♥)
                 if (s.rebalance && !B.units.some((v) => v.side === "e"
                     && v.def.type === "unit" && v.curAtk !== v.hp)) return false;
+                // «Плен» (hon197) — карта призыва у игрока уже проверена
+                // гейтом applySpellPInner-зеркала; ИИ-гейт: не жжём 1⚡ ради
+                // жетона/мелочи — удаляемое должно стоить 3+ энергии
+                if (s.captivate) {
+                    const units = B.hand.filter((id) => CARDS[id]
+                        && CARDS[id].type === "unit");
+                    if (!units.some((id) => (CARDS[id].cost || 0) >= 3
+                        || CARDS[id].rarity === "epic")) return false;
+                }
+                // «Воскрешение» (hon200) — в сбросе должна быть карта
+                // призыва (не под «Ловушкой-пузырём») и пустая клетка призыва
+                if (s.resurrect && !B.eDiscard.some((id) => CARDS[id]
+                    && CARDS[id].type === "unit" && !bubbleBlocked("e", id)
+                    && aiUnitSpot(CARDS[id]))) return false;
+                // «Аура света» (hon199) — своё существо с соседом-врагом,
+                // иначе свету некого жечь
+                if (s.lightAura && !B.units.some((v) => v.side === "e"
+                    && v.def.type === "unit" && B.units.some((w) =>
+                        w.side !== "e" && w.def.type === "unit"
+                        && Math.abs(w.col - v.col) + Math.abs(w.row - v.row) === 1))) return false;
                 // «Бросок валуна» — метатель с уроном 3+ либо добивание базы;
                 // слабым метателем карту не переводим — держим для сильного
                 // из колоды (просил юзер: часть комбы в руке ждёт пару)

@@ -371,11 +371,35 @@
                     if (unitAt(col, row)) return false;
                     return addUnit(side, cardId, col, row, { testSummon: true });
                 },
-                // тест-хук: взвести ловушку стороны (как розыгрыш карты ловушки)
-                _trap(side, cardId, col, row) { return armTrap(side, cardId, col, row); },
+                // тест-хук: взвести ловушку стороны (как розыгрыш карты ловушки);
+                // unitCol/unitRow — привязать к объекту на клетке («Засадный
+                // отряд» hon196 вешается на СВОЮ постройку, как руна)
+                _trap(side, cardId, col, row, unitCol, unitRow) {
+                    const u = unitCol === undefined ? null : unitAt(unitCol, unitRow);
+                    return armTrap(side, cardId, col, row, u);
+                },
+                // тест-хук: розыгрыш заклинания из руки игрока (проба «Плена»
+                // hon197, «Воскрешения» hon200, «Ауры света» hon199)
+                _castSpell(handIdx, target = null) { return castSpell(handIdx, target); },
+                // тест-хук: тик конца хода стороны (проба «Ауры света» hon199)
+                _auraTick(side) { auraLightTick(side); return true; },
+                // тест-хук: клик по клетке поля (постановка journeySummon/
+                // resurrectSummon — бесплатный призыв «Воскрешения»)
+                _cellTap(col, row) { onCellTap(col, row); return true; },
                 // тест-хук: урон базе стороны (проба «Неусыпного гарнизона»
                 // hon194 — триггер «ваша база получает урон» живёт в damageBase)
                 _damageBase(side, amount) { damageBase(side, amount); return true; },
+                // тест-хук: лечение базы стороны (проба «Претендента на
+                // трон» honThrone — гейт throneGuard живёт в healBase)
+                _healBase(side, n) { healBase(side, n); return true; },
+                // тест-хуки «Плена» (hon197) и «Воскрешения» (hon200): панели
+                captivateState: () => ({ open: !!captivatePanel,
+                    hand: B ? [...B.eHand] : [] }),
+                captivatePick(idx) { pickCaptivate(idx); return true; },
+                resurrectState: () => ({ open: !!resurrectPanel,
+                    units: B ? unitsInDiscard("p") : [],
+                    summon: B ? B.resurrectSummon : null }),
+                resurrectPick(idx) { pickResurrect(idx); return true; },
                 // тест-хук: upkeep стороны (начало её хода: грибницы, костры)
                 _upkeep(side) { upkeep(side); return true; },
                 // тест-хуки «Торговца» (hon183): панель сброса по выбору
