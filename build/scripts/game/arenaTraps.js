@@ -463,15 +463,16 @@
                     // убирается с поля БЕЗ каскадов смерти (это не гибель)
                     // и получает «Сдвиг 2» — вернётся на эту клетку в начале
                     // хода своего владельца, когда счётчик истечёт (клетка
-                    // занята — значок ждёт с нулём). «Машина времени»
-                    // ВЛАДЕЛЬЦА существа снижает «Сдвиг» (effDelayVal).
-                    // Эффекты и параметры сбрасываются: оно заново призывается
-                    // из своей карты (свежий addUnit)
+                    // занята — значок ждёт с нулём). «Машина времени» НЕ
+                    // снижает этот «Сдвиг»: от ловушки он идёт на существо
+                    // ПРОТИВНИКА ловушки — не «карта вашей стороны» (поправка
+                    // юзера). Эффекты и параметры сбрасываются: оно заново
+                    // призывается из своей карты (свежий addUnit)
                     const id = cardIdOf(u.def);
                     const wasToken = !!u.token;
                     const us = u.side;
                     const cell = { col: u.col, row: u.row };
-                    const left = A.effDelayVal(trap.def.trap.delay || 2, us);
+                    const left = trap.def.trap.delay || 2;
                     removeUnit(u);
                     const p2 = cellXY(cell.col, cell.row);
                     floatText(p2.x, p2.y - 66,
@@ -480,11 +481,6 @@
                     if (left > 0) {
                         delayPlace(us, id, cell.col, cell.row,
                             { token: wasToken, left });
-                    } else {
-                        // «Машина времени» сняла и этот «Сдвиг» —
-                        // существо возвращается сразу
-                        addUnit(us, id, cell.col, cell.row,
-                            { noDelay: true, token: wasToken });
                     }
                     refreshHud();
                     checkEnd();

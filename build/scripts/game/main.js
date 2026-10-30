@@ -58,6 +58,8 @@
         uiTextures["scenes/4.png"] = await assets.loadTexture("./images/scenes/4.png");
         // арена «Залов Чести» (стихия Честь, просил юзер)
         uiTextures["scenes/5.png"] = await assets.loadTexture("./images/scenes/5.png");
+        // арена «Логова Времени» (стихия Время, просил юзер)
+        uiTextures["scenes/6.png"] = await assets.loadTexture("./images/scenes/6.png");
         // эффект поля «Стена костров» и рубашки колод по стихиям
         // (гоблины/природа/мудрость/тлен/честь)
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
@@ -71,7 +73,8 @@
         // тайлы подземелий юзера: images/dungeon_tiles/<данж>/<…>.png —
         // полы 64×64 (floor/0-9) и стены walls/* по маске соседей.
         // Свой набор на каждый данж: goblins_lair (Сила), growth_lair (Рост),
-        // water_lair (Мудрость), necro_lair (Тлен), honor_lair (Честь)
+        // water_lair (Мудрость), necro_lair (Тлен), honor_lair (Честь),
+        // time_lair (Время)
         say("тайлы подземелья…");
         await frame();
         const TILE_FILES = ["floor/0", "floor/1", "floor/2", "floor/3",
@@ -83,7 +86,7 @@
             "walls/wall_end1", "walls/wall_end2", "walls/wall_end3",
             "walls/wall_end4"];
         for (const lair of ["goblins_lair", "growth_lair", "water_lair",
-                            "necro_lair", "honor_lair"]) {
+                            "necro_lair", "honor_lair", "time_lair"]) {
             for (const f of TILE_FILES) {
                 uiTextures[`dungeon_tiles/${lair}/${f}.png`] =
                     await assets.loadTexture(`./images/dungeon_tiles/${lair}/${f}.png`);
@@ -165,6 +168,7 @@
             wisdom: await assets.loadCharacter("./images/sprites/sorca_256"), // Мира
             decay: await assets.loadCharacter("./images/sprites/necr_256"), // Мортис
             honor: await assets.loadCharacter("./images/sprites/knight_256"), // Леон
+            time: await assets.loadCharacter("./images/sprites/gnome_256"), // Тордин
         };
         // Листы существ поля боя. Стандарт: <имя>_256.png — сетка 256×256,
         // 4 ряда анимаций (спереди/сзади/справа/слева) по 6 кадров + json-манифест.
@@ -194,6 +198,9 @@
             // лист Чести юзера (просил юзер): все существа стихии (Человек)
             // пока ходят рыцарем knight_256
             knight: await assets.loadCharacter("./images/sprites/knight_256"),
+            // лист Времени юзера (просил юзер): существа стихии — гномы
+            // (tim201–203/209); Тордин в мире ходит тем же листом
+            gnome: heroSheets.time,
         };
 
         // ── UI-корень: базовое разрешение 1920×1080, вписывается в окно ────

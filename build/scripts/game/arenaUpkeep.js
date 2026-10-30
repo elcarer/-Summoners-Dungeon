@@ -53,12 +53,58 @@
             // Колода без заклинаний не выбирается (эпик не должен молча
             // простаивать, если заклинания есть хотя бы у одной стороны).
 
-            // «Весёлый штормовик» (wis110): в начале хода владельца играет
-            // случайное заклинание из СЛУЧАЙНОЙ колоды (игрока или врага)
-            // без траты энергии. Каст идёт от хозяина выбранной колоды —
-            // «вражеская» половина эффекта может ударить по самому штормовику.
-            // Колода без заклинаний не выбирается (эпик не должен молча
-            // простаивать, если заклинания есть хотя бы у одной стороны).
+            // «Пещера времени» (tim210, просил юзер): раз разрешённый тик —
+            // случайный призыв со «Сдвигом» из руки владельца уходит в
+            // случайную свободную клетку поля (гейт «Сдвига» в addUnit
+            // поставит значок-счётчик; «Машина времени» владельца может
+            // снизить его до 0 — тогда существо выйдет сразу). Руки без
+            // призывов со «Сдвигом» или поле без свободных клеток — тик
+            // сгорает. «Битва умов» противника ловит этот призыв, как
+            // обычный (образец — «Круг стихий»). Тик зовётся ПОСЛЕ марша
+            // (timeCavePulse): значок, поставленный в начале хода, не тает
+            // от delayArrive этого же хода — «Сдвиг 1» означает «в начале
+            // следующего хода», как у призыва рукой
+            A.timeCaveTick = function timeCaveTick(b) {
+                if (!b || !B.units.includes(b)) return;
+                const side = b.side;
+                const hand = side === "p" ? B.hand : B.eHand;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const picks = [];
+                for (let i = 0; i < hand.length; i++) {
+                    const d = CARDS[hand[i]];
+                    if (d && d.type === "unit" && d.delay) picks.push(i);
+                }
+                const free = [];
+                for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++)
+                    if (!unitAt(c, r)) free.push([c, r]);
+                if (!picks.length || !free.length) return;
+                const cardId = hand.splice(picks[(Math.random() * picks.length) | 0], 1)[0];
+                const [col, row] = free[(Math.random() * free.length) | 0];
+                const p = cellXY(col, row);
+                if (counterTrapConsume(side === "p" ? "e" : "p", "counterSummon")) {
+                    noteDiscard(1, side, [cardId]);
+                    discard.push(cardId);
+                    floatText(p.x, p.y - 60,
+                        "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                    return;
+                }
+                addUnit(side, cardId, col, row);
+                noteDiscard(1, side, [cardId]);
+                discard.push(cardId);
+                floatText(p.x, p.y - 78,
+                    "⏳ " + GAME_LOC.t(`card.${cardId}.name`), 0xc9a0ef);
+                sfx("chpoc");
+            };
+            // Пульс пещер стороны: после марша (см. комментарий выше).
+            // Несколько Пещер — несколько призывов (каждая тикает сама)
+            A.timeCavePulse = function timeCavePulse(side) {
+                for (const b of B.units.slice()) {
+                    if (b.side !== side || !b.def.timeCave
+                        || !B.units.includes(b)) continue;
+                    timeCaveTick(b);
+                }
+            };
+
             A.stormerTick = function stormerTick(u) {
                 if (!u || !B.units.includes(u)) return false;
                 const decks = ["p", "e"].filter((side) => {

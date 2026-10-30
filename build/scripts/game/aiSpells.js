@@ -503,6 +503,18 @@
                     recalcAuras();
                     sfx("up");
                 }
+                if (s.forge) { // «Ковка оружия» (tim208): появившиеся в этот ход — +2⚔
+                    B.forge.e = { turn: B.turnNo, amt: s.forge };
+                    for (const v of B.units) if (v.side === "e"
+                        && v.def.type === "unit" && v.bornTurn === B.turnNo) {
+                        v.bonusAtk += s.forge;
+                        punch(v.node);
+                        const p = cellXY(v.col, v.row);
+                        floatText(p.x, p.y - 39, `+${s.forge}⚔`, 0x9fd489);
+                    }
+                    recalcAuras();
+                    sfx("up");
+                }
                 if (s.sacrifice) { // «Жертвоприношение»: взрыв по соседям жертвы
                     const u = aiSacrificePick();
                     if (u) {

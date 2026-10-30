@@ -1360,7 +1360,7 @@
         // уменьшается на 1 (врождённая защита — def.protect в
         // unitProtectTotal; «Извлечением духа» не снимается)
         tim201: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
-                  creature: "goblin", // плейсхолдер листа поля боя (гнома пока нет)
+                  creature: "gnome", // лист поля боя — gnome_256 (просил юзер)
                   protect: 1, // «Защита 1» — врождённая (def.protect)
                   subtype: "gnome", // подтип — по спеке юзера (cards.txt)
                   rarity: "common", elem: "time",
@@ -1368,7 +1368,7 @@
         // «Базовый мех» (tim202): Гном 4/4 со «Сдвигом 1» — появится на
         // выбранной клетке в начале СЛЕДУЮЩЕГО хода владельца
         tim202: { type: "unit", cost: 2, atk: 4, hp: 4, speed: 1,
-                  creature: "goblin", // плейсхолдер листа поля боя
+                  creature: "gnome", // лист поля боя — gnome_256 (просил юзер)
                   delay: 1, // «Сдвиг 1» — маркер-счётчик на клетке
                   subtype: "gnome", // подтип — по спеке юзера (cards.txt)
                   rarity: "common", elem: "time",
@@ -1379,7 +1379,7 @@
         // поправка юзера, выстрел срабатывает и после марш-шага, которым
         // сопровождается появление через «Сдвиг»)
         tim203: { type: "unit", cost: 3, atk: 3, hp: 5, speed: 1,
-                  creature: "goblin", // плейсхолдер листа поля боя
+                  creature: "gnome", // лист поля боя — gnome_256 (просил юзер)
                   delay: 2, // «Сдвиг 2»
                   ability: "archer", shotDmg: 1, // «Выстрел 1» (поправка юзера)
                   subtype: "gnome", // подтип — по спеке юзера (cards.txt)
@@ -1414,6 +1414,30 @@
                   kind: "control", // тип эффекта — по спеке юзера
                   rarity: "common", elem: "time",
                   color: 0x5a3a7c, img: "time/207" },
+        // «Ковка оружия» (tim208): заклинание 2⚡ без цели — все существа,
+        // появившиеся на поле боя в этот ход владельца, получают +2 к урону
+        // (включая пришедших через «Сдвиг»; последующие появления в этот же
+        // ход ловит флаг B.forge в addUnit — applySpellPInner/aiSpells)
+        tim208: { type: "spell", cost: 2,
+                  spell: { target: "none", forge: 2 },
+                  kind: "buff", // тип эффекта — по спеке юзера (Усиление)
+                  rarity: "common", elem: "time",
+                  color: 0x8a5ab0, img: "time/208" },
+        // «Гномолёт» (tim209): Гном 6/5 со «Сдвигом 3» и «Полётом»
+        // (перелетает за жертву — ability flyOver, как у «Мини-феи»)
+        tim209: { type: "unit", cost: 4, atk: 6, hp: 5, speed: 1,
+                  creature: "gnome", // лист поля боя — gnome_256 (просил юзер)
+                  delay: 3, // «Сдвиг 3»
+                  ability: "flyOver", // «Полёт»
+                  subtype: "gnome", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "time",
+                  color: 0x7a4a9c, img: "time/209" },
+        // «Пещера времени» (tim210): постройка 6⚡/5♥ — в начале хода
+        // владельца разыгрывает случайный призыв со «Сдвигом» из его руки
+        // в случайную клетку поля боя, без траты энергии (timeCaveTick)
+        tim210: { type: "building", cost: 6, atk: 0, hp: 5, timeCave: 1,
+                  rarity: "rare", elem: "time",
+                  color: 0x6a3a8c, img: "time/210" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1738,6 +1762,16 @@
             baseHp: 15, elems: ["time"], starter: "time",
             img: "40", ability: "firstBuildingDiscount", abilityVal: 1,
         },
+        // «Бой во времени» (противник 1-го этажа данжа Времени, просил
+        // юзер): Время (фиолетовая), 10♥, обычная. Способность
+        // startDrawDelayed — начиная бой берёт случайный призыв со
+        // «Сдвигом» из колоды (heroStartDraw в arenaFlow).
+        // Спрайт — heroes/41.png
+        timBattle: {
+            id: "timBattle", rarity: "common",
+            baseHp: 10, elems: ["time"], starter: "time",
+            img: "41", ability: "startDrawDelayed",
+        },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon", "tordin"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1751,7 +1785,8 @@
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
         "decThirst", "decLich", // «Архилич» — ключ HEROES (enc.hero), не id энкаунтера
         "honRebels", "honCavalry", "honRampart", "honZealot",
-        "honNeighbor", "honGreatBattle", "honThrone"]; // «Залы Чести» (этажи 1–7)
+        "honNeighbor", "honGreatBattle", "honThrone", // «Залы Чести» (этажи 1–6)
+        "timBattle"]; // данж Времени, 1-й этаж (просил юзер)
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

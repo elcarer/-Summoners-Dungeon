@@ -472,6 +472,15 @@
                 // «Поднять стяги!» — окупается при двух и более своих существах
                 if (s.buffAllAtk
                     && B.units.filter((v) => v.side === "e" && v.def.type === "unit").length < 2) return false;
+                // «Ковка оружия» (tim208) — есть кому: в этот ход уже
+                // появлялись свои существа ИЛИ в руке есть призыв, который
+                // выйдет сразу (эффективный «Сдвиг» 0 — «Машина времени»)
+                if (s.forge
+                    && !B.units.some((v) => v.side === "e" && v.def.type === "unit"
+                        && v.bornTurn === B.turnNo)
+                    && !B.eHand.some((id) => { const d = CARDS[id];
+                        return d && d.type === "unit" && d.delay
+                            && effDelayVal(d.delay, "e") <= 0; })) return false;
                 // «Снабжение» (hon170) — выравнивание статов: играем, если
                 // хотя бы одно своё существо выигрывает (⚔ ≠ ♥)
                 if (s.rebalance && !B.units.some((v) => v.side === "e"

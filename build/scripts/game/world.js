@@ -108,7 +108,7 @@
             if (!G.world.wander) G.world.wander = {};
             for (let i = 0; i < map.wanderers.length; i++) {
                 const d = map.wanderers[i];
-                if (!globalThis.GAME_DATA.CAVES[d.cave]) continue; // Время — данжа нет
+                if (!globalThis.GAME_DATA.CAVES[d.cave]) continue; // hon — данжа ещё нет
                 const k = d.cave + ":" + i;
                 if (!G.world.wander[k]) G.world.wander[k] = {
                     alive: true, x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS };
@@ -608,7 +608,7 @@
 
         // Вход в подземелье: продолжить текущий этаж ЭТОГО данжа (состояния
         // этажей хранит G.dungeonStates) или начать его первый. Данжа
-        // Времени ещё нет — арка говорит «Скоро…»
+        // Чести ещё нет — арка говорит «Скоро…»
         function enterCave(cave) {
             const caveId = globalThis.GAME_DATA.CAVES[cave] ? cave : "gob";
             if (!globalThis.GAME_DATA.CAVES[caveId]) return false; // на всякий

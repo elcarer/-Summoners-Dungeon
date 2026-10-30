@@ -31,7 +31,7 @@
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // сетка зон 3×2: индекс k — колонка k%3, ряд (k/3|0), сектор 128×128
     const ZONE_ADJ = [[0, 1], [1, 2], [3, 4], [4, 5], [0, 3], [1, 4], [2, 5]];
-    // вход в подземелье стихии (id данжа из CAVES; hon/tim — «Скоро…»)
+    // вход в подземелье стихии (id данжа из CAVES; hon — «Скоро…»)
     const ELEM_CAVE = {
         strength: "gob", growth: "grw", wisdom: "wis",
         decay: "dec", honor: "hon", time: "tim",

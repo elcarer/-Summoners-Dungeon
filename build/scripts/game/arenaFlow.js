@@ -90,7 +90,8 @@
                     : hd.ability === "startDrawSkeleton" ? "skeleton"
                     : hd.ability === "startDrawDecaySpell" ? "decaySpell"
                     : hd.ability === "startDrawBuilding" ? "building"
-                    : hd.ability === "startDrawHonorSpell" ? "honorSpell" : null;
+                    : hd.ability === "startDrawHonorSpell" ? "honorSpell"
+                    : hd.ability === "startDrawDelayed" ? "delayed" : null;
                 if (!want) return;
                 const deck = side === "p" ? B.deck : B.eDeck;
                 const hand = side === "p" ? B.hand : B.eHand;
@@ -105,6 +106,8 @@
                             ? x.def.type === "spell" && x.def.elem === "decay"
                         : want === "honorSpell"
                             ? x.def.type === "spell" && x.def.elem === "honor"
+                        : want === "delayed"
+                            ? x.def.type === "unit" && x.def.delay
                         : want === "building" ? x.def.type === "building"
                             : !!x.def.plant); // растение — существо или постройка
                 if (!pool.length) return;

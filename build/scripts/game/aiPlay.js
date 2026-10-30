@@ -28,6 +28,7 @@
                 await delayArrive("e"); // «Сдвиг» (Время): созревшие являются
                 await marchSide("e");
                 if (B.stopped || B.phase === "over") return;
+                timeCavePulse("e"); // «Пещера времени»: призыв после марша — значок не тает в этом же ходу
                 await aiPlay();
                 if (B.stopped || B.phase === "over") return;
                 cryptRefund("e"); // «Склеп» врага: не разыгранная карта — назад в сброс

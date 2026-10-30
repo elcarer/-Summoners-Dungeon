@@ -15,9 +15,11 @@
                 // scenes/1.png, Роща Роста — scenes/2.png (просил юзер),
                 // Мудрость/«Подземные ключи» — scenes/3.png (подводная пещера),
                 // Тлен/«Земли мёртвых» — scenes/4.png,
-                // Честь/«Залы Чести» — scenes/5.png (просил юзер)
+                // Честь/«Залы Чести» — scenes/5.png (просил юзер),
+                // Время/«Логово Времени» — scenes/6.png (просил юзер)
                 curScene = enc.elem === "growth" ? 2 : enc.elem === "wisdom" ? 3
-                    : enc.elem === "decay" ? 4 : enc.elem === "honor" ? 5 : 1;
+                    : enc.elem === "decay" ? 4 : enc.elem === "honor" ? 5
+                    : enc.elem === "time" ? 6 : 1;
                 if (ctx.music) ctx.music("battle");
                 // колода врага хранится в враге подземелья (кидается при
                 // генерации этажа по глубине); для старых сейвов — генерим.
@@ -105,6 +107,10 @@
                     lastSpell: { p: null, e: null }, journeySummon: null,
                     resurrectSummon: null,
                     scorch: { p: new Set(), e: new Set() },
+                    // «Ковка оружия» (tim208): активна до конца текущего хода
+                    // стороны — существа, появившиеся ПОСЛЕ розыгрыша, тоже
+                    // получают +2 к урону ({ turn, amt }; см. addUnit)
+                    forge: { p: null, e: null },
                 };
                 G.battle = B;
                 // «Контроль природы» (firstTurnEnergyDown, просил юзер): на

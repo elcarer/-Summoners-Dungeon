@@ -22,6 +22,7 @@
                 poisonTick("p"); // яд: до марша (просил юзер)
                 await delayArrive("p"); // «Сдвиг» (Время): созревшие являются
                 await marchSide("p");
+                timeCavePulse("p"); // «Пещера времени»: призыв после марша — значок не тает в этом же ходу
                 if (B.stopped || B.phase === "over") return;
                 B.phase = "player";
                 layoutHand();
@@ -872,6 +873,23 @@
                         punch(v.node);
                         const p = cellXY(v.col, v.row);
                         floatText(p.x, p.y - 39, `+${def.spell.buffAllAtk}⚔`, 0x9fd489);
+                        fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.6 });
+                    }
+                    recalcAuras();
+                    sfx("up");
+                }
+                // «Ковка оружия» (tim208): все свои существа, появившиеся
+                // в ЭТОТ ход (включая пришедших через «Сдвиг»), получают
+                // +2 к урону; до конца хода бонус ловят и следующие
+                // появления (forge в addUnit)
+                if (def.spell.forge) {
+                    B.forge.p = { turn: B.turnNo, amt: def.spell.forge };
+                    for (const v of B.units) if (v.side === "p"
+                        && v.def.type === "unit" && v.bornTurn === B.turnNo) {
+                        v.bonusAtk += def.spell.forge;
+                        punch(v.node);
+                        const p = cellXY(v.col, v.row);
+                        floatText(p.x, p.y - 39, `+${def.spell.forge}⚔`, 0x9fd489);
                         fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.6 });
                     }
                     recalcAuras();
