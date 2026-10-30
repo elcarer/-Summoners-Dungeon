@@ -23,16 +23,21 @@
 // касанию: продолжает текущий этаж забега (G.dungeonStates) или начинает
 // первый. Города пока без функционала (просил юзер — потом добавим).
 // БРОДЯЧИЕ ОТРЯДЫ (просил юзер): «охрана» подземелий — по 3 отряда у
-// каждой арки патрулируют окрестности. Маршруты (5 точек в кольце 5–12
-// клеток от арки) генерит worldGen по сиду, у каждого отряда свой сектор
-// 120° — маршруты не пересекаются. Тип врага отряда — архетип 1-го этажа
-// охраняемого данжа. Заметив героя (4.5 клетки, путь есть) — преследуют,
-// но недалеко от маршрута (поводок 9 клеток от его центра); скорость —
-// 0.9 от героевой; касание отряда — бой, как в подземелье. Побеждённый
-// отряд уходит с карты навсегда (жив/мёртв и позиция — в сейве забега).
+// каждой арки патрулируют окрестности; ОХРАННИКИ МОСТОВ — по стражу у
+// каждого моста через реку в зоне своей стихии (Время — позже). Все
+// отряды — полноценные персонажи мира: спрайтшиты существ своей стихии,
+// ходят по сетке 4 направлениями (BFS) и разворачиваются как герой
+// (контроллер characters, виртуальный ввод). Маршруты генерит worldGen
+// по сиду. Заметив героя (4.5 клетки, путь есть) — преследуют, но
+// недалеко от маршрута (поводок 9 клеток от его центра); скорость —
+// 0.9 от героевой; касание отряда — бой, как в подземелье. Наведение
+// курсора — карта персонажа героя отряда + состав его колоды (просил
+// юзер). Побеждённый отряд уходит с карты навсегда (жив/мёртв и позиция
+// — в сейве забега). Вход в подземелье требует растущую колоду: 16 карт
+// на 1-й этаж, +1 за следующий (просил юзер); открытый мир живёт по
+// минимуму 12 — отряды фармят недостающие карты.
 // В правом нижнем углу — мини-карта всего мира (просил юзер) с живым
-// маркером героя. Подземелье Времени на карте есть, но вход скажет
-// «Скоро…» — данж этой стихии ещё впереди (Залы Чести открыты).
+// маркером героя.
 (function () {
     // клетка мира 32px (просил юзер: общий стандарт + нативный размер
     // тайлсета images/tiles — листы 4×4 по 32px идут в масштабе 1:1).
@@ -84,7 +89,14 @@
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
         let floaties = []; // всплывающие подписи («Скоро…» у арки)
         let soonCount = 0; // сколько раз арка сказала «Скоро…» (тесты)
-        let squads = []; // бродячие отряды: { d, idx, st, node, wp, stuck, aggro, cx, cy }
+        // бродячие отряды (просил юзер): охрана данжей + охранники мостов.
+        // Ходят как герой — сущности characters с виртуальным вводом:
+        // спрайтшит существ своей стихии, анимации walk_* и разворот
+        // делает контроллер, маршрут — BFS по 4 направлениям
+        // s = { kind: "cave"|"bridge", key, d, st, enc, id, sprite,
+        //       shadow, wp, path, aggro, repath }
+        let squads = [];
+        let tip = null; // { squad, node, hero } — подсказка на отряде (курсор)
 
         // карта мира живёт в забеге: генерится по сиду один раз и
         // переживает переходы сцены (сейв хранит только сид)
@@ -101,18 +113,48 @@
 
         // динамическое состояние отрядов (жив/мёртв, где стоит) живёт в
         // забеге — сейв хранит его рядом с сидом карты; геометрия и
-        // маршруты детерминированы сидом (worldGen, map.wanderers)
+        // маршруты детерминированы сидом (worldGen, map.wanderers +
+        // map.bridgeGuards). Ключи "cave:i" и "bridge:j" в одном словаре —
+        // победа над отрядом (arenaFlow) снимает его по G.activeEnemy.wander
         function ensureWander() {
             const map = G.world.map;
-            if (!map.wanderers) return;
             if (!G.world.wander) G.world.wander = {};
-            for (let i = 0; i < map.wanderers.length; i++) {
+            if (map.wanderers) for (let i = 0; i < map.wanderers.length; i++) {
                 const d = map.wanderers[i];
                 if (!globalThis.GAME_DATA.CAVES[d.cave]) continue; // hon — данжа ещё нет
-                const k = d.cave + ":" + i;
+                const k = "cave:" + d.cave + ":" + i;
                 if (!G.world.wander[k]) G.world.wander[k] = {
                     alive: true, x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS };
             }
+            if (map.bridgeGuards) for (let j = 0; j < map.bridgeGuards.length; j++) {
+                const d = map.bridgeGuards[j];
+                if (!guardEncOf(d.elem)) continue; // Время — стражей ещё нет
+                const k = "bridge:" + j;
+                if (!G.world.wander[k]) G.world.wander[k] = {
+                    alive: true, x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS };
+            }
+            // миграция старых ключей "gob:0" → "cave:gob:0" (до v13)
+            for (const k of Object.keys(G.world.wander))
+                if (!k.startsWith("cave:") && !k.startsWith("bridge:")) {
+                    G.world.wander["cave:" + k] = G.world.wander[k];
+                    delete G.world.wander[k];
+                }
+        }
+        // архетип отряда-охраны данжа: 1-й этаж охраняемого подземелья;
+        // при двух архетипах этажа выбор детерминирован сидом (тутип мира
+        // и бой показывают один и тот же состав колоды всегда)
+        function wanderEnc(d, i) {
+            const D = globalThis.GAME_DATA;
+            const rows = D.MOB_TABLES[d.cave] || D.MOB_TABLES.gob;
+            const tab = rows[0];
+            if (tab.length === 1) return tab[0];
+            return tab[(GEN.hash2(G.world.seed, i * 131 + d.cave.length * 17, 7)
+                * tab.length) | 0];
+        }
+        // энкаунтер охранника моста по стихии (Время — позже, просил юзер)
+        function guardEncOf(elem) {
+            return { strength: "strGuard", growth: "grwGuard",
+                wisdom: "wisGuard", decay: "decGuard", honor: "honGuard" }[elem] || null;
         }
 
         function walkable(gx, gy) {
@@ -401,30 +443,31 @@
             return c;
         }
 
-        // отряд-страж: иконка врага из подземелья (глаза с кинжалами,
-        // как в данже) на тени — чуть крупнее полевого токена
-        function makeWanderer(d) {
-            const c = new PIXI.Container();
-            const sh = new PIXI.Graphics();
-            sh.ellipse(0, 4, 20, 9);
-            sh.fill({ color: 0x0d130a, alpha: 0.5 });
-            c.addChild(sh);
-            const sp = new PIXI.Sprite(uiTex("icon_enemy.png"));
-            sp.anchor.set(0.5);
-            sp.scale.set(0.66);
-            c.addChild(sp);
-            c.eventMode = "none";
-            return c;
+        // отряд-страж (просил юзер): полноценный персонаж мира —
+        // спрайтшит существ СВОЕЙ стихии, те же анимации ходьбы и
+        // развороты, что у героя (контроллер characters). Спрайт в
+        // общий y-sort слой (zIndex по позиции ставит контроллер),
+        // под ним — тень, как у героя
+        function makeSquadNode(s) {
+            const sheet = ctx.heroSheets[s.elem] || ctx.heroSheets.strength;
+            const sprite = new PIXI.AnimatedSprite(sheet.animations.walk_front, false);
+            sprite.anchor.set(0.5, 1);
+            sprite.scale.set(0.375); // как герой (96×96)
+            const shadow = new PIXI.Graphics();
+            shadow.ellipse(0, 0, 15, 7);
+            shadow.fill({ color: 0x0e140c, alpha: 0.45 });
+            return { sprite, shadow, sheet };
         }
 
         // бой с отрядом: как касание врага в подземелье (arenaScene читает
         // G.activeEnemy), только флаг wander — трофей и реванш вернут в мир,
-        // а победа снимет отряд с карты. Тип врага — архетип 1-го этажа
-        // охраняемого данжа (просил юзер)
+        // а победа снимет отряд с карты (ключ s.key). Тип врага — энкаунтер
+        // отряда: архетип 1-го этажа данжа у охраны, охранник моста у мостов
         function fightSquad(s) {
             const D = globalThis.GAME_DATA;
-            // бой с колодой меньше минимума этажа 1 запрещён — как в
-            // подземелье: запираем в редакторе колоды (отряд — бой этажа 1)
+            // бой с колодой меньше минимума открытого мира (12) запрещён:
+            // запираем в редакторе колоды (данжи требуют свои 16+, просил
+            // юзер — мир фармится отрядами со стартовыми 12)
             const need = D.deckMinFor(1);
             if (G.deck.length < need) {
                 floatText(GAME_LOC.t("dungeon.deckLow", { min: need }),
@@ -434,15 +477,14 @@
                 scenes.go("deck");
                 return;
             }
-            const enc = D.mobForFloor(s.d.cave, 1);
             G.world.heroPos = {
                 x: COMPONENTS.positionX[heroId],
                 y: COMPONENTS.positionY[heroId],
             };
             G.worldFrom = true; // трофей/поражение ведут в открытый мир
-            G.activeEnemy = { x: s.st.x, y: s.st.y, enc,
-                deck: D.enemyDeck(enc, 1), alive: true, boss: false,
-                wander: s.d.cave + ":" + s.idx };
+            G.activeEnemy = { x: s.st.x, y: s.st.y, enc: s.enc,
+                deck: D.enemyDeck(s.enc, 1), alive: true, boss: false,
+                wander: s.key };
             if (ctx.sfx) ctx.sfx();
             scenes.go("arena");
         }
@@ -457,6 +499,91 @@
             t.zIndex = y + 10;
             objLayer.addChild(t);
             floaties.push({ node: t, t: 0 });
+        }
+
+        // ── Подсказка на бродячем отряде (просил юзер): КАРТА ПЕРСОНАЖА
+        // героя отряда + инфо-окно с составом колоды — как тутип врага в
+        // подземелье (dungeon.js showTip). Панель живёт в ui-слое и каждый
+        // кадр следует за отрядом; показывается pointermove по клик-зоне
+        // карты, отряды НЕ интерактивны (не съедают клики движения)
+        function squadDeckSummary(encId) {
+            const enc = globalThis.GAME_DATA.ENCOUNTERS[encId]
+                || globalThis.GAME_DATA.ENCOUNTERS.gob;
+            const counts = new Map();
+            for (const id of enc.core) counts.set(id, (counts.get(id) || 0) + 1);
+            return [...counts.entries()]
+                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+                .map(([id, n]) => `${n}× ${GAME_LOC.t("card." + id + ".name")}`)
+                .join(", ");
+        }
+        function hideSquadTip() {
+            if (!tip) return;
+            tip.node.destroy({ children: true });
+            tip = null;
+        }
+        function showSquadTip(s) {
+            if (tip && tip.squad === s) return;
+            hideSquadTip();
+            const D = globalThis.GAME_DATA;
+            const enc = D.ENCOUNTERS[s.enc] || D.ENCOUNTERS.gob;
+            const hd = D.HEROES[enc.hero] || D.HEROES.gob;
+            const node = new PIXI.Container();
+            node.eventMode = "none";
+            // карта персонажа героя отряда (слева, 115×169)
+            const heroCard = new PIXI.Sprite(uiTex(`heroes/${hd.img}.png`));
+            heroCard.anchor.set(0, 0);
+            heroCard.scale.set(0.5);
+            heroCard.position.set(0, 0);
+            node.addChild(heroCard);
+            // инфо-панель (справа): имя, HP базы, колода — как в данже
+            const title = new PIXI.Text({
+                text: GAME_LOC.t("enc." + s.enc + ".title"),
+                style: { fontFamily: "Kereru", fontSize: 24, fill: 0xffe9b0 },
+            });
+            const hpLine = new PIXI.Text({
+                text: GAME_LOC.t("dungeon.tipBase", { n: enc.baseHp }),
+                style: { fontFamily: "Kereru", fontSize: 18, fill: 0xff9c8c },
+            });
+            const deck = new PIXI.Text({
+                text: GAME_LOC.t("dungeon.tipDeck") + ": "
+                    + squadDeckSummary(s.enc),
+                style: { fontFamily: "Kereru", fontSize: 18, fill: 0xd8c79d,
+                    wordWrap: true, wordWrapWidth: 336, breakWords: true },
+            });
+            const w = 372, pad = 15;
+            const h = Math.max(heroCard.height,
+                pad + title.height + 4 + hpLine.height + 6 + deck.height + pad);
+            const g = new PIXI.Graphics();
+            g.roundRect(heroCard.width, 0, w, h, 12);
+            g.fill({ color: 0x171310, alpha: 0.94 });
+            g.stroke({ width: 3, color: 0x6b5c40 });
+            title.position.set(heroCard.width + pad, pad);
+            hpLine.position.set(heroCard.width + pad, pad + title.height + 4);
+            deck.position.set(heroCard.width + pad,
+                pad + title.height + 8 + hpLine.height);
+            node.addChild(g, title, hpLine, deck);
+            ctx.ui.addChild(node);
+            tip = { squad: s, node, h: h + 16 };
+        }
+        // панель следует за отрядом (камера едет) — экранные координаты
+        // через мировую матрицу layer + фит ui-канваса
+        function placeSquadTip() {
+            if (!tip || !layer) return;
+            const s = tip.squad;
+            const g = layer.toGlobal({ x: s.st.x, y: s.st.y });
+            const p = ctx.ui.toLocal(g);
+            const wAll = 115 + 372;
+            tip.node.position.set(
+                Math.max(8, Math.min(1920 - wAll - 8, p.x - wAll / 2)),
+                Math.max(8, p.y - 30 - tip.h));
+        }
+        function hoverSquads(p) {
+            let best = null, bd = 1e9;
+            for (const s of squads) {
+                const d = Math.hypot(s.st.x - p.x, s.st.y - p.y);
+                if (d < 30 && d < bd) { best = s; bd = d; }
+            }
+            if (best) showSquadTip(best); else hideSquadTip();
         }
 
         // Иконка-кнопка HUD (настройки/колода) — как в подземелье
@@ -607,11 +734,19 @@
         }
 
         // Вход в подземелье: продолжить текущий этаж ЭТОГО данжа (состояния
-        // этажей хранит G.dungeonStates) или начать его первый. Данжа
-        // Чести ещё нет — арка говорит «Скоро…»
+        // этажей хранит G.dungeonStates) или начать его первый. Подземелья
+        // требуют растущую колоду (просил юзер): вход — 16 карт, каждый
+        // следующий этаж +1 (dataCards.caveDeckFor); с меньшей колодой
+        // вход закрыт — всплывает предупреждение. Открытый мир живёт по
+        // минимуму 12 (стартовые колоды) — добор фармят отрядами
         function enterCave(cave) {
-            const caveId = globalThis.GAME_DATA.CAVES[cave] ? cave : "gob";
-            if (!globalThis.GAME_DATA.CAVES[caveId]) return false; // на всякий
+            const D = globalThis.GAME_DATA;
+            const caveId = D.CAVES[cave] ? cave : "gob";
+            if (!D.CAVES[caveId]) return false; // на всякий
+            const floor = G.run.cave === caveId
+                ? (G.run.floors || (G.run.floors = {}))[caveId] || 1 : 1;
+            const need = D.caveDeckFor(floor);
+            if (G.deck.length < need) return false; // мало карт — вход закрыт
             if (heroId !== null) {
                 G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
             }
@@ -675,7 +810,8 @@
                 // проигранный бой (как retreatCell в подземелье)
                 if (G.world.wander && map.wanderers) {
                     for (let i = 0; i < map.wanderers.length; i++) {
-                        const w = G.world.wander[map.wanderers[i].cave + ":" + i];
+                        const w = G.world.wander
+                            ["cave:" + map.wanderers[i].cave + ":" + i];
                         if (!w || !w.alive) continue;
                         if (Math.hypot(w.x - hp.x, w.y - hp.y) < TS * 1.3) {
                             const away = freeCellNear(w.x, w.y);
@@ -698,6 +834,12 @@
                     const next = bfsPath(Math.floor(hx / TS), Math.floor(hy / TS),
                         Math.floor(p.x / TS), Math.floor(p.y / TS));
                     if (next) path = next;
+                });
+                // наведение на бродячий отряд — карточка героя + состав
+                // колоды (просил юзер); квест-диалог открыт — тутипа нет
+                zone.on("pointermove", (e) => {
+                    if (!squads.length || ctx.questModal) return;
+                    hoverSquads(zone.toLocal(e.global));
                 });
                 layer.addChild(zone);
                 // слой МЕСТНОСТИ — dual-grid тайлы юзера (images/tiles),
@@ -742,24 +884,48 @@
                     poiNodes.push({ node, x: node.x, y: node.y });
                     objLayer.addChild(node);
                 }
-                // бродячие отряды: живые — на карту (общий y-sort слой);
+                // бродячие отряды (просил юзер): охрана данжей + охранники
+                // мостов — персонажи мира на спрайтшитах своих стихий;
                 // позиция берётся из состояния забега (переживает выход
                 // в данж и перезаход), маршруты — из карты
                 squads = [];
-                if (map.wanderers && G.world.wander) {
-                    for (let i = 0; i < map.wanderers.length; i++) {
-                        const d = map.wanderers[i];
-                        const st = G.world.wander[d.cave + ":" + i];
+                const spawnSquads = (defs, kind) => {
+                    for (let i = 0; i < defs.length; i++) {
+                        const d = defs[i];
+                        const key = kind === "bridge" ? "bridge:" + i
+                            : "cave:" + d.cave + ":" + i;
+                        const st = G.world.wander[key];
                         if (!st || !st.alive) continue;
-                        const node = makeWanderer(d);
-                        node.position.set(st.x, st.y);
-                        node.zIndex = st.y;
-                        objLayer.addChild(node);
-                        squads.push({
-                            d, idx: i, st, node, wp: 0, stuck: 0, aggro: false,
+                        const s = {
+                            kind, key, d, st, wp: 0, path: null, aggro: false,
+                            repath: 0, id: null,
+                            enc: kind === "bridge" ? guardEncOf(d.elem)
+                                : wanderEnc(d, i),
+                        };
+                        if (!s.enc) continue; // данж/стихия ещё без отрядов
+                        s.elem = globalThis.GAME_DATA.ENCOUNTERS[s.enc].elem;
+                        const made = makeSquadNode(s);
+                        s.sprite = made.sprite;
+                        s.shadow = made.shadow;
+                        s.sprite.position.set(st.x, st.y);
+                        s.sprite.zIndex = st.y;
+                        s.shadow.position.set(st.x, st.y - 9.8);
+                        s.shadow.zIndex = st.y - 0.5;
+                        objLayer.addChild(s.shadow);
+                        objLayer.addChild(s.sprite);
+                        s.id = characters.spawn({
+                            x: st.x, y: st.y, sprite: s.sprite,
+                            anims: made.sheet.animations,
+                            speed: WAND_SPEED, fps: made.sheet.fps,
+                            halfW: 7, halfH: 5,
                         });
+                        ECS.addComponent(world, s.id, "ctrlVI", 0);
+                        ECS.addComponent(world, s.id, "ctrlVJ", 0);
+                        squads.push(s);
                     }
-                }
+                };
+                if (map.wanderers) spawnSquads(map.wanderers, "cave");
+                if (map.bridgeGuards) spawnSquads(map.bridgeGuards, "bridge");
                 worldContainer.addChild(layer);
 
                 // герой — лист по стихии забега (Рост — эльф, Сила — гоблин)
@@ -836,7 +1002,17 @@
                 swampStats = null;
                 roadStats = null;
                 path = null;
-                squads = []; // узлы уйдут вместе со слоем; состояние — в G.world.wander
+                // отряды — полноценные сущности characters: снять с ECS и
+                // вернуть позиции в сейв-состояние (узлы уйдут со слоем)
+                for (const s of squads) {
+                    if (s.id !== null) {
+                        s.st.x = COMPONENTS.positionX[s.id];
+                        s.st.y = COMPONENTS.positionY[s.id];
+                        characters.remove(s.id);
+                    }
+                }
+                squads = [];
+                hideSquadTip();
                 floaties = [];
                 if (layer) { layer.destroy({ children: true }); layer = null; }
                 if (uiHud) { uiHud.destroy({ children: true }); uiHud = null; }
@@ -899,6 +1075,14 @@
                     if (f.t > 1.4) { f.node.destroy(); floaties.splice(i, 1); }
                 }
 
+                // панель-подсказка на отряде следует за ним (камера едет);
+                // отряд скрылся/умер — тутип закрыт
+                if (tip) {
+                    if (!squads.includes(tip.squad) || !tip.squad.st.alive
+                        || ctx.questModal) hideSquadTip();
+                    else placeSquadTip();
+                }
+
                 // скорость анимаций из настроек (0..10; 5 = скорость листа) —
                 // живая, как в бою и подземелье (просил юзер)
                 COMPONENTS.animationSpeed[heroId] = (ctx.heroSheet.animationSpeed || 0.2)
@@ -944,12 +1128,20 @@
                 uiHud.userData.goldT.text = String(G.gold);
 
                 // ── бродячие отряды: патруль, погоня, касание — бой ────────
-                // (просил юзер). Пока открыт квест-диалог или отряды заморожены
-                // тестами (wanderFreeze) — стоят
+                // (просил юзер). Ходят по сетке 4 направлениями: BFS-путь
+                // ведём виртуальными осями ctrlVI/VJ — контроллер characters
+                // сам двигает отряд, играет walk_* и разворачивает его
+                // (как героя). Пока открыт квест-диалог или отряды
+                // заморожены тестами (wanderFreeze) — стоят
                 if (!ctx.questModal && !G.world.wanderFreeze
                     && !window.__wanderFreezeAll && squads.length) {
                     for (const s of squads) {
-                        const dHero = Math.hypot(hx - s.st.x, hy - s.st.y);
+                        const sx = COMPONENTS.positionX[s.id],
+                            sy = COMPONENTS.positionY[s.id];
+                        s.st.x = sx; s.st.y = sy; // сейв-состояние живёт с ним
+                        s.shadow.position.set(sx, sy - 9.8);
+                        s.shadow.zIndex = sy - 0.5;
+                        const dHero = Math.hypot(hx - sx, hy - sy);
                         // касание отряда — бой (как соприкосновение
                         // с противником в самом подземелье)
                         if (dHero < TS * 0.85) { fightSquad(s); return; }
@@ -958,74 +1150,93 @@
                         let dRoute = Infinity;
                         for (const [gx, gy] of s.d.route) {
                             const dd = Math.hypot(
-                                s.st.x - (gx * TS + TS / 2),
-                                s.st.y - (gy * TS + TS / 2));
+                                sx - (gx * TS + TS / 2),
+                                sy - (gy * TS + TS / 2));
                             if (dd < dRoute) dRoute = dd;
                         }
                         // агро: герой близко, отряд не за поводком маршрута
                         // и до героя есть путь (через реку не гонимся);
                         // сорвать погоню — герой ушёл или отряд дошёл до края
                         const hgx = Math.floor(hx / TS), hgy = Math.floor(hy / TS);
-                        const sgx = Math.floor(s.st.x / TS), sgy = Math.floor(s.st.y / TS);
+                        const sgx = Math.floor(sx / TS), sgy = Math.floor(sy / TS);
                         if (!s.aggro && dHero < WAND_AGGRO && dRoute < WAND_LEASH
                             && bfsPath(sgx, sgy, hgx, hgy)) s.aggro = true;
                         else if (s.aggro && (dHero > WAND_AGGRO * 1.4
                             || dRoute > WAND_LEASH)) s.aggro = false;
-                        // цель: герой (погоня) или очередная точка маршрута
-                        let tx, ty;
-                        if (s.aggro) { tx = hx; ty = hy; }
-                        else {
+                        if (s.aggro) {
+                            // погоня: путь к герою, пересчёт раз в 0.4с
+                            // (герой бежит — маршрут перестраивается)
+                            s.repath -= ticker.deltaMS;
+                            if (!s.path || !s.path.length || s.repath <= 0) {
+                                s.repath = 400;
+                                s.path = bfsPath(sgx, sgy, hgx, hgy);
+                            }
+                        } else {
+                            // патруль: к очередной точке маршрута; дойдя —
+                            // следующая. Путь строится от клетки отряда
                             const wc = s.d.route[s.wp % s.d.route.length];
-                            tx = wc[0] * TS + TS / 2;
-                            ty = wc[1] * TS + TS / 2;
-                        }
-                        const dx = tx - s.st.x, dy = ty - s.st.y;
-                        const d = Math.hypot(dx, dy);
-                        if (!s.aggro && d < 6) { // точка патруля достигнута
-                            s.wp = (s.wp + 1) % s.d.route.length;
-                            s.stuck = 0;
-                            continue;
-                        }
-                        if (d > 0.001) {
-                            const step = WAND_SPEED * ticker.deltaMS / 1000;
-                            const mx = s.st.x + dx / d * step;
-                            const my = s.st.y + dy / d * step;
-                            // скольжение вдоль стен: весь шаг → только X →
-                            // только Y → топтание (счётчик застревания)
-                            if (walkable(Math.floor(mx / TS), Math.floor(my / TS))) {
-                                s.st.x = mx; s.st.y = my; s.stuck = 0;
-                            } else if (walkable(Math.floor(mx / TS), Math.floor(s.st.y / TS))) {
-                                s.st.x = mx; s.stuck++;
-                            } else if (walkable(Math.floor(s.st.x / TS), Math.floor(my / TS))) {
-                                s.st.y = my; s.stuck++;
-                            } else s.stuck++;
-                            // упёрся: в патруле — следующая точка, в погоне —
-                            // отстать (вернуться к маршруту)
-                            if (s.stuck > 60) {
-                                s.stuck = 0;
-                                if (s.aggro) s.aggro = false;
-                                else s.wp = (s.wp + 1) % s.d.route.length;
+                            if (Math.hypot(wc[0] * TS + TS / 2 - sx,
+                                wc[1] * TS + TS / 2 - sy) < TS / 3) {
+                                s.wp = (s.wp + 1) % s.d.route.length;
+                                s.path = null;
+                            } else if (!s.path || !s.path.length) {
+                                s.path = bfsPath(sgx, sgy, wc[0], wc[1]);
+                                if (!s.path) {
+                                    // точку отрезало (чужой отряд не бывает —
+                                    // компонента общая): пропустить
+                                    s.wp = (s.wp + 1) % s.d.route.length;
+                                }
                             }
                         }
-                        s.node.position.set(s.st.x, s.st.y);
-                        s.node.zIndex = s.st.y; // y-sort общий слой
+                        // ведение по пути: ось на очередную клетку пути
+                        let vx = 0, vy = 0;
+                        if (s.path && s.path.length) {
+                            const t = s.path[0];
+                            const dx = t.x - sx, dy = t.y - sy;
+                            const d = Math.hypot(dx, dy) || 1;
+                            if (d < 5) s.path.shift(); // клетка пройдена
+                            const t2 = s.path[0];
+                            if (t2) {
+                                const dx2 = t2.x - sx, dy2 = t2.y - sy;
+                                const d2 = Math.hypot(dx2, dy2) || 1;
+                                vx = dx2 / d2; vy = dy2 / d2;
+                            }
+                        }
+                        COMPONENTS.ctrlVI[s.id] = vx;
+                        COMPONENTS.ctrlVJ[s.id] = vy;
+                    }
+                } else if (squads.length) {
+                    for (const s of squads) {
+                        COMPONENTS.ctrlVI[s.id] = 0;
+                        COMPONENTS.ctrlVJ[s.id] = 0;
                     }
                 }
 
-                // арки подземелий — касание (диалог открыт — молчат);
-                // Время ещё без данжа — «Скоро…»
+                // арки подземелий — касание (диалог открыт — молчат).
+                // Вход закрыт малой колодой или данж ещё впереди —
+                // всплывает предупреждение (кулдаун 2.5с — без спама)
                 if (!ctx.questModal && layer)
                 for (const p of G.world.map.pois) {
                     if (p.kind !== "dungeon") continue;
                     const c = px(p);
                     if (Math.hypot(c.x - hx, c.y - hy) < TS * 0.85) {
-                        if (globalThis.GAME_DATA.CAVES[p.cave]) {
-                            enterCave(p.cave);
-                        } else if (!p.soonAt || performance.now() - p.soonAt > 2500) {
-                            p.soonAt = performance.now();
-                            soonCount++;
-                            if (ctx.sfx) ctx.sfx();
-                            floatText(GAME_LOC.t("world.soon"), c.x, c.y, 0xd8c79d);
+                        const deniedAt = p.denyAt || p.soonAt;
+                        if (globalThis.GAME_DATA.CAVES[p.cave]
+                            ? !enterCave(p.cave)
+                            : true) {
+                            if (!deniedAt || performance.now() - deniedAt > 2500) {
+                                p.denyAt = p.soonAt = performance.now();
+                                soonCount++;
+                                if (ctx.sfx) ctx.sfx();
+                                floatText(GAME_LOC.t(
+                                    globalThis.GAME_DATA.CAVES[p.cave]
+                                        ? "world.deckLow" : "world.soon",
+                                    { min: globalThis.GAME_DATA.caveDeckFor(
+                                        G.run.cave === p.cave
+                                            ? (G.run.floors || (G.run.floors = {}))[p.cave] || 1
+                                            : 1) }),
+                                    c.x, c.y, 0xd8c79d);
+                            }
                         }
                         return;
                     }
@@ -1120,20 +1331,77 @@
                 enterCave: (cave) => enterCave(cave),
                 soonCount: () => soonCount,
                 // ── бродячие отряды (тесты): список с живыми позициями и
-                // заморозка ИИ — пробы с прогулками по миру не ловят бои
+                // заморозка ИИ — пробы с прогулками по миру не ловят бои.
+                // Живая позиция отряда — из сущности characters (сцена),
+                // иначе из сейв-состояния
                 wander: () => ({
                     freeze: !!G.world.wanderFreeze,
                     list: ((G.world.map && G.world.map.wanderers) || [])
                         .map((d, i) => {
-                            const st = G.world.wander
-                                && G.world.wander[d.cave + ":" + i];
-                            return st ? {
-                                cave: d.cave, i, alive: st.alive,
-                                x: st.x, y: st.y, route: d.route,
+                            const key = "cave:" + d.cave + ":" + i;
+                            const st = G.world.wander && G.world.wander[key];
+                            if (!st) return null;
+                            const s = squads.find((x) => x.key === key);
+                            return {
+                                cave: d.cave, i, key, alive: st.alive,
+                                x: s && s.id !== null ? COMPONENTS.positionX[s.id] : st.x,
+                                y: s && s.id !== null ? COMPONENTS.positionY[s.id] : st.y,
+                                enc: s ? s.enc : null,
+                                route: d.route,
                                 active: !!globalThis.GAME_DATA.CAVES[d.cave],
-                            } : null;
+                                face: s && s.id !== null
+                                    ? characters.facingName(s.id) : null,
+                                walking: !!(s && s.id !== null
+                                    && COMPONENTS.ctrlMove[s.id]),
+                            };
                         }).filter(Boolean),
                 }),
+                // ── охранники мостов (тесты): список + живые позиции ─────
+                bridges: () => ({
+                    list: ((G.world.map && G.world.map.bridgeGuards) || [])
+                        .map((d, j) => {
+                            const key = "bridge:" + j;
+                            const st = G.world.wander && G.world.wander[key];
+                            if (!st) return null;
+                            const s = squads.find((x) => x.key === key);
+                            return {
+                                j, key, elem: d.elem, alive: st.alive,
+                                enc: guardEncOf(d.elem),
+                                x: s && s.id !== null ? COMPONENTS.positionX[s.id] : st.x,
+                                y: s && s.id !== null ? COMPONENTS.positionY[s.id] : st.y,
+                                route: d.route,
+                                // персонаж мира: взгляд и «идёт» (контроллер)
+                                face: s && s.id !== null
+                                    ? characters.facingName(s.id) : null,
+                                walking: !!(s && s.id !== null
+                                    && COMPONENTS.ctrlMove[s.id]),
+                            };
+                        }).filter(Boolean),
+                }),
+                // подсказка на отряде: состояние панели (как в подземелье)
+                hoverAt(x, y) {
+                    hoverSquads({ x, y });
+                    return tip ? { enc: tip.squad.enc } : null;
+                },
+                tipState: () => (tip ? {
+                    enc: tip.squad.enc,
+                    title: GAME_LOC.t("enc." + tip.squad.enc + ".title"),
+                    deck: squadDeckSummary(tip.squad.enc),
+                    heroImg: (globalThis.GAME_DATA.ENCOUNTERS[tip.squad.enc]
+                        || {}).hero || null,
+                } : null),
+                tipHide: () => hideSquadTip(),
+                // пополнить колоду тестово (гейты данжа: вход 16+): карты
+                // стартера героя циклично до нужного размера
+                deckAdd: (n) => {
+                    const D = globalThis.GAME_DATA;
+                    const starter = D.STARTER_DECKS[
+                        (D.HEROES[G.heroId] || D.HEROES.gorbag).starter]
+                        || D.DEFAULT_DECK;
+                    while (G.deck.length < n) G.deck.push(
+                        starter[G.deck.length % starter.length]);
+                    return G.deck.length;
+                },
                 wanderFreeze: (v) => { G.world.wanderFreeze = !!v; return true; },
                 // мини-карта (правый нижний угол): бокс и маркер героя
                 mini: () => {

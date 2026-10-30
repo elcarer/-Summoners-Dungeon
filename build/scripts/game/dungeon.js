@@ -136,12 +136,13 @@
         });
     }
 
-    // Требование колоды для спуска: с этажа N нужно 12+N карт
-    // (спуск на 2-й — 13, на 3-й — 14, …), рост +1 за этаж до капа 60
-    // (просил юзер). Минимум колоды НА этаже N — то же число минус 1
-    // (dataCards.deckMinFor)
+    // Требование колоды для спуска: с этажа N нужно 16+N карт
+    // (спуск на 2-й — 17, на 3-й — 18, …), рост +1 за этаж до капа 60
+    // (просил юзер; вход на 1-й этаж — 16, dataCards.caveDeckFor).
+    // Минимум колоды ДЛЯ БОЯ на этаже N — то же число минус 1
+    // (caveDeckFor(N) = 15+N)
     function deckNeed(floor) {
-        return Math.min(globalThis.GAME_DATA.DECK_MAX, 12 + floor);
+        return Math.min(globalThis.GAME_DATA.DECK_MAX, 16 + Math.max(0, floor));
     }
 
     // ── ГЕНЕРАТОР РАСКЛАДКИ ЭТАЖА (просил юзер: комнаты и граф проходов
@@ -1356,10 +1357,11 @@
                         setHeroAxes(0, 0);
                         path = null;
                         st.heroPos = { x: hx, y: hy };
-                        // бой с колодой меньше минимума этажа запрещён
-                        // (просил юзер): запираем в редакторе колоды —
-                        // замок не выпустит, пока минимум не собран
-                        const need = globalThis.GAME_DATA.deckMinFor(
+                        // бой с колодой меньше минимума ДАНЖА запрещён
+                        // (просил юзер: вход 16 карт, каждый следующий
+                        // этаж +1): запираем в редакторе колоды — замок
+                        // не выпустит, пока минимум не собран
+                        const need = globalThis.GAME_DATA.caveDeckFor(
                             G.run && G.run.floor ? G.run.floor : 1);
                         if (G.deck.length < need) {
                             showToast(GAME_LOC.t("dungeon.deckLow", { min: need }));
@@ -1416,8 +1418,8 @@
                     else if (st.floor >= caveOf(st.cave).maxFloor) {
                         showToast(GAME_LOC.t("dungeon.exitBottom"));
                     }
-                    // спуск требует растущую колоду: с этажа N — 12+N карт
-                    // (спуск на 2-й — 13, …) до капа 60
+                    // спуск требует растущую колоду: с этажа N — 16+N карт
+                    // (спуск на 2-й — 17, …) до капа 60 (просил юзер)
                     else if (G.deck.length < deckNeed(st.floor)) {
                         showToast(GAME_LOC.t("dungeon.exitDeck", { n: deckNeed(st.floor) }));
                     } else {

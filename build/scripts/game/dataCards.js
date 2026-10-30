@@ -29,6 +29,15 @@
     function deckMinFor(floor) {
         return Math.min(DECK_MAX, DECK_MIN + Math.max(0, (floor | 0) - 1));
     }
+    // Минимум колоды ДЛЯ ПОДЗЕМЕЛИЙ (просил юзер): вход на 1-й этаж —
+    // 16 карт, каждый следующий этаж +1 (2-й — 17, 3-й — 18, …). Открытый
+    // мир живёт по прежнему минимуму 12 (стартовые колоды) — бои с
+    // бродячими отрядами идут по deckMinFor(1); данж требует своё:
+    // вход (этаж 1) и все бои этажа — caveDeckFor(1) = 16, спуск с
+    // этажа N требует caveDeckFor(N+1) = 16+N
+    function caveDeckFor(floor) {
+        return Math.min(DECK_MAX, 15 + Math.max(1, floor | 0));
+    }
 
     // Пул наград «1 из 3» — запасной (сейчас трофеи берутся из колоды
     // побеждённого врага; пул работает для старых сейвов/прямых заходов).
@@ -524,6 +533,81 @@
                             "tim208",
                             "tim209", "tim209",
                             "tim210"] },
+        // ── «Охранники мостов» открытого мира (просил юзер): бродячие
+        // враги у мостов через реки в зонах своих стихий. Ядро — ровно
+        // 25 карт по спеке юзера (enemyDeck без grow играют как есть —
+        // колода детерминированная, тутип мира показывает её состав).
+        // «Свет» юзера = «Луч света» (hon179) — как в ядре «Претендента
+        // на трон». Охранника Времени пока нет — после данжа Времени.
+        strGuard: { scene: 1, baseHp: 16, elem: "strength", hero: "strGuard",
+                    core: ["str5", "str5",
+                           "str2", "str2", "str2",
+                           "str6", "str6",
+                           "str12", "str12",
+                           "str14", "str14",
+                           "str20", "str20",
+                           "str26", "str26",
+                           "str34", "str34",
+                           "str36", "str36",
+                           "str4", "str4",
+                           "str39", "str39",
+                           "str38", "str38"] },
+        grwGuard: { scene: 1, baseHp: 16, elem: "growth", hero: "grwGuard",
+                    core: ["grw1", "grw1",
+                           "grw4", "grw4",
+                           "grw7", "grw7",
+                           "grw10", "grw10",
+                           "grw12", "grw12",
+                           "grw17", "grw17",
+                           "grw16", "grw16",
+                           "grw25", "grw25",
+                           "grw27", "grw27",
+                           "grw29", "grw29",
+                           "grw32", "grw32",
+                           "grw34", "grw34",
+                           "grw13"] },
+        wisGuard: { scene: 3, baseHp: 16, elem: "wisdom", hero: "wisGuard",
+                    core: ["wis84", "wis84",
+                           "wis83", "wis83",
+                           "wis89", "wis89",
+                           "wis87", "wis87",
+                           "wis90", "wis90",
+                           "wis92", "wis92",
+                           "wis98", "wis98",
+                           "wis97", "wis97",
+                           "wis103", "wis103",
+                           "wis107", "wis107",
+                           "wis108", "wis108",
+                           "wis99", "wis99",
+                           "wis95"] },
+        decGuard: { scene: 1, baseHp: 16, elem: "decay", hero: "decGuard",
+                    core: ["dec156", "dec156",
+                           "dec155", "dec155",
+                           "dec152", "dec152",
+                           "dec150", "dec150",
+                           "dec146", "dec146",
+                           "dec144", "dec144",
+                           "dec143", "dec143",
+                           "dec141", "dec141",
+                           "dec139", "dec139",
+                           "dec129", "dec129",
+                           "dec130", "dec130",
+                           "dec123", "dec123",
+                           "dec131"] },
+        honGuard: { scene: 5, baseHp: 16, elem: "honor", hero: "honGuard",
+                    core: ["hon191", "hon191",
+                           "hon189", "hon189",
+                           "hon187", "hon187",
+                           "hon186", "hon186",
+                           "hon180", "hon180",
+                           "hon174", "hon174",
+                           "hon167", "hon167",
+                           "hon168", "hon168",
+                           "hon169", "hon169",
+                           "hon179", "hon179",
+                           "hon181", "hon181",
+                           "hon183",
+                           "hon182", "hon182"] },
     };
     // Подземелья открытого мира: стихия (пул наград/драфта) и кап глубины.
     // У «Подземных ключей» шесть этажей; главарь «Безумный маг» стоит на
@@ -751,6 +835,7 @@
         FLOOR_MOBS_HONOR, FLOOR_MOBS_TIME,
         MOB_TABLES, ENEMY_FILL, ENEMY_FILLS, CAVES,
         STARTER_DECKS, STARTER_COLLECTIONS, HEROES, HERO_ORDER, HERO_FOE_ORDER,
+        caveDeckFor,
         enemyDeck, mobForFloor, ELEM_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,
     };
 })();

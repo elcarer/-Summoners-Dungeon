@@ -203,6 +203,20 @@
                         sfx("up");
                     }
                 }
+                // «Охранники мостов» (heroes 42–46, просил юзер): при
+                // гибели СВОЕГО существа СВОЕЙ стихии (КАЖДЫЙ раз, без
+                // «первого за бой») герой срабатывает — эффекты в
+                // guardDeathAct ниже
+                if (u.def.type === "unit") {
+                    const hd = heroDefOf(u.side);
+                    const he = hd && hd.elems && hd.elems[0];
+                    if (hd && he && u.def.elem === he
+                        && ["elemDeathSnipe", "elemDeathHp", "elemDeathLoot",
+                            "elemDeathReturn", "elemDeathMend"]
+                            .includes(hd.ability)) {
+                        guardDeathAct(u.side, hd);
+                    }
+                }
                 // «Проклятые артефакты» (dec138): при смерти постройки все
                 // запомненные ею карты возвращаются в руку владельца — по
                 // одной копии из сброса, иначе из колоды (карты нигде нет —
@@ -240,6 +254,75 @@
                 exhumingReplay(u); // «Выкапливание»: существо возвращается после смерти
                 if (ambush) ambushRiseAct(ambush.side, ambush.trap,
                     ambush.col, ambush.row); // «Засадный отряд»
+            };
+
+            // Способности «Охранников мостов» (просил юзер). Срабатывают
+            // при КАЖДОЙ гибели существа своей стихии стороны:
+            //   elemDeathSnipe  «Охранник Силы» (42): 1 урон случайному
+            //                   существу или постройке противника
+            //   elemDeathHp     «Охранник Роста» (43): случайное своё
+            //                   существо получает +1 к жизням
+            //   elemDeathLoot   «Охранник Мудрости» (44): взять карту,
+            //                   затем скинуть карту с руки на выбор
+            //   elemDeathReturn «Охранник Тлена» (45): вернуть карту
+            //                   призыва из сброса в руку, затем скинуть
+            //                   карту с руки на выбор
+            //   elemDeathMend   «Охранник Чести» (46): если у базы 3 жизни
+            //                   и меньше — вылечить ей 1 жизнь
+            // Выбор сброса ИГРОКА откладывается в очередь pendingDiscard —
+            // панель откроется в начале его хода (механизм «Торговца»):
+            // гибель существа часто случается в ход врага, и модальная
+            // панель открыла бы его ход поверх себя. ИИ скидывает сразу
+            // (самую дешёвую/слабую карту)
+            A.guardDeathAct = function guardDeathAct(side, hd) {
+                const hand = side === "p" ? B.hand : B.eHand;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const dropWorst = () => { // сброс ИИ: дешевле и слабее — первой
+                    if (!hand.length) return;
+                    let bi = 0;
+                    for (let i = 1; i < hand.length; i++) {
+                        const a = CARDS[hand[i]], b = CARDS[hand[bi]];
+                        const ka = (a.cost || 0) * 10
+                            + (A.aiCardPower ? A.aiCardPower(a) : 0);
+                        const kb = (b.cost || 0) * 10
+                            + (A.aiCardPower ? A.aiCardPower(b) : 0);
+                        if (ka < kb) bi = i;
+                    }
+                    const id = hand.splice(bi, 1)[0];
+                    discard.push(id);
+                    noteDiscard(1, side, [id]);
+                };
+                if (hd.ability === "elemDeathSnipe") {
+                    const foes = B.units.filter((v) => v.side !== side);
+                    if (foes.length) {
+                        const v = foes[(Math.random() * foes.length) | 0];
+                        const p = cellXY(v.col, v.row);
+                        floatText(p.x, p.y - 66, "1", 0xff8f6e);
+                        damageUnit(v, 1, null, "dam");
+                    }
+                } else if (hd.ability === "elemDeathHp") {
+                    const own = B.units.filter((v) => v.side === side);
+                    if (own.length) healUnit(own[(Math.random() * own.length) | 0], 1);
+                } else if (hd.ability === "elemDeathMend") {
+                    const cur = side === "p" ? B.playerBase : B.enemyBase;
+                    if (cur <= 3) healBase(side, 1);
+                } else if (hd.ability === "elemDeathLoot") {
+                    if (side === "p") drawCards(1); else drawEnemy(1);
+                    if (side === "p") B.pendingDiscard = (B.pendingDiscard || 0) + 1;
+                    else dropWorst();
+                } else if (hd.ability === "elemDeathReturn") {
+                    // последняя ушедшая в сброс карта призыва — первой обратно
+                    for (let k = discard.length - 1; k >= 0; k--) {
+                        const d = CARDS[discard[k]];
+                        if (d && d.type === "unit") {
+                            hand.push(discard.splice(k, 1)[0]);
+                            if (side === "p") layoutHand();
+                            break;
+                        }
+                    }
+                    if (side === "p") B.pendingDiscard = (B.pendingDiscard || 0) + 1;
+                    else dropWorst();
+                }
             };
 
             // «Рыцарь смерти» (dec159, просил юзер): убив СУЩЕСТВО (постройки

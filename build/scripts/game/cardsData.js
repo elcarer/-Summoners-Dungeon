@@ -1772,6 +1772,54 @@
             baseHp: 10, elems: ["time"], starter: "time",
             img: "41", ability: "startDrawDelayed",
         },
+        // ── «Охранники мостов» (просил юзер): бродячие враги открытого
+        // мира, патрулируют мосты через реки в зонах своих стихий.
+        // Общий принцип: 16♥, обычная; при гибели СВОЕГО существа СВОЕЙ
+        // стихии срабатывает способность (каждый раз, не «первый за бой»).
+        // Спрайты в мире — спрайтшиты существ стихии (как у охраны данжей).
+        // Способности работают у обеих сторон (хуки в killUnit,
+        // arenaDamage.js). Охранника Времени пока нет — его колоду зададут
+        // после подземелья Времени (просил юзер).
+        // «Охранник Силы» (heroes/42.png): при гибели своего существа
+        // Силы наносит 1 урон случайному существу или постройке противника
+        // (elemDeathSnipe).
+        strGuard: {
+            id: "strGuard", rarity: "common",
+            baseHp: 16, elems: ["strength"], starter: "strength",
+            img: "42", ability: "elemDeathSnipe", abilityVal: 1,
+        },
+        // «Охранник Роста» (heroes/43.png): при гибели своего существа
+        // Роста случайное ваше существо получает +1 к жизням (elemDeathHp)
+        grwGuard: {
+            id: "grwGuard", rarity: "common",
+            baseHp: 16, elems: ["growth"], starter: "growth",
+            img: "43", ability: "elemDeathHp", abilityVal: 1,
+        },
+        // «Охранник Мудрости» (heroes/44.png): при гибели своего существа
+        // Мудрости возьмите карту, затем скиньте карту с руки на выбор
+        // (elemDeathLoot; выбор игрока — панель сброса в начале его хода,
+        // как у «Торговца»; ИИ сбрасывает сам)
+        wisGuard: {
+            id: "wisGuard", rarity: "common",
+            baseHp: 16, elems: ["wisdom"], starter: "wisdom",
+            img: "44", ability: "elemDeathLoot", abilityVal: 1,
+        },
+        // «Охранник Тлена» (heroes/45.png): при гибели своего существа
+        // Тлена верните карту призыва из сброса в руку, затем скиньте
+        // карту с руки на выбор (elemDeathReturn)
+        decGuard: {
+            id: "decGuard", rarity: "common",
+            baseHp: 16, elems: ["decay"], starter: "decay",
+            img: "45", ability: "elemDeathReturn", abilityVal: 1,
+        },
+        // «Охранник Чести» (heroes/46.png): при гибели своего существа
+        // Чести, если у вашей базы 3 жизни и меньше, вылечите ей 1 жизнь
+        // (elemDeathMend)
+        honGuard: {
+            id: "honGuard", rarity: "common",
+            baseHp: 16, elems: ["honor"], starter: "honor",
+            img: "46", ability: "elemDeathMend", abilityVal: 1,
+        },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon", "tordin"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -1786,7 +1834,9 @@
         "decThirst", "decLich", // «Архилич» — ключ HEROES (enc.hero), не id энкаунтера
         "honRebels", "honCavalry", "honRampart", "honZealot",
         "honNeighbor", "honGreatBattle", "honThrone", // «Залы Чести» (этажи 1–6)
-        "timBattle"]; // данж Времени, 1-й этаж (просил юзер)
+        "timBattle", // данж Времени, 1-й этаж (просил юзер)
+        // «Охранники мостов» открытого мира (просил юзер)
+        "strGuard", "grwGuard", "wisGuard", "decGuard", "honGuard"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

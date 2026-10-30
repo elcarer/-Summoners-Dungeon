@@ -11,13 +11,17 @@
 (function () {
     function createDeckScene(ctx) {
         const { scenes, G, ui, uiTex } = ctx;
-        const { CARDS, DECK_MAX, DECK_MIN, deckMinFor, DECK_COPIES, ELEM_LOGO, HEROES,
+        const { CARDS, DECK_MAX, DECK_MIN, DECK_COPIES, ELEM_LOGO, HEROES,
             HERO_ORDER, HERO_FOE_ORDER } = globalThis.GAME_DATA;
         const { T, fit, button, chip, cardFace, dimBg, scrollPane } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
-        // минимум колоды поднимается с этажом забега (просил юзер):
-        // спуск требовал 12+N карт — на этаже N+1 минимум уже 12+N
-        const deckMinNow = () => deckMinFor(G.run && G.run.floor ? G.run.floor : 1);
+        // минимум колоды: открытый мир живёт по DECK_MIN = 12 (стартовые
+        // колоды), подземелья требуют свои 16+ этаж (просил юзер —
+        // dataCards.caveDeckFor); редактор показывает минимум контекста
+        const deckMinNow = () => (G.dungeon
+            ? globalThis.GAME_DATA.caveDeckFor(
+                G.run && G.run.floor ? G.run.floor : 1)
+            : DECK_MIN);
         let root = null, leftPane = null, rightPane = null, heroesPane = null;
         let tab = "deck"; // вкладка сцены: «Колода» | «Герои» (просил юзер)
         const heroCards = []; // вкладка «Герои»: {id, node} (тесты)

@@ -32,7 +32,10 @@
                 // карты для сброса (панель поверх; несколько Торговцев —
                 // несколько очередей). Открытие ПОСЛЕ марша: панель
                 // заморозила бы анимации боя
-                if (B.pendingDiscard > 0) buildDiscardPanel("trade");
+                if (B.pendingDiscard > 0) {
+                    if (B.hand.length) buildDiscardPanel("trade");
+                    else B.pendingDiscard = 0; // скидывать нечего — очередь в никуда
+                }
                 // «Пень обряда»: в начале хода — взгляд на верхнюю карту колоды
                 if (B.units.some((b) => b.side === "p" && b.def.type === "building"
                     && b.def.riteStump)) openStumpPanel();

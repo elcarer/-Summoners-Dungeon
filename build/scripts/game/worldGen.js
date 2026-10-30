@@ -26,7 +26,7 @@
     // V9: воды в зоне Тлена нет вовсе (русла обрываются у его границ),
     // болота отступают на клетку от границ зоны — без стыков с чужими
     // биомами
-    const V = 12; // v12 — спавн у города СВОЕЙ зоны (map.spawn по стихиям)
+    const V = 13; // v13 — охранники мостов (map.bridgeGuards, просил юзер)
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // сетка зон 3×2: индекс k — колонка k%3, ряд (k/3|0), сектор 128×128
@@ -925,9 +925,77 @@
             }
         }
 
+        // ── 8c. охранники мостов (просил юзер): бродячие враги, патрули-
+        // рующие мосты через реки в зонах своих стихий. Один страж на
+        // мост-«кластер» (связные клетки настила: русло в 3 клетки под
+        // дорогой — один мост); стихия — зона центра кластера. Охранника
+        // Времени пока нет (его колоду зададут после данжа Времени,
+        // просил юзер) — мосты зоны Времени без стражей. Маршрут — 4
+        // точки в кольце 1.5–4.5 клетки от моста, только проходимая суша
+        // из компоненты связности моста (берега у стражи свои)
+        const bridgeGuards = [];
+        {
+            const seen = new Uint8Array(N);
+            for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+                const i0 = y * W + x;
+                if (ter[i0] !== T_BRIDGE || seen[i0]) continue;
+                const cl = [i0]; seen[i0] = 1; // кластер моста (4-связный)
+                for (let qi = 0; qi < cl.length; qi++) {
+                    const c = cl[qi], cx = c % W, cy = (c / W) | 0;
+                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        const nx = cx + dx, ny = cy + dy;
+                        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                        const ni = ny * W + nx;
+                        if (!seen[ni] && ter[ni] === T_BRIDGE) {
+                            seen[ni] = 1; cl.push(ni);
+                        }
+                    }
+                }
+                const cz = zone[cl[(cl.length / 2) | 0]];
+                if (cz === 5) continue; // Время — стражей пока нет
+                const mx = Math.round(cl.reduce((s, c) => s + (c % W), 0) / cl.length);
+                const my = Math.round(cl.reduce((s, c) => s + ((c / W) | 0), 0) / cl.length);
+                // суша, достижимая пешком от моста (берега + дороги)
+                const comp = new Uint8Array(N);
+                const q = cl.slice();
+                for (const c of cl) comp[c] = 1;
+                for (let qi = 0; qi < q.length; qi++) {
+                    const c = q[qi], cx = c % W, cy = (c / W) | 0;
+                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        const nx = cx + dx, ny = cy + dy;
+                        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                        const ni = ny * W + nx;
+                        if (!comp[ni] && rows[ny][nx] === ".") {
+                            comp[ni] = 1; q.push(ni);
+                        }
+                    }
+                }
+                const pts = [];
+                for (let k = 0; k < 4; k++) {
+                    for (let tries = 0; tries < 40; tries++) {
+                        const ang = (k + rng()) * (Math.PI / 2);
+                        const r = 1.5 + rng() * 3; // 1.5–4.5 клетки от моста
+                        const gx = mx + Math.round(Math.cos(ang) * r);
+                        const gy = my + Math.round(Math.sin(ang) * r);
+                        if (gx < 2 || gy < 2 || gx >= W - 2 || gy >= H - 2) continue;
+                        if (rows[gy][gx] !== "." || !comp[gy * W + gx]) continue;
+                        if (pts.some((p) => Math.hypot(p[0] - gx, p[1] - gy) < 2)) continue;
+                        pts.push([gx, gy]);
+                        break;
+                    }
+                }
+                if (pts.length < 2) continue; // мост в скалах — стража нет
+                bridgeGuards.push({
+                    elem: ELEMS[cz],
+                    gx: pts[0][0], gy: pts[0][1], // спавн — первая точка
+                    route: pts,
+                });
+            }
+        }
+
         return {
             v: V, w: W, h: H, seed,
-            ter, zone, rows, pois, spawn, wanderers,
+            ter, zone, rows, pois, spawn, wanderers, bridgeGuards,
             centers: centers.map((c) => ({ x: Math.round(c.x), y: Math.round(c.y) })),
         };
     }

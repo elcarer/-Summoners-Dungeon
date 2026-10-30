@@ -548,7 +548,10 @@
             // иначе «dungeon» — обычный реванш.
             lossAftermath() {
                 const D = globalThis.GAME_DATA;
-                const min = D.deckMinFor(this.run && this.run.floor ? this.run.floor : 1);
+                // минимум контекста боя (просил юзер): открытый мир — 12
+                // (стартовые колоды), подземелье — 15+этаж (вход 16)
+                const min = this.worldFrom ? D.deckMinFor(1)
+                    : D.caveDeckFor(this.run && this.run.floor ? this.run.floor : 1);
                 if (this.deck.length >= min) return "dungeon";
                 const heroes = [this.starterId, ...(this.captured || [])];
                 const reach = heroes.some((h) => {
