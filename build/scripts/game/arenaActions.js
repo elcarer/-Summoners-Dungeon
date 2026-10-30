@@ -228,8 +228,6 @@
                             "✕", 0x8cd0ef);
                         return;
                     }
-                    // клетка со «Сдвиг»-значком под бесплатный призыв занята
-                    if (delayAt(col, row)) return;
                     B.journeySummon = null;
                     B.resurrectSummon = null;
                     // «Отмена призыва» (wis84) врага: бесплатный призыв — тоже
@@ -381,9 +379,7 @@
                 // мимо допустимых клеток (не в зоне / занято / не хватает маны) —
                 // снять выбор: карты руки снова кликабельны (при выбранной карте
                 // они неинтерактивны, чтобы крупные карты не съедали клики полем)
-                if (!deployRows("p").includes(row) || unitAt(col, row)
-                    || delayAt(col, row) // «Сдвиг»-значок — клетка под призыв занята
-                    || effCost(B.hand[B.selected]) > B.energy) {
+                if (!deployRows("p").includes(row) || unitAt(col, row) || effCost(B.hand[B.selected]) > B.energy) {
                     deselect();
                     return;
                 }

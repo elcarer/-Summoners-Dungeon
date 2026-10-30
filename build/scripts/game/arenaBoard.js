@@ -32,11 +32,7 @@
             A.freeCells = function freeCells(rows) {
                 const out = [];
                 for (const r of rows) for (let col = 0; col < GRID; col++) {
-                    // клетки со «Сдвиг»-значком под призыв заняты (существо
-                    // вот-вот появится), но для марша поле свободно —
-                    // через значок ходят (спека: «если клетка останется
-                    // свободной» — появление может быть отложено)
-                    if (!unitAt(col, r) && !A.delayAt(col, r)) out.push([col, r]);
+                    if (!unitAt(col, r)) out.push([col, r]);
                 }
                 return out;
             };
@@ -63,7 +59,9 @@
                 return B.delayed.p.concat(B.delayed.e)
                     .find((e) => e.col === col && e.row === row) || null;
             };
-            // Значок-счётчик на клетке (создать/обновить цифру)
+            // Значок-счётчик на клетке (создать/обновить цифру). Несколько
+            // значков на одной клетке (клетка со значком принимает призыв —
+            // просил юзер) расходятся в ряд, чтобы цифры не слипались
             A.delayDrawNode = function delayDrawNode(e) {
                 if (!root || !root.delayLayer) return;
                 const p = cellXY(e.col, e.row);
@@ -85,7 +83,11 @@
                     e.node = c;
                 }
                 e.node.getChildAt(1).text = String(Math.max(0, e.left));
-                e.node.position.set(p.x, p.y);
+                const same = B.delayed.p.concat(B.delayed.e)
+                    .filter((x) => x.col === e.col && x.row === e.row);
+                const idx = same.indexOf(e);
+                e.node.position.set(
+                    p.x + (idx - (same.length - 1) / 2) * 26, p.y);
             };
             // Постановка значка (вместо немедленного призыва). opts.left —
             // явный счётчик (Ловушка времени даёт «Сдвиг 2» ЛЮБОМУ существу,
