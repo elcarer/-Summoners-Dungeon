@@ -1288,7 +1288,7 @@
         // база владельца получает урон, на каждую пустую клетку в двух
         // рядах, ближайших к базе, становится Прихожанин 2/2 (жетон
         // parishioner, как у «Молебна»; garrisonRise — damageBase)
-        hon194: { type: "trap", cost: 1,
+        hon194: { type: "trap", cost: 5,
                   trap: { event: "onBaseDamage", effect: "garrisonRise" },
                   kind: "damage", // тип эффекта — по спеке юзера
                   rarity: "epic", elem: "honor",
@@ -1648,10 +1648,11 @@
         honGreatBattle: { id: "honGreatBattle", rarity: "rare", baseHp: 15,
                           elems: ["honor"], starter: "honor",
                           img: "38", ability: "greatBattle" },
-        // «Претендент на трон» (босс «Залов Чести», 7-й этаж, просил юзер):
-        // Честь (белая), 18♥, Эпическая. Способность throneGuard: когда у
-        // базы ВЛАДЕЛЬЦА меньше 10 жизней и она получает жизни, она
-        // получает на 1 жизнь больше (healBase). Спрайт — heroes/39.png
+        // «Претендент на трон» (босс «Залов Чести», на каждом из 6 этажей,
+        // просил юзер): Честь (белая), 18♥, Эпическая. Способность
+        // throneGuard: когда у базы ВЛАДЕЛЬЦА меньше 10 жизней и она
+        // получает жизни, она получает на 1 жизнь больше (healBase).
+        // Спрайт — heroes/39.png
         honThrone: { id: "honThrone", rarity: "epic", baseHp: 18,
                      elems: ["honor"], starter: "honor",
                      img: "39", ability: "throneGuard" },

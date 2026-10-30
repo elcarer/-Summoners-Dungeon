@@ -72,8 +72,8 @@
     // Победа в бою (не драфт): выполняет активный квест, если бой был
     // в подземелье фракции игрока (у квеста «boss» — над Боссом этажа).
     // Возвращает id выполненного квеста или null.
-    function onBattleWin(G, { boss, draft }) {
-        if (!G.quests || G.quests.pending || draft) return null;
+    function onBattleWin(G, { boss, draft, wander }) {
+        if (!G.quests || G.quests.pending || draft || wander) return null;
         const q = QUESTS.find((x) => x.id === G.quests.active);
         if (!q) return null;
         const D = globalThis.GAME_DATA;

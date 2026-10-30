@@ -358,7 +358,8 @@
             // «Сохранить» из настроек при live делает сначала штатный автосейв
             live: false,
             dungeon: null, activeEnemy: null, battle: null,
-            world: { heroPos: null, out: false }, // открытый мир: где герой
+            world: { heroPos: null, out: false, wander: null }, // открытый мир: где герой + бродячие отряды
+            worldFrom: false, // последний бой начался в открытом мире (трофей/реванш ведут в мир)
             dungeonStates: {}, // этажи подземелий, ключ «данж:этаж» (gob:1, grw:2…)
             // (враги/объекты этажа остаются как их оставили),
             rewardDeck: null, // колода побеждённого — пул трофея «1 из 3»
@@ -438,8 +439,9 @@
                 this.world = {
                     v: globalThis.GAME_WORLDGEN.V,
                     seed: (Math.random() * 0x7fffffff) | 0,
-                    heroPos: null, out: false,
+                    heroPos: null, out: false, wander: null,
                 };
+                this.worldFrom = false;
                 this.dungeonStates = {};
                 this.activeEnemy = null;
                 this.battle = null;
@@ -472,6 +474,9 @@
                     dungeonStates: JSON.parse(JSON.stringify(this.dungeonStates || {})),
                     worldPos: this.world.heroPos,
                     worldOut: this.world.out,
+                    // бродячие отряды: жив/мёртв и позиции (геометрия — из сида)
+                    worldWander: this.world.wander
+                        ? JSON.parse(JSON.stringify(this.world.wander)) : null,
                     // глобальная карта: сейв хранит только сид — карта
                     // регенерируется детерминированно (worldGen.js)
                     worldV: globalThis.GAME_WORLDGEN.V,
@@ -688,6 +693,9 @@
                     ? r.worldSeed : (Math.random() * 0x7fffffff) | 0,
                 heroPos: r.worldV === globalThis.GAME_WORLDGEN.V ? (r.worldPos || null) : null,
                 out: !!r.worldOut,
+                // отряды той же версии генератора: жив/мёртв и позиции
+                wander: r.worldV === globalThis.GAME_WORLDGEN.V
+                    && r.worldWander ? r.worldWander : null,
                 map: null,
             };
             // сюжетная линия забега (старые сейвы — без неё: первый

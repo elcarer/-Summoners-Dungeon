@@ -26,7 +26,7 @@
     // V9: воды в зоне Тлена нет вовсе (русла обрываются у его границ),
     // болота отступают на клетку от границ зоны — без стыков с чужими
     // биомами
-    const V = 9;
+    const V = 10; // v10 — бродячие отряды у арок (map.wanderers)
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // сетка зон 3×2: индекс k — колонка k%3, ряд (k/3|0), сектор 128×128
@@ -857,9 +857,65 @@
             rows.push(s);
         }
 
+        // ── 8b. бродячие отряды — «охрана» подземелий (просил юзер): по 3
+        // отряда у каждого данжа патрулируют окрестности. Маршрут — 5 точек
+        // в кольце 5–12 клеток от арки, у каждого отряда СВОЙ сектор 120°
+        // (маршруты не пересекаются и не сходятся в одну точку: до любой
+        // точки чужого маршрута этого же данжа — не меньше 3 клеток).
+        // Точки — только в компоненте связности арки (река/хребет не
+        // отрежут отряду путь домой). Данж без диалога врагов (Время)
+        // мир пропустит при спавне — геометрия всё равно генерится для
+        // всех арок, чтобы сид не зависел от набора подземелий
+        const wanderers = [];
+        {
+            const ok = (x, y) => x >= 2 && y >= 2 && x < W - 2 && y < H - 2
+                && rows[y][x] === ".";
+            for (const dp of pois) {
+                if (dp.kind !== "dungeon") continue;
+                // суша, достижимая пешком от арки (после прокладки дорог)
+                const comp = new Uint8Array(N);
+                const q = [dp.gy * W + dp.gx];
+                comp[q[0]] = 1;
+                for (let qi = 0; qi < q.length; qi++) {
+                    const c = q[qi], cx = c % W, cy = (c / W) | 0;
+                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        const nx = cx + dx, ny = cy + dy;
+                        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                        const ni = ny * W + nx;
+                        if (!comp[ni] && rows[ny][nx] === ".") {
+                            comp[ni] = 1; q.push(ni);
+                        }
+                    }
+                }
+                const taken = []; // точки чужих маршрутов этого же данжа
+                for (let s = 0; s < 3; s++) {
+                    const pts = [];
+                    for (let k = 0; k < 5; k++) {
+                        for (let tries = 0; tries < 60; tries++) {
+                            const ang = (s + rng()) * (Math.PI * 2 / 3);
+                            const r = 5 + rng() * 7; // 5–12 клеток от арки
+                            const gx = dp.gx + Math.round(Math.cos(ang) * r);
+                            const gy = dp.gy + Math.round(Math.sin(ang) * r);
+                            if (!ok(gx, gy) || !comp[gy * W + gx]) continue;
+                            if (taken.some((p) =>
+                                Math.hypot(p[0] - gx, p[1] - gy) < 3)) continue;
+                            pts.push([gx, gy]); taken.push(pts[pts.length - 1]);
+                            break;
+                        }
+                    }
+                    if (!pts.length) continue; // тесно — отряда нет (не бывает)
+                    wanderers.push({
+                        cave: dp.cave,
+                        gx: pts[0][0], gy: pts[0][1], // спавн — первая точка
+                        route: pts,
+                    });
+                }
+            }
+        }
+
         return {
             v: V, w: W, h: H, seed,
-            ter, zone, rows, pois, spawn,
+            ter, zone, rows, pois, spawn, wanderers,
             centers: centers.map((c) => ({ x: Math.round(c.x), y: Math.round(c.y) })),
         };
     }

@@ -22,6 +22,14 @@
 // путь с ведением героя виртуальными осями). Вход в пещеру — триггер по
 // касанию: продолжает текущий этаж забега (G.dungeonStates) или начинает
 // первый. Города пока без функционала (просил юзер — потом добавим).
+// БРОДЯЧИЕ ОТРЯДЫ (просил юзер): «охрана» подземелий — по 3 отряда у
+// каждой арки патрулируют окрестности. Маршруты (5 точек в кольце 5–12
+// клеток от арки) генерит worldGen по сиду, у каждого отряда свой сектор
+// 120° — маршруты не пересекаются. Тип врага отряда — архетип 1-го этажа
+// охраняемого данжа. Заметив героя (4.5 клетки, путь есть) — преследуют,
+// но недалеко от маршрута (поводок 9 клеток от его центра); скорость —
+// 0.9 от героевой; касание отряда — бой, как в подземелье. Побеждённый
+// отряд уходит с карты навсегда (жив/мёртв и позиция — в сейве забега).
 // В правом нижнем углу — мини-карта всего мира (просил юзер) с живым
 // маркером героя. Подземелье Времени на карте есть, но вход скажет
 // «Скоро…» — данж этой стихии ещё впереди (Залы Чести открыты).
@@ -33,6 +41,11 @@
     const TS = 32;
     const HERO_SPEED = 136; // 4.25 кл/с — прежний темп в клетках
     const ROAD_SPEED = HERO_SPEED * 1.2; // по дорогам/мостам ×1.2 (просил юзер)
+    // бродячие отряды (просил юзер): скорость 0.9 от героевой; агро —
+    // 4.5 клетки, поводок погони — 9 клеток от центра своего маршрута
+    const WAND_SPEED = HERO_SPEED * 0.9;
+    const WAND_AGGRO = TS * 4.5;
+    const WAND_LEASH = TS * 9;
 
     // палитры зон: крыши городов и цвет чащ на мини-карте — у каждой
     // стихии свой характер (земля зон и ЛЕСНЫЕ МАССИВЫ — тайлы
@@ -71,6 +84,7 @@
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
         let floaties = []; // всплывающие подписи («Скоро…» у арки)
         let soonCount = 0; // сколько раз арка сказала «Скоро…» (тесты)
+        let squads = []; // бродячие отряды: { d, idx, st, node, wp, stuck, aggro, cx, cy }
 
         // карта мира живёт в забеге: генерится по сиду один раз и
         // переживает переходы сцены (сейв хранит только сид)
@@ -83,6 +97,22 @@
             if (G.world.map.lang !== GAME_LOC.lang)
                 GEN.namePois(G.world.map, GAME_LOC.lang);
             return G.world.map;
+        }
+
+        // динамическое состояние отрядов (жив/мёртв, где стоит) живёт в
+        // забеге — сейв хранит его рядом с сидом карты; геометрия и
+        // маршруты детерминированы сидом (worldGen, map.wanderers)
+        function ensureWander() {
+            const map = G.world.map;
+            if (!map.wanderers) return;
+            if (!G.world.wander) G.world.wander = {};
+            for (let i = 0; i < map.wanderers.length; i++) {
+                const d = map.wanderers[i];
+                if (!globalThis.GAME_DATA.CAVES[d.cave]) continue; // Время — данжа нет
+                const k = d.cave + ":" + i;
+                if (!G.world.wander[k]) G.world.wander[k] = {
+                    alive: true, x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS };
+            }
         }
 
         function walkable(gx, gy) {
@@ -371,6 +401,52 @@
             return c;
         }
 
+        // отряд-страж: иконка врага из подземелья (глаза с кинжалами,
+        // как в данже) на тени — чуть крупнее полевого токена
+        function makeWanderer(d) {
+            const c = new PIXI.Container();
+            const sh = new PIXI.Graphics();
+            sh.ellipse(0, 4, 20, 9);
+            sh.fill({ color: 0x0d130a, alpha: 0.5 });
+            c.addChild(sh);
+            const sp = new PIXI.Sprite(uiTex("icon_enemy.png"));
+            sp.anchor.set(0.5);
+            sp.scale.set(0.66);
+            c.addChild(sp);
+            c.eventMode = "none";
+            return c;
+        }
+
+        // бой с отрядом: как касание врага в подземелье (arenaScene читает
+        // G.activeEnemy), только флаг wander — трофей и реванш вернут в мир,
+        // а победа снимет отряд с карты. Тип врага — архетип 1-го этажа
+        // охраняемого данжа (просил юзер)
+        function fightSquad(s) {
+            const D = globalThis.GAME_DATA;
+            // бой с колодой меньше минимума этажа 1 запрещён — как в
+            // подземелье: запираем в редакторе колоды (отряд — бой этажа 1)
+            const need = D.deckMinFor(1);
+            if (G.deck.length < need) {
+                floatText(GAME_LOC.t("dungeon.deckLow", { min: need }),
+                    COMPONENTS.positionX[heroId], COMPONENTS.positionY[heroId],
+                    0xff9a6e);
+                G.uiReturn = "world";
+                scenes.go("deck");
+                return;
+            }
+            const enc = D.mobForFloor(s.d.cave, 1);
+            G.world.heroPos = {
+                x: COMPONENTS.positionX[heroId],
+                y: COMPONENTS.positionY[heroId],
+            };
+            G.worldFrom = true; // трофей/поражение ведут в открытый мир
+            G.activeEnemy = { x: s.st.x, y: s.st.y, enc,
+                deck: D.enemyDeck(enc, 1), alive: true, boss: false,
+                wander: s.d.cave + ":" + s.idx };
+            if (ctx.sfx) ctx.sfx();
+            scenes.go("arena");
+        }
+
         function floatText(text, x, y, fill) {
             const t = new PIXI.Text({
                 text, style: { fontFamily: "Kereru", fontSize: 22, fill,
@@ -569,6 +645,7 @@
             enter() {
                 if (ctx.music) ctx.music("menu"); // трек мира (пока общий с меню)
                 const map = ensureMap();
+                ensureWander(); // жив/мёртв и позиции отрядов (создать/дописать)
                 ctx.collide.rows = map.rows; // коллизии героя — по карте мира
                 ctx.collide.ts = TS; // после подземелья (клетка 64) — шаг мира
                 // точка появления: вышедший из подземелья герой стоит
@@ -592,6 +669,19 @@
                             return Math.hypot(hp.x - c.x, hp.y - c.y) < TS * 1.2;
                         });
                     if (near) hp = freeCellNear(hp.x, hp.y);
+                }
+                // реванш: живой отряд у точки появления отодвигает героя —
+                // касание с первого кадра не перезапускает только что
+                // проигранный бой (как retreatCell в подземелье)
+                if (G.world.wander && map.wanderers) {
+                    for (let i = 0; i < map.wanderers.length; i++) {
+                        const w = G.world.wander[map.wanderers[i].cave + ":" + i];
+                        if (!w || !w.alive) continue;
+                        if (Math.hypot(w.x - hp.x, w.y - hp.y) < TS * 1.3) {
+                            const away = freeCellNear(w.x, w.y);
+                            hp = { x: away.x, y: away.y };
+                        }
+                    }
                 }
                 G.world.heroPos = { ...hp };
 
@@ -651,6 +741,24 @@
                         : poi.kind === "town" ? makeTown(poi) : makeCave(poi);
                     poiNodes.push({ node, x: node.x, y: node.y });
                     objLayer.addChild(node);
+                }
+                // бродячие отряды: живые — на карту (общий y-sort слой);
+                // позиция берётся из состояния забега (переживает выход
+                // в данж и перезаход), маршруты — из карты
+                squads = [];
+                if (map.wanderers && G.world.wander) {
+                    for (let i = 0; i < map.wanderers.length; i++) {
+                        const d = map.wanderers[i];
+                        const st = G.world.wander[d.cave + ":" + i];
+                        if (!st || !st.alive) continue;
+                        const node = makeWanderer(d);
+                        node.position.set(st.x, st.y);
+                        node.zIndex = st.y;
+                        objLayer.addChild(node);
+                        squads.push({
+                            d, idx: i, st, node, wp: 0, stuck: 0, aggro: false,
+                        });
+                    }
                 }
                 worldContainer.addChild(layer);
 
@@ -728,6 +836,7 @@
                 swampStats = null;
                 roadStats = null;
                 path = null;
+                squads = []; // узлы уйдут вместе со слоем; состояние — в G.world.wander
                 floaties = [];
                 if (layer) { layer.destroy({ children: true }); layer = null; }
                 if (uiHud) { uiHud.destroy({ children: true }); uiHud = null; }
@@ -833,6 +942,75 @@
                 }
 
                 uiHud.userData.goldT.text = String(G.gold);
+
+                // ── бродячие отряды: патруль, погоня, касание — бой ────────
+                // (просил юзер). Пока открыт квест-диалог или отряды заморожены
+                // тестами (wanderFreeze) — стоят
+                if (!ctx.questModal && !G.world.wanderFreeze
+                    && !window.__wanderFreezeAll && squads.length) {
+                    for (const s of squads) {
+                        const dHero = Math.hypot(hx - s.st.x, hy - s.st.y);
+                        // касание отряда — бой (как соприкосновение
+                        // с противником в самом подземелье)
+                        if (dHero < TS * 0.85) { fightSquad(s); return; }
+                        // дистанция до СВОЕГО маршрута (ближайшая его точка) —
+                        // поводок погони: преследуем, но недалеко от маршрута
+                        let dRoute = Infinity;
+                        for (const [gx, gy] of s.d.route) {
+                            const dd = Math.hypot(
+                                s.st.x - (gx * TS + TS / 2),
+                                s.st.y - (gy * TS + TS / 2));
+                            if (dd < dRoute) dRoute = dd;
+                        }
+                        // агро: герой близко, отряд не за поводком маршрута
+                        // и до героя есть путь (через реку не гонимся);
+                        // сорвать погоню — герой ушёл или отряд дошёл до края
+                        const hgx = Math.floor(hx / TS), hgy = Math.floor(hy / TS);
+                        const sgx = Math.floor(s.st.x / TS), sgy = Math.floor(s.st.y / TS);
+                        if (!s.aggro && dHero < WAND_AGGRO && dRoute < WAND_LEASH
+                            && bfsPath(sgx, sgy, hgx, hgy)) s.aggro = true;
+                        else if (s.aggro && (dHero > WAND_AGGRO * 1.4
+                            || dRoute > WAND_LEASH)) s.aggro = false;
+                        // цель: герой (погоня) или очередная точка маршрута
+                        let tx, ty;
+                        if (s.aggro) { tx = hx; ty = hy; }
+                        else {
+                            const wc = s.d.route[s.wp % s.d.route.length];
+                            tx = wc[0] * TS + TS / 2;
+                            ty = wc[1] * TS + TS / 2;
+                        }
+                        const dx = tx - s.st.x, dy = ty - s.st.y;
+                        const d = Math.hypot(dx, dy);
+                        if (!s.aggro && d < 6) { // точка патруля достигнута
+                            s.wp = (s.wp + 1) % s.d.route.length;
+                            s.stuck = 0;
+                            continue;
+                        }
+                        if (d > 0.001) {
+                            const step = WAND_SPEED * ticker.deltaMS / 1000;
+                            const mx = s.st.x + dx / d * step;
+                            const my = s.st.y + dy / d * step;
+                            // скольжение вдоль стен: весь шаг → только X →
+                            // только Y → топтание (счётчик застревания)
+                            if (walkable(Math.floor(mx / TS), Math.floor(my / TS))) {
+                                s.st.x = mx; s.st.y = my; s.stuck = 0;
+                            } else if (walkable(Math.floor(mx / TS), Math.floor(s.st.y / TS))) {
+                                s.st.x = mx; s.stuck++;
+                            } else if (walkable(Math.floor(s.st.x / TS), Math.floor(my / TS))) {
+                                s.st.y = my; s.stuck++;
+                            } else s.stuck++;
+                            // упёрся: в патруле — следующая точка, в погоне —
+                            // отстать (вернуться к маршруту)
+                            if (s.stuck > 60) {
+                                s.stuck = 0;
+                                if (s.aggro) s.aggro = false;
+                                else s.wp = (s.wp + 1) % s.d.route.length;
+                            }
+                        }
+                        s.node.position.set(s.st.x, s.st.y);
+                        s.node.zIndex = s.st.y; // y-sort общий слой
+                    }
+                }
 
                 // арки подземелий — касание (диалог открыт — молчат);
                 // Время ещё без данжа — «Скоро…»
@@ -941,6 +1119,22 @@
                 },
                 enterCave: (cave) => enterCave(cave),
                 soonCount: () => soonCount,
+                // ── бродячие отряды (тесты): список с живыми позициями и
+                // заморозка ИИ — пробы с прогулками по миру не ловят бои
+                wander: () => ({
+                    freeze: !!G.world.wanderFreeze,
+                    list: ((G.world.map && G.world.map.wanderers) || [])
+                        .map((d, i) => {
+                            const st = G.world.wander
+                                && G.world.wander[d.cave + ":" + i];
+                            return st ? {
+                                cave: d.cave, i, alive: st.alive,
+                                x: st.x, y: st.y, route: d.route,
+                                active: !!globalThis.GAME_DATA.CAVES[d.cave],
+                            } : null;
+                        }).filter(Boolean),
+                }),
+                wanderFreeze: (v) => { G.world.wanderFreeze = !!v; return true; },
                 // мини-карта (правый нижний угол): бокс и маркер героя
                 mini: () => {
                     const mini = uiHud && uiHud.userData.mini;

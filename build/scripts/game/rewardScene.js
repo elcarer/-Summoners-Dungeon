@@ -32,9 +32,13 @@
             if (G.saveRun) G.saveRun(); // трофей получен — забег сохранён
             if (ctx.sfx) ctx.sfx("coins");
             rebuild();
-            // подсветка выбора видна ~0.7с, затем карта сама ведёт в подземелье
+            // подсветка выбора видна ~0.7с, затем карта сама ведёт дальше:
+            // бой из открытого мира — в мир, из подземелья — в подземелье
             scheduler.after(0.7, () => {
-                if (root && picked !== null) scenes.go("dungeon");
+                if (root && picked !== null) {
+                    scenes.go(G.worldFrom ? "world" : "dungeon");
+                    G.worldFrom = false;
+                }
             });
         }
 

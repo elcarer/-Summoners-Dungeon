@@ -78,6 +78,7 @@
         // возьмёт колоду игрока из драфта и разыграет итог сама.
         function launchBattle() {
             G.draftBattle = true;
+            G.worldFrom = false; // драфт — бой подземелья («Карта сокровищ»)
             G.activeEnemy = { enc: "draft", deck: [...G.draft.ePicks], draft: true };
             G.draft.round = G.draft.picks.length;
             scenes.go("arena");

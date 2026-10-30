@@ -1366,6 +1366,7 @@
                             scenes.go("deck");
                             return;
                         }
+                        G.worldFrom = false; // бой из подземелья — трофей вернёт сюда
                         G.activeEnemy = t.enemy;
                         scenes.go("arena");
                         return;

@@ -557,10 +557,12 @@
                         G.wonHero = enc2.hero;
                     // сюжетная линия (просил юзер): победа в подземелье СВОЕЙ
                     // стихии выполняет активный квест — окно награды откроется
-                    // после экрана выбора карты (на входе в подземелье)
+                    // после экрана выбора карты (на входе в подземелье).
+                    // Победа над бродячим отрядом мира квестов не касается
                     if (globalThis.GAME_QUESTS)
                         globalThis.GAME_QUESTS.onBattleWin(G, {
                             boss: !!(G.activeEnemy && G.activeEnemy.boss),
+                            wander: !!(G.activeEnemy && G.activeEnemy.wander),
                         });
                 }
                 if (draft && victory) {
@@ -619,6 +621,10 @@
                     if (victory) {
                         if (G.activeEnemy) {
                             G.activeEnemy.alive = false;
+                            // бродячий отряд открытого мира: побеждён —
+                            // снят с карты навсегда (состояние — в сейве)
+                            if (G.activeEnemy.wander && G.world.wander)
+                                G.world.wander[G.activeEnemy.wander].alive = false;
                             if (G.activeEnemy.boss) {
                                 G.dungeon.bossDead = true;
                                 // «Карта сокровищ» (просил юзер): только на
@@ -658,9 +664,15 @@
                         if (afterLoss === "deck") {
                             // колода ниже минимума (просил юзер): запереть
                             // игрока в редакторе колоды до сбора минимума
-                            G.uiReturn = "dungeon";
+                            G.uiReturn = G.worldFrom ? "world" : "dungeon";
                             scenes.go("deck");
-                        } else scenes.go("dungeon");
+                        } else {
+                            // бой из открытого мира — реванш возвращает в мир
+                            // (герой в world.heroPos, живой отряд отодвинет
+                            // его при входе в сцену); из данжа — в подземелье
+                            scenes.go(G.worldFrom ? "world" : "dungeon");
+                        }
+                        G.worldFrom = false;
                     }
                 };
                 if (victory) {
@@ -681,7 +693,8 @@
                     const backKey = draft ? "arena.toDungeon"
                         : afterLoss === "newGame" ? "arena.toMenu"
                         : afterLoss === "deck" ? "arena.toDeck"
-                        : (B.lossCard ? "arena.toDungeon" : "arena.toMenu");
+                        : (B.lossCard ? (G.worldFrom ? "arena.toWorld"
+                            : "arena.toDungeon") : "arena.toMenu");
                     const bt = T(t(backKey), 45, 0xf3e6c2);
                     bt.anchor.set(0.5);
                     globalThis.GAME_UI.fit(bt, btn.texture.width * btn.scale.x * 0.8, 11); // не шире кнопки

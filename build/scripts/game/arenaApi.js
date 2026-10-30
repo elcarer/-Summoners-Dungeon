@@ -387,8 +387,13 @@
                 // resurrectSummon — бесплатный призыв «Воскрешения»)
                 _cellTap(col, row) { onCellTap(col, row); return true; },
                 // тест-хук: урон базе стороны (проба «Неусыпного гарнизона»
-                // hon194 — триггер «ваша база получает урон» живёт в damageBase)
-                _damageBase(side, amount) { damageBase(side, amount); return true; },
+                // hon194 — триггер «ваша база получает урон» живёт в damageBase;
+                // обнуление базы завершает бой — как боевой урон по базе)
+                _damageBase(side, amount) {
+                    damageBase(side, amount);
+                    checkEnd();
+                    return true;
+                },
                 // тест-хук: лечение базы стороны (проба «Претендента на
                 // трон» honThrone — гейт throneGuard живёт в healBase)
                 _healBase(side, n) { healBase(side, n); return true; },
