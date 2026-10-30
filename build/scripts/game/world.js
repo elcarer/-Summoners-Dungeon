@@ -77,6 +77,7 @@
         let swampStats = null; // статистика болот swamp.png (тесты)
         let roadStats = null; // статистика дорог roads.png (тесты)
         let objLayer = null; // общий y-sort слой: деревья/горы/POI/герой
+        let fxLayer = null; // всплывающие надписи — ВСЕГДА на переднем плане
         let chunkHolder = null; // контейнер активных чанков рендера
         let chunkCache = null; // Map: ключ чанка → {node, objs, active, used}
         let chunkRect = ""; // набор активных чанков — «cx0,cy0,cx1,cy1»
@@ -503,8 +504,7 @@
             });
             t.anchor.set(0.5);
             t.position.set(x, y - 40);
-            t.zIndex = y + 10;
-            objLayer.addChild(t);
+            fxLayer.addChild(t); // передний план (просил юзер волна 15)
             floaties.push({ node: t, t: 0 });
         }
 
@@ -672,7 +672,7 @@
             hint.anchor.set(0.5, 0);
             hint.position.set(960, 1050);
             c.addChild(hint);
-            const mini = buildMinimap();
+            const mini = buildMinimap(miniMode); // режим помнится (M)
             c.addChild(mini.box);
             // краевые элементы HUD — ссылки для ежекадрового прижатия
             // к краям ОКНА по горизонтали (просил юзер: при переходе
@@ -687,13 +687,15 @@
         // Статична: рельеф/дороги/POI рисуются один раз при входе; поверх —
         // живой пульсирующий маркер героя (update). Клики по ней
         // поглощаются — герой не бегает в угол.
+        // ДВА РЕЖИМА (просил юзер волна 15): обычный (1px на клетку) и
+        // крупный вдвое (2px) — переключение клавишей M.
         // Угол привязан к КРАЮ ОКНА, а не UI-канваса 1920×1080: при окне
         // шире 16:9 letterbox-полосы справа сдвигали угол UI к центру
         // (баг, просил юзер пофиксить) — позиция пересчитывается каждый
         // кадр (fit) от реального размера экрана
-        function buildMinimap() {
+        function buildMinimap(scale = 1) {
             const map = G.world.map;
-            const MS = 1, MW = map.w * MS, MH = map.h * MS;
+            const MS = scale, MW = map.w * MS, MH = map.h * MS;
             const box = new PIXI.Container();
             const fit = () => {
                 const c = ctx.ui.toLocal({
@@ -725,7 +727,7 @@
             // точки интереса: столицы/города — цвет крыши стихии, арки — светлые
             const p = new PIXI.Graphics();
             for (const poi of map.pois) {
-                const s = poi.kind === "capital" ? 6 : poi.kind === "town" ? 4 : 4;
+                const s = (poi.kind === "capital" ? 6 : 4) * MS;
                 p.rect(poi.gx * MS - s / 2 + MS / 2, poi.gy * MS - s / 2 + MS / 2, s, s);
                 p.fill(poi.kind === "dungeon" ? 0xffe9b0
                     : poi.kind === "capital" ? 0xffd76a : ROOF[poi.elem]);
@@ -733,11 +735,23 @@
             box.addChild(p);
             // маркер героя — белый пульсирующий кружок
             const dot = new PIXI.Graphics();
-            dot.circle(0, 0, 3.5);
+            dot.circle(0, 0, 3.5 * MS);
             dot.fill({ color: 0xffffff });
             dot.stroke({ width: 1.5, color: 0x1c1207 });
             box.addChild(dot);
             return { box, dot, MW, MH, fit };
+        }
+
+        // переключение режима мини-карты клавишей M (просил юзер волна 15):
+        // пересобрать Graphics в новом масштабе — прежний узел сгорает
+        let miniMode = 1; // 1 — обычная (1px на клетку), 2 — крупная (2px)
+        function setMiniMode(m) {
+            if (!uiHud || !uiHud.userData.mini) return;
+            miniMode = m;
+            uiHud.userData.mini.box.destroy({ children: true });
+            const mini = buildMinimap(m);
+            uiHud.addChild(mini.box); // поверх прочего HUD, как при входе
+            uiHud.userData.mini = mini;
         }
 
         // Вход в подземелье: продолжить текущий этаж ЭТОГО данжа (состояния
@@ -884,6 +898,12 @@
                 objLayer.sortableChildren = true;
                 objLayer.zIndex = -96; // над чанками и рамкой
                 layer.addChild(objLayer);
+                // надписи поверх всего мира (просил юзер волна 15: раньше
+                // жили в y-sort objLayer и прятались за спрайтом входа
+                // в подземелье и прочими высокими объектами)
+                fxLayer = new PIXI.Container();
+                fxLayer.zIndex = -90;
+                layer.addChild(fxLayer);
                 poiNodes = [];
                 for (const poi of map.pois) {
                     const node = poi.kind === "capital" ? makeCapital(poi)
@@ -1000,6 +1020,7 @@
                 chunkRect = "";
                 mapFrame = null;
                 objLayer = null;
+                fxLayer = null;
                 poiNodes = null;
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
                 heroShadow = null;
@@ -1101,6 +1122,11 @@
                 if (ctx.input.wasPressed("Escape") && (ctx.questModal || 0) > 0)
                     globalThis.GAME_QUESTS.tap();
 
+                // M — размер мини-карты: обычная ↔ крупная вдвое
+                // (просил юзер волна 15)
+                if (ctx.input.wasPressed("KeyM"))
+                    setMiniMode(miniMode === 1 ? 2 : 1);
+
                 // квест-диалог открыт (модальный) — герой стоит и не входит
                 // в пещеры, пока окно не закрыто
                 if (ctx.questModal) {
@@ -1151,8 +1177,13 @@
                         s.shadow.zIndex = sy - 0.5;
                         const dHero = Math.hypot(hx - sx, hy - sy);
                         // касание отряда — бой (как соприкосновение
-                        // с противником в самом подземелье)
-                        if (dHero < TS * 0.85) { fightSquad(s); return; }
+                        // с противником в самом подземелье). После
+                        // «Убежать»/поражения 3с бой не начинается
+                        // (просил юзер волна 15 — успеть отбежать)
+                        if (dHero < TS * 0.85
+                            && performance.now() >= (G.world.battleCool || 0)) {
+                            fightSquad(s); return;
+                        }
                         // дистанция до СВОЕГО маршрута (ближайшая его точка) —
                         // поводок погони: преследуем, но недалеко от маршрута
                         let dRoute = Infinity;
@@ -1164,10 +1195,14 @@
                         }
                         // агро: герой близко, отряд не за поводком маршрута
                         // и до героя есть путь (через реку не гонимся);
-                        // сорвать погоню — герой ушёл или отряд дошёл до края
+                        // сорвать погоню — герой ушёл или отряд дошёл до края.
+                        // Пока действует иммунитет после побега/поражения —
+                        // новые погони не срываются (герой отходит в покое)
                         const hgx = Math.floor(hx / TS), hgy = Math.floor(hy / TS);
                         const sgx = Math.floor(sx / TS), sgy = Math.floor(sy / TS);
-                        if (!s.aggro && dHero < WAND_AGGRO && dRoute < WAND_LEASH
+                        const battleCool = performance.now() < (G.world.battleCool || 0);
+                        if (!s.aggro && !battleCool && dHero < WAND_AGGRO
+                            && dRoute < WAND_LEASH
                             && bfsPath(sgx, sgy, hgx, hgy)) s.aggro = true;
                         else if (s.aggro && (dHero > WAND_AGGRO * 1.4
                             || dRoute > WAND_LEASH)) s.aggro = false;

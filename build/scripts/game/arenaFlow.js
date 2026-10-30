@@ -521,6 +521,12 @@
             A.finish = function finish(victory) {
                 B.phase = "over";
                 B.spellTarget = false;
+                // побег («Убежать») или поражение в бою из открытого мира:
+                // 3с отряды мира не начинают с героем бой (просил юзер
+                // волна 15 — чтобы успеть убежать без моментального
+                // второго боя); в подземелье работает реванш как прежде
+                if (!victory && G.worldFrom)
+                    G.world.battleCool = performance.now() + 3000;
                 const draft = !!(G.draftBattle && G.draft);
                 sfx(victory ? "lvlUp" : "die");
                 fxEvent(victory ? "victory" : "defeat", { x: 960, y: 430 });
