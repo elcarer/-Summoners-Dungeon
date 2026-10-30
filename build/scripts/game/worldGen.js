@@ -26,7 +26,7 @@
     // V9: воды в зоне Тлена нет вовсе (русла обрываются у его границ),
     // болота отступают на клетку от границ зоны — без стыков с чужими
     // биомами
-    const V = 13; // v13 — охранники мостов (map.bridgeGuards, просил юзер)
+    const V = 14; // v14 — охранники Тлена (map.decayGuards, просил юзер)
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // сетка зон 3×2: индекс k — колонка k%3, ряд (k/3|0), сектор 128×128
@@ -993,9 +993,187 @@
             }
         }
 
+        // ── 8d. охранники Тлена (просил юзер, волна 13): в зоне Тлена рек
+        // нет (v9) — мостовых у него не бывает. Его стражи патрулируют
+        // горные проходы (дороги сквозь хребты) из зоны тьмы и болота;
+        // числом — примерно как мостовые в других зонах: проходы у Тлена
+        // получают стража на каждый кластер, болота добирают до нормы
+        // (максимум из 6 и числа мостовых этого сида)
+        const decayGuards = [];
+        {
+            const DZ = 3; // ELEMS[3] === "decay"
+            // точки маршрута не липнут к POI (арки/площади городов) —
+            // стража не караулит двери данжей и спавн героя
+            const nearPoi = (gx, gy) => pois.some((p) =>
+                Math.max(Math.abs(p.gx - gx), Math.abs(p.gy - gy)) <= 3);
+            // суша, достижимая пешком от затравок (как у мостов: у стражи
+            // своя береговая компонента — реки/хребты её режут)
+            const compFrom = (seeds) => {
+                const comp = new Uint8Array(N);
+                const q = [];
+                for (const c of seeds)
+                    if (rows[(c / W) | 0][c % W] === "." && !comp[c]) {
+                        comp[c] = 1; q.push(c);
+                    }
+                for (let qi = 0; qi < q.length; qi++) {
+                    const c = q[qi], cx = c % W, cy = (c / W) | 0;
+                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        const nx = cx + dx, ny = cy + dy;
+                        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                        const ni = ny * W + nx;
+                        if (!comp[ni] && rows[ny][nx] === ".") {
+                            comp[ni] = 1; q.push(ni);
+                        }
+                    }
+                }
+                return comp;
+            };
+            // маршрут 2–4 точки в кольце r0..r0+3 клетки от точки по 4
+            // углам, только проходимая суша из comp, попарно ≥2 (как у
+            // мостов); спавн — первая точка
+            const routeNear = (mx, my, comp, r0) => {
+                const pts = [];
+                for (let k = 0; k < 4; k++) {
+                    for (let tries = 0; tries < 40; tries++) {
+                        const ang = (k + rng()) * (Math.PI / 2);
+                        const r = r0 + rng() * 3;
+                        const gx = mx + Math.round(Math.cos(ang) * r);
+                        const gy = my + Math.round(Math.sin(ang) * r);
+                        if (gx < 2 || gy < 2 || gx >= W - 2 || gy >= H - 2)
+                            continue;
+                        if (rows[gy][gx] !== "." || !comp[gy * W + gx])
+                            continue;
+                        if (nearPoi(gx, gy)) continue;
+                        if (pts.some((p) =>
+                            Math.hypot(p[0] - gx, p[1] - gy) < 2)) continue;
+                        pts.push([gx, gy]);
+                        break;
+                    }
+                }
+                return pts;
+            };
+            const cluster = (i0, kind, seen) => {
+                const cl = [i0]; seen[i0] = 1;
+                for (let qi = 0; qi < cl.length; qi++) {
+                    const c = cl[qi], cx = c % W, cy = (c / W) | 0;
+                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        const nx = cx + dx, ny = cy + dy;
+                        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                        const ni = ny * W + nx;
+                        if (!seen[ni] && ter[ni] === kind) {
+                            seen[ni] = 1; cl.push(ni);
+                        }
+                    }
+                }
+                return cl;
+            };
+            // 1) горные проходы из зоны тьмы: кластеры дорог, у которых
+            // есть гора в чебышёв-1 (дорога идёт сквозь хребет) и клетки
+            // зоны Тлена в кольце 6. Страж ходит у УСТЬЯ — края кластера
+            // на стороне Тлена
+            const seenR = new Uint8Array(N);
+            for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+                const i0 = y * W + x;
+                if (ter[i0] !== T_ROAD || seenR[i0]) continue;
+                const cl = cluster(i0, T_ROAD, seenR);
+                let inMtn = false;
+                for (const c of cl) {
+                    const cx = c % W, cy = (c / W) | 0;
+                    for (let dy = -1; dy <= 1 && !inMtn; dy++)
+                        for (let dx = -1; dx <= 1; dx++) {
+                            if (!dx && !dy) continue;
+                            const nx = cx + dx, ny = cy + dy;
+                            if (nx < 0 || ny < 0 || nx >= W || ny >= H)
+                                continue;
+                            if (ter[ny * W + nx] === T_MOUNTAIN) {
+                                inMtn = true; break;
+                            }
+                        }
+                    if (inMtn) break;
+                }
+                if (!inMtn) continue; // дорога вне гор — не проход
+                let nearD = false;
+                for (const c of cl) {
+                    const cx = c % W, cy = (c / W) | 0;
+                    for (let dy = -6; dy <= 6 && !nearD; dy++)
+                        for (let dx = -6; dx <= 6; dx++) {
+                            const nx = cx + dx, ny = cy + dy;
+                            if (nx < 0 || ny < 0 || nx >= W || ny >= H)
+                                continue;
+                            if (zone[ny * W + nx] === DZ) {
+                                nearD = true; break;
+                            }
+                        }
+                    if (nearD) break;
+                }
+                if (!nearD) continue; // проход чужой зоны
+                // устье: клетка кластера ближе прочих к зоне Тлена
+                let bi = 0, bd = Infinity;
+                for (let ci = 0; ci < cl.length; ci++) {
+                    const cx = cl[ci] % W, cy = (cl[ci] / W) | 0;
+                    let d = Infinity;
+                    for (let dy = -7; dy <= 7; dy++)
+                        for (let dx = -7; dx <= 7; dx++) {
+                            const nx = cx + dx, ny = cy + dy;
+                            if (nx < 0 || ny < 0 || nx >= W || ny >= H)
+                                continue;
+                            if (zone[ny * W + nx] === DZ)
+                                d = Math.min(d, Math.hypot(dx, dy));
+                        }
+                    if (d < bd) { bd = d; bi = ci; }
+                }
+                const mx = cl[bi] % W, my = (cl[bi] / W) | 0;
+                const pts = routeNear(mx, my, compFrom(cl), 1.5);
+                if (pts.length < 2) continue; // проход в скалах — тесно
+                decayGuards.push({
+                    elem: "decay",
+                    gx: pts[0][0], gy: pts[0][1], // спавн — первая точка
+                    route: pts,
+                });
+            }
+            // 2) болота: кластеры T_SWAMP (болота растут только в Тлене,
+            // 3b); страж ходит ВКОЛО края болота — радиус от центра с
+            // запасом на размер кляксы. Добор до нормы мостовых
+            const norm = Math.max(6, bridgeGuards.length);
+            const seenS = new Uint8Array(N);
+            for (let y = 0; y < H && decayGuards.length < norm; y++)
+                for (let x = 0; x < W && decayGuards.length < norm; x++) {
+                    const i0 = y * W + x;
+                    if (ter[i0] !== T_SWAMP || seenS[i0]) continue;
+                    const cl = cluster(i0, T_SWAMP, seenS);
+                    const mx = Math.round(cl.reduce((s, c) => s + (c % W), 0)
+                        / cl.length);
+                    const my = Math.round(cl.reduce((s, c) =>
+                        s + ((c / W) | 0), 0) / cl.length);
+                    // суша вокруг болота: 4-соседи кластера (гать — тоже
+                    // суша), компонента от них
+                    const seeds = [];
+                    for (const c of cl) {
+                        const cx = c % W, cy = (c / W) | 0;
+                        for (const [dx, dy] of
+                            [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                            const nx = cx + dx, ny = cy + dy;
+                            if (nx < 0 || ny < 0 || nx >= W || ny >= H)
+                                continue;
+                            if (rows[ny][nx] === ".")
+                                seeds.push(ny * W + nx);
+                        }
+                    }
+                    if (!seeds.length) continue; // болото замуровано
+                    const r0 = Math.sqrt(cl.length / Math.PI) + 1.5;
+                    const pts = routeNear(mx, my, compFrom(seeds), r0);
+                    if (pts.length < 2) continue; // болото в скалах — тесно
+                    decayGuards.push({
+                        elem: "decay",
+                        gx: pts[0][0], gy: pts[0][1], // спавн — первая
+                        route: pts,
+                    });
+                }
+        }
+
         return {
             v: V, w: W, h: H, seed,
-            ter, zone, rows, pois, spawn, wanderers, bridgeGuards,
+            ter, zone, rows, pois, spawn, wanderers, bridgeGuards, decayGuards,
             centers: centers.map((c) => ({ x: Math.round(c.x), y: Math.round(c.y) })),
         };
     }

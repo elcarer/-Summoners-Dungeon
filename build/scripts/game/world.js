@@ -114,8 +114,9 @@
         // динамическое состояние отрядов (жив/мёртв, где стоит) живёт в
         // забеге — сейв хранит его рядом с сидом карты; геометрия и
         // маршруты детерминированы сидом (worldGen, map.wanderers +
-        // map.bridgeGuards). Ключи "cave:i" и "bridge:j" в одном словаре —
-        // победа над отрядом (arenaFlow) снимает его по G.activeEnemy.wander
+        // map.bridgeGuards + map.decayGuards). Ключи "cave:i",
+        // "bridge:j" и "decay:j" в одном словаре — победа над отрядом
+        // (arenaFlow) снимает его по G.activeEnemy.wander
         function ensureWander() {
             const map = G.world.map;
             if (!G.world.wander) G.world.wander = {};
@@ -126,16 +127,21 @@
                 if (!G.world.wander[k]) G.world.wander[k] = {
                     alive: true, x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS };
             }
-            if (map.bridgeGuards) for (let j = 0; j < map.bridgeGuards.length; j++) {
-                const d = map.bridgeGuards[j];
-                if (!guardEncOf(d.elem)) continue; // Время — стражей ещё нет
-                const k = "bridge:" + j;
-                if (!G.world.wander[k]) G.world.wander[k] = {
-                    alive: true, x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS };
+            for (const [list, kind] of [["bridgeGuards", "bridge"],
+                                        ["decayGuards", "decay"]]) {
+                if (!map[list]) continue;
+                for (let j = 0; j < map[list].length; j++) {
+                    const d = map[list][j];
+                    if (!guardEncOf(d.elem)) continue; // Время — стражей ещё нет
+                    const k = kind + ":" + j;
+                    if (!G.world.wander[k]) G.world.wander[k] = {
+                        alive: true, x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS };
+                }
             }
             // миграция старых ключей "gob:0" → "cave:gob:0" (до v13)
             for (const k of Object.keys(G.world.wander))
-                if (!k.startsWith("cave:") && !k.startsWith("bridge:")) {
+                if (!k.startsWith("cave:") && !k.startsWith("bridge:")
+                    && !k.startsWith("decay:")) {
                     G.world.wander["cave:" + k] = G.world.wander[k];
                     delete G.world.wander[k];
                 }
@@ -228,7 +234,8 @@
             const x0 = cx * CHUNK_CELLS, y0 = cy * CHUNK_CELLS;
             const map = G.world.map;
             c.addChild(globalThis.GAME_WORLDTILES.renderChunk(
-                map, worldTerr, ctx.worldSheets, TS, x0, y0, terrStats).container);
+                map, worldTerr, ctx.worldSheets, TS, x0, y0, terrStats,
+                G.world.seed).container);
             if (ctx.worldSheets.swamp)
                 c.addChild(globalThis.GAME_WORLDTILES.renderSwampChunk(
                     map, ctx.worldSheets, TS, x0, y0, swampStats).container);
@@ -892,15 +899,15 @@
                 const spawnSquads = (defs, kind) => {
                     for (let i = 0; i < defs.length; i++) {
                         const d = defs[i];
-                        const key = kind === "bridge" ? "bridge:" + i
-                            : "cave:" + d.cave + ":" + i;
+                        const key = kind === "cave"
+                            ? "cave:" + d.cave + ":" + i : kind + ":" + i;
                         const st = G.world.wander[key];
                         if (!st || !st.alive) continue;
                         const s = {
                             kind, key, d, st, wp: 0, path: null, aggro: false,
                             repath: 0, id: null,
-                            enc: kind === "bridge" ? guardEncOf(d.elem)
-                                : wanderEnc(d, i),
+                            enc: kind === "cave" ? wanderEnc(d, i)
+                                : guardEncOf(d.elem),
                         };
                         if (!s.enc) continue; // данж/стихия ещё без отрядов
                         s.elem = globalThis.GAME_DATA.ENCOUNTERS[s.enc].elem;
@@ -926,6 +933,7 @@
                 };
                 if (map.wanderers) spawnSquads(map.wanderers, "cave");
                 if (map.bridgeGuards) spawnSquads(map.bridgeGuards, "bridge");
+                if (map.decayGuards) spawnSquads(map.decayGuards, "decay");
                 worldContainer.addChild(layer);
 
                 // герой — лист по стихии забега (Рост — эльф, Сила — гоблин)
@@ -1356,28 +1364,34 @@
                             };
                         }).filter(Boolean),
                 }),
-                // ── охранники мостов (тесты): список + живые позиции ─────
-                bridges: () => ({
-                    list: ((G.world.map && G.world.map.bridgeGuards) || [])
-                        .map((d, j) => {
-                            const key = "bridge:" + j;
-                            const st = G.world.wander && G.world.wander[key];
-                            if (!st) return null;
-                            const s = squads.find((x) => x.key === key);
-                            return {
-                                j, key, elem: d.elem, alive: st.alive,
-                                enc: guardEncOf(d.elem),
-                                x: s && s.id !== null ? COMPONENTS.positionX[s.id] : st.x,
-                                y: s && s.id !== null ? COMPONENTS.positionY[s.id] : st.y,
-                                route: d.route,
-                                // персонаж мира: взгляд и «идёт» (контроллер)
-                                face: s && s.id !== null
-                                    ? characters.facingName(s.id) : null,
-                                walking: !!(s && s.id !== null
-                                    && COMPONENTS.ctrlMove[s.id]),
-                            };
-                        }).filter(Boolean),
-                }),
+                // ── охранники мостов и Тлена (тесты): список + живые
+                // позиции (единый формат; ключи bridge:j / decay:j) ────
+                bridges: () => {
+                    const m = G.world.map;
+                    const item = (d, key, j) => {
+                        const st = G.world.wander && G.world.wander[key];
+                        if (!st) return null;
+                        const s = squads.find((x) => x.key === key);
+                        return {
+                            j, key, elem: d.elem, alive: st.alive,
+                            enc: guardEncOf(d.elem),
+                            x: s && s.id !== null ? COMPONENTS.positionX[s.id] : st.x,
+                            y: s && s.id !== null ? COMPONENTS.positionY[s.id] : st.y,
+                            route: d.route,
+                            // персонаж мира: взгляд и «идёт» (контроллер)
+                            face: s && s.id !== null
+                                ? characters.facingName(s.id) : null,
+                            walking: !!(s && s.id !== null
+                                && COMPONENTS.ctrlMove[s.id]),
+                        };
+                    };
+                    return { list: [
+                        ...(((m && m.bridgeGuards) || []).map((d, j) =>
+                            item(d, "bridge:" + j, j))),
+                        ...(((m && m.decayGuards) || []).map((d, j) =>
+                            item(d, "decay:" + j, j))),
+                    ].filter(Boolean) };
+                },
                 // подсказка на отряде: состояние панели (как в подземелье)
                 hoverAt(x, y) {
                     hoverSquads({ x, y });

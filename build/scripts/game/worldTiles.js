@@ -69,6 +69,14 @@
         { sheet: "grass_water", feature: WATER },
         { sheet: "waste_dirt", feature: WASTE }, // болото — подложка тлена
     ];
+    // листы ВАРИАНТОВ сплошной заливки (просил юзер, волна 13): сплошная
+    // заливка одной текстурой однообразна — для местности с листом
+    // вариантов тайл целиком своей местности (все 4 угла блока — она)
+    // рисуется случайным вариантом ОТДЕЛЬНОГО тайлсета 4×4 (16 вариантов
+    // по 32px, images/tiles/<имя>.png), детерминированным сидом карты и
+    // координатой тайла. Переходные тайлы (границы местностей) не тронуты
+    // — у них свои углы. Пока вариант один — пустыня (sand.png юзера)
+    const VARIANTS = { [SAND]: "sand" };
     // цвета мини-карты (в тон тайлам; земля/трава/снег/песок/тлен/магия/
     // вода/болото)
     const MINI = [0x6a4828, 0x467622, 0xe8eef2, 0xe2d58b, 0x1c1a20, 0x9999ff,
@@ -153,7 +161,8 @@
     // renderChunk/renderForestChunk строят один чанк, render/renderForest
     // (вся карта сразу) оставлены офлайн-пробам и совместимости
     const CHUNK = 32; // клеток в чанке
-    function renderChunk(map, terr, sheets, TS, x0, y0, stats) {
+    function renderChunk(map, terr, sheets, TS, x0, y0, stats, seed) {
+        const GEN = globalThis.GAME_WORLDGEN, T = GEN.T;
         const t = terr || terrainOf(map);
         const W = map.w, H = map.h, s32 = sheets.grass_dirt.ts;
         const st = stats || { tiles: 0, fallback: 0, odd: 0, bySheet: {} };
@@ -179,6 +188,22 @@
                 sheet = "grass_water"; feature = WATER;
                 if (m & ~((1 << WATER) | (1 << GRASS))) st.fallback++;
             } else if (POP[m] === 1) {
+                // сплошная заливка: у местности с листом вариантов —
+                // случайный вариант 4×4 (сид карты + координата тайла,
+                // просил юзер волна 13); остальным — клетка листа, где
+                // она есть (бит фичи)
+                const vn = VARIANTS[tl], vs = vn && sheets[vn];
+                if (vs) {
+                    const spr = new PIXI.Sprite(vs.textures[
+                        (GEN.hash2(i, j, (seed | 0) ^ 0x7a11)
+                            * vs.textures.length) | 0]);
+                    spr.position.set(i * TS, j * TS);
+                    spr.scale.set(TS / vs.ts);
+                    c.addChild(spr);
+                    st.tiles++;
+                    st.bySheet[vn] = (st.bySheet[vn] || 0) + 1;
+                    continue;
+                }
                 const sol = SOLID[tl];
                 sheet = sol.sheet; feature = sol.feature;
             } else if (POP[m] === 2) {
@@ -199,14 +224,14 @@
         return { container: c, stats: st };
     }
     // вся карта — чанки подряд (офлайн-пробы, полный рендер)
-    function render(map, terr, sheets, TS) {
+    function render(map, terr, sheets, TS, seed) {
         const W = map.w, H = map.h;
         const c = new PIXI.Container();
         const stats = { tiles: 0, fallback: 0, odd: 0, bySheet: {} };
         for (let cy = 0; cy < H; cy += CHUNK)
             for (let cx = 0; cx < W; cx += CHUNK)
                 c.addChild(renderChunk(map, terr, sheets, TS,
-                    cx, cy, stats).container);
+                    cx, cy, stats, seed).container);
         return { container: c, stats };
     }
 
@@ -387,11 +412,13 @@
     }
 
     globalThis.GAME_WORLDTILES = {
-        // V7: болота — оверлей поверх тлена (без кромок terrainOf,
-        // подложка waste в renderChunk); пара трава|болото из PAIRS
-        // убрана
-        V: 7, CHUNK, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER, SWAMP,
-        NAME, ZONE_TERRAIN, PAIRS, MINI, terrainOf, ROAD_TILE,
+        // V8: сплошная заливка — лист вариантов 4×4 (VARIANTS, sand.png
+        // пустыни, просил юзер волна 13); V7 — болота оверлеем поверх
+        // тлена (без кромок terrainOf, подложка waste в renderChunk),
+        // пара трава|болото из PAIRS убрана
+        V: 8, CHUNK, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER, SWAMP,
+        NAME, ZONE_TERRAIN, PAIRS, SOLID, VARIANTS, MINI, terrainOf,
+        ROAD_TILE,
         render, renderChunk, renderForest, renderForestChunk,
         renderSwamp, renderSwampChunk, renderRoadsChunk,
         renderTreesChunk, renderMountainsChunk, pairOK,
