@@ -249,7 +249,8 @@
                     if (e === "freezeSplash" || e === "rowShift"
                         || e === "bubble" || e === "alliesStrike"
                         || e === "ghostGrave" || e === "darkOffering"
-                        || e === "tarStatue" || e === "tarKettles")
+                        || e === "tarStatue" || e === "tarKettles"
+                        || e === "timeTrap") // «Ловушка времени» — только существа
                         return u.def.type === "unit";
                     return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
                         || e === "confuse" || e === "cellDebuff"
@@ -258,14 +259,16 @@
                 let i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                     && cellEffect(t));
                 if (i < 0) {
-                    // «Решётка с шипами», «Шипастые лозы» и «Опутывание корней»
-                    // нейтральны: срабатывают на ЛЮБОЕ существо, оказавшееся на
-                    // клетке, — включая хозяина ловушки («Котлы со смолой» —
-                    // на любое СУЩЕСТВО: перемещение/призыв, спека hon191)
+                    // «Решётка с шипами», «Шипастые лозы», «Опутывание корней»
+                    // и «Ловушка времени» нейтральны: срабатывают на ЛЮБОЕ
+                    // существо, оказавшееся на клетке, — включая хозяина
+                    // ловушки («Котлы со смолой» — на любое СУЩЕСТВО:
+                    // перемещение/призыв, спека hon191)
                     side = u.side;
                     i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                         && (t.def.trap.effect === "cellDmgAll" || t.def.trap.effect === "cellDebuff"
                             || t.def.trap.effect === "entangle"
+                            || t.def.trap.effect === "timeTrap"
                             || (t.def.trap.effect === "tarKettles"
                                 && u.def.type === "unit")));
                 }
@@ -451,6 +454,38 @@
                     if (hn) hn.text = String(Math.max(0, u.hp));
                     sfx("acid");
                     if (u.hp <= 0) killUnit(u, null);
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
+                if (trap.def.trap.effect === "timeTrap") {
+                    // «Ловушка времени» (tim207, просил юзер): существо
+                    // убирается с поля БЕЗ каскадов смерти (это не гибель)
+                    // и получает «Сдвиг 2» — вернётся на эту клетку в начале
+                    // хода своего владельца, когда счётчик истечёт (клетка
+                    // занята — значок ждёт с нулём). «Машина времени»
+                    // ВЛАДЕЛЬЦА существа снижает «Сдвиг» (effDelayVal).
+                    // Эффекты и параметры сбрасываются: оно заново призывается
+                    // из своей карты (свежий addUnit)
+                    const id = cardIdOf(u.def);
+                    const wasToken = !!u.token;
+                    const us = u.side;
+                    const cell = { col: u.col, row: u.row };
+                    const left = A.effDelayVal(trap.def.trap.delay || 2, us);
+                    removeUnit(u);
+                    const p2 = cellXY(cell.col, cell.row);
+                    floatText(p2.x, p2.y - 66,
+                        "⏳ " + GAME_LOC.t("status.delay.name"), 0xc9a0ef);
+                    sfx("acid");
+                    if (left > 0) {
+                        delayPlace(us, id, cell.col, cell.row,
+                            { token: wasToken, left });
+                    } else {
+                        // «Машина времени» сняла и этот «Сдвиг» —
+                        // существо возвращается сразу
+                        addUnit(us, id, cell.col, cell.row,
+                            { noDelay: true, token: wasToken });
+                    }
                     refreshHud();
                     checkEnd();
                     return;

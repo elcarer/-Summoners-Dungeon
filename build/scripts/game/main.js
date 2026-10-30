@@ -66,6 +66,8 @@
         uiTextures["card_wisdom_back.png"] = await assets.loadTexture("./images/ui/card_wisdom_back.png");
         uiTextures["card_decay_back.png"] = await assets.loadTexture("./images/ui/card_decay_back.png");
         uiTextures["card_honor_back.png"] = await assets.loadTexture("./images/ui/card_honor_back.png");
+        // рубашка стихии Время (Тордин, просил юзер)
+        uiTextures["card_time_back.png"] = await assets.loadTexture("./images/ui/card_time_back.png");
         // тайлы подземелий юзера: images/dungeon_tiles/<данж>/<…>.png —
         // полы 64×64 (floor/0-9) и стены walls/* по маске соседей.
         // Свой набор на каждый данж: goblins_lair (Сила), growth_lair (Рост),
@@ -923,9 +925,10 @@
                     epRoot.addChild(c);
                     cards.push({ id, node: c, x: cx, y: cy });
                 });
-                // Пустой слот 6 (просил юзер): под героя следующей стихии —
-                // приглушённая рамка с «?», без кликов
-                {
+                // Пустой слот под героя следующей стихии (просил юзер):
+                // приглушённая рамка с «?», без кликов — только пока героев
+                // меньше шести (сетка 3×2); Тордин занял свой слот
+                if (GAME_DATA.HERO_ORDER.length < 6) {
                     const c = new PIXI.Container();
                     c.position.set(colX(5), rowY(5));
                     const panel = new PIXI.Graphics();

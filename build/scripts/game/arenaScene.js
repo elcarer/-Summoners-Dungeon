@@ -86,6 +86,9 @@
                     eDeckBase: eBase,
                     eDiscard: [], eHand: [],
                     units: [], traps: { p: [], e: [] }, firewalls: [],
+                    // «Сдвиг» (стихия Время): отложенные призывы стороны —
+                    // { side, cardId, col, row, left, token, node }
+                    delayed: { p: [], e: [] },
                     selected: null, spellTarget: false, result: null,
                     discarding: false, picking: false, brewCasts: 0,
                     // «Торговец» (hon183): очередь панелей сброса после его
@@ -145,6 +148,10 @@
                 root.addChild(root.board);
                 root.fireLayer = new PIXI.Container(); // «Стена костров» — огонь под жетонами
                 root.addChild(root.fireLayer);
+                // значки «Сдвига» (tim202/203/207) — ПОД жетонами: существо,
+                // дождавшееся появления, рисуется поверх значка
+                root.delayLayer = new PIXI.Container();
+                root.addChild(root.delayLayer);
                 root.unitsLayer = new PIXI.Container();
                 // общий z-order существ и строений: кто ниже по полю (больше row),
                 // тот ближе к зрителю — рисуется поверх (просил юзер: строения

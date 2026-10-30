@@ -722,6 +722,9 @@
                     if (d.spellGrow) s += 1.0; // hon182: растёт от каждого своего заклинания
                     if (d.undying) s += 1.5; // hon190: переживает смертельный удар
                     if (d.medicHeal) s += 1.2; // hon195: +1♥ случайному объекту каждый ход
+                    if (d.protect) s += 0.5 * d.protect; // tim201: врождённая «Защита»
+                    // «Сдвиг» (Время): тело придёт позже — сейчас стоит дешевле
+                    if (d.delay) s -= 0.5 * d.delay;
                     return s;
                 }
                 if (d.type === "building") {
@@ -750,7 +753,10 @@
                         + (d.trebuchet ? 1.7 : 0) // −2 базы врага каждый ход
                         + (d.aura ? 2.2 : 0) // hon185 «Грааль»: +2/+2 всем своим
                         + (d.siegeShot ? (d.siegeFollow ? 1.8 : 0.8) : 0) // hon188: ездит и стреляет
-                        + (d.pillarEnergy ? 1.2 : 0); // hon198: +1⚡ за атаку по себе
+                        + (d.pillarEnergy ? 1.2 : 0) // hon198: +1⚡ за атаку по себе
+                        // Время (tim204/205): движки «Сдвига»
+                        + (d.timeMachine ? 1.5 : 0) // ускоряет всех своих на ход
+                        + (d.clockwork ? 1.4 : 0); // рывок каждому пришедшему «Сдвигом»
                 }
                 if (d.type === "spell") {
                     const s = d.spell || {};
@@ -813,6 +819,10 @@
                     if (s.discardHandDraw) v += 1.0
                         + 0.35 * Math.min(6, B.hand.length)
                         - 0.3 * Math.min(6, B.eHand.length);
+                    // «Мозговой штурм» (tim206): смена руки +1 карта —
+                    // ценнее с полной рукой слабых карт
+                    if (s.brainstorm) v += 0.6
+                        + 0.25 * Math.min(6, B.eHand.length);
                     return v;
                 }
                 if (d.type === "trap") {
@@ -829,6 +839,7 @@
                     if (d.trap.effect === "grandParley") v += 0.6; // hon192: размен рук — ценен при пустой руке ИИ
                     if (d.trap.effect === "garrisonRise") v += 1.6; // hon194: до 10 Прихожан 2/2 за удар по базе
                     if (d.trap.effect === "ambushRise") v += 1.4; // hon196: Прихожанин + карта в руку за смерть постройки
+                    if (d.trap.effect === "timeTrap") v += 1.3; // tim207: существо из игры на 2 хода
                     return v;
                 }
                 return 1;

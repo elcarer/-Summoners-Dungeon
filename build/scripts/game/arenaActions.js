@@ -20,6 +20,7 @@
                 if (B.stopped) return;
                 upkeep("p"); // грибницы игрока
                 poisonTick("p"); // яд: до марша (просил юзер)
+                await delayArrive("p"); // «Сдвиг» (Время): созревшие являются
                 await marchSide("p");
                 if (B.stopped || B.phase === "over") return;
                 B.phase = "player";
@@ -227,6 +228,8 @@
                             "✕", 0x8cd0ef);
                         return;
                     }
+                    // клетка со «Сдвиг»-значком под бесплатный призыв занята
+                    if (delayAt(col, row)) return;
                     B.journeySummon = null;
                     B.resurrectSummon = null;
                     // «Отмена призыва» (wis84) врага: бесплатный призыв — тоже
@@ -378,7 +381,9 @@
                 // мимо допустимых клеток (не в зоне / занято / не хватает маны) —
                 // снять выбор: карты руки снова кликабельны (при выбранной карте
                 // они неинтерактивны, чтобы крупные карты не съедали клики полем)
-                if (!deployRows("p").includes(row) || unitAt(col, row) || effCost(B.hand[B.selected]) > B.energy) {
+                if (!deployRows("p").includes(row) || unitAt(col, row)
+                    || delayAt(col, row) // «Сдвиг»-значок — клетка под призыв занята
+                    || effCost(B.hand[B.selected]) > B.energy) {
                     deselect();
                     return;
                 }
@@ -906,6 +911,11 @@
                     } else return false;
                 }
                 if (def.spell.draw) drawCards(def.spell.draw);
+                // «Мозговой штурм» (tim206): сбросить ВСЮ руку и взять столько
+                // же +1. Прямой розыгрыш — карта ещё в руке, её сбросит/
+                // оплатит castSpell (skipHandReset); вызов после spendCard
+                if (def.spell.brainstorm && !(opts && opts.skipHandReset))
+                    discardHandDraw("p", B.hand.length + 1);
                 // «Запутать руны»: обе руки — в сброс, по 3 карты (спека:
                 // «вы И ПРОТИВНИК»; раньше сбрасывалась только своя — баг
                 // юзера). При прямом розыгрыше карта ещё в руке — её сбросит/
@@ -1066,6 +1076,9 @@
                 if (!def || def.type !== "spell"
                     || effCost(cardId, "p", target) > B.energy) return false;
                 const resetHand = def.spell.discardHandDraw;
+                // «Мозговой штурм» (tim206): рука уйдёт в сброс ПОСЛЕ выхода
+                // самой карты (в applySpellPInner она ещё в руке)
+                const brainstorm = def.spell.brainstorm;
                 // центр разыгранной карты (просил юзер): эффект заклинания
                 // без позиции цели рождается на карте; считаем ДО эффектов —
                 // сбросы/доборы могли бы пересобрать руку и сдвинуть индексы
@@ -1108,7 +1121,7 @@
                 // (decMind); снимается после выхода карты в сброс
                 B.playCtx = { side: "p", cardId };
                 if (!applySpellP(cardId, target, false,
-                    resetHand ? { skipHandReset: true } : null)) {
+                    (resetHand || brainstorm) ? { skipHandReset: true } : null)) {
                     B.playCtx = null;
                     return false;
                 }
@@ -1119,6 +1132,9 @@
                 spendCard(handIdx); // при пометке «Сброса разума» вернёт карту в руку
                 B.playCtx = null;
                 if (resetHand) confuseRunes("p", resetHand); // обе стороны (спека)
+                if (brainstorm) // сброс остатка руки уже без карты штурма:
+                    // добор = (рука сейчас) + 2, итого «столько же и ещё +1»
+                    discardHandDraw("p", B.hand.length + 2);
                 heroFirstSpellEnergy("p"); // «Дуновение опасности»: +1⚡ за 1-е заклинание
                 heroStrReplay("p", cardId, def); // «Мастера огня»
                 B.lastSpell.p = cardId;

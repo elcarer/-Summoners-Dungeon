@@ -32,9 +32,114 @@
             A.freeCells = function freeCells(rows) {
                 const out = [];
                 for (const r of rows) for (let col = 0; col < GRID; col++) {
-                    if (!unitAt(col, r)) out.push([col, r]);
+                    // клетки со «Сдвиг»-значком под призыв заняты (существо
+                    // вот-вот появится), но для марша поле свободно —
+                    // через значок ходят (спека: «если клетка останется
+                    // свободной» — появление может быть отложено)
+                    if (!unitAt(col, r) && !A.delayAt(col, r)) out.push([col, r]);
                 }
                 return out;
+            };
+
+            // ── «Сдвиг N» (стихия Время, просил юзер) ──────────────────────
+            // Существо с def.delay появляется на выбранной клетке не сразу:
+            // на клетке ставится значок-счётчик, в начале КАЖДОГО хода
+            // владельца счётчик тает на 1, на нуле существо появляется —
+            // если клетка осталась свободной (занята — значок ждёт с нулём).
+            // «Машина времени» (tim204) снижает «Сдвиг» всех карт стороны
+            // на 1 (0 — сдвига нет, приходит сразу); «Часовой механизм»
+            // (tim205) даёт пришедшему через «Сдвиг» «Скорость 1»;
+            // «Ловушка времени» (tim207) убирает существо с поля и даёт
+            // ему «Сдвиг 2» (эффекты/параметры сбросятся — свежий призыв).
+            // Итоговый «Сдвиг» с учётом Машины времени (0 = приходит сразу)
+            A.effDelayVal = function effDelayVal(n, side) {
+                let v = n | 0;
+                if (v > 0 && B.units.some((u) => u.side === side
+                    && u.def.timeMachine && B.units.includes(u))) v -= 1;
+                return Math.max(0, v);
+            };
+            A.delayAt = function delayAt(col, row) {
+                if (!B || !B.delayed) return null;
+                return B.delayed.p.concat(B.delayed.e)
+                    .find((e) => e.col === col && e.row === row) || null;
+            };
+            // Значок-счётчик на клетке (создать/обновить цифру)
+            A.delayDrawNode = function delayDrawNode(e) {
+                if (!root || !root.delayLayer) return;
+                const p = cellXY(e.col, e.row);
+                if (!e.node || e.node.destroyed) {
+                    const c = new PIXI.Container();
+                    c.eventMode = "none";
+                    c.name = "delayMark";
+                    const g = new PIXI.Graphics();
+                    g.circle(0, 0, 17);
+                    g.fill({ color: 0x5a3a7c, alpha: 0.9 });
+                    g.stroke({ width: 3, color: 0xc9a0ef });
+                    c.addChild(g);
+                    const tx = T("", 24, 0xf0e2ff,
+                        { stroke: { color: 0x241505, width: 4 } });
+                    tx.anchor.set(0.5);
+                    c.addChild(tx);
+                    c.position.set(p.x, p.y);
+                    root.delayLayer.addChild(c);
+                    e.node = c;
+                }
+                e.node.getChildAt(1).text = String(Math.max(0, e.left));
+                e.node.position.set(p.x, p.y);
+            };
+            // Постановка значка (вместо немедленного призыва). opts.left —
+            // явный счётчик (Ловушка времени даёт «Сдвиг 2» ЛЮБОМУ существу,
+    // не только карте со своим «Сдвигом»)
+            A.delayPlace = function delayPlace(side, cardId, col, row, opts = {}) {
+                const entry = { side, cardId, col, row,
+                    left: opts.left !== undefined
+                        ? opts.left
+                        : A.effDelayVal(CARDS[cardId].delay || 0, side),
+                    token: !!opts.token, node: null };
+                B.delayed[side].push(entry);
+                A.delayDrawNode(entry);
+                const p = cellXY(col, row);
+                floatText(p.x, p.y - 66,
+                    "⏳ " + GAME_LOC.t("status.delay.name"), 0xc9a0ef);
+                sfx("mine");
+                return entry;
+            };
+            // Тик начала хода владельца: счётчики тают, созревшие существа
+            // являются. Занятая клетка — значок ждёт с нулём до освобождения.
+            // Зовётся из playerTurnStart/aiPlay.enemyTurn ПЕРЕД маршем
+            A.delayArrive = async function delayArrive(side) {
+                if (!B || B.stopped || !B.delayed) return;
+                const list = B.delayed[side];
+                for (const e of list.slice()) {
+                    if (B.stopped || B.phase === "over") return;
+                    e.left -= 1;
+                    if (e.left > 0 || unitAt(e.col, e.row)) {
+                        A.delayDrawNode(e); // цифра тает / значок ждёт клетку
+                        continue;
+                    }
+                    list.splice(list.indexOf(e), 1);
+                    if (e.node && !e.node.destroyed)
+                        e.node.destroy({ children: true });
+                    e.node = null;
+                    const p = cellXY(e.col, e.row);
+                    floatText(p.x, p.y - 66,
+                        GAME_LOC.t(`card.${e.cardId}.name`), 0xc9a0ef);
+                    sfx("chpoc");
+                    const u = addUnit(side, e.cardId, e.col, e.row,
+                        { noDelay: true, token: e.token }); // ловушки клетки сработают
+                    // «Часовой механизм» (tim205): пришедшее через «Сдвиг»
+                    // существо получает «Скорость 1» — рывок после появления
+                    if (u && B.units.includes(u)
+                        && B.units.some((b) => b.side === side && b.def.clockwork
+                            && B.units.includes(b))) {
+                        summonDash(u);
+                        const sp = cellXY(u.col, u.row);
+                        floatText(sp.x, sp.y - 96,
+                            "» " + GAME_LOC.t("status.dash.name"), 0xb7d0ef);
+                        sfx("step");
+                    }
+                    await delay(0.3 / animK()); // появления не слипаются
+                }
             };
 
             // ── Поле: нарисованная сетка бэкграунда + полупрозрачная подсветка ─
@@ -369,6 +474,8 @@
             A.unitProtectTotal = function unitProtectTotal(u) {
                 if (!u || !u.def) return 0;
                 let n = u.protect || 0;
+                // врождённая «Защита N» карты («Защитник» tim201)
+                if (u.def.protect) n += u.def.protect;
                 if (u.def.type === "unit") n += A.cloudSpireCount(u.side);
                 return n;
             };
@@ -427,6 +534,17 @@
             A.addUnit = function addUnit(side, cardId, col, row, opts = {}) {
                 if (!root) return null; // сцена уже вышла: поле уничтожено, призыву некуда
                 const def = CARDS[cardId];
+                // «Сдвиг N» (tim202/tim203, просил юзер): существо появляется
+                // не сразу — на клетке значок-счётчик (delayPlace). Нулевой
+                // итоговый «Сдвиг» (сняла «Машина времени») — призыв сразу.
+                // opts.noDelay — само появление значка (delayArrive),
+                // opts.testSummon — тест-хук _spawn
+                if (def.type === "unit" && def.delay
+                    && !opts.noDelay && !opts.testSummon
+                    && A.effDelayVal(def.delay, side) > 0) {
+                    A.delayPlace(side, cardId, col, row, opts);
+                    return null;
+                }
                 const u = { side, def, col, row, hp: def.hp, curAtk: def.atk || 0, auraHp: 0, bonusAtk: 0,
                     // жетон — существо без карты призыва (засада, культ, дух
                     // предка, волки): «Гоблин-вождь» такие не возвращает
@@ -800,6 +918,10 @@
                         addProtect(u);
                     }
                 }
+                // Врождённая «Защита N» (tim201 «Защитник», def.protect):
+                // урон режется в damageUnit через unitProtectTotal, бейдж —
+                // как у «Кокона»/«Облачного шпиля»
+                if (def.protect) refreshProtectMark(u);
                 // ловушка врага на клетке призыва (и существа, и строения)
                 triggerCellTraps(u);
                 // Пришло с 0 жизней («Иллюзия» без соседей — 0/0): сразу

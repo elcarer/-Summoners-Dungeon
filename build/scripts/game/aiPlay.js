@@ -25,6 +25,7 @@
                 upkeep("e"); // грибницы врага
                 riteStumpTick("e"); // пень обряда врага подсмотрел и решил
                 poisonTick("e"); // яд: до марша (просил юзер)
+                await delayArrive("e"); // «Сдвиг» (Время): созревшие являются
                 await marchSide("e");
                 if (B.stopped || B.phase === "over") return;
                 await aiPlay();

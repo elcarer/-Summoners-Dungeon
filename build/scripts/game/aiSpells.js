@@ -630,6 +630,12 @@
                 if (s.discardHandDraw)
                     confuseRunes("e", s.discardHandDraw,
                         fromHand ? cardIdOf(def) : null);
+                // «Мозговой штурм» (tim206): сброс ВСЕЙ руки и добор столько
+                // же +1. Карта при прямом розыгрыше ещё в руке (fromHand —
+                // aiPlay уберёт её сам, как у «Запутать руны»)
+                if (s.brainstorm)
+                    discardHandDraw("e", B.eHand.length + (fromHand ? 2 : 1),
+                        fromHand ? cardIdOf(def) : null);
                 if (s.search) { // «Поиск рун»: из ВЕРХНИХ N заклинаний — лучшее в руку
                     const k = aiSearchSpell(s.search);
                     if (k) { B.eDeck.splice(k.j, 1); B.eHand.push(k.id); }

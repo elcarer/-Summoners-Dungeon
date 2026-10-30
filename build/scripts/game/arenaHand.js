@@ -143,6 +143,19 @@
                 for (const u of B.units) if (markTipAt(u, x, y)) { unitCardHide(); return; }
                 effectTipHide();
                 const hit = cellAt(x, y);
+                // значок «Сдвига» (Время): при наведении — карта призыва,
+                // которая создаст существо (спека юзера)
+                const dm = hit ? delayAt(hit[0], hit[1]) : null;
+                if (dm) {
+                    if (unitCard && unitCard.dm === dm) return;
+                    unitCardHide();
+                    const node = globalThis.GAME_UI.cardFace(ctx, dm.cardId, { scale: 0.75 });
+                    node.eventMode = "none";
+                    node.position.set(430, 420);
+                    root.addChild(node);
+                    unitCard = { unit: null, dm, node };
+                    return;
+                }
                 const u = hit ? unitAt(hit[0], hit[1]) : null;
                 if (!u) { unitCardHide(); return; }
                 if (unitCard && unitCard.unit === u) return;

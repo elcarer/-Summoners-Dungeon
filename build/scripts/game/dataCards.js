@@ -20,6 +20,7 @@
         wisdom: starterCollection(STARTER_DECKS.wisdom), // стартер Миры
         decay: starterCollection(STARTER_DECKS.decay), // стартер Мортиса
         honor: starterCollection(STARTER_DECKS.honor), // стартер Леона
+        time: starterCollection(STARTER_DECKS.time), // стартер Тордина
     };
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N
@@ -198,6 +199,15 @@
                 "hon198",
                 "hon199",
                 "hon200"],
+        // Время: все 7 карт стихии (201–207, все обычные — ×3) — для
+        // сундуков/магазина/наград данжа Времени (данж пока «Скоро…»)
+        time: ["tim201", "tim201", "tim201",
+               "tim202", "tim202", "tim202",
+               "tim203", "tim203", "tim203",
+               "tim204", "tim204", "tim204",
+               "tim205", "tim205", "tim205",
+               "tim206", "tim206", "tim206",
+               "tim207", "tim207", "tim207"],
     };
 
     // ── Враги по глубине (просил юзер) ────────────────────────────────────
@@ -638,6 +648,14 @@
             epic:   ["hon176", "hon177", "hon185", "hon190", "hon192",
                      "hon194", "hon196", "hon197", "hon198", "hon199",
                      "hon200"],
+        },
+        // Время: все 7 карт обычные (добор будущих боссов данжа Времени;
+        // редкие/эпические появятся вместе с ними)
+        time: {
+            common: ["tim201", "tim202", "tim203", "tim204", "tim205",
+                     "tim206", "tim207"],
+            rare:   [],
+            epic:   [],
         },
     };
     // Колода врага: ядро архетипа; весь добор — только боссу (просил

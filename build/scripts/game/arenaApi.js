@@ -407,6 +407,17 @@
                 resurrectPick(idx) { pickResurrect(idx); return true; },
                 // тест-хук: upkeep стороны (начало её хода: грибницы, костры)
                 _upkeep(side) { upkeep(side); return true; },
+                // тест-хуки «Сдвига» (Время, просил юзер): состояние значков
+                // и принудительный тик начала хода стороны (появления)
+                delayState: () => ({
+                    p: B ? B.delayed.p.map((e) => ({
+                        cardId: e.cardId, col: e.col, row: e.row,
+                        left: e.left, token: e.token, node: !!e.node })) : [],
+                    e: B ? B.delayed.e.map((e) => ({
+                        cardId: e.cardId, col: e.col, row: e.row,
+                        left: e.left, token: e.token, node: !!e.node })) : [],
+                }),
+                async _delayTick(side) { await delayArrive(side); return true; },
                 // тест-хуки «Торговца» (hon183): панель сброса по выбору
                 _openTradePanel() { buildDiscardPanel("trade"); return true; },
                 _pickDiscard(idx) { pickDiscard(idx); return true; },

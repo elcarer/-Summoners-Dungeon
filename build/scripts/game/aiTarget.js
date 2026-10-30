@@ -450,6 +450,9 @@
                 if (s.growthHand && spellHitDmg(def, "e") < 1) return false;
                 // «Цветение кристаллов» — разгон: играется при 4+ картах в руке
                 if (s.energyPerHand && B.eHand.length < 4) return false;
+                // «Мозговой штурм» (tim206): полная смена руки +1 карта —
+                // окупается от трёх карт в руке
+                if (s.brainstorm && B.eHand.length < 3) return false;
                 // «Поток маны» — без своих ловушек энергии не даёт
                 if (s.energyPerTrap && !B.traps.e.length) return false;
                 // «Нехватка воздуха» — нужен хоть один урон у существ игрока

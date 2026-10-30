@@ -26,7 +26,7 @@
     // V9: воды в зоне Тлена нет вовсе (русла обрываются у его границ),
     // болота отступают на клетку от границ зоны — без стыков с чужими
     // биомами
-    const V = 10; // v10 — бродячие отряды у арок (map.wanderers)
+    const V = 11; // v11 — спавн героя у случайного города (map.spawn единый)
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // сетка зон 3×2: индекс k — колонка k%3, ряд (k/3|0), сектор 128×128
@@ -803,42 +803,48 @@
             }
         }
 
-        // ── 7. точка появления героя каждой стихии: свободная клетка
-        // в 1.9–5 клетках от входа в СВОЁ подземелье — из компоненты
-        // связности арки (река/хребет у входа не отрежут героя от мира;
-        // стены городов непроходимы) ──────────────────────────────────────
+        // ── 7. точка появления героя: случайный ГОРОД (не столица, просил
+        // юзер) — свободная клетка в 1.9–4.5 клетках от него, из компоненты
+        // связности города (река/хребет у города не отрежут героя от мира;
+        // стены городов непроходимы). Одна точка на карте — герой один ────
         const spawn = {};
-        for (let k = 0; k < 6; k++) {
-            const d = pois.find((p) => p.elem === ELEMS[k] && p.kind === "dungeon");
+        {
+            const towns = pois.filter((p) => p.kind === "town");
             const passable = (i) => !blocked[i] && ter[i] !== T_MOUNTAIN
                 && ter[i] !== T_FOREST && ter[i] !== T_WATER
                 && ter[i] !== T_SWAMP;
-            // суша, соединённая с аркой (после прокладки дорог)
-            const comp = new Uint8Array(N);
-            const q = [d.gy * W + d.gx];
-            comp[q[0]] = 1;
-            for (let qi = 0; qi < q.length; qi++) {
-                const c = q[qi], cx = c % W, cy = (c / W) | 0;
-                for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-                    const nx = cx + dx, ny = cy + dy;
-                    if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-                    const ni = ny * W + nx;
-                    if (!comp[ni] && passable(ni)) { comp[ni] = 1; q.push(ni); }
+            let tw = towns.length ? towns[(rng() * towns.length) | 0] : null;
+            let cand = [];
+            if (tw) {
+                // суша, соединённая с городом (после прокладки дорог)
+                const comp = new Uint8Array(N);
+                const q = [tw.gy * W + tw.gx];
+                comp[q[0]] = 1;
+                for (let qi = 0; qi < q.length; qi++) {
+                    const c = q[qi], cx = c % W, cy = (c / W) | 0;
+                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        const nx = cx + dx, ny = cy + dy;
+                        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                        const ni = ny * W + nx;
+                        if (!comp[ni] && passable(ni)) { comp[ni] = 1; q.push(ni); }
+                    }
+                }
+                for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) {
+                    const i = y * W + x, dist = Math.hypot(x - tw.gx, y - tw.gy);
+                    if (dist >= 1.9 && dist <= 4.5 && comp[i])
+                        cand.push({ gx: x, gy: y });
                 }
             }
-            let cand = [];
-            for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) {
-                const i = y * W + x, dist = Math.hypot(x - d.gx, y - d.gy);
-                if (dist >= 1.9 && dist <= 5 && zone[i] === k && comp[i])
-                    cand.push({ gx: x, gy: y });
-            }
-            if (!cand.length) { // страховка: любая суша рядом с аркой
-                const c = spiral(d.gx, d.gy,
+            if (!cand.length) { // страховка: любая суша рядом с городом
+                const at = tw || pois.find((p) => p.kind === "capital")
+                    || { gx: W >> 1, gy: H >> 1 };
+                const c = spiral(at.gx, at.gy,
                     (x, y) => x >= 2 && y >= 2 && x < W - 2 && y < H - 2
                         && passable(y * W + x), 8);
-                cand = [c || { gx: d.gx, gy: Math.min(H - 3, d.gy + 2) }];
+                cand = [c || { gx: at.gx, gy: Math.min(H - 3, at.gy + 2) }];
             }
-            spawn[ELEMS[k]] = cand[(rng() * cand.length) | 0];
+            const pt = cand[(rng() * cand.length) | 0];
+            for (let k = 0; k < 6; k++) spawn[ELEMS[k]] = pt;
         }
 
         // ── 8. строки коллизий (стены '#', вода '~', проход '.'): мост,
