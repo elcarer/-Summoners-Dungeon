@@ -69,14 +69,19 @@
         { sheet: "grass_water", feature: WATER },
         { sheet: "waste_dirt", feature: WASTE }, // болото — подложка тлена
     ];
-    // листы ВАРИАНТОВ сплошной заливки (просил юзер, волна 13): сплошная
+    // листы ВАРИАНТОВ сплошной заливки (просил юзер, волны 13–14): сплошная
     // заливка одной текстурой однообразна — для местности с листом
     // вариантов тайл целиком своей местности (все 4 угла блока — она)
     // рисуется случайным вариантом ОТДЕЛЬНОГО тайлсета 4×4 (16 вариантов
     // по 32px, images/tiles/<имя>.png), детерминированным сидом карты и
     // координатой тайла. Переходные тайлы (границы местностей) не тронуты
-    // — у них свои углы. Пока вариант один — пустыня (sand.png юзера)
-    const VARIANTS = { [SAND]: "sand" };
+    // — у них свои углы. Пустыня sand (w13), с w14 — все остальные:
+    // грязь/трава/снег/вода/пустошь(она же подложка болот)/магия
+    const VARIANTS = {
+        [DIRT]: "dirt", [GRASS]: "grass", [SNOW]: "snow",
+        [SAND]: "sand", [WASTE]: "waste", [MAGIC]: "magic",
+        [WATER]: "water",
+    };
     // цвета мини-карты (в тон тайлам; земля/трава/снег/песок/тлен/магия/
     // вода/болото)
     const MINI = [0x6a4828, 0x467622, 0xe8eef2, 0xe2d58b, 0x1c1a20, 0x9999ff,
@@ -412,11 +417,12 @@
     }
 
     globalThis.GAME_WORLDTILES = {
-        // V8: сплошная заливка — лист вариантов 4×4 (VARIANTS, sand.png
-        // пустыни, просил юзер волна 13); V7 — болота оверлеем поверх
+        // V9: варианты заливки — ВСЕ местности (dirt/grass/snow/sand/
+        // waste/magic/water, просил юзер волна 14); V8 — первый лист
+        // вариантов (sand.png, пустыня); V7 — болота оверлеем поверх
         // тлена (без кромок terrainOf, подложка waste в renderChunk),
         // пара трава|болото из PAIRS убрана
-        V: 8, CHUNK, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER, SWAMP,
+        V: 9, CHUNK, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER, SWAMP,
         NAME, ZONE_TERRAIN, PAIRS, SOLID, VARIANTS, MINI, terrainOf,
         ROAD_TILE,
         render, renderChunk, renderForest, renderForestChunk,

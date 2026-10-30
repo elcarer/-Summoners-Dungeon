@@ -97,15 +97,17 @@
         // конвенция углов — из движкового dualgrid.js (TILE_CORNERS).
         // Пары: grass_dirt, grass_water и снег/песок/тлен/магия поверх
         // земли; wood — прозрачный оверлей лесных массивов (renderForest);
-        // sand — НЕ dual-grid: тайлсет ВАРИАНТОВ сплошной заливки пустыни
-        // 4×4 (16 вариантов по 32px, просил юзер волна 13) — нарезка та же
+        // dirt/grass/snow/sand/waste/magic/water — НЕ dual-grid: тайлсеты
+        // ВАРИАНТОВ сплошной заливки 4×4 (16 вариантов по 32px, просил
+        // юзер волны 13–14) — нарезка та же
         say("тайлы мира…");
         await frame();
         const dual = globalThis.createDualGrid();
         const worldSheets = {};
         for (const name of ["grass_dirt", "grass_water", "sand_dirt",
                             "snow_dirt", "waste_dirt", "magic_dirt", "wood",
-                            "swamp", "sand"]) {
+                            "swamp", "dirt", "grass", "snow", "sand",
+                            "waste", "magic", "water"]) {
             worldSheets[name] = dual.sliceTileset(
                 await assets.loadTexture(`./images/tiles/${name}.png`));
         }
