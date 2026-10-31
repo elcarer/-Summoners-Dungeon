@@ -270,7 +270,8 @@
             subNone: "без подтипа",
             subNames: { goblin: "Гоблин", animal: "Животное", elf: "Эльф",
                 plant: "Растение", elemental: "Элементаль", mage: "Маг",
-                skeleton: "Скелет", zombie: "Зомби" },
+                skeleton: "Скелет", zombie: "Зомби", gnome: "Гном",
+                human: "Человек", ghost: "Призрак" },
             kind: "Тип эффекта:",
             kindNames: {
                 damage: "Нанесение урона", buff: "Усиление",
@@ -306,7 +307,8 @@
             subNone: "no subtype",
             subNames: { goblin: "Goblin", animal: "Animal", elf: "Elf",
                 plant: "Plant", elemental: "Elemental", mage: "Mage",
-                skeleton: "Skeleton", zombie: "Zombie" },
+                skeleton: "Skeleton", zombie: "Zombie", gnome: "Gnome",
+                human: "Human", ghost: "Ghost" },
             kind: "Effect:",
             kindNames: {
                 damage: "Damage", buff: "Buff", debuff: "Stat reduction",
@@ -856,7 +858,7 @@
         chipSet($("rarityBtns"), ["common", "rare", "epic"],
             state.rarity, (r) => t("rarity." + r));
         chipSet($("subBtns"), ["goblin", "animal", "elf", "plant", "elemental",
-            "mage", "skeleton", "zombie", "none"],
+            "mage", "skeleton", "zombie", "gnome", "human", "ghost", "none"],
             state.subtype, (s) => s === "none" ? T("subNone") : T("subNames")[s]);
         chipSet($("kindBtns"), ["damage", "buff", "debuff", "search", "copy", "control",
             "protect", "draw", "discard", "resource", "summon", "summonBuilding", "castSpell"],

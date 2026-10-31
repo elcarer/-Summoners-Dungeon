@@ -117,7 +117,37 @@
             // пауза между розыгрышами (она же — сколько видна карта врага):
             // минимум 1.5 секунды — на 0.5 дольше прежнего, успеть разглядеть
             // (просил юзер); при замедленных анимациях — ещё дольше
-            A.enemyPlayDelay = () => Math.max(1.5, 1.5 / animK());
+            A.enemyPlayDelay = () => Math.max(1.6, 1.6 / animK());
+
+            // Полёт разыгранной врагом карты к цели (просил юзер — розыгрыши
+            // с перемещением): карта с левого места показа летит к клетке/
+            // центру поля, сжимаясь, и «превращается» в призыв/эффект.
+            // Узел уничтожит тик полёта (handFlight), ссылка enemyCard
+            // снимается в done — последующий hideEnemyCard() безвреден.
+            // Возвращает промис (в aiPlay — await).
+            A.enemyFlyCard = function enemyFlyCard(to, opts = {}) {
+                if (!enemyCard || !enemyCard.node || enemyCard.node.destroyed
+                    || !root || !root.cardFxLayer) {
+                    hideEnemyCard();
+                    return Promise.resolve();
+                }
+                const node = enemyCard.node;
+                if (node.anchor && node.anchor.x === 0) {
+                    // рубашка ловушки (Sprite) якорена левым-верхним углом —
+                    // переводим в центр без визуального скачка
+                    node.x += node.width / 2;
+                    node.y += node.height / 2;
+                    node.anchor.set(0.5);
+                }
+                return new Promise((res) => {
+                    handFlight(node, {
+                        target: () => to,
+                        r: opts.r ?? 0, s: opts.s ?? 0.34, arc: 60,
+                        life: (opts.life ?? 0.42) / animK(), a1: opts.a1 ?? 1,
+                        done: () => { enemyCard = null; res(); },
+                    });
+                });
+            };
 
             // ── Правила ИИ по картам и связкам (просил юзер) ───────────────────
             // ИИ играет аккуратно: не навредит своим (стена костров, сплэш мины,
@@ -218,6 +248,7 @@
                             showEnemyCard(pick.id); // карта врага слева ≥ 1с
                             await delay(enemyPlayDelay());
                             const [col, row] = spot;
+                            await enemyFlyCard(cellXY(col, row)); // полёт к клетке
                             const cardId = B.eHand[pick.i];
                             // «Отмена призыва» (wis84) игрока: существо не
                             // появляется, карта и энергия врага потрачены;
@@ -267,6 +298,7 @@
                                 if (!pu) continue;
                                 showEnemyBack(); // какую руну повесил — загадка (просил юзер)
                                 await delay(enemyPlayDelay());
+                                await enemyFlyCard(cellXY(pu.col, pu.row), { s: 0.3 });
                                 const cardId = B.eHand[pick.i];
                                 B.eHand.splice(pick.i, 1);
                                 B.eEnergy -= effCost(cardId, "e");
@@ -293,6 +325,8 @@
                                 if (!blds.length) continue;
                                 showEnemyBack();
                                 await delay(enemyPlayDelay());
+                                await enemyFlyCard(cellXY(blds[0].col, blds[0].row),
+                                    { s: 0.3 });
                                 const cardId = B.eHand[pick.i];
                                 B.eHand.splice(pick.i, 1);
                                 B.eEnergy -= effCost(cardId, "e");
@@ -314,6 +348,7 @@
                             showEnemyBack(); // какая ловушка — загадка (просил юзер)
                             await delay(enemyPlayDelay());
                             const [col, row] = spot;
+                            await enemyFlyCard(cellXY(col, row), { s: 0.3 });
                             const cardId = B.eHand[pick.i];
                             B.eHand.splice(pick.i, 1);
                             B.eEnergy -= effCost(cardId, "e");
@@ -330,6 +365,8 @@
                             // что сейчас произойдёт (просил юзер)
                             showEnemyCard(pick.id);
                             await delay(enemyPlayDelay());
+                            await enemyFlyCard({ x: 960, y: 430 },
+                                { s: 0.42, a1: 0 }); // к центру поля и растворяется
                             const cardId = B.eHand[pick.i];
                             // «Отмена заклинания» (wis83) игрока: эффект не
                             // срабатывает, карта и энергия врага потрачены

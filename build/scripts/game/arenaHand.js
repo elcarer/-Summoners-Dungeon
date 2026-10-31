@@ -71,7 +71,7 @@
                 node.addChild(bg, nt, dt);
                 nt.x = dt.x = 15;
                 node.x = Math.max(240, Math.min(1680 - w, mx - w / 2));
-                node.y = Math.max(88, my - h - 26);
+                node.y = Math.max(88, my - h - 46); // на 20px выше (поправка юзера)
                 node.eventMode = "none";
                 root.addChild(node);
                 effectTip = { key, node };
@@ -295,27 +295,225 @@
                     || root.cardsLayer.children[idx] || null;
             };
 
+            // ── Анимации руки (просил юзер, по мотивам Balatro) ────────────────
+            // Карты не появляются и не исчезают мгновенно: добор прилетает
+            // ИЗ КОЛОДЫ в свой слот веера (рубашкой, по дуге с доворотом),
+            // разыгранная улетает В СБРОС, перестроение руки доигрывается
+            // плавно. Узлы полётов живут в root.cardFxLayer — пересборка
+            // cardsLayer их не трогает. Тик — handFxTick из update сцены.
+            A.handTweens = []; // доигрывание позиций узлов руки
+            A.handFlights = []; // полёты карт (добор/сброс)
+            // якорные точки колод и сбросов — центры слотов из buildHud
+            A.handAnchor = function handAnchor(side, what) {
+                return side === "p"
+                    ? (what === "deck" ? { x: 114, y: 934 } : { x: 302, y: 931 })
+                    : (what === "deck" ? { x: 1630, y: 149 } : { x: 1810, y: 149 });
+            };
+            A.makeFlightFace = function makeFlightFace(cardId) {
+                const def = CARDS[cardId];
+                const c = new PIXI.Container();
+                const spr = new PIXI.Sprite(uiTex(def && def.img
+                    ? `cards/${def.img}.png` : "card_back_small.png"));
+                spr.anchor.set(0.5);
+                if (!def || !def.img) spr.tint = (def && def.color) || 0xffffff;
+                c.addChild(spr);
+                return c;
+            };
+            A.handTween = function handTween(node, tx, ty, tr, ts, dur) {
+                const i = handTweens.findIndex((t) => t.node === node);
+                if (i >= 0) handTweens.splice(i, 1); // новый твин — старый снят
+                handTweens.push({ node, fx: node.x, fy: node.y, fr: node.rotation,
+                    fs: node.scale.x, tx, ty, tr, ts, life: dur, total: dur });
+            };
+            // Полёт карты: дуга с подъёмом, доворот, масштаб; target() зовётся
+            // каждый кадр — слот руки мог переехать (рука перестроилась)
+            A.handFlight = function handFlight(node, o) {
+                node.eventMode = "none";
+                root.cardFxLayer.addChild(node);
+                handFlights.push({
+                    node, fx: node.x, fy: node.y, fr: node.rotation, fs: node.scale.x,
+                    target: o.target, tr: o.r ?? 0, ts: o.s ?? 1,
+                    arc: o.arc ?? 0, life: o.life, total: o.life,
+                    delay: o.delay || 0, a1: o.a1 ?? 1,
+                    done: o.done || null,
+                });
+            };
+            A.handFxTick = function handFxTick(dt) {
+                for (let i = handTweens.length - 1; i >= 0; i--) {
+                    const t = handTweens[i];
+                    if (!t.node || t.node.destroyed) { handTweens.splice(i, 1); continue; }
+                    if (B && B.stopped) t.life = 0; // бой кончился — доиграть мгновенно
+                    t.life -= dt;
+                    const k = 1 - Math.max(0, t.life / t.total);
+                    const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
+                    t.node.x = t.fx + (t.tx - t.fx) * e;
+                    t.node.y = t.fy + (t.ty - t.fy) * e;
+                    t.node.rotation = t.fr + (t.tr - t.fr) * e;
+                    t.node.scale.set(t.fs + (t.ts - t.fs) * e);
+                    if (t.life <= 0) handTweens.splice(i, 1);
+                }
+                for (let i = handFlights.length - 1; i >= 0; i--) {
+                    const f = handFlights[i];
+                    if (!f.node || f.node.destroyed) { handFlights.splice(i, 1); continue; }
+                    if (f.delay > 0 && !(B && B.stopped)) { f.delay -= dt; continue; }
+                    if (B && B.stopped) f.life = 0;
+                    f.life -= dt;
+                    const k = 1 - Math.max(0, f.life / f.total);
+                    const e = 1 - Math.pow(1 - k, 3);
+                    const tg = f.target();
+                    const tgr = tg.r === undefined ? f.tr : tg.r;
+                    const lift = Math.sin(Math.PI * Math.min(1, k)) * f.arc;
+                    f.node.x = f.fx + (tg.x - f.fx) * e;
+                    f.node.y = f.fy + (tg.y - f.fy) * e - lift;
+                    f.node.rotation = f.fr + (tgr - f.fr) * e;
+                    f.node.scale.set(f.fs + (f.ts - f.fs) * e);
+                    f.node.alpha = 1 + (f.a1 - 1) * e;
+                    if (f.life <= 0) {
+                        handFlights.splice(i, 1);
+                        f.node.destroy({ children: true });
+                        if (f.done) f.done();
+                    }
+                }
+            };
+            // Показанная часть руки — B.hand без летящих доборов (hiddenDraw):
+            // карта появляется в руке только когда долетела из колоды
+            A.shownHandCount = function shownHandCount() {
+                return B.hand.length - (B.hiddenDraw || 0);
+            };
+            // Слот карты руки по индексу (формулы — как в layoutHand)
+            A.handSlotOf = function handSlotOf(idx, shown) {
+                const n = shown;
+                const spread = Math.min(225, n > 1 ? 790 / (n - 1) : 225);
+                return { x: 960 + (idx - (n - 1) / 2) * spread, y: HAND_Y,
+                    r: (idx - (n - 1) / 2) * 0.035 };
+            };
+            // Добор: рубашки летят из колоды в слоты руки (просил юзер).
+            // Игроку карты на время полёта скрыты из руки — появляются по
+            // одной по мере прилёта. Врагу — короткий жест к его «руке»
+            // (у врага рука не видна, карта растворяется у верхнего края)
+            A.animateDraw = function animateDraw(side, drawn, baseIdx) {
+                if (!root || !root.cardFxLayer || !drawn.length) return;
+                const a = handAnchor(side, "deck");
+                const backTex = side === "p" ? playerBackTex() : enemyBackTex();
+                const k = animK();
+                drawn.forEach((cardId, j) => {
+                    const node = new PIXI.Container();
+                    const spr = new PIXI.Sprite(uiTex(backTex));
+                    spr.anchor.set(0.5);
+                    spr.scale.set(0.74); // рубашка 230×338 — как слоты колод
+                    node.addChild(spr);
+                    node.position.set(a.x, a.y);
+                    node.rotation = side === "p" ? -0.55 : 0.55;
+                    if (side === "p") {
+                        const idx = baseIdx + j;
+                        handFlight(node, {
+                            target: () => {
+                                const slot = handSlotOf(idx, shownHandCount());
+                                return { x: slot.x, y: slot.y - 169, r: slot.r };
+                            },
+                            s: 1, arc: 120, life: 0.32 / k, delay: j * 0.07 / k,
+                            done: () => {
+                                if (!B || !root || !root.cardsLayer) return;
+                                B.hiddenDraw = Math.max(0, (B.hiddenDraw || 0) - 1);
+                                B.noFlyIn = true;
+                                layoutHand(); // карта встала в свой слот
+                                B.noFlyIn = false;
+                            },
+                        });
+                    } else {
+                        handFlight(node, {
+                            target: () => ({ x: 1330, y: 92, r: 0.25 }),
+                            s: 0.5, arc: 40, life: 0.34 / k, delay: j * 0.07 / k,
+                            a1: 0,
+                        });
+                    }
+                });
+            };
+            // Полёт карты руки в сброс (центр слота сброса). burn=true
+            // («Сожжение») — карта сгорает: летит к центру поля, растворяясь
+            A.flyToDiscard = function flyToDiscard(cardId, from, burn = false, side = "p") {
+                if (!root || !root.cardFxLayer || !B || B.stopped) return;
+                const a = burn ? { x: 960, y: 560 } : handAnchor(side, "discard");
+                const node = makeFlightFace(cardId);
+                node.position.set(from.x, from.y);
+                node.rotation = from.r || 0;
+                node.scale.set(from.s || 1);
+                handFlight(node, {
+                    target: () => ({ x: a.x, y: a.y, r: 0.42 }),
+                    s: 0.72, arc: 70, life: 0.42 / animK(), a1: burn ? 0 : 1,
+                });
+            };
+            // Откуда прилетит карта, вернувшаяся в руку извне добора
+            // («Мастера огня», «Трусливый гоблин») — из сброса стороны
+            A.markFlyFrom = function markFlyFrom(cardId, side, what = "discard") {
+                if (!B) return;
+                B.flyFrom = B.flyFrom || new Map();
+                B.flyFrom.set(cardId, handAnchor(side, what));
+            };
+
             A.layoutHand = function layoutHand() {
+                // слепок прежних узлов — карты доигрывают перестроение руки
+                // плавно (в духе Balatro, просил юзер), а не прыгают
+                const snap = [];
+                for (const n of root.cardsLayer.children)
+                    if (n.__handIdx !== undefined)
+                        snap[n.__handIdx] = { x: n.x, y: n.y, r: n.rotation,
+                            s: n.scale.x, card: B.hand[n.__handIdx], used: false };
                 for (const n of root.cardsLayer.children) n.destroy({ children: true });
                 root.cardsLayer.removeChildren();
                 hoverIdx = null; // карта под курсором уничтожена — подсказку погасить
                 raisedCard = null; // узлы руки пересобраны — выдвинутой карты нет
                 updateEnergyHint();
-                const n = B.hand.length;
-                B.hand.forEach((card, idx) => {
+                const shown = shownHandCount();
+                const deckA = handAnchor("p", "deck");
+                B.hand.slice(0, shown).forEach((card, idx) => {
                     const node = makeCardNode(card, idx);
                     // у малых рук разлёт как был (225); у больших — веер с
                     // нахлёстом: крайние карты не залезают под «Конец хода»
                     // и угловые колоды (просил юзер)
-                    const spread = Math.min(225, n > 1 ? 790 / (n - 1) : 225);
-                    node.x = 960 + (idx - (n - 1) / 2) * spread;
-                    node.y = HAND_Y;
-                    node.rotation = (idx - (n - 1) / 2) * 0.035;
+                    const slot = handSlotOf(idx, shown);
                     const sel = B.selected === idx;
-                    node.scale.set((sel ? 1.12 : 1) * HAND_SCALE);
+                    const ts = (sel ? 1.12 : 1) * HAND_SCALE;
                     const f = node.getChildByName("selframe");
                     if (f) f.visible = sel;
                     root.cardsLayer.addChild(node);
+                    // откуда доигрывать: тот же индекс — та же карта; иначе та
+                    // же карта на соседнем месте (рука сдвинулась); нет вовсе —
+                    // новая карта прилетает из колоды (или из пометки flyFrom)
+                    let from = null;
+                    const same = snap[idx];
+                    if (same && same.card === card && !same.used) {
+                        from = same;
+                        same.used = true;
+                    } else {
+                        let bd = 1e9, bs = null;
+                        for (let k = 0; k < snap.length; k++) {
+                            const v = snap[k];
+                            if (!v || v.used || v.card !== card) continue;
+                            const d = Math.abs(k - idx);
+                            if (d < bd) { bd = d; bs = v; }
+                        }
+                        if (bs) { from = bs; bs.used = true; }
+                    }
+                    if (!from && !B.noFlyIn) {
+                        const fo = B.flyFrom && B.flyFrom.get(card);
+                        from = fo ? { x: fo.x, y: fo.y, r: 0, s: 0.74 }
+                            : { x: deckA.x, y: deckA.y, r: -0.5, s: 0.74 };
+                        if (fo) B.flyFrom.delete(card);
+                    }
+                    if (from && (Math.abs(from.x - slot.x) > 2
+                            || Math.abs(from.y - slot.y) > 2
+                            || Math.abs((from.r || 0) - slot.r) > 0.005
+                            || Math.abs((from.s || 1) - ts) > 0.01)) {
+                        node.x = from.x; node.y = from.y;
+                        node.rotation = from.r || 0;
+                        node.scale.set(from.s || 1);
+                        handTween(node, slot.x, slot.y, slot.r, ts, 0.16 / animK());
+                    } else {
+                        node.x = slot.x; node.y = slot.y;
+                        node.rotation = slot.r;
+                        node.scale.set(ts);
+                    }
                 });
             };
             // Центр карты руки по индексу (просил юзер): здесь рождается
@@ -323,7 +521,7 @@
             // (anchor 0.5,1, высота 338) — центр выше HAND_Y на полкарты;
             // выбранная карта чуть крупнее (×1.12)
             A.handCardCenter = function handCardCenter(idx) {
-                const n = B.hand.length;
+                const n = shownHandCount();
                 const spread = Math.min(225, n > 1 ? 790 / (n - 1) : 225);
                 const s = (B.selected === idx ? 1.12 : 1) * HAND_SCALE;
                 return { x: 960 + (idx - (n - 1) / 2) * spread, y: HAND_Y - 169 * s };
@@ -652,6 +850,7 @@
                         c.addChild(nm);
                     }
                     c.position.set(960 + (idx - (n - 1) / 2) * spread, 600);
+                    c.__pickIdx = idx; // полёт в сброс после клика (анимации руки)
                     c.eventMode = "static";
                     c.on("pointertap", () => pickDiscard(idx));
                     node.addChild(c);
@@ -666,6 +865,10 @@
                     B.discard.push(cardId);
                     noteDiscard(1, "p", [cardId]);
                     B.scorch.p.delete(cardId); // метка ушла вместе с этой картой
+                    // карта из панели летит в сброс (анимации руки, просил юзер)
+                    const pn = discardPanel.children.find((n2) =>
+                        n2.__pickIdx === idx && !n2.destroyed);
+                    if (pn) flyToDiscard(cardId, { x: pn.x, y: pn.y, r: 0, s: 0.825 });
                 }
                 sfx("chpoc");
                 if (B.discardMode === "trade") {

@@ -170,6 +170,11 @@
                 root.addChild(root.trapLayer);
                 root.cardsLayer = new PIXI.Container();
                 root.addChild(root.cardsLayer);
+                // полёты карт (добор/сброс — анимации руки, просил юзер):
+                // живут ВНЕ cardsLayer, чтобы пересборка руки их не убивала
+                root.cardFxLayer = new PIXI.Container();
+                root.cardFxLayer.eventMode = "none";
+                root.addChild(root.cardFxLayer);
                 root.fx = new PIXI.Container();
                 root.addChild(root.fx);
                 root.hud = buildHud();
@@ -231,6 +236,8 @@
                 hideEnemyCard(); // узел умер бы вместе с root — снимаем ссылку
                 unitCard = null; // узел подсказки умер вместе с root
                 trapCard = null; // подсказка ловушки тоже
+                handTweens.length = 0; // узлы руки умерли с root
+                handFlights.length = 0; // полёты карт тоже
                 fxClear(); // снять ссылки на Graphics до уничтожения root
                 if (root) { root.destroy({ children: true }); root = null; }
                 overlay = null;
@@ -307,6 +314,7 @@
                         if (!moves.some((mm) => mm.u === m.u)) setWalk(m.u, false);
                     }
                 }
+                handFxTick(dt); // анимации руки: добор из колоды, уход в сброс
                 // кадры спрайтов тикаем сами (autoUpdate=false; update ждёт ТИКЕР,
                 // не число — иначе кадр NaN и спрайт замирает). Скорость походки
                 // каждый кадр — ползунок «Анимации» действует и на живые юниты.

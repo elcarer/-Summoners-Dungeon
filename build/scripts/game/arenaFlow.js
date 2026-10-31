@@ -15,13 +15,24 @@
             A.drawCards = function drawCards(count) {
                 // в процессе хода рука ничем не ограничена — лимит 7 проверяется
                 // только в конце хода (панель сброса)
+                const drawn = [];
                 for (let k = 0; k < count; k++) {
                     if (!B.deck.length) { B.deck = shuffle(B.discard); B.discard = []; }
                     if (!B.deck.length) break;
-                    B.hand.push(B.deck.pop());
+                    const id = B.deck.pop();
+                    B.hand.push(id);
+                    drawn.push(id);
+                }
+                // прилёт карт из колоды в слоты руки (просил юзер) — если
+                // есть что показывать: в начале боя root ещё не собран, добор
+                // мгновенный, как раньше
+                if (drawn.length && root && root.cardFxLayer && !B.stopped) {
+                    B.hiddenDraw = (B.hiddenDraw || 0) + drawn.length;
+                    animateDraw("p", drawn, B.hand.length - drawn.length);
                 }
             };
             A.drawEnemy = function drawEnemy(count) {
+                const drawn = [];
                 for (let k = 0; k < count; k++) {
                     if (!B.eDeck.length) { B.eDeck = shuffle(B.eDiscard); B.eDiscard = []; }
                     // «Подкрепление»: и колода, и сброс пусты — свежая тасовка
@@ -29,7 +40,29 @@
                     // без карт и копит энергию — просил юзер)
                     if (!B.eDeck.length && B.eDeckBase) B.eDeck = shuffle([...B.eDeckBase]);
                     if (!B.eDeck.length) break;
-                    B.eHand.push(B.eDeck.pop());
+                    const id = B.eDeck.pop();
+                    B.eHand.push(id);
+                    drawn.push(id);
+                }
+                // жест добора врага (просил юзер): рубашка летит от его колоды
+                // к верхнему краю и растворяется — рука врага не видна
+                if (drawn.length && root && root.cardFxLayer && !B.stopped) {
+                    const a = handAnchor("e", "deck");
+                    const k = animK();
+                    drawn.forEach((id, j) => {
+                        const node = new PIXI.Container();
+                        const spr = new PIXI.Sprite(uiTex(enemyBackTex()));
+                        spr.anchor.set(0.5);
+                        spr.scale.set(0.74);
+                        node.addChild(spr);
+                        node.position.set(a.x, a.y);
+                        node.rotation = 0.55;
+                        handFlight(node, {
+                            target: () => ({ x: 1330, y: 92, r: 0.25 }),
+                            s: 0.5, arc: 40, life: 0.34 / k, delay: j * 0.07 / k,
+                            a1: 0,
+                        });
+                    });
                 }
             };
 
@@ -42,16 +75,44 @@
                 const hand = side === "p" ? B.hand : B.eHand;
                 const discard = side === "p" ? B.discard : B.eDiscard;
                 const scorch = B.scorch[side];
+                // старая рука улетает в сброс (анимации руки, просил юзер):
+                // позиции узлов снимаются ДО splice — узлы ещё на местах
+                const sweep = [];
+                if (side === "p" && root && root.cardFxLayer && !B.stopped) {
+                    let keepSeen = false;
+                    hand.forEach((id, i2) => {
+                        if (keepId && id === keepId && !keepSeen) { keepSeen = true; return; }
+                        const nd = handNode(i2);
+                        if (nd && !nd.destroyed && nd.__handIdx === i2)
+                            sweep.push({ id, x: nd.x, y: nd.y - 169 * nd.scale.y,
+                                r: nd.rotation, s: nd.scale.x });
+                    });
+                }
                 const old = hand.splice(0, hand.length);
                 let kept = false, burned = 0, dropped = 0;
                 const droppedIds = [];
+                const burnedIds = [];
                 for (const id of old) {
                     if (!kept && keepId && id === keepId) { kept = true; hand.push(id); continue; }
-                    if (scorch && scorch.has(id)) { scorch.delete(id); burned++; }
+                    if (scorch && scorch.has(id)) { scorch.delete(id); burned++; burnedIds.push(id); }
                     else { discard.push(id); dropped++; droppedIds.push(id); }
                 }
                 noteDiscard(dropped, side, droppedIds); // «Болотная слизь»: вся рука в сброс
                 const n = count | 0;
+                const k2 = animK();
+                sweep.forEach((sv, j2) => {
+                    const fl = makeFlightFace(sv.id);
+                    fl.position.set(sv.x, sv.y);
+                    fl.rotation = sv.r;
+                    fl.scale.set(sv.s);
+                    const burn2 = burnedIds.includes(sv.id);
+                    handFlight(fl, {
+                        target: () => (burn2 ? { x: 960, y: 560, r: 0.42 }
+                            : { x: 302, y: 931, r: 0.42 }),
+                        s: 0.72, arc: 70, life: 0.42 / k2, delay: j2 * 0.05 / k2,
+                        a1: burn2 ? 0 : 1,
+                    });
+                });
                 if (side === "p") drawCards(n); else drawEnemy(n);
                 if (burned) {
                     floatText(960, side === "p" ? 640 : 300,
@@ -506,11 +567,14 @@
                 removeUnit(u);
                 floatText(p.x, p.y - 60, GAME_LOC.t(`card.${id}.name`), 0xd8c79d);
                 let i = discard.indexOf(id);
+                let src = "discard";
                 if (i >= 0) { discard.splice(i, 1); hand.push(id); }
                 else {
+                    src = "deck";
                     i = deck.indexOf(id);
                     if (i >= 0) { deck.splice(i, 1); hand.push(id); }
                 }
+                markFlyFrom(id, side, src); // прилетит из сброса/колоды (анимации)
                 sfx("chpoc");
             };
 

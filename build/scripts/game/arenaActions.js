@@ -45,7 +45,19 @@
             // ── Действия игрока ────────────────────────────────────────────────
             A.spendCard = function spendCard(handIdx) { // вынимает карту из руки в сброс
                 const cardId = B.hand[handIdx];
-                if (B.scorch.p.has(cardId)) { // «Сожжение»: карта удаляется из боя
+                // улетание карты в сброс (анимации руки, просил юзер):
+                // позиция снимается ДО splice; узел мог быть пересобран
+                // эффектами заклинания — тогда слот по расчёту веера
+                const burn = B.scorch.p.has(cardId);
+                const nd = handNode(handIdx);
+                flyToDiscard(cardId,
+                    nd && !nd.destroyed && nd.__handIdx === handIdx
+                        ? { x: nd.x, y: nd.y - 169 * nd.scale.y,
+                            r: nd.rotation, s: nd.scale.x }
+                        : { x: handCardCenter(handIdx).x,
+                            y: handCardCenter(handIdx).y, r: 0, s: 1 },
+                    burn);
+                if (burn) { // «Сожжение»: карта удаляется из боя
                     B.scorch.p.delete(cardId);
                     floatText(960, 640, `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
                     sfx("rocket");
@@ -92,6 +104,15 @@
                 const discard = side === "p" ? B.discard : B.eDiscard;
                 const hi = hand.indexOf(mark);
                 if (hi < 0) return;
+                if (side === "p") { // улетание в сброс (анимации руки)
+                    const nd = handNode(hi);
+                    flyToDiscard(mark,
+                        nd && !nd.destroyed && nd.__handIdx === hi
+                            ? { x: nd.x, y: nd.y - 169 * nd.scale.y,
+                                r: nd.rotation, s: nd.scale.x }
+                            : { x: handCardCenter(hi).x,
+                                y: handCardCenter(hi).y, r: 0, s: 1 });
+                }
                 hand.splice(hi, 1);
                 discard.push(mark);
                 if (side === "p") { layoutHand(); refreshHud(); }

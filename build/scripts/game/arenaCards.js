@@ -140,6 +140,7 @@
                 if (discard[discard.length - 1] !== cardId) return; // сожжена
                 discard.pop();
                 hand.push(cardId);
+                markFlyFrom(cardId, side); // прилетит из сброса (анимации руки)
                 B.heroFlags.strReplay[side] = true;
                 floatText(960, side === "p" ? 640 : 300,
                     `↩ ${GAME_LOC.t(`card.${cardId}.name`)}`, 0x9fd489);

@@ -16,8 +16,10 @@
                     if (energy > 0) { B.energy += energy; sfx("aqua"); } // на следующий ход
                     layoutHand();
                     refreshHud();
-                    if (B.hand.length > HAND_MAX) buildDiscardPanel(); // лимит — на конце хода
-                    else enemyTurn();
+                    if (B.hand.length > HAND_MAX) {
+                        handFxTick(1e9); handFxTick(1e9); // полёты добора доиграть —
+                        buildDiscardPanel(); // лимит — на конце хода
+                    } else enemyTurn();
                 },
                 // шкала «карты↔энергия»: total сфер (3 + ход−1), split — доля в карты
                 sliderGet: () => (B ? { total: spheresTotal(), split: B.split } : null),
@@ -125,6 +127,8 @@
                         energy: B.energy, eEnergy: B.eEnergy,
                         spheres: { total: spheresTotal(), split: B.split },
                         hand: [...B.hand],
+                        hiddenDraw: B.hiddenDraw || 0,
+                        handFlights: handFlights.length,
                         discarding: !!B.discarding,
                         discardMode: B.discardMode || "overflow",
                         pendingDiscard: B.pendingDiscard || 0,
@@ -431,6 +435,30 @@
                 // тест-хуки «Торговца» (hon183): панель сброса по выбору
                 _openTradePanel() { buildDiscardPanel("trade"); return true; },
                 _pickDiscard(idx) { pickDiscard(idx); return true; },
+                // анимации руки (тесты): мгновенно доиграть полёты/твины
+                // (дважды — второй прогон добирает твины после прилётов)
+                _handSettle() {
+                    handFxTick(1e9);
+                    handFxTick(1e9);
+                    return { hidden: B.hiddenDraw || 0, flights: handFlights.length };
+                },
+                _handNodes() {
+                    return root && root.cardsLayer
+                        ? root.cardsLayer.children.length : 0;
+                },
+                // полёты карт (тесты): сколько на слое полётов, где карта врага
+                _cardFx() {
+                    return root && root.cardFxLayer
+                        ? root.cardFxLayer.children.length : -1;
+                },
+                _enemyCardPos() {
+                    return enemyCard && enemyCard.node && !enemyCard.node.destroyed
+                        ? { x: Math.round(enemyCard.node.x),
+                            y: Math.round(enemyCard.node.y),
+                            a: Math.round(enemyCard.node.alpha * 100) / 100 }
+                        : null;
+                },
+                _enemyFlyTo(col, row) { enemyFlyCard(cellXY(col, row)); return true; },
                 // тест-хуки боевых хуков атаки: марш одной стороны и тик яда
                 // (проба сокрушения/чащи/ядовитости без полного хода ИИ)
                 async _march(side) { await marchSide(side); return true; },

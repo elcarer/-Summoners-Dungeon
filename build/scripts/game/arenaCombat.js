@@ -410,8 +410,11 @@
                 const i = disc.indexOf(cardId);
                 if (i < 0) return;
                 disc.splice(i, 1);
-                if (side === "p") { B.hand.push(cardId); layoutHand(); }
-                else B.eHand.push(cardId);
+                if (side === "p") {
+                    markFlyFrom(cardId, side); // прилетит из сброса (анимации руки)
+                    B.hand.push(cardId);
+                    layoutHand();
+                } else B.eHand.push(cardId);
                 const p = side === "p" ? { x: 960, y: 840 } : { x: 960, y: 240 };
                 floatText(p.x, p.y, "↩ " + GAME_LOC.t(`card.${cardId}.name`), 0xb7d0ef);
                 sfx("up");
