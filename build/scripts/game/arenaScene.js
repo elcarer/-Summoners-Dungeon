@@ -60,6 +60,7 @@
                     // скидка первой постройке («Город мудрости»); первая
                     // способность Мага дважды («Безумный маг»)
                     heroFlags: { firstSpell: { p: false, e: false },
+                        delayMinus: { p: false, e: false },
                         spellEnergy: { p: false, e: false },
                         trapEnergy: { p: false, e: false },
                         elementalDraw: { p: false, e: false },

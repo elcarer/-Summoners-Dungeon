@@ -67,6 +67,7 @@
                 if (d.type === "building") v += 0.5; // стоит, клетку держит
                 if (d.crush) v += 0.8;
                 if (d.thicket) v += 0.8;
+                if (d.siegeDouble) v += 0.9; // «Тараномобиль»: ×2 постройкам/базе
                 if (d.ability === "archer") v += 0.4;
                 if (d.ability === "assassin") v += 0.4;
                 if (d.ability === "pushBack") v += 0.3;
@@ -103,6 +104,7 @@
                 let s = (u.curAtk || 0) * 1.25 + (u.hp || 0) * 0.6;
                 if (d.crush) s += 1.4;
                 if (d.thicket) s += 1.4;
+                if (d.siegeDouble) s += 1.2; // «Тараномобиль»: ×2 постройкам/базе
                 if (d.ability === "archer") s += 0.9;
                 if (d.ability === "assassin") s += 0.8;
                 if (d.ability === "pushBack") s += 0.6;
@@ -824,6 +826,11 @@
                     // ценнее с полной рукой слабых карт
                     if (s.brainstorm) v += 0.6
                         + 0.25 * Math.min(6, B.eHand.length);
+                    // «Добыча кристаллов» (tim211): ценность — по суммарному
+                    // «Сдвигу» своих ждущих карт (значков на клетках)
+                    if (s.crystalHarvest) v += 0.3 + 0.5 * Math.min(6,
+                        B.delayed ? B.delayed.e.reduce(
+                            (a2, e2) => a2 + Math.max(0, e2.left), 0) : 0);
                     // «Ковка оружия» (tim208): ценнее, когда в этот ход уже
                     // вышли свои существа (кого усиливать — решает гейт)
                     if (s.forge) v += 0.9 + 0.3 * Math.min(4,

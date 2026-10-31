@@ -928,6 +928,18 @@
                     } else return false;
                 }
                 if (def.spell.draw) drawCards(def.spell.draw);
+                // «Добыча кристаллов» (tim211): +1⚡ за каждую единицу
+                // «Сдвига» каждого своего существа, ждущего на поле (значки)
+                if (def.spell.crystalHarvest) {
+                    let n = 0;
+                    for (const d2 of (B.delayed ? B.delayed.p : []))
+                        n += Math.max(0, d2.left);
+                    if (n > 0) {
+                        B.energy += n;
+                        floatText(960, 790, `+${n}⚡`, 0xffd98c);
+                        sfx("aqua");
+                    }
+                }
                 // «Мозговой штурм» (tim206): сбросить ВСЮ руку и взять столько
                 // же +1. Прямой розыгрыш — карта ещё в руке, её сбросит/
                 // оплатит castSpell (skipHandReset); вызов после spendCard

@@ -23,8 +23,8 @@ stdout обёртки — только tail; rc ненадёжен — свер�
 Живой регресс — `for_work/regress_v5.sh` (последовательно, мини-порты):
 probe_fix3 (эталон эпохи мира), probe_world, probe_tiles, probe_v7shots,
 mini_test, mini_fix_test, quest_test, probe_decay2, probe_honor2..honor7,
-probe_wander, probe_time, probe_bridge, probe_fix1, probe_fix2,
-probe_ai_smart (свой раннер, 8164/9347) + оффлайн tiles_offline /
+probe_wander, probe_time, probe_bridge, probe_tim2, probe_fix1,
+probe_fix2, probe_ai_smart (свой раннер, 8164/9347) + оффлайн tiles_offline /
 forest_offline; генератор отдельно — `check_worldgen.mjs` (2000 сидов).
 Прочие пробы — история волн, не перепрогонять. Паттерн
 пробы: свой порт 8174+ и одноразовый Chrome-профиль.
@@ -33,7 +33,7 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 **Картотека карт** (w24, просил юзер) — отдельная от игры программка
 `build/tools/cards.html`: открывается двойным кликом (file://, без fetch —
 только `<script>`/img) или по `tools/cards.html` на дев-сервере. Просмотр
-всех карт каталога (растёт с волнами; сейчас 217 + карты персонажей) по
+всех карт каталога (растёт с волнами; сейчас 221 + карты персонажей) по
 фильтрам (стихия/тип/редкость/цена/
 поиск/сортировка; кнопки-опции включаются/выключаются независимо — w29),
 подробности карты (лицо + описание из loc.js + сырые
@@ -55,7 +55,7 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 |---|---|
 | `loc.js` | локализация RU/EN: `GAME_LOC.t(key, vars)`, `setLang`. Все тексты игры |
 | `meta.js` | localStorage: настройки (`sd_settings`: sound/music/animSpeed 0..10, lang, dragSummon), коллекция+колода+герои (`sd_meta`: deck/collection, heroDecks, captured, activeHeroId, starterId), сейв забега (`sd_run`: floor/hero/gold/dungeon) |
-| `cardsData.js` | **ЧИСТЫЕ ДАННЫЕ КАРТ** (w24, просил юзер: внешний инструмент читает карты отсюда): каталог CARDS (`str1..40` «Сила», `grw1..80` «Рост», `wis81..120` «Мудрость», `dec121..160` «Тлен», `hon161..200` «Честь», `tim201..210` «Время» + служебные gobA/gobC/ancBear/icePixie, id = № спрайта `images/cards/<elem>/<№>.png`; сейчас 217), RARITY_COLORS, лимиты колоды (DECK_MAX/MIN, DECK_COPIES; TRAP_SLOTS = Infinity — лимита ловушек нет), STARTER_DECKS, карты персонажей (HEROES + HERO_ORDER/HERO_FOE_ORDER), ELEM_LOGO → `globalThis.GAME_CARD_DATA`. Этот же файл (`<script>`-глобаль, без зависимостей) читает картотека `tools/cards.html` |
+| `cardsData.js` | **ЧИСТЫЕ ДАННЫЕ КАРТ** (w24, просил юзер: внешний инструмент читает карты отсюда): каталог CARDS (`str1..40` «Сила», `grw1..80` «Рост», `wis81..120` «Мудрость», `dec121..160` «Тлен», `hon161..200` «Честь», `tim201..214` «Время» + служебные gobA/gobC/ancBear/icePixie, id = № спрайта `images/cards/<elem>/<№>.png`; сейчас 221), RARITY_COLORS, лимиты колоды (DECK_MAX/MIN, DECK_COPIES; TRAP_SLOTS = Infinity — лимита ловушек нет), STARTER_DECKS, карты персонажей (HEROES + HERO_ORDER/HERO_FOE_ORDER), ELEM_LOGO → `globalThis.GAME_CARD_DATA`. Этот же файл (`<script>`-глобаль, без зависимостей) читает картотека `tools/cards.html` |
 | `tools/cards.html` (build/tools/) | **КАРТОТЕКА** — отдельная программа (двойной клик file://: только `<script>`+`<img>`, без fetch; или /tools/cards.html на дев-сервере): просмотр каталога + вкладка персонажей, фильтры (стихия/тип/редкость/цена/подтип/тип эффекта kind) + поиск + сортировки (в т.ч. по baseHp), токены (карты без img) — за галочкой, **КОНСТРУКТОР КОЛОД** (капы DECK_MAX/DECK_COPIES, пресеты стартеров, save/load JSON {game,kind:"deck",version,name,cards:{id:n}} + именованные слоты localStorage + автосейв), тест-API `window.__CARDSDB` |
 | `dataCards.js` | ЛОГИКА поверх данных (каталог — в cardsData.js): стартовые реестры коллекции (STARTER_COLLECTIONS/DEFAULT_COLLECTION), deckMinFor (минимум колоды открытого мира растёт с этажом) и caveDeckFor (гейты подземелий: 15+этаж, w12), архетипы врагов шести данжей (ENCOUNTERS + MOB_TABLES: gob/grw/wis/dec/hon/tim) + охранники мостов (strGuard/grwGuard/wisGuard/decGuard/honGuard, ядра по 25 карт) + генератор enemyDeck(encId, floor) (пулы добора по elem архетипа; добор — только боссу), пулы наград ПО СТИХИИ данжа (REWARD_POOLS, rollLootCard(elem)), CAVES — реестр подземелий (стихия/глубина/босс), магазин (SHOP_BUY/SELL); всё это экспортирует в `globalThis.GAME_DATA` (формат прежний — игра не заметила разрез) |
 | `uiKit.js` | T (текст), **fit()** (вписать текст), button/chip (button_menu — натуральные 274×77 при базе 1920×1080), cardFace (эталон 495), dimBg, **scrollPane** (колесо/ползунок/трек) |
@@ -1250,6 +1250,23 @@ arena.js): cols [427, 509, 594, 679, 765, 850], rows сцена1
   касание-бой И срыв новой погони; в сейв не утекает). Баг «мигание тайлов
   Тлена» снят юзером (монитор) — diag_blink: рендер тайлов детерминирован
   (dpr/resolution/GPU выровнены, residual только на анимированных спрайтах).
+- **«Время 211–214 + 2-й этаж Логова Времени» (2026-10-31, probe_tim2 60)**:
+  tim211 Добыча кристаллов (crystalHarvest — +1⚡ за каждую единицу «Сдвига»
+  своих значков; applySpellP/aiSpells, гейт aiTarget при 0 значков), tim212
+  Тараномобиль (siegeDouble — ×2 урона ПОСТРОЙКАМ противника в damageUnit
+  при killer-существе и базе в baseHit; обычный урон существам), tim213
+  Квадромех (Сдвиг 4), tim214 Паровой стрелятель (ПОСТРОЙКА со Сдвигом:
+  addUnit принимает building+delay; delayArrive: прибытие → archerShot
+  «Выстрел 4» (доступ по def.steamShot) → removeUnit → снова значок
+  «Сдвига 1», left = max(1, effDelayVal(1)) — Машина времени не рвёт цикл;
+  «Часовой механизм» не даёт постройкам рывок — type unit гейт); враг 2-го
+  этажа longShift «Долгий сдвиг» (heroes/47, 11♥, firstDelayMinus: первый
+  за бой призыв стороны со Сдвигом приходит на 1 ход раньше —
+  B.heroFlags.delayMinus, left через opts). CAVES.tim 2 этажа,
+  FLOOR_MOBS_TIME, пулы наград 14×3, ENEMY_FILLS.time.common 12; каталог
+  221. Тест-хук arenaApi._enemyCast; ЛОВУШКА: playCardAt гонит заклинания
+  без цели в юнит-ветку onCellTap (энергия тратится, эффект мимо) —
+  заклинания в пробе кастовать через arenaApi.castSpell(idx).
 - **«Документация и смоук» (2026-10-31)**: полный смоук возобновлён после
   w12–15 — в smoke_test починены 4 устаревших места (вход в пещеру: поле
   wInf.cave потерято при переписывании блока спавна + гейт 16 deckAdd-ом;

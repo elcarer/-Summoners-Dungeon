@@ -130,8 +130,9 @@
                     const u = addUnit(side, e.cardId, e.col, e.row,
                         { noDelay: true, token: e.token }); // ловушки клетки сработают
                     // «Часовой механизм» (tim205): пришедшее через «Сдвиг»
-                    // существо получает «Скорость 1» — рывок после появления
-                    if (u && B.units.includes(u)
+                    // СУЩЕСТВО получает «Скорость 1» — рывок после появления
+                    // (постройкам «Сдвига» рывок не нужен — tim214)
+                    if (u && u.def.type === "unit" && B.units.includes(u)
                         && B.units.some((b) => b.side === side && b.def.clockwork
                             && B.units.includes(b))) {
                         summonDash(u);
@@ -139,6 +140,21 @@
                         floatText(sp.x, sp.y - 96,
                             "» " + GAME_LOC.t("status.dash.name"), 0xb7d0ef);
                         sfx("step");
+                    }
+                    // «Паровой стрелятель» (tim214): прибывшая через «Сдвиг»
+                    // постройка совершает «Выстрел 4» и снова уходит в
+                    // «Сдвиг 1» (просил юзер). Минимум 1: «Машина времени»
+                    // не может сделать уход мгновенным — постройка всегда
+                    // стоит на клетке хотя бы один ход противника
+                    if (u && B.units.includes(u) && u.def.steamShot) {
+                        archerShot(u);
+                        if (B.stopped || B.phase === "over") return;
+                        const cell2 = { col: e.col, row: e.row };
+                        const id2 = cardIdOf(u.def);
+                        removeUnit(u);
+                        A.delayPlace(side, id2, cell2.col, cell2.row,
+                            { token: e.token,
+                              left: Math.max(1, A.effDelayVal(1, side)) });
                     }
                     await delay(0.3 / animK()); // появления не слипаются
                 }
@@ -539,13 +555,26 @@
                 // «Сдвиг N» (tim202/tim203, просил юзер): существо появляется
                 // не сразу — на клетке значок-счётчик (delayPlace). Нулевой
                 // итоговый «Сдвиг» (сняла «Машина времени») — призыв сразу.
-                // opts.noDelay — само появление значка (delayArrive),
-                // opts.testSummon — тест-хук _spawn
-                if (def.type === "unit" && def.delay
-                    && !opts.noDelay && !opts.testSummon
-                    && A.effDelayVal(def.delay, side) > 0) {
-                    A.delayPlace(side, cardId, col, row, opts);
-                    return null;
+                // «Паровой стрелятель» (tim214): в «Сдвиге» бывают и
+                // постройки. opts.noDelay — само появление значка
+                // (delayArrive), opts.testSummon — тест-хук _spawn
+                if ((def.type === "unit" || def.type === "building")
+                    && def.delay && !opts.noDelay && !opts.testSummon) {
+                    // «Долгий сдвиг» (firstDelayMinus, просил юзер): первый
+                    // за бой призыв стороны со «Сдвигом» из своей карты
+                    // приходит на 1 ход раньше (0 — появляется сразу)
+                    let dv = A.effDelayVal(def.delay, side);
+                    if (dv > 0 && !B.heroFlags.delayMinus[side]) {
+                        const hd = heroDefOf(side);
+                        if (hd && hd.ability === "firstDelayMinus") {
+                            B.heroFlags.delayMinus[side] = true;
+                            dv -= hd.abilityVal || 1;
+                        }
+                    }
+                    if (dv > 0) {
+                        A.delayPlace(side, cardId, col, row, { ...opts, left: dv });
+                        return null;
+                    }
                 }
                 const u = { side, def, col, row, hp: def.hp, curAtk: def.atk || 0, auraHp: 0, bonusAtk: 0,
                     // «Ковка оружия» (tim208): ход появления — «появившиеся

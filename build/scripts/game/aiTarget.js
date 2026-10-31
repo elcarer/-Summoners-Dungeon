@@ -453,6 +453,10 @@
                 // «Мозговой штурм» (tim206): полная смена руки +1 карта —
                 // окупается от трёх карт в руке
                 if (s.brainstorm && B.eHand.length < 3) return false;
+                // «Добыча кристаллов» (tim211) — без своих значков «Сдвига»
+                // энергии не даёт
+                if (s.crystalHarvest && !(B.delayed && B.delayed.e.length))
+                    return false;
                 // «Поток маны» — без своих ловушек энергии не даёт
                 if (s.energyPerTrap && !B.traps.e.length) return false;
                 // «Нехватка воздуха» — нужен хоть один урон у существ игрока

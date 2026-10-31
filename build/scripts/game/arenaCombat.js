@@ -672,9 +672,11 @@
             // «Выстрел N» (Гоблинский лучник — 1, Скелет-лучник dec135 — 2):
             // после перемещения — N урона ближайшему существу или строению
             // впереди по вертикали (любой стороны); если вертикаль перед ним
-            // пуста — N урона базе противника.
+            // пуста — N урона базе противника. «Паровой стрелятель» (tim214)
+            // стреляет тем же выстрелом при прибытии из «Сдвига» (def.steamShot)
             A.archerShot = function archerShot(u) {
-                if (!B.units.includes(u) || u.def.ability !== "archer") return;
+                if (!B.units.includes(u)
+                    || (u.def.ability !== "archer" && !u.def.steamShot)) return;
                 const dmg = u.def.shotDmg || 1;
                 const dir = u.side === "p" ? -1 : 1;
                 for (let r = u.row + dir; r >= 0 && r < GRID; r += dir) {

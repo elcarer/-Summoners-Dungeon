@@ -1438,6 +1438,38 @@
         tim210: { type: "building", cost: 6, atk: 0, hp: 5, timeCave: 1,
                   rarity: "rare", elem: "time",
                   color: 0x6a3a8c, img: "time/210" },
+        // «Добыча кристаллов» (tim211): заклинание 2⚡ без цели — +1 энергии
+        // за каждую единицу «Сдвига» каждого своего существа, ждущего на
+        // поле (значки-счётчики; crystalHarvest — applySpellP/aiSpells)
+        tim211: { type: "spell", cost: 2,
+                  spell: { target: "none", crystalHarvest: 1 },
+                  kind: "resource", // тип эффекта — по спеке юзера (Получение ресурсов)
+                  rarity: "common", elem: "time",
+                  color: 0x8a5ab0, img: "time/211" },
+        // «Тараномобиль» (tim212): Гном 2/3 со «Сдвигом 3» — двойной урон
+        // постройкам и базе противника (siegeDouble — damageUnit/baseHit)
+        tim212: { type: "unit", cost: 1, atk: 2, hp: 3, speed: 1,
+                  creature: "gnome", // лист поля боя — gnome_256
+                  delay: 3, // «Сдвиг 3»
+                  siegeDouble: 1, // двойной урон постройкам и базе противника
+                  subtype: "gnome", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "time",
+                  color: 0x7a4a9c, img: "time/212" },
+        // «Квадромех» (tim213): Гном 4/6 со «Сдвигом 4»
+        tim213: { type: "unit", cost: 2, atk: 4, hp: 6, speed: 1,
+                  creature: "gnome", // лист поля боя — gnome_256
+                  delay: 4, // «Сдвиг 4»
+                  subtype: "gnome", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "time",
+                  color: 0x7a4a9c, img: "time/213" },
+        // «Паровой стрелятель» (tim214): постройка 3⚡/4♥ со «Сдвигом 3» —
+        // прибыв, совершает «Выстрел 4» (archerShot — вертикаль вперёд,
+        // пусто — базе противника) и снова уходит в «Сдвиг 1» (delayArrive)
+        tim214: { type: "building", cost: 3, atk: 0, hp: 4,
+                  delay: 3, // «Сдвиг 3»
+                  steamShot: 1, shotDmg: 4, // прибытие → «Выстрел 4» → «Сдвиг 1»
+                  rarity: "common", elem: "time",
+                  color: 0x6a3a8c, img: "time/214" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1772,6 +1804,16 @@
             baseHp: 10, elems: ["time"], starter: "time",
             img: "41", ability: "startDrawDelayed",
         },
+        // «Долгий сдвиг» (противник 2-го этажа данжа Времени, просил
+        // юзер): Время (фиолетовая), 11♥, обычная. Способность
+        // firstDelayMinus — первый за бой призыв стороны со «Сдвигом»
+        // (из своей карты) приходит на 1 ход раньше (addUnit).
+        // Спрайт — heroes/47.png
+        longShift: {
+            id: "longShift", rarity: "common",
+            baseHp: 11, elems: ["time"], starter: "time",
+            img: "47", ability: "firstDelayMinus", abilityVal: 1,
+        },
         // ── «Охранники мостов» (просил юзер): бродячие враги открытого
         // мира, патрулируют мосты через реки в зонах своих стихий.
         // Общий принцип: 16♥, обычная; при гибели СВОЕГО существа СВОЕЙ
@@ -1835,6 +1877,7 @@
         "honRebels", "honCavalry", "honRampart", "honZealot",
         "honNeighbor", "honGreatBattle", "honThrone", // «Залы Чести» (этажи 1–6)
         "timBattle", // данж Времени, 1-й этаж (просил юзер)
+        "longShift", // данж Времени, 2-й этаж (просил юзер)
         // «Охранники мостов» открытого мира (просил юзер)
         "strGuard", "grwGuard", "wisGuard", "decGuard", "honGuard"];
 

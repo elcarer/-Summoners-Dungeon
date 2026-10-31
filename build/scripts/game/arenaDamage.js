@@ -528,6 +528,12 @@
                 // «Защита N» («Защитный кокон») режет входящий урон до нуля;
                 // споры/огненное дыхание реагируют на ФАКТИЧЕСКИ прошедший урон
                 let amt = amount;
+                // «Тараномобиль» (tim212): двойной урон ПОСТРОЙКАМ противника
+                // (урон, источником которого является существо: атака,
+                // спецудар; заклинания и ловушки бьют без killer-существа)
+                if (amt > 0 && killer && killer.def && killer.def.siegeDouble
+                    && killer.side !== target.side
+                    && target.def.type === "building") amt *= 2;
                 let blocked = 0;
                 // «Снизошедший» (hon190): страж — если ПРОТИВНИК атакует это
                 // существо (удар существом: марш, «Скорость», «Тёмные цепи»)
@@ -717,7 +723,9 @@
                 sfx("crash");
                 procEnchantFire(u); // «Огненное дыхание» срабатывает и на базе
                 procSpores(u, u.curAtk); // споры: удар по чужой базе бьёт и свою
-                damageBase(side === "p" ? "e" : "p", u.curAtk,
+                // «Тараномобиль» (tim212): удар по базе противника — двойной урон
+                const baseDmg = u.curAtk * (u.def.siegeDouble ? 2 : 1);
+                damageBase(side === "p" ? "e" : "p", baseDmg,
                     side === "p"
                         ? { x: cellXY(u.col, 0).x, y: cellXY(u.col, 0).y - 15, fill: 0xff8f6e }
                         : { x: cellXY(u.col, GRID - 1).x, y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff5f4e });

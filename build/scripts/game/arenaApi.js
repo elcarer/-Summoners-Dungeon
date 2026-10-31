@@ -407,6 +407,14 @@
                 resurrectPick(idx) { pickResurrect(idx); return true; },
                 // тест-хук: upkeep стороны (начало её хода: грибницы, костры)
                 _upkeep(side) { upkeep(side); return true; },
+                // тест-хук: честный эффект вражеского заклинания (проба
+                // «Добычи кристаллов» — прибавка энергии без хода ИИ)
+                _enemyCast(cardId) {
+                    const d = CARDS[cardId];
+                    if (!d || d.type !== "spell") return false;
+                    enemyCastSpellEffect(d);
+                    return true;
+                },
                 // тест-хуки «Сдвига» (Время, просил юзер): состояние значков
                 // и принудительный тик начала хода стороны (появления)
                 delayState: () => ({

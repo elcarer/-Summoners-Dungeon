@@ -635,6 +635,18 @@
                     if (own[0]) { baseHit("e", own[0]); triggerAttackTraps(own[0]); }
                 }
                 if (s.draw) drawEnemy(s.draw);
+                // «Добыча кристаллов» (tim211): +1⚡ за каждую единицу
+                // «Сдвига» своих ждущих карт (значков на клетках)
+                if (s.crystalHarvest) {
+                    let n = 0;
+                    for (const d2 of (B.delayed ? B.delayed.e : []))
+                        n += Math.max(0, d2.left);
+                    if (n > 0) {
+                        B.eEnergy += n;
+                        floatText(960, 190, `+${n}⚡`, 0xffd98c);
+                        sfx("aqua");
+                    }
+                }
                 // «Запутать руны»: ОБЕ руки в сброс, по 3 карты (спека: «вы и
                 // противник»; раньше сбрасывалась только своя — баг юзера).
                 // При прямом розыгрыше карта ещё в руке — её оставляем, aiPlay
