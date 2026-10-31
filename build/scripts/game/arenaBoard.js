@@ -243,6 +243,25 @@
                         }
                         return;
                     }
+                    if (tg === "token") { // «Управление временем» — годится ЖЕТОН:
+                        // «Возврат» существа (обе стороны) или значок «Сдвига»
+                        root.board.userData.baseZone.eventMode = "none";
+                        for (const u of B.units) {
+                            if (!(u.ret > 0) || !spellAimable(u)) continue;
+                            const rc = cellRect(u.col, u.row);
+                            hi.rect(rc.x, rc.y, rc.w, rc.h);
+                            hi.fill({ color: u.side === "p" ? 0x7dc95e : 0xd05a3c, alpha: 0.4 });
+                            hi.stroke({ width: 2, color: 0xb07ad5 });
+                        }
+                        for (const s of ["p", "e"])
+                            for (const d of (B.delayed[s] || [])) {
+                                const rc = cellRect(d.col, d.row);
+                                hi.rect(rc.x, rc.y, rc.w, rc.h);
+                                hi.fill({ color: s === "p" ? 0x7dc95e : 0xd05a3c, alpha: 0.4 });
+                                hi.stroke({ width: 2, color: 0xb07ad5 });
+                            }
+                        return;
+                    }
                     if (tg === "anyUnit" || tg === "anyUnitDmg") {
                         // усиление — любые существа; дротик — существа и строения
                         // (варево строения не берёт — только существа)
@@ -494,7 +513,17 @@
                 let n = u.protect || 0;
                 // врождённая «Защита N» карты («Защитник» tim201)
                 if (u.def.protect) n += u.def.protect;
-                if (u.def.type === "unit") n += A.cloudSpireCount(u.side);
+                if (u.def.type === "unit") {
+                    n += A.cloudSpireCount(u.side);
+                    // «Хирд» (tim222): «Защита 1» существам СЛЕВА И СПРАВА
+                    // от постройки (тот же ряд, col±1; считаем по живым
+                    // постройкам — гибель снимает сама, бейдж синхронизирует
+                    // recalcAuras → refreshProtectMark)
+                    for (const b of B.units)
+                        if (b.side === u.side && b.def.type === "building"
+                            && b.def.hird && b.row === u.row
+                            && Math.abs(b.col - u.col) === 1) n += 1;
+                }
                 return n;
             };
             A.recalcAuras = function recalcAuras() {

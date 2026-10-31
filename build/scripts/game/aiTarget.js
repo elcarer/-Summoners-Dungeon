@@ -397,6 +397,35 @@
             // forReplay — проверка ПОВТОРА «Горящими рунами»: карта уже не в руке.
             // Играбельность заклинания для ИИ (общие проверки цели/эффекта).
             // forReplay — проверка ПОВТОРА «Горящими рунами»: карта уже не в руке.
+            // «Управление временем» (tim223): лучший жетон и направление.
+            // Приоритеты: (1) уменьшить ЧУЖОЙ значок «Сдвига» с наибольшим
+            // счётчиком — затянуть прибытие врага; (2) уменьшить СВОЙ
+            // «Возврат» с наибольшим счётчиком — карта вернётся раньше;
+            // (3) увеличить СВОЙ значок «Сдвига» — только если в руке есть
+            // «Добыча кристаллов» (+1⚡ за единицу Сдвига). Нет жетонов — null
+            A.aiTokenPick = function aiTokenPick() {
+                let best = null;
+                let bs = -1;
+                for (const s of ["p", "e"]) {
+                    for (const d of (B.delayed[s] || [])) {
+                        if (s !== "e") { // чужой значок — замедлить (−2)
+                            const sc = 10 + Math.min(d.left, 5);
+                            if (sc > bs) { bs = sc; best = { col: d.col, row: d.row, dir: -1 }; }
+                        } else if (B.eHand.some((id) => CARDS[id]
+                            && CARDS[id].spell && CARDS[id].spell.crystalHarvest)) {
+                            const sc = 2 + Math.min(d.left, 5); // свой — при Добыче (+2)
+                            if (sc > bs) { bs = sc; best = { col: d.col, row: d.row, dir: 1 }; }
+                        }
+                    }
+                }
+                for (const u of B.units) {
+                    if (u.side !== "e" || u.def.type !== "unit"
+                        || !(u.ret > 0)) continue;
+                    const sc = 8 + Math.min(u.ret, 5); // свой «Возврат» — вернуть раньше (−2)
+                    if (sc > bs) { bs = sc; best = { col: u.col, row: u.row, dir: -1 }; }
+                }
+                return best;
+            };
             A.aiSpellPlayable = function aiSpellPlayable(def, forReplay = false) {
                 const s = def.spell;
                 if (s.copyLast) return aiReplayOk();
@@ -457,6 +486,8 @@
                 // энергии не даёт
                 if (s.crystalHarvest && !(B.delayed && B.delayed.e.length))
                     return false;
+                // «Управление временем» (tim223) — жетонов на поле нет вообще
+                if (s.tokenShift && !aiTokenPick()) return false;
                 // «Поток маны» — без своих ловушек энергии не даёт
                 if (s.energyPerTrap && !B.traps.e.length) return false;
                 // «Нехватка воздуха» — нужен хоть один урон у существ игрока

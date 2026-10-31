@@ -208,6 +208,35 @@
                 sfx("chpoc");
             };
 
+            // ── «Стройка» (timBuild, противник 4-го этажа данжа Времени,
+            // просил юзер): в начале боя сторона разыгрывает случайную
+            // ПОСТРОЙКУ с руки БЕЗ траты энергии — в случайную свободную
+            // клетку зоны призыва, карта уходит в сброс. Зовётся из enter()
+            // рядом с «Великой битвой» (постройки стреляют только после
+            // прибытия «Сдвига»/тиков — здесь просто ставятся на поле)
+            A.startBuildingPlay = function startBuildingPlay(side) {
+                const hand = side === "p" ? B.hand : B.eHand;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const pool = hand.map((id, i) => ({ id, i }))
+                    .filter((x) => CARDS[x.id] && CARDS[x.id].type === "building");
+                const rows = deployRows(side);
+                const cols = [];
+                for (let c = 0; c < GRID; c++) for (const r of rows)
+                    if (!unitAt(c, r) && !cols.some((p) => p[0] === c && p[1] === r))
+                        cols.push([c, r]);
+                if (!pool.length || !cols.length) return;
+                const pick = pool[(Math.random() * pool.length) | 0];
+                const spot = cols[(Math.random() * cols.length) | 0];
+                hand.splice(pick.i, 1);
+                discard.push(pick.id);
+                noteDiscard(1, side, [pick.id]);
+                addUnit(side, pick.id, spot[0], spot[1]);
+                const p = cellXY(spot[0], spot[1]);
+                floatText(p.x, p.y - 108,
+                    GAME_LOC.t(`card.${pick.id}.name`), 0xffd98c);
+                sfx("chpoc");
+            };
+
             // ── «Запутанность N» (ловушка «Путь грибов», просил юзер) ─────────
             // Запутанное существо вместо своего перемещения/атаки (всего марша,
             // включая доб. атаки берсерка) идёт на клетку НАЗАД — к своей базе —

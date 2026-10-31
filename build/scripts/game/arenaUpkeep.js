@@ -105,6 +105,26 @@
                 }
             };
 
+            // «Лаборатория» (tim224, просил юзер): активация кликом —
+            // сторона берёт карту, постройка снимается с поля БЕЗ каскадов
+            // смерти (это не гибель) и снова уходит в «Сдвиг 1» на своей
+            // клетке (Машина времени может вернуть её ходом раньше).
+            // Игрок — клик по постройке (onCellTap), ИИ — раз в свой ход
+            A.labActivate = function labActivate(side, b) {
+                if (!b || !B.units.includes(b)) return false;
+                const col = b.col, row = b.row;
+                const cardId = cardIdOf(b.def);
+                if (side === "p") drawCards(1); else drawEnemy(1);
+                removeUnit(b); // без каскадов — клетка свободна для значка
+                A.delayPlace(side, cardId, col, row,
+                    { left: A.effDelayVal(1, side) });
+                const p = cellXY(col, row);
+                floatText(p.x, p.y - 96, "+1 ✧", 0xffd98c);
+                sfx("chpoc");
+                refreshHud();
+                return true;
+            };
+
             A.stormerTick = function stormerTick(u) {
                 if (!u || !B.units.includes(u)) return false;
                 const decks = ["p", "e"].filter((side) => {
@@ -498,6 +518,33 @@
                     bounceUnit(u); // карта — в руку владельца, каскадов нет
                     floatText(p.x, p.y - 96,
                         "↩ " + GAME_LOC.t("status.return.name"), 0xc9a0ef);
+                    sfx("chpoc");
+                }
+            };
+
+            // «Возврат» ЛОВУШКИ («Удар двойника» tim221, просил юзер):
+            // спустя N ходов после установки ловушка возвращается в руку
+            // владельца (armTrap ставит trap.ret = def.returnN). Тик — в
+            // начале хода владельца, рядом с «Возвратом» существ; счётчик
+            // на значке «?» не рисуем (у существ метка — на жетоне)
+            A.trapReturnTick = function trapReturnTick(side) {
+                if (!B.traps || !B.traps[side]) return;
+                for (const t of B.traps[side].slice()) {
+                    if (!t.ret || t.ret <= 0) continue;
+                    t.ret -= 1;
+                    if (t.ret > 0) continue;
+                    const i = B.traps[side].indexOf(t);
+                    if (i < 0) continue; // сработала в этот же ход — уже не в списке
+                    B.traps[side].splice(i, 1);
+                    redrawTraps();
+                    const p = t.unit && B.units.includes(t.unit)
+                        ? cellXY(t.unit.col, t.unit.row) : cellXY(t.col, t.row);
+                    floatText(p.x, p.y - 60,
+                        "↩ " + GAME_LOC.t("status.return.name"), 0xc9a0ef);
+                    if (side === "p") {
+                        B.hand.push(cardIdOf(t.def));
+                        layoutHand();
+                    } else B.eHand.push(cardIdOf(t.def));
                     sfx("chpoc");
                 }
             };

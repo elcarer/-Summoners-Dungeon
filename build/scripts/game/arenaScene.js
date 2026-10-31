@@ -113,6 +113,9 @@
                     // стороны — существа, появившиеся ПОСЛЕ розыгрыша, тоже
                     // получают +2 к урону ({ turn, amt }; см. addUnit)
                     forge: { p: null, e: null },
+                    // «Конвейер» (tim225): сколько карт с руки разыграла
+                    // сторона в этот ход (effCost даёт скидку Конвейерам)
+                    convey: { p: { turn: 0, n: 0 }, e: { turn: 0, n: 0 } },
                 };
                 G.battle = B;
                 // «Контроль природы» (firstTurnEnergyDown, просил юзер): на
@@ -212,6 +215,10 @@
                     greatBattleSummon("p");
                     greatBattleSummon("e");
                 }
+                // «Стройка» (timBuild): в начале боя сторона разыгрывает
+                // случайную постройку С РУКИ бесплатно (просил юзер)
+                if (eHeroDef && eHeroDef.ability === "startBuildingPlay") startBuildingPlay("e");
+                if (heroDef && heroDef.ability === "startBuildingPlay") startBuildingPlay("p");
                 layoutHand();
                 refreshHud();
                 banner(t("arena.yourTurn"));

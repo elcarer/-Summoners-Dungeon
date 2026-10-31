@@ -10,6 +10,7 @@
                 B.phase = "enemy";
                 B.selected = null;
                 B.spellTarget = false;
+                tokenPanelClose(); // панель «Управления временем» не переживает смену хода
                 cryptRefund("p"); // «Склеп»: не разыгранная игроком карта — назад в сброс
                 layoutHand();
                 redrawHighlight();
@@ -26,6 +27,7 @@
                 riteStumpTick("e"); // пень обряда врага подсмотрел и решил
                 poisonTick("e"); // яд: до марша (просил юзер)
                 returnTick("e"); // «Возврат» (Время): счётчики тают, созревшие — в руку
+                trapReturnTick("e"); // «Возврат» ЛОВУШКИ (tim221): созревшая — в руку
                 await delayArrive("e"); // «Сдвиг» (Время): созревшие являются
                 await marchSide("e");
                 if (B.stopped || B.phase === "over") return;
@@ -168,6 +170,14 @@
                         }
                     }
                 }
+                // «Лаборатория» (tim224): активация своей постройки —
+                // добор карты и снова в «Сдвиг 1» (после активации на поле
+                // её нет — за ход не зациклится; вернётся delayArrive-ом)
+                {
+                    const lab = B.units.find((v) => v.side === "e"
+                        && v.def.type === "building" && v.def.lab);
+                    if (lab) labActivate("e", lab);
+                }
                 // ИИ тратит энергию, пока есть чем. Если играть нечем (в руке всё
                 // слишком дорого или неприменимо — поле забито, целей нет), а
                 // энергии много — добирает карты и пробует снова: копить десятки
@@ -240,6 +250,7 @@
                                     && counterTrapConsume("p", "counterBuilding"))) {
                                 B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eEnergy -= effCost(cardId, "e");
+                                notePlay("e"); // «Конвейер» (tim225)
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 B.eDiscard.push(cardId);
                                 cryptSettle("e", cardId); // «Склеп»
@@ -252,6 +263,7 @@
                             }
                             B.eHand.splice(pick.i, 1);
                             B.eEnergy -= effCost(cardId, "e");
+                            notePlay("e"); // «Конвейер» (tim225)
                             consumeEpicDiscount(cardId, "e"); // «Архилич»
                             // playCtx для «Сброса разума» (decMind): dec146 при
                             // появлении сбрасывает карту; свой выход карты в
@@ -283,6 +295,7 @@
                                 const cardId = B.eHand[pick.i];
                                 B.eHand.splice(pick.i, 1);
                                 B.eEnergy -= effCost(cardId, "e");
+                                notePlay("e"); // «Конвейер» (tim225)
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                                 if (def.trap.effect === "sporeCurse") addSpores(pu);
@@ -311,6 +324,7 @@
                                 const cardId = B.eHand[pick.i];
                                 B.eHand.splice(pick.i, 1);
                                 B.eEnergy -= effCost(cardId, "e");
+                                notePlay("e"); // «Конвейер» (tim225)
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                                 armTrap("e", cardId, 0, 0, blds[0]);
@@ -333,6 +347,7 @@
                             const cardId = B.eHand[pick.i];
                             B.eHand.splice(pick.i, 1);
                             B.eEnergy -= effCost(cardId, "e");
+                            notePlay("e"); // «Конвейер» (tim225)
                             consumeEpicDiscount(cardId, "e"); // «Архилич»
                             cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                             armTrap("e", cardId, col, row);
@@ -356,6 +371,7 @@
                                 B.eDiscard.push(cardId);
                                 noteDiscard(1, "e", [cardId]);
                                 B.eEnergy -= effCost(cardId, "e");
+                                notePlay("e"); // «Конвейер» (tim225)
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                                 floatText(960, 500,
@@ -385,7 +401,8 @@
                             castTargetOff = 0;
                             B.eEnergy = (def.spell.drainAll || def.spell.stormAll)
                                 ? 0 : B.eEnergy - Math.max(0, effCost(cardId, "e") - tOff);
-                            consumeEpicDiscount(cardId, "e"); // «Архилич»: флаг первой эпик-карты
+                            notePlay("e"); // «Конвейер» (tim225)
+                            consumeEpicDiscount(cardId, "e"); // «Архилич»
                             heroFirstSpellEnergy("e"); // «Дуновение опасности»
                             // рука ИИ тоже не больше 7 — излишек панельных доборов
                             // сбрасывается случайно (как панель сброса у игрока)

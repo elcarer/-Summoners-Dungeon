@@ -4,11 +4,22 @@
 (function () {
     globalThis.GAME_ARENA.installActions = function installActions(A) {
         with (A) {
+            // Розыгрыш карты С РУКИ стороной (счётчик «Конвейера» tim225):
+            // после каждого розыгрыша карты «Конвейер» этого хода дешевле
+            // на 1 (effCost; turn-сверка сбрасывает счётчик на новом ходу)
+            A.notePlay = function notePlay(side) {
+                if (!B.convey) return;
+                const cp = B.convey[side] || (B.convey[side] = { turn: 0, n: 0 });
+                if (cp.turn !== B.turnNo) { cp.turn = B.turnNo; cp.n = 0; }
+                cp.n += 1;
+            };
+
             A.playerTurnStart = async function playerTurnStart() {
                 B.turnNo += 1; // шкала подросла: сфер теперь на одну больше
                 B.phase = "anim";
                 B.selected = null;
                 B.spellTarget = false;
+                tokenPanelClose(); // панель «Управления временем» не переживает смену хода
                 refreshHud();
                 firewallTick("e"); // стена костров врага — конец хода врага
                 sproutTick("e");   // ростки врага подросли — конец его хода
@@ -21,6 +32,7 @@
                 upkeep("p"); // грибницы игрока
                 poisonTick("p"); // яд: до марша (просил юзер)
                 returnTick("p"); // «Возврат» (Время): счётчики тают, созревшие — в руку
+                trapReturnTick("p"); // «Возврат» ЛОВУШКИ (tim221): созревшая — в руку
                 await delayArrive("p"); // «Сдвиг» (Время): созревшие являются
                 await marchSide("p");
                 timeCavePulse("p"); // «Пещера времени»: призыв после марша — значок не тает в этом же ходу
@@ -45,6 +57,7 @@
             // ── Действия игрока ────────────────────────────────────────────────
             A.spendCard = function spendCard(handIdx) { // вынимает карту из руки в сброс
                 const cardId = B.hand[handIdx];
+                notePlay("p"); // «Конвейер» (tim225): разыграна карта с руки
                 // улетание карты в сброс (анимации руки, просил юзер):
                 // позиция снимается ДО splice; узел мог быть пересобран
                 // эффектами заклинания — тогда слот по расчёту веера
@@ -199,12 +212,101 @@
 
             // снять выбор карты: карты руки снова интерактивны
             A.deselect = function deselect() {
+                tokenPanelClose(); // панель «Управления временем» закрывается
                 if (B.selected === null && !B.spellTarget) return;
                 B.selected = null;
                 B.spellTarget = false;
                 layoutHand();
                 redrawHighlight();
                 refreshHud();
+            };
+
+            // ── «Управление временем» (tim223, просил юзер) ────────────────────
+            // Цель заклинания — ЖЕТОН: значок «Сдвига» на клетке (любая
+            // сторона) или существо со «Возвратом» (любая сторона). После
+            // выбора цели панелька предлагает −2 или +2; каст идёт с dir.
+            A.tokenAt = function tokenAt(col, row) {
+                const u = unitAt(col, row);
+                if (u && u.ret > 0) return { kind: "ret" };
+                for (const side of ["p", "e"])
+                    if (B.delayed[side] && B.delayed[side]
+                        .some((e) => e.col === col && e.row === row))
+                        return { kind: "delay" };
+                return null;
+            };
+            // Применение: dir −1 уменьшает, +1 увеличивает (не ниже 0);
+            // жетон «Возврата» с 0 вернётся в следующий тик владельца
+            // (returnTick: счётчик тает и на 0 существо уходит в руку)
+            A.applyTokenShift = function applyTokenShift(side, target) {
+                if (!target || target.col === undefined || !target.dir) return false;
+                const u = unitAt(target.col, target.row);
+                if (u && u.ret > 0) {
+                    u.ret = Math.max(0, u.ret + target.dir * 2);
+                    if (u.ret > 0) A.returnMarkDraw(u); // метка с новым числом
+                    const p = cellXY(u.col, u.row);
+                    floatText(p.x, p.y - 84, `${target.dir < 0 ? "−" : "+"}2 ${GAME_LOC.t("status.return.name")}`,
+                        0xc9a0ef);
+                    punch(u.node);
+                    sfx("aqua");
+                    return true;
+                }
+                for (const s of ["p", "e"]) {
+                    const e = (B.delayed[s] || []).find((d) =>
+                        d.col === target.col && d.row === target.row);
+                    if (!e) continue;
+                    e.left = Math.max(0, e.left + target.dir * 2);
+                    A.delayDrawNode(e); // цифра на значке обновится
+                    const p = cellXY(e.col, e.row);
+                    floatText(p.x, p.y - 84, `${target.dir < 0 ? "−" : "+"}2 ${GAME_LOC.t("status.delay.name")}`,
+                        0xc9a0ef);
+                    sfx("aqua");
+                    return true;
+                }
+                return false;
+            };
+            // Панелька выбора направления (две кнопки над полем)
+            A.tokenPanelOpen = function tokenPanelOpen(col, row) {
+                tokenPanelClose();
+                B.tokenPick = { col, row };
+                const panel = new PIXI.Container();
+                const bg = new PIXI.Graphics();
+                bg.roundRect(960 - 330, 196, 660, 132, 14);
+                bg.fill({ color: 0x201a2e, alpha: 0.92 });
+                bg.stroke({ width: 3, color: 0xb07ad5 });
+                panel.addChild(bg);
+                const cap = T(GAME_LOC.t("time.ctl.pick"), 24, 0xf3e6c2,
+                    { stroke: { color: 0x1c1207, width: 4 } });
+                cap.anchor.set(0.5);
+                cap.position.set(960, 226);
+                cap.eventMode = "none";
+                panel.addChild(cap);
+                panel.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: GAME_LOC.t("time.ctl.down"),
+                    x: 960 - 158, y: 288, scale: 0.9, fontSize: 38,
+                    onTap: () => tokenPanelCast(-1),
+                }));
+                panel.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: GAME_LOC.t("time.ctl.up"),
+                    x: 960 + 158, y: 288, scale: 0.9, fontSize: 38,
+                    onTap: () => tokenPanelCast(1),
+                }));
+                root.tokenPanel = panel;
+                root.addChild(panel); // поверх поля; умрёт вместе с root (exit боя)
+            };
+            A.tokenPanelClose = function tokenPanelClose() {
+                B.tokenPick = null;
+                if (root && root.tokenPanel && !root.tokenPanel.destroyed) {
+                    root.tokenPanel.destroy({ children: true });
+                }
+                if (root) root.tokenPanel = null;
+            };
+            A.tokenPanelCast = function tokenPanelCast(dir) {
+                if (!B.tokenPick) return;
+                const target = { col: B.tokenPick.col, row: B.tokenPick.row, dir };
+                const sel = B.selected;
+                tokenPanelClose();
+                if (sel !== null) castSpell(sel, target);
+                else deselect();
             };
 
             A.onCardTap = function onCardTap(idx) {
@@ -287,6 +389,13 @@
                     if (cb && cb.side === "p" && cb.def.type === "building"
                         && cb.def.cryptPlay && B.discard.length && !B.cryptTaken) {
                         cryptAutoPlay(B.discard[B.discard.length - 1], col, row);
+                        return;
+                    }
+                    // «Лаборатория» (tim224): активация кликом по постройке —
+                    // взять карту, постройка снова уходит в «Сдвиг 1»
+                    if (cb && cb.side === "p" && cb.def.type === "building"
+                        && cb.def.lab) {
+                        labActivate("p", cb);
                     }
                     return;
                 }
@@ -302,6 +411,14 @@
                     }
                     if (tg === "emptyCell") { // культ кочерыжки — только пустая клетка
                         if (!unitAt(col, row)) castSpell(B.selected, { col, row });
+                        else deselect();
+                        return;
+                    }
+                    if (tg === "token") { // «Управление временем» — по ЖЕТОНУ:
+                        // значок «Сдвига» на клетке или «Возврат» существа;
+                        // направление (−2/+2) выбирается в панельке
+                        const pick = tokenAt(col, row);
+                        if (pick) tokenPanelOpen(col, row);
                         else deselect();
                         return;
                     }
@@ -555,6 +672,12 @@
                 // «Воскрешение» (hon200): в своём сбросе нет карты призыва —
                 // воскрешать нечего (как у «Поднятия мёртвых»)
                 if (def.spell.resurrect && !unitsInDiscard("p").length) return false;
+                // «Управление временем» (tim223): жетон выбран кликом,
+                // направление — панелька (target {col, row, dir})
+                if (def.spell.tokenShift) {
+                    if (!target || target.col === undefined) return false;
+                    return applyTokenShift("p", target);
+                }
                 if (tg === "anyUnit") { // усиление/Смыв/Слабость
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);

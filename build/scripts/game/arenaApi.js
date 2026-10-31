@@ -431,6 +431,12 @@
                 async _delayTick(side) { await delayArrive(side); return true; },
                 // «Возврат» (тесты): тик счётчиков стороны
                 _retTick(side) { returnTick(side); return true; },
+                // тест-хуки «Управления временем» (tim223): панель направления
+                tokenState: () => ({
+                    pick: B && B.tokenPick ? { ...B.tokenPick } : null,
+                    open: !!(root && root.tokenPanel && !root.tokenPanel.destroyed),
+                }),
+                tokenPick(dir) { tokenPanelCast(dir); return true; },
                 // тест-хуки «Торговца» (hon183): панель сброса по выбору
                 _openTradePanel() { buildDiscardPanel("trade"); return true; },
                 _pickDiscard(idx) { pickDiscard(idx); return true; },

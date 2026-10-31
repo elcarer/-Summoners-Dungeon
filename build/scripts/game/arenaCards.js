@@ -31,6 +31,21 @@
                 // постройкам — гибель снимает скидку, как аура)
                 if (def.type === "building" && B
                     && B.units.some((u) => u.side === side && u.def.village)) d += 1;
+                // «Строительный кран» (tim226): все ПОСТРОЙКИ стороны на
+                // 1 энергию дешевле ЗА КАЖДЫЙ кран на поле (складывается
+                // с «Деревней» и с другими кранами)
+                if (def.type === "building" && B)
+                    d += B.units.filter((u) => u.side === side
+                        && u.def.type === "building" && u.def.crane).length;
+                // «Конвейер» (tim225): карты «Конвейер» в этот ход на 1
+                // энергию дешевле за КАЖДУЮ карту, разыгранную стороной с
+                // руки (счётчик B.convey[side] {turn, n} — notePlay в
+                // spendCard/aiPlay; скидка живёт, пока есть живой Конвейер)
+                if (def.conveyor && B && B.units.some((u) => u.side === side
+                    && u.def.type === "building" && u.def.conveyor)) {
+                    const cp = B.convey && B.convey[side];
+                    if (cp && cp.turn === B.turnNo) d += cp.n;
+                }
                 // «Архилич» (decLich): ПЕРВАЯ сыгранная Эпическая карта
                 // стороны стоит на 2 энергии дешевле. Флаг тратится в момент
                 // реальной оплаты (consumeEpicDiscount), поэтому скидка видна

@@ -647,6 +647,17 @@
                         sfx("aqua");
                     }
                 }
+                // «Управление временем» (tim223): лучший жетон и направление
+                // выбрал aiTokenPick (гейт проверил, что есть что менять)
+                if (s.tokenShift) {
+                    const pick = aiTokenPick();
+                    if (pick) {
+                        applyTokenShift("e", pick);
+                        const pp = cellXY(pick.col, pick.row);
+                        floatText(pp.x, pp.y - 108,
+                            GAME_LOC.t(`card.${cardIdOf(def)}.name`), 0xc9a0ef);
+                    }
+                }
                 // «Запутать руны»: ОБЕ руки в сброс, по 3 карты (спека: «вы и
                 // противник»; раньше сбрасывалась только своя — баг юзера).
                 // При прямом розыгрыше карта ещё в руке — её оставляем, aiPlay

@@ -250,7 +250,8 @@
                         || e === "bubble" || e === "alliesStrike"
                         || e === "ghostGrave" || e === "darkOffering"
                         || e === "tarStatue" || e === "tarKettles"
-                        || e === "timeTrap") // «Ловушка времени» — только существа
+                        || e === "timeTrap" // «Ловушка времени» — только существа
+                        || e === "selfDmg") // «Удар двойника»: существо бьёт себя
                         return u.def.type === "unit";
                     return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
                         || e === "confuse" || e === "cellDebuff"
@@ -385,6 +386,21 @@
             // Эффект сработавшей ловушки на клетке (отделён от поиска ловушки —
             // «Роща лоз» применяет его дважды); u — существо, наступившее на неё
             A.applyCellTrap = function applyCellTrap(trap, side, u) {
+                if (trap.def.trap.effect === "selfDmg") {
+                    // «Удар двойника» (tim221, просил юзер): существо
+                    // наносит САМО СЕБЕ урон, равный своему параметру
+                    // урона. Это не «атака» — хуки атаки (лёд/яд/
+                    // сокрушение/руна) не срабатывают; урон идёт через
+                    // damageUnit — «Защита 1» и кокон режут как обычно
+                    const p2 = cellXY(u.col, u.row);
+                    floatText(p2.x, p2.y - 84, "⚔↺", 0xe08cd0);
+                    punch(u.node);
+                    sfx("sword");
+                    damageUnit(u, u.curAtk, null, "sword");
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
                 if (trap.def.trap.effect === "alliesStrike") {
                     // «Тёмные цепи» (dec127): вошедшее на клетку существо
                     // атакуют ВСЕ соседние СВОИ (хозяйки ловушки) существа —
@@ -650,7 +666,10 @@
             A.armTrap = function armTrap(side, cardId, col, row, unit = null) {
                 if (CARDS[cardId] && CARDS[cardId].type === "trap"
                     && trapPlayCountered(side)) return false;
-                B.traps[side].push({ def: CARDS[cardId], col, row, unit });
+                // «Удар двойника» (tim221): «Возврат 2» — спустя 2 хода
+                // после установки ловушка вернётся в руку (trapReturnTick)
+                const ret = CARDS[cardId] && CARDS[cardId].returnN || 0;
+                B.traps[side].push({ def: CARDS[cardId], col, row, unit, ret });
                 redrawTraps();
                 const p = unit ? cellXY(unit.col, unit.row) : cellXY(col, row);
                 fxEvent("seal", { x: p.x, y: p.y + 8, color: 0xb07ad5, scale: 0.85 });
