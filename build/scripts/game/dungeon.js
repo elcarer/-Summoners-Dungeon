@@ -350,6 +350,8 @@
         let refreshShop = null; // живое обновление окна магазина (пишет buildShopWin)
         let shopZoomHook = null; // ховер-зум карт магазина (пишет buildShopWin)
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
+        let zoneRef = null; // клик-зона местности (тесты: clickAt)
+        let pathLayer = null; // fx-слой следа клика (кольцо + точки маршрута)
 
         function blocked(px, py) {
             const gx = Math.floor(px / TS), gy = Math.floor(py / TS);
@@ -386,6 +388,27 @@
             for (let c = [tx, ty]; c; c = prev.get(key(c[0], c[1]))) cells.push(c);
             cells.reverse();
             return cells.slice(1).map(([cx, cy]) => ({ x: cx * TS + TS / 2, y: cy * TS + TS / 2 }));
+        }
+        // Путь с доводкой: клик в стену/иконку у стены (например, по
+        // подписи «Выход» над лестницей) ведёт героя к ближайшей
+        // проходимой клетке в радиусе 2 от цели (просил юзер W22)
+        function pathTo(sx, sy, tx, ty) {
+            if (walkable(tx, ty)) return bfsPath(sx, sy, tx, ty);
+            for (let r = 1; r <= 2; r++) {
+                const cand = [];
+                for (let dy = -r; dy <= r; dy++)
+                    for (let dx = -r; dx <= r; dx++)
+                        if (Math.max(Math.abs(dx), Math.abs(dy)) === r)
+                            cand.push([tx + dx, ty + dy]);
+                cand.sort((a, b) =>
+                    Math.hypot(a[0] - tx, a[1] - ty) - Math.hypot(b[0] - tx, b[1] - ty));
+                for (const [x, y] of cand) {
+                    if (!walkable(x, y)) continue;
+                    const p = bfsPath(sx, sy, x, y);
+                    if (p) return p;
+                }
+            }
+            return null;
         }
         function setHeroAxes(ix, iy) {
             COMPONENTS.ctrlVI[heroId] = ix;
@@ -593,6 +616,8 @@
             const c = new PIXI.Container();
             c.position.set(x, y);
             c.addChild(sp);
+            // жёлтое свечение при наведении — правило UI для кнопок (W22)
+            globalThis.GAME_UI.addGlow(ctx, c, sp.width * 1.15, sp.height * 1.15);
             return c;
         }
 
@@ -1181,10 +1206,20 @@
                     if (heroId === null) return;
                     const p = zone.toLocal(e.global); // мировые координаты (камера учтена)
                     const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
-                    const next = bfsPath(Math.floor(hx / TS), Math.floor(hy / TS),
+                    const next = pathTo(Math.floor(hx / TS), Math.floor(hy / TS),
                         Math.floor(p.x / TS), Math.floor(p.y / TS));
-                    if (next) path = next; // в стену/сам в себя — не идём
+                    if (next) { // в стену/сам в себя — не идём
+                        path = next;
+                        // след клика: кольцо в КОНЦЕ пути (просил юзер W22)
+                        // + точки маршрута волной к нему
+                        const last = next[next.length - 1];
+                        globalThis.GAME_UI.pathFx(ctx, {
+                            layer: pathLayer, x: last.x, y: last.y,
+                            points: next.slice(0, -1),
+                        });
+                    }
                 });
+                zoneRef = zone; // тест-хук clickAt
                 // наведение на врага — подсказка (имя + колода); ушли — скрыть
                 zone.on("pointermove", (e) => hoverCheck(zone.toLocal(e.global)));
                 zone.on("pointerout", () => hideTip());
@@ -1206,6 +1241,11 @@
                     objNodes.push({ obj: o, node, base: node.y, phase: Math.random() * 6.28 });
                 }
                 worldContainer.addChild(layer);
+                // fx-слой следа клика — ПОВЕРХ всего этажа (включая стены):
+                // точки маршрута должны быть видны и между стен
+                pathLayer = new PIXI.Container();
+                pathLayer.zIndex = 999999;
+                layer.addChild(pathLayer);
 
                 // герой — лист по стихии забега (Рост — эльф, Сила — гоблин).
                 // Спрайт 96×96 (0.375 листа 256 — просил юзер), якорь (0.5,1)
@@ -1397,10 +1437,17 @@
                 // ── лестница у старта: наверх; на 1-м этаже — в открытый мир ──
                 // первые 2с после входа в подземелье лестница «остывает» —
                 // герой прибывает к ней вплотную, без паузы выход срабатывал
-                // от первого же клика (просил юзер)
+                // от первого же клика (просил юзер). Порог шире полклетки
+                // (просил юзер W22): герой, вставший кликом в СОСЕДНЮЮ с
+                // иконкой клетку (например, попал в подпись «Выход»),
+                // тоже выходит. Остывание — убывающий счётчик МС (тик
+                // ниже), а НЕ performance.now(): метка, сохранённая в сейв,
+                // после «Продолжить» в новой сессии блокировала выход до
+                // конца сессии (баг W22)
+                if (st.ladderCoolMs > 0) st.ladderCoolMs -= dt * 1000;
                 if (!st.win && !ctx.questModal && st.ladder
-                    && !(st.ladderCool && performance.now() < st.ladderCool)
-                    && Math.hypot(st.ladder.x - hx, st.ladder.y - hy) < TS * 0.85) {
+                    && !(st.ladderCoolMs > 0)
+                    && Math.hypot(st.ladder.x - hx, st.ladder.y - hy) < TS * 1.02) {
                     const from = st.floor;
                     st.heroPos = { x: hx, y: hy };
                     G.dungeonStates[stKey(st.cave, from)] = st; // этаж — в архив как оставили
@@ -1451,6 +1498,11 @@
                         const next = stateFor(G.dungeonStates, st.cave, G.run.floor);
                         next.heroPos = { ...next.spawn };
                         next.exitCool = false;
+                        // лестница прибывшего этажа 2с «остывает»: герой
+                        // стоит от неё в СОСЕДНЕЙ клетке, а порог выхода
+                        // теперь шире клетки (W22) — без остывания его
+                        // мгновенно выкидывало на предыдущий этаж
+                        next.ladderCoolMs = 2000;
                         G.dungeon = next;
                         // сразу на следующий этаж, без меню «этаж пройден»
                         // (просил юзер); floorSwap — перезаход в ту же сцену
@@ -1465,6 +1517,9 @@
             // в экранные (тесты кликают по полу через реальные события мыши);
             // layer стоит в (0,0) мира — его трансформ и есть мировая матрица
             path: () => path,
+            // тест-хук: эмуляция клика по местности (обработчик зоны)
+            clickAt: (x, y) => zoneRef && zoneRef.emit("pointertap",
+                { global: layer ? layer.toGlobal({ x, y }) : { x, y } }),
             worldToScreen: (x, y) => (layer ? layer.toGlobal({ x, y }) : null),
             // тултип врага: тест-хук «наведение в мировых координатах» + состояние
             hoverAt(x, y) {

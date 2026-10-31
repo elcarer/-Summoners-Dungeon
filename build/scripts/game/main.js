@@ -830,6 +830,14 @@
                         const b = name === "continue" ? bCont : name === "newGame" ? bNew : null;
                         if (b) b.emit("pointertap");
                     },
+                    // тест-хук W22: узел кнопки меню (свечение addGlow)
+                    btn(name) {
+                        return name === "continue" ? bCont
+                            : name === "newGame" ? bNew
+                            : name === "deck" ? bDeck
+                            : name === "settings" ? bSet
+                            : name === "exit" ? bExit : null;
+                    },
                     intro: () => ({
                         t: Math.round(introT * 100) / 100, done: !!introDone,
                         cards: {
@@ -1089,6 +1097,9 @@
             arenaApi: arenaScene.api, deckApi: deckScene.api,
             rewardApi: rewardScene.api, settingsApi: settingsScene.api,
             draftApi: draftScene.api, worldApi: worldScene.api,
+            // тест-хук W22: активные следы кликов (кольцо + точки пути)
+            clickFxs: () => (ctx.__clickFxs
+                ? [...ctx.__clickFxs].map((f) => ({ ...f })) : []),
             questApi: {
                 state: () => globalThis.GAME_QUESTS.stateOf(G),
                 dialog: () => globalThis.GAME_QUESTS.dialogInfo(),

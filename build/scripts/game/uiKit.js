@@ -41,9 +41,122 @@
         }
         c.position.set(x, y);
         c.eventMode = "static";
+        addGlow(ctx, c, sp.texture.width * scale, sp.texture.height * scale);
         c.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onTap && onTap(); });
-        c.userData = { sprite: sp };
+        c.userData.sprite = sp;
         return c;
+    }
+
+    // Эффект клика-перемещения в мире/подземелье (просил юзер W22):
+    // золотое кольцо-волна в точке клика + точки маршрута (центры клеток,
+    // мировые px) волной от героя к цели; всё растворяется за ~0.6с.
+    // layer — fx-слой сцены поверх объектов. Активные эффекты пишутся
+    // в ctx.__clickFxs (тесты).
+    function pathFx(ctx, { layer, x, y, points = [] }) {
+        if (!layer || layer.destroyed) return;
+        const root = new PIXI.Container();
+        root.eventMode = "none";
+        layer.addChild(root);
+        const ring = new PIXI.Graphics();
+        ring.circle(0, 0, 10).fill({ color: 0xf0c96a, alpha: 0.25 });
+        ring.circle(0, 0, 10).stroke({ width: 2.5, color: 0xf0c96a, alpha: 0.95 });
+        ring.position.set(x, y);
+        ring.blendMode = "add";
+        root.addChild(ring);
+        const dots = points.map((p, i) => {
+            const g = new PIXI.Graphics();
+            g.circle(0, 0, 3.4).fill({ color: 0xf5e2ac, alpha: 0.85 });
+            g.position.set(p.x, p.y);
+            root.addChild(g);
+            return { g, at: i * 0.014 }; // волна появления по маршруту
+        });
+        const fxs = ctx.__clickFxs || (ctx.__clickFxs = new Set());
+        const fx = { x, y, dots: dots.length, alive: true };
+        fxs.add(fx);
+        let t = 0;
+        const LIFE = 0.62, FADE = 0.3;
+        const tick = () => {
+            if (root.destroyed) { // сцена умерла — эффект уже уничтожен
+                ctx.app.ticker.remove(tick);
+                fx.alive = false;
+                fxs.delete(fx);
+                return;
+            }
+            t += Math.min(ctx.app.ticker.deltaMS, 100) / 1000;
+            if (t >= LIFE) {
+                ctx.app.ticker.remove(tick);
+                root.destroy({ children: true });
+                fx.alive = false;
+                fxs.delete(fx);
+                return;
+            }
+            const k = Math.min(1, t / 0.5); // кольцо: рост и растворение
+            ring.scale.set(0.55 + 1.15 * (1 - Math.pow(1 - k, 3)));
+            ring.alpha = 0.95 * (1 - k);
+            const out = Math.min(1, Math.max(0, (t - (LIFE - FADE)) / FADE));
+            for (const d of dots) {
+                const a = Math.min(1, Math.max(0, (t - d.at) / 0.12));
+                d.g.alpha = 0.85 * a * (1 - out * 0.9);
+                d.g.scale.set(1 - 0.35 * out);
+            }
+        };
+        ctx.app.ticker.add(tick);
+    }
+
+    // Жёлтое свечение вокруг кнопки при наведении курсора (просил юзер
+    // W22 — правило UI: ВСЕ кнопки игры). Мягкий ореол — растянутая
+    // радиальная текстура в add-режиме под картинкой кнопки, альфа
+    // доводится твином (0.25/кадр). Тикер снимается сам, узлы умерли —
+    // сразу. c.userData.glow — доступ тестов.
+    function glowTex() {
+        if (!globalThis.__uiGlowTex) {
+            const cv = document.createElement("canvas");
+            cv.width = cv.height = 128;
+            const g = cv.getContext("2d");
+            const grd = g.createRadialGradient(64, 64, 6, 64, 64, 64);
+            grd.addColorStop(0, "rgba(255,255,255,0.9)");
+            grd.addColorStop(0.4, "rgba(255,255,255,0.4)");
+            grd.addColorStop(1, "rgba(255,255,255,0)");
+            g.fillStyle = grd;
+            g.fillRect(0, 0, 128, 128);
+            globalThis.__uiGlowTex = PIXI.Texture.from(cv);
+        }
+        return globalThis.__uiGlowTex;
+    }
+    function addGlow(ctx, c, w, h) {
+        const glow = new PIXI.Sprite(glowTex());
+        glow.anchor.set(0.5);
+        glow.width = w * 1.42; // ореол торчит за края кнопки
+        glow.height = h * 1.9; // плоские кнопки — запас по вертикали
+        glow.tint = 0xffd75e;
+        glow.blendMode = "add";
+        glow.alpha = 0;
+        glow.eventMode = "none";
+        c.addChildAt(glow, 0); // под картинкой кнопки — свечение Вокруг
+        let a = 0, tgt = 0, running = false;
+        const tick = () => {
+            if (c.destroyed || glow.destroyed) { // сцена умерла — снимаем
+                ctx.app.ticker.remove(tick);
+                running = false;
+                return;
+            }
+            a += (tgt - a) * 0.25;
+            if (Math.abs(tgt - a) < 0.012) { // дошли — тикер больше не нужен
+                a = tgt;
+                ctx.app.ticker.remove(tick);
+                running = false;
+            }
+            glow.alpha = a;
+        };
+        const setGlow = (on) => {
+            tgt = on ? 0.8 : 0;
+            if (!running) { running = true; ctx.app.ticker.add(tick); }
+        };
+        c.on("pointerover", () => setGlow(true));
+        c.on("pointerout", () => setGlow(false));
+        c.userData = c.userData || {};
+        c.userData.glow = glow;
+        return glow;
     }
 
     // Чип-кнопка (фильтры): маленькая прямоугольная кнопка с текстом
@@ -349,5 +462,5 @@
         return GAME_LOC.t(`hero.${heroId}.name`);
     }
 
-    globalThis.GAME_UI = { T, fit, button, chip, cardFace, cardZoomer, backTexOf, dimBg, scrollPane, foeTitle };
+    globalThis.GAME_UI = { T, fit, button, chip, cardFace, cardZoomer, addGlow, pathFx, backTexOf, dimBg, scrollPane, foeTitle };
 })();

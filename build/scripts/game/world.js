@@ -88,6 +88,8 @@
         let mtnCount = 0; // спрайтов гор построено (тесты)
         let uiHud = null;
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
+        let zoneRef = null; // клик-зона местности (тесты: clickAt)
+        const hudBtns = []; // иконки-кнопки HUD (тесты: hudNodes)
         let floaties = []; // всплывающие подписи («Скоро…» у арки)
         let soonCount = 0; // сколько раз арка сказала «Скоро…» (тесты)
         // бродячие отряды (просил юзер): охрана данжей + охранники мостов.
@@ -194,6 +196,27 @@
             cells.reverse();
             return cells.slice(1).map(([cx, cy]) =>
                 ({ x: cx * TS + TS / 2, y: cy * TS + TS / 2 }));
+        }
+        // Путь с доводкой: клик в непроходимую клетку (гора, вода, стена,
+        // иконка у стены) ведёт героя к ближайшей проходимой клетке в
+        // радиусе 2 от цели (просил юзер W22)
+        function pathTo(sx, sy, tx, ty) {
+            if (walkable(tx, ty)) return bfsPath(sx, sy, tx, ty);
+            for (let r = 1; r <= 2; r++) {
+                const cand = [];
+                for (let dy = -r; dy <= r; dy++)
+                    for (let dx = -r; dx <= r; dx++)
+                        if (Math.max(Math.abs(dx), Math.abs(dy)) === r)
+                            cand.push([tx + dx, ty + dy]);
+                cand.sort((a, b) =>
+                    Math.hypot(a[0] - tx, a[1] - ty) - Math.hypot(b[0] - tx, b[1] - ty));
+                for (const [x, y] of cand) {
+                    if (!walkable(x, y)) continue;
+                    const p = bfsPath(sx, sy, x, y);
+                    if (p) return p;
+                }
+            }
+            return null;
         }
         function setHeroAxes(ix, iy) {
             COMPONENTS.ctrlVI[heroId] = ix;
@@ -603,6 +626,9 @@
             const c = new PIXI.Container();
             c.position.set(x, y);
             c.addChild(sp);
+            // жёлтое свечение при наведении — правило UI для кнопок (W22)
+            globalThis.GAME_UI.addGlow(ctx, c, sp.width * 1.15, sp.height * 1.15);
+            hudBtns.push(c);
             return c;
         }
 
@@ -789,8 +815,10 @@
             st.exitCool = false;
             // лестница наверх (выход) 2с не работает после входа: герой
             // прибывает к ней вплотную, и первый же клик выкидывал в мир
-            // (просил юзер)
-            st.ladderCool = performance.now() + 2000;
+            // (просил юзер). Остаток МС, тикает в update данжа, — НЕ
+            // performance.now(): метка, уехавшая в сейв, после «Продолжить»
+            // блокировала выход до конца сессии (баг W22)
+            st.ladderCoolMs = 2000;
             G.dungeon = st;
             if (ctx.sfx) ctx.sfx();
             scenes.go("dungeon");
@@ -852,10 +880,20 @@
                     if (heroId === null) return;
                     const p = zone.toLocal(e.global);
                     const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
-                    const next = bfsPath(Math.floor(hx / TS), Math.floor(hy / TS),
+                    const next = pathTo(Math.floor(hx / TS), Math.floor(hy / TS),
                         Math.floor(p.x / TS), Math.floor(p.y / TS));
-                    if (next) path = next;
+                    if (next) {
+                        path = next;
+                        // след клика: кольцо в КОНЦЕ пути (просил юзер W22)
+                        // + точки маршрута волной к нему
+                        const last = next[next.length - 1];
+                        globalThis.GAME_UI.pathFx(ctx, {
+                            layer: fxLayer, x: last.x, y: last.y,
+                            points: next.slice(0, -1),
+                        });
+                    }
                 });
+                zoneRef = zone; // тест-хук clickAt
                 // наведение на бродячий отряд — карточка героя + состав
                 // колоды (просил юзер); квест-диалог открыт — тутипа нет
                 zone.on("pointermove", (e) => {
@@ -1482,6 +1520,10 @@
                     };
                 },
                 path: () => path,
+                // тест-хук: эмуляция клика по местности (обработчик зоны)
+                clickAt: (x, y) => zoneRef && zoneRef.emit("pointertap",
+                    { global: layer ? layer.toGlobal({ x, y }) : { x, y } }),
+                hudNodes: () => hudBtns.filter((n) => !n.destroyed),
                 worldToScreen: (x, y) => (layer ? layer.toGlobal({ x, y }) : null),
             },
         };
