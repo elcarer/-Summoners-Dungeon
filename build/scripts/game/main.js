@@ -39,6 +39,7 @@
             "panel_1", "panel_2", "panel_allert", "panel_buff", "panel_buff_circle",
             "panel_down", "panel_label", "panel_minimap", "panel_skill", "panel_top",
             "portrate_hero", "sign_mana", "sign_shield", "start_back",
+            "start_cards",
             "UI_cards_hand", "UI_energy",
             // подложки чисел на жетонах поля боя (просил юзер)
             "attack", "heals",
@@ -731,6 +732,7 @@
 
         // ── Сцена «Меню» ───────────────────────────────────────────────────
         let menuRoot = null;
+        let menuIntro = null; // тикер появления стартового экрана (W21)
         const T = (text, size, fill, opts = {}) => new PIXI.Text({
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
         });
@@ -747,6 +749,18 @@
                 bg.scale.set(s);
                 bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);
                 menuRoot.addChild(bg);
+
+                // Поверх коридора проявляется фон с картами (арт юзера
+                // images/ui/start_cards.png): медленное появление с мягким
+                // наездом камеры — см. интро-анимацию ниже (W21)
+                const cardsBg = new PIXI.Sprite(uiTex("start_cards.png"));
+                const cs = Math.max(1920 / cardsBg.texture.width, 1080 / cardsBg.texture.height);
+                cardsBg.anchor.set(0.5);
+                cardsBg.position.set(960, 540);
+                cardsBg.scale.set(cs * 1.06);
+                cardsBg.alpha = 0;
+                cardsBg.eventMode = "none";
+                menuRoot.addChild(cardsBg);
 
                 // Заголовок и кнопки — по референсу юзера (референсы/
                 // start_menu.png): «Подземелье»/«призывателей» строками с
@@ -786,15 +800,14 @@
                     if (!contEnabled || !r) return;
                     applySavedRun(r); // поднятие забега — см. applySavedRun
                 });
-                if (!contEnabled) bCont.alpha = 0.45; // забега нет — кнопка приглушена
                 const bNew = addMenuBtn(t("menu.newGame"), 960, 720, () => {
                     // герой задаёт стихию/стартовую колоду/жизни базы —
                     // сначала выбор героя (юзер)
                     scenes.go("heroPick");
                 });
-                addMenuBtn(t("menu.deck"), 960, 810, () => scenes.go("deck"));
-                addMenuBtn(t("menu.settings"), 960, 900, () => scenes.go("settings"));
-                addMenuBtn(t("menu.exit"), 960, 990, () => {
+                const bDeck = addMenuBtn(t("menu.deck"), 960, 810, () => scenes.go("deck"));
+                const bSet = addMenuBtn(t("menu.settings"), 960, 900, () => scenes.go("settings"));
+                const bExit = addMenuBtn(t("menu.exit"), 960, 990, () => {
                     // выйти по-настоящему: в Electron window.close() закрывает
                     // окно (и приложение), браузер обычно запрещает закрытие
                     // вкладки, открытой не скриптом — тогда остаётся «До встречи»
@@ -817,6 +830,14 @@
                         const b = name === "continue" ? bCont : name === "newGame" ? bNew : null;
                         if (b) b.emit("pointertap");
                     },
+                    intro: () => ({
+                        t: Math.round(introT * 100) / 100, done: !!introDone,
+                        cards: {
+                            alpha: Math.round(cardsBg.alpha * 100) / 100,
+                            scale: Math.round(cardsBg.scale.x * 1000) / 1000,
+                        },
+                        items: reveals.map((r) => Math.round(r.node.alpha * 100) / 100),
+                    }),
                 };
 
                 const bye = T(t("menu.bye"), 33, 0xffe2a8, { stroke: { color: 0x1c1207, width: 8 } });
@@ -832,9 +853,57 @@
                 menuRoot.addChild(ver);
                 ui.addChild(menuRoot);
                 worldContainer.visible = false;
+
+                // ── Появление стартового экрана (W21, просил юзер) ─────────
+                // Сначала виден только коридор; поверх плавно проявляется
+                // фон с картами (fade + мягкий наезд камеры 1.06 → 1);
+                // затем по очереди проявляются заголовок, кнопки, версия
+                // (fade + лёгкий подъём). Кликабельны с первого кадра.
+                const reveals = []; // { node, by, delay, dur, dy, a1 }
+                const reveal = (node, delay, dur, dy = 0, a1 = 1) => {
+                    node.alpha = 0;
+                    node.y += dy;
+                    reveals.push({ node, by: node.y - dy, delay, dur, dy, a1 });
+                };
+                reveal(t1, 1.3, 0.6, 26);
+                reveal(t2, 1.5, 0.6, 26);
+                reveal(bCont, 1.75, 0.5, 18, contEnabled ? 1 : 0.45);
+                reveal(bNew, 1.87, 0.5, 18);
+                reveal(bDeck, 1.99, 0.5, 18);
+                reveal(bSet, 2.11, 0.5, 18);
+                reveal(bExit, 2.23, 0.5, 18);
+                reveal(ver, 2.4, 0.4);
+                const CARD_DELAY = 0.15, CARD_DUR = 1.35;
+                let introT = 0, introDone = false;
+                const smooth = (k) => k * k * (3 - 2 * k); // мягкий ease
+                menuIntro = () => {
+                    // закончилось в прошлый кадр — снимаем отдельным вызовом
+                    // (удаление из тикера прямо во время его же вызова
+                    // зависит от внутренностей Ticker, не рискуем)
+                    if (introDone) {
+                        ctx.app.ticker.remove(menuIntro);
+                        menuIntro = null;
+                        return;
+                    }
+                    introT += Math.min(ctx.app.ticker.deltaMS, 100) / 1000;
+                    const kc = Math.min(1, Math.max(0, (introT - CARD_DELAY) / CARD_DUR));
+                    const ec = smooth(kc);
+                    cardsBg.alpha = ec;
+                    cardsBg.scale.set(cs * (1.06 - 0.06 * ec));
+                    for (const r of reveals) {
+                        const k = Math.min(1, Math.max(0, (introT - r.delay) / r.dur));
+                        const e = smooth(k);
+                        r.node.alpha = r.a1 * e;
+                        r.node.y = r.by + r.dy * (1 - e);
+                    }
+                    introDone = kc >= 1
+                        && reveals.every((r) => introT >= r.delay + r.dur);
+                };
+                ctx.app.ticker.add(menuIntro);
             },
             exit() {
                 window.__GAME.menu = null; // кнопки умерли вместе с root
+                if (menuIntro) { ctx.app.ticker.remove(menuIntro); menuIntro = null; }
                 if (menuRoot) { menuRoot.destroy({ children: true }); menuRoot = null; }
             },
         });
