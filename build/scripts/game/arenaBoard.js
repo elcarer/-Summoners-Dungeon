@@ -549,6 +549,29 @@
                 }
             };
 
+            // Метка «Возврата» на жетоне (кружок с оставшимися ходами).
+            // Пересоздаётся после каждого тика — счётчик всегда виден
+            A.returnMarkDraw = function returnMarkDraw(u) {
+                if (!u.node || u.node.destroyed) return;
+                let mark = u.node.getChildByName("returnMark");
+                if (!mark) {
+                    mark = new PIXI.Container();
+                    mark.name = "returnMark";
+                    mark.eventMode = "none";
+                    const g = new PIXI.Graphics();
+                    g.circle(0, 0, 13.5);
+                    g.fill({ color: 0x5a3a7c });
+                    g.stroke({ width: 3, color: 0xc9a0ef });
+                    mark.addChild(g);
+                    const tx = T("", 17, 0xf0e2ff);
+                    tx.anchor.set(0.5);
+                    mark.addChild(tx);
+                    mark.position.set(36, -84); // справа, выше меток статусов
+                    u.node.addChild(mark);
+                }
+                mark.getChildAt(1).text = String(Math.max(0, u.ret));
+            };
+
             A.addUnit = function addUnit(side, cardId, col, row, opts = {}) {
                 if (!root) return null; // сцена уже вышла: поле уничтожено, призыву некуда
                 const def = CARDS[cardId];
@@ -794,6 +817,50 @@
                             floatText(spS.x, spS.y - 96,
                                 `+${hdS.abilityVal || 1}⚔`, 0x9fd489);
                             sfx("up");
+                        }
+                    }
+                    // «Возврат N» (tim215/218/219/220, просил юзер): спустя N
+                    // ходов после призыва существо вернётся в руку (тик — в
+                    // начале хода владельца, returnTick). «В прошлом»
+                    // (firstReturnPlus): первый за бой призыв стороны со
+                    // «Возвратом» приходит с счётчиком на 2 больше
+                    if (def.returnN && !u.token) {
+                        let rv = def.returnN;
+                        if (!B.heroFlags.returnPlus[side]) {
+                            const hdR = heroDefOf(side);
+                            if (hdR && hdR.ability === "firstReturnPlus") {
+                                B.heroFlags.returnPlus[side] = true;
+                                rv += hdR.abilityVal || 2;
+                            }
+                        }
+                        u.ret = rv;
+                        returnMarkDraw(u);
+                    }
+                    // «Целитель царства» (tim219): при появлении даёт 2 жизни
+                    // случайному соседнему (верт/гориз) СВОЕМУ существу
+                    if (def.healArrive) {
+                        const near = B.units.filter((v) => v !== u && v.side === side
+                            && v.def.type === "unit"
+                            && Math.abs(v.col - col) + Math.abs(v.row - row) === 1);
+                        if (near.length) {
+                            healUnit(near[(Math.random() * near.length) | 0], def.healArrive);
+                            const hpA = cellXY(col, row);
+                            floatText(hpA.x, hpA.y - 75, `+${def.healArrive}♥`, 0x9fd489);
+                            sfx("up");
+                        }
+                    }
+                    // «Секироносец царства» (tim220): при появлении наносит 1
+                    // урон случайному соседнему (верт/гориз) существу ВРАГА
+                    // (постройки не существа)
+                    if (def.axeArrive) {
+                        const foes = B.units.filter((v) => v.side !== side
+                            && v.def.type === "unit"
+                            && Math.abs(v.col - col) + Math.abs(v.row - row) === 1);
+                        if (foes.length) {
+                            damageUnit(foes[(Math.random() * foes.length) | 0],
+                                def.axeArrive, u, "sword");
+                            const axA = cellXY(col, row);
+                            floatText(axA.x, axA.y - 75, `−${def.axeArrive}♥`, 0xef9f8c);
                         }
                     }
                     if (def.ability === "dash1") honorRelayAct(u, () => summonDash(u)); // «Скорость 1»

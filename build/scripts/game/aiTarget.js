@@ -542,6 +542,11 @@
                     .some((id) => CARDS[id] && CARDS[id].type === "unit")) return false;
                 // «Поиск знаний»: брать нечего, если колода пуста
                 if (s.seek && !B.eDeck.length) return false;
+                // «Поиск во времени» (tim217): в верхних картах колоды должна
+                // быть карта со «Сдвигом» или «Возвратом» — иначе эффект пуст
+                if (s.timeSearch && !B.eDeck.slice(-s.timeSearch)
+                    .some((id) => { const d = CARDS[id];
+                        return d && (d.delay || d.returnN); })) return false;
                 // «Гримуар инея»: смотреть нечего, если колода пуста
                 if (s.grim && !B.eDeck.length) return false;
                 // «Природная мощь»: есть свой крепыш (3+ жизни) — иначе +1 урона

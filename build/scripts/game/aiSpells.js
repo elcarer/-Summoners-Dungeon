@@ -679,6 +679,23 @@
                     for (let i = 0; i < top.length; i++) if (!take.has(i)) B.eDeck.push(top[i]);
                     if (want) sfx("chpoc");
                 }
+                if (s.timeSearch) { // «Поиск во времени»: лучшая карта со
+                    // «Сдвигом»/«Возвратом» из верхних N — в руку (гейт уже
+                    // проверил, что такая там есть)
+                    const k = Math.min(s.timeSearch, B.eDeck.length);
+                    const top = k ? B.eDeck.splice(B.eDeck.length - k, k) : [];
+                    const fit = top.map((id, i) => ({ id, i }))
+                        .filter((x) => { const d = CARDS[x.id];
+                            return d && (d.delay || d.returnN); });
+                    if (fit.length) {
+                        fit.sort((a, b) => aiCardPower(CARDS[b.id]) - aiCardPower(CARDS[a.id])
+                            || b.i - a.i);
+                        B.eHand.push(top[fit[0].i]);
+                        top.splice(fit[0].i, 1);
+                        sfx("chpoc");
+                    }
+                    B.eDeck.push(...top); // остаток — наверх колоды в прежнем порядке
+                }
                 if (s.grim) { // «Гримуар инея»: тип с наибольшим числом карт среди верхних 4
                     const k = Math.min(s.grim, B.eDeck.length);
                     const top = k ? B.eDeck.splice(B.eDeck.length - k, k) : [];

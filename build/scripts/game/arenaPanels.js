@@ -89,15 +89,21 @@
             // ЛЮБЫЕ `picks` карт в руку. Выбранные уходят в руку, остальные
             // возвращаются наверх колоды в прежнем порядке (как «Поиск рун»:
             // непросмотренное не пропадает). «Закончить»/Esc — взять меньше.
+            // «Поиск во времени» (tim217) зовёт её же с ФИЛЬТРОМ (filter) и
+            // своим заголовком: брать можно только карты со «Сдвигом» или
+            // «Возвратом» — остальные показаны затемнёнными и не кликаются.
             A.seekPanel = null;
             A.seekTop = [];
             A.seekTaken = [];
             A.seekPicks = 0;
+            A.seekFilter = null;
+            A.seekTitle = null;
             A.closeSeekPanel = function closeSeekPanel() {
                 if (seekPanel) {
                     seekPanel.destroy({ children: true });
                     seekPanel = null;
                 }
+                seekFilter = null;
                 if (B) B.picking = false;
             };
             A.finishSeek = function finishSeek() { // подобранное — в руку, остаток — в колоду
@@ -114,11 +120,13 @@
                 layoutHand();
                 refreshHud();
             };
-            A.openSeekPanel = function openSeekPanel(n, picks) {
+            A.openSeekPanel = function openSeekPanel(n, picks, filter, titleKey) {
                 closeSeekPanel();
                 const k = Math.min(n, B.deck.length);
                 seekTop = k ? B.deck.splice(B.deck.length - k, k) : []; // верх колоды — конец массива
                 seekTaken = [];
+                seekFilter = filter || null;
+                seekTitle = titleKey || "seek.title";
                 seekPicks = Math.min(Math.max(1, picks | 0 || 1), seekTop.length);
                 if (!seekTop.length) return; // в колоде пусто — смотреть нечего
                 B.picking = true;
@@ -137,12 +145,14 @@
                 dim.eventMode = "static";
                 node.addChild(dim);
                 node.addChild(stumpFrame());
-                const title = T(t("seek.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
+                const title = T(t(seekTitle || "seek.title"), 39, 0xf0c96a, { stroke: { color: 0x241505, width: 7.5 } });
                 title.anchor.set(0.5, 0);
                 title.position.set(960, 297);
                 title.eventMode = "none";
                 node.addChild(title);
-                const hint = T(t("seek.hint", { n: seekTop.length, left: seekPicks }), 25, 0xd8c79d);
+                const hint = T(t(seekTitle === "seekTime.title"
+                    ? "seekTime.hint"
+                    : "seek.hint", { n: seekTop.length, left: seekPicks }), 25, 0xd8c79d);
                 hint.anchor.set(0.5, 0);
                 hint.position.set(960, 354);
                 hint.eventMode = "none";
@@ -152,8 +162,15 @@
                 seekTop.forEach((cardId, idx) => {
                     const c = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.66 });
                     c.position.set(960 + (idx - (m - 1) / 2) * spread, 545);
-                    c.eventMode = "static";
-                    c.on("pointertap", () => pickSeek(idx));
+                    if (seekFilter && !seekFilter(cardId)) {
+                        // «Поиск во времени»: карта без «Сдвига»/«Возврата» —
+                        // затемнена и не кликается (как дорогая карта в руке)
+                        c.tint = 0x9f9f9f;
+                        c.eventMode = "none";
+                    } else {
+                        c.eventMode = "static";
+                        c.on("pointertap", () => pickSeek(idx));
+                    }
                     node.addChild(c);
                 });
                 node.addChild(globalThis.GAME_UI.button(ctx, {
@@ -167,6 +184,7 @@
                 if (!B || !B.picking || !seekPanel) return;
                 const cardId = seekTop[idx];
                 if (!cardId) return;
+                if (seekFilter && !seekFilter(cardId)) return; // затемнённая не берётся
                 seekTop.splice(idx, 1);
                 seekTaken.push(cardId);
                 seekPicks -= 1;

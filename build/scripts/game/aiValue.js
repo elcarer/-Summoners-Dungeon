@@ -725,6 +725,9 @@
                     if (d.undying) s += 1.5; // hon190: переживает смертельный удар
                     if (d.medicHeal) s += 1.2; // hon195: +1♥ случайному объекту каждый ход
                     if (d.protect) s += 0.5 * d.protect; // tim201: врождённая «Защита»
+                    if (d.returnN) s += 0.3; // tim215/218/219/220: карта переигрывается
+                    if (d.healArrive) s += 0.4; // tim219: лечение соседа при появлении
+                    if (d.axeArrive) s += 0.3; // tim220: урон соседу врага при появлении
                     // «Сдвиг» (Время): тело придёт позже — сейчас стоит дешевле
                     if (d.delay) s -= 0.5 * d.delay;
                     return s;
@@ -756,10 +759,11 @@
                         + (d.aura ? 2.2 : 0) // hon185 «Грааль»: +2/+2 всем своим
                         + (d.siegeShot ? (d.siegeFollow ? 1.8 : 0.8) : 0) // hon188: ездит и стреляет
                         + (d.pillarEnergy ? 1.2 : 0) // hon198: +1⚡ за атаку по себе
-                        // Время (tim204/205/210): движки «Сдвига»
+                        // Время (tim204/205/210/216): движки «Сдвига» и «Возврата»
                         + (d.timeMachine ? 1.5 : 0) // ускоряет всех своих на ход
                         + (d.clockwork ? 1.4 : 0) // рывок каждому пришедшему «Сдвигом»
-                        + (d.timeCave ? 1.5 : 0); // бесплатный призыв «Сдвигом» каждый ход
+                        + (d.timeCave ? 1.5 : 0) // бесплатный призыв «Сдвигом» каждый ход
+                        + (d.retShield ? 1.4 : 0); // tim216: блокирует тик «Возврата»
                 }
                 if (d.type === "spell") {
                     const s = d.spell || {};
@@ -792,6 +796,13 @@
                         (u) => u.side === "p" && u.def.type === "unit" && u.curAtk > 0).length) * 0.25;
                     if (s.search || s.searchUnit || s.journey || s.discardPick) v += 0.5;
                     if (s.seek) v += 0.6 + Math.min(4, B ? B.eDeck.length : 0) * 0.05;
+                    // «Поиск во времени» (tim217): ценнее, когда в верхних
+                    // картах колоды есть карты со «Сдвигом»/«Возвратом»
+                    if (s.timeSearch) v += 0.5 + 0.25 * Math.min(4,
+                        B ? B.eDeck.slice(-(s.timeSearch || 6)).filter((id) => {
+                            const d = CARDS[id];
+                            return d && (d.delay || d.returnN);
+                        }).length : 0);
                     if (s.grim) v += 0.5 + Math.min(4, B ? B.eDeck.length : 0) * 0.05;
                     if (s.copyLast) v += 1.0;
                     if (s.wolfVolley) v += 2.0;

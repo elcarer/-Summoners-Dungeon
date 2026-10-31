@@ -132,7 +132,7 @@
                         lastSpell: B.lastSpell.p,
                         journeySummon: B.journeySummon,
                         eDeck: B.eDeck.length,
-                        units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0, venom: u.venom || 0, poison: u.poison || 0, entangle: u.entangle || 0, frozen: u.frozen || 0, frozenMark: !!u.node.getChildByName("frozenMark"), ward: !!u.spellWard, token: !!u.token, exhuming: u.exhuming || 0, exhumingMark: !!u.node.getChildByName("exhumingMark") })),
+                        units: B.units.map((u) => ({ side: u.side, id: cardIdOf(u.def), col: u.col, row: u.row, hp: u.hp, atk: u.curAtk, type: u.def.type, spr: !!u.node.getChildByName("body"), ench: !!u.enchantFire, berserk: u.berserk || 0, confused: u.confused || 0, venom: u.venom || 0, poison: u.poison || 0, entangle: u.entangle || 0, frozen: u.frozen || 0, frozenMark: !!u.node.getChildByName("frozenMark"), ward: !!u.spellWard, token: !!u.token, exhuming: u.exhuming || 0, exhumingMark: !!u.node.getChildByName("exhumingMark"), ret: u.ret || 0, returnMark: !!u.node.getChildByName("returnMark") })),
                         traps: { p: B.traps.p.length, e: B.traps.e.length },
                         // эффекты висящих ловушек (тесты: «Отмена заклинания/
                         // призыва» и др. — какие ловушки на поле)
@@ -426,6 +426,8 @@
                         left: e.left, token: e.token, node: !!e.node })) : [],
                 }),
                 async _delayTick(side) { await delayArrive(side); return true; },
+                // «Возврат» (тесты): тик счётчиков стороны
+                _retTick(side) { returnTick(side); return true; },
                 // тест-хуки «Торговца» (hon183): панель сброса по выбору
                 _openTradePanel() { buildDiscardPanel("trade"); return true; },
                 _pickDiscard(idx) { pickDiscard(idx); return true; },

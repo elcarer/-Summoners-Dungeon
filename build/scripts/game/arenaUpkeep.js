@@ -459,6 +459,49 @@
                 checkEnd();
             };
 
+            // «Возврат N» (tim215/218/219/220, просил юзер): в начале хода
+            // владельца счётчики Возврата его существ тают на 1; на нуле
+            // существо возвращается в руку (штатный bounceUnit — без каскадов
+            // смерти, карта из любой зоны). «Подгорное царство» (tim216):
+            // тик Возврата карты владельца вместо этого бьёт постройку на
+            // 1 жизнь — счётчик НЕ уменьшается (спека: «когда уменьшается
+            // "Возврат" вашей карты, вместо этого эта постройка теряет 1
+            // жизнь»); несколько царств — бьёт первое живое (как «Дома на
+            // деревьях»). Зовётся из playerTurnStart/aiPlay.enemyTurn ДО
+            // delayArrive: освободившаяся клетка может принять значок «Сдвига»
+            A.returnTick = function returnTick(side) {
+                for (const u of B.units.slice()) {
+                    if (u.side !== side || !u.ret || !B.units.includes(u)) continue;
+                    const shield = B.units.find((b) => b.side === side
+                        && b.def.retShield && B.units.includes(b));
+                    if (shield) {
+                        const up = cellXY(u.col, u.row);
+                        floatText(up.x, up.y - 66,
+                            "⏱ " + GAME_LOC.t("status.return.name"), 0xc9a0ef);
+                        const bp = cellXY(shield.col, shield.row);
+                        floatText(bp.x, bp.y - 60, "−1♥", 0xef9f8c);
+                        punch(shield.node);
+                        damageUnit(shield, 1, null, "dam");
+                        if (B.stopped || B.phase === "over") return;
+                        continue;
+                    }
+                    u.ret -= 1;
+                    if (u.ret > 0) {
+                        returnMarkDraw(u);
+                        continue;
+                    }
+                    const p = cellXY(u.col, u.row);
+                    if (u.node && !u.node.destroyed) {
+                        const mk = u.node.getChildByName("returnMark");
+                        if (mk) mk.destroy({ children: true });
+                    }
+                    bounceUnit(u); // карта — в руку владельца, каскадов нет
+                    floatText(p.x, p.y - 96,
+                        "↩ " + GAME_LOC.t("status.return.name"), 0xc9a0ef);
+                    sfx("chpoc");
+                }
+            };
+
             // ── Ловушки ─────────────────────────────────────────────────────────
             // Мины хранят клетку (col/row); руна («Наскальная рунопись») —
             // само существо (unit) и ездит с ним. Лимита ловушек нет (просил юзер).

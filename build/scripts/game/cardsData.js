@@ -1470,6 +1470,57 @@
                   steamShot: 1, shotDmg: 4, // прибытие → «Выстрел 4» → «Сдвиг 1»
                   rarity: "common", elem: "time",
                   color: 0x6a3a8c, img: "time/214" },
+        // «Стреломёт» (tim215): Гном 2/2 — «Выстрел 2» (archer/shotDmg) и
+        // «Возврат 2» (returnN — спустя 2 хода после призыва вернётся в руку)
+        tim215: { type: "unit", cost: 2, atk: 2, hp: 2, speed: 1,
+                  creature: "gnome", // лист поля боя — gnome_256
+                  ability: "archer", shotDmg: 2, // «Выстрел 2»
+                  returnN: 2, // «Возврат 2» (тик в upkeep владельца)
+                  subtype: "gnome", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "time",
+                  color: 0x7a4a9c, img: "time/215" },
+        // «Подгорное царство» (tim216): постройка 5⚡/8♥ — когда тикает
+        // «Возврат» карты владельца, счётчик НЕ уменьшается, вместо этого
+        // постройка теряет 1 жизнь (retShield — тик в returnTick)
+        tim216: { type: "building", cost: 5, atk: 0, hp: 8, retShield: 1,
+                  rarity: "epic", elem: "time",
+                  color: 0x6a3a8c, img: "time/216" },
+        // «Поиск во времени» (tim217): заклинание 1⚡ без цели — посмотреть
+        // верхние 6 карт колоды и взять 1 карту со «Сдвигом» или «Возвратом»
+        // в руку (панель Поиска знаний с фильтром; timeSearch)
+        tim217: { type: "spell", cost: 1,
+                  spell: { target: "none", timeSearch: 6 },
+                  kind: "draw", // тип эффекта — по спеке юзера (Добор карт)
+                  rarity: "common", elem: "time",
+                  color: 0x8a5ab0, img: "time/217" },
+        // «Верховой гном» (tim218): Гном 4/4 — «Скорость 1» и «Возврат 2»
+        tim218: { type: "unit", cost: 3, atk: 4, hp: 4, speed: 1,
+                  creature: "gnome", // лист поля боя — gnome_256
+                  ability: "dash1", // «Скорость 1»
+                  returnN: 2, // «Возврат 2»
+                  subtype: "gnome", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "time",
+                  color: 0x7a4a9c, img: "time/218" },
+        // «Целитель царства» (tim219): Гном 1/4 — при появлении даёт 2 жизни
+        // случайному соседнему (верт/гориз) СВОЕМУ существу (healArrive)
+        // и уходит в «Возврат 1» (returnN)
+        tim219: { type: "unit", cost: 2, atk: 1, hp: 4, speed: 1,
+                  creature: "gnome", // лист поля боя — gnome_256
+                  healArrive: 2, // при появлении +2♥ соседнему своему
+                  returnN: 1, // «Возврат 1»
+                  subtype: "gnome", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "time",
+                  color: 0x7a4a9c, img: "time/219" },
+        // «Секироносец царства» (tim220): Гном 4/3 — при появлении наносит
+        // 1 урон случайному соседнему (верт/гориз) существу ВРАГА
+        // (axeArrive) и уходит в «Возврат 2» (returnN)
+        tim220: { type: "unit", cost: 2, atk: 4, hp: 3, speed: 1,
+                  creature: "gnome", // лист поля боя — gnome_256
+                  axeArrive: 1, // при появлении 1 урон соседнему врагу
+                  returnN: 2, // «Возврат 2»
+                  subtype: "gnome", // подтип — по спеке юзера (cards.txt)
+                  rarity: "common", elem: "time",
+                  color: 0x7a4a9c, img: "time/220" },
         // Гоблин из «Гоблинской засады» (str20) — служебная карта без лица:
         // нет в коллекции/наградах/энкаунтерах, в редакторе колоды не виден
         // (тот фильтрует по коллекции). Спавнится только ловушкой.
@@ -1814,6 +1865,15 @@
             baseHp: 11, elems: ["time"], starter: "time",
             img: "47", ability: "firstDelayMinus", abilityVal: 1,
         },
+        // «В прошлое» (противник 3-го этажа данжа Времени, просил юзер):
+        // Время (фиолетовая), 12♥, обычная. Способность firstReturnPlus —
+        // первый за бой призыв стороны со «Возвратом» приходит с
+        // счётчиком на 2 больше (addUnit). Спрайт — heroes/48.png
+        intoTime: {
+            id: "intoTime", rarity: "common",
+            baseHp: 12, elems: ["time"], starter: "time",
+            img: "48", ability: "firstReturnPlus", abilityVal: 2,
+        },
         // ── «Охранники мостов» (просил юзер): бродячие враги открытого
         // мира, патрулируют мосты через реки в зонах своих стихий.
         // Общий принцип: 16♥, обычная; при гибели СВОЕГО существа СВОЕЙ
@@ -1878,6 +1938,7 @@
         "honNeighbor", "honGreatBattle", "honThrone", // «Залы Чести» (этажи 1–6)
         "timBattle", // данж Времени, 1-й этаж (просил юзер)
         "longShift", // данж Времени, 2-й этаж (просил юзер)
+        "intoTime", // данж Времени, 3-й этаж (просил юзер)
         // «Охранники мостов» открытого мира (просил юзер)
         "strGuard", "grwGuard", "wisGuard", "decGuard", "honGuard"];
 

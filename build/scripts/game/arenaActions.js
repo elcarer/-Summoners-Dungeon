@@ -20,6 +20,7 @@
                 if (B.stopped) return;
                 upkeep("p"); // грибницы игрока
                 poisonTick("p"); // яд: до марша (просил юзер)
+                returnTick("p"); // «Возврат» (Время): счётчики тают, созревшие — в руку
                 await delayArrive("p"); // «Сдвиг» (Время): созревшие являются
                 await marchSide("p");
                 timeCavePulse("p"); // «Пещера времени»: призыв после марша — значок не тает в этом же ходу
@@ -956,6 +957,15 @@
                 if (def.spell.search) openRunesPanel(def.spell.search); // выбор поверх боя
                 if (def.spell.searchUnit) openRunesPanel(def.spell.searchUnit, "unit"); // «Рунное гадание»
                 if (def.spell.seek) openSeekPanel(def.spell.seek, def.spell.seekPicks || 1); // «Поиск знаний»
+                // «Поиск во времени» (tim217): верхние 6 карт колоды — 1 карта
+                // со «Сдвигом» или «Возвратом» в руку (панель Поиска знаний
+                // с фильтром; не подходящие затемнены; нет подходящих —
+                // «Закончить», карта и энергия потрачены)
+                if (def.spell.timeSearch)
+                    openSeekPanel(def.spell.timeSearch, 1,
+                        (id) => { const d = CARDS[id];
+                            return !!(d && (d.delay || d.returnN)); },
+                        "seekTime.title");
                 if (def.spell.grim) openGrimPanel(); // «Гримуар инея»: выбор типа + верхние 4
                 if (def.spell.journey) openJourneyPanel(def.spell.journey);
                 if (def.spell.discardPick) openBrewPanel(); // «Варка зелий»: выбор из сбросов

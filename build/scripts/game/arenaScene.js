@@ -61,6 +61,7 @@
                     // способность Мага дважды («Безумный маг»)
                     heroFlags: { firstSpell: { p: false, e: false },
                         delayMinus: { p: false, e: false },
+                        returnPlus: { p: false, e: false }, // «В прошлом»: первый «Возврат» +2
                         spellEnergy: { p: false, e: false },
                         trapEnergy: { p: false, e: false },
                         elementalDraw: { p: false, e: false },
