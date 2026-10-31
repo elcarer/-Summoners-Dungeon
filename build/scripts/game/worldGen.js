@@ -29,6 +29,17 @@
     const V = 14; // v14 — охранники Тлена (map.decayGuards, просил юзер)
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
+    // деревья лесных массивов по зонам стихий (просил юзер): вместо
+    // одинаковых деревьев везде — свой набор спрайтов images/tiles/trees/
+    // <n>.png в каждой зоне (число — номер файла; добор — из остальных)
+    const TREE_SETS = {
+        strength: [6, 10],
+        growth: [1, 2, 3, 5, 7, 8, 9, 10],
+        wisdom: [4, 5, 8],
+        decay: [1, 8, 10],
+        honor: [6, 9, 10],
+        time: [1, 10],
+    };
     // сетка зон 3×2: индекс k — колонка k%3, ряд (k/3|0), сектор 128×128
     const ZONE_ADJ = [[0, 1], [1, 2], [3, 4], [4, 5], [0, 3], [1, 4], [2, 5]];
     // вход в подземелье стихии (id данжа из CAVES; hon — «Скоро…»)
@@ -1213,6 +1224,7 @@
 
     globalThis.GAME_WORLDGEN = {
         V, W, H, ELEMS, ELEM_CAVE, KIND_SIZE, namePois, generate, hash2,
+        TREE_SETS,
         T: { GROUND: T_GROUND, MOUNTAIN: T_MOUNTAIN, FOREST: T_FOREST,
             WATER: T_WATER, ROAD: T_ROAD, BRIDGE: T_BRIDGE, SWAMP: T_SWAMP },
     };

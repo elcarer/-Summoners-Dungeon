@@ -295,8 +295,13 @@
             if (map.ter[j * W + i] !== T.FOREST) continue;
             const roll = GEN.hash2(i, j, seed ^ 0x51ab);
             if (roll >= 0.48) continue; // ~48% клеток чащи с деревом
-            const tex = treeTex[(GEN.hash2(i, j, seed ^ 0x77d2)
-                * treeTex.length) | 0];
+            // вид дерева — по ЗОНЕ СТИХИИ клетки (просил юзер: разные
+            // виды деревьев в разных зонах; выбор детерминирован сидом
+            // как прежде — номер из набора зоны по hash2 клетки)
+            const el = GEN.ELEMS[map.zone[j * W + i]] || "strength";
+            const set = GEN.TREE_SETS[el] || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+            const num = set[(GEN.hash2(i, j, seed ^ 0x77d2) * set.length) | 0];
+            const tex = treeTex[num - 1];
             const spr = new PIXI.Sprite(tex);
             spr.anchor.set(0.5, 1);
             spr.scale.x = GEN.hash2(i, j, seed ^ 0x99e1) < 0.5 ? -1 : 1;
@@ -305,6 +310,7 @@
                     * TS * 0.6,
                 (j + 1) * TS + 3);
             spr.zIndex = spr.position.y; // y-sort: низ ствола
+            spr.__tree = num; spr.__elem = el; // тест-хук treeCensus
             sprites.push(spr);
         }
         return { sprites, trees: sprites.length };

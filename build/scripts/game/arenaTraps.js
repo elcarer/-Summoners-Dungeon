@@ -251,7 +251,8 @@
                         || e === "ghostGrave" || e === "darkOffering"
                         || e === "tarStatue" || e === "tarKettles"
                         || e === "timeTrap" // «Ловушка времени» — только существа
-                        || e === "selfDmg") // «Удар двойника»: существо бьёт себя
+                        || e === "selfDmg" // «Удар двойника»: существо бьёт себя
+                        || e === "massRet") // «В гуще боя»: существам «Возврат 1»
                         return u.def.type === "unit";
                     return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
                         || e === "confuse" || e === "cellDebuff"
@@ -399,6 +400,29 @@
                     damageUnit(u, u.curAtk, null, "sword");
                     refreshHud();
                     checkEnd();
+                    return;
+                }
+                if (trap.def.trap.effect === "massRet") {
+                    // «В гуще боя» (tim227, просил юзер): вошедшее существо
+                    // и все соседние с ним (верт/гориз) СУЩЕСТВА получают
+                    // «Возврат 1». Это НЕ атака и не «Возврат»-заклинание:
+                    // уже стоящий счётчик только усиливаем (max) — ловушка
+                    // не может отложить чужой «Возврат». Токены (юниты-не-
+                    // карты) в руку не возвращаются — их пропускаем
+                    const victims = [u, ...B.units.filter((v) => v !== u
+                        && !v.token && v.def.type === "unit"
+                        && Math.abs(v.col - u.col)
+                            + Math.abs(v.row - u.row) === 1)];
+                    for (const v of victims) {
+                        if (!B.units.includes(v)) continue;
+                        v.ret = Math.max(v.ret || 0, 1);
+                        returnMarkDraw(v);
+                        punch(v.node);
+                    }
+                    const pr = cellXY(u.col, u.row);
+                    floatText(pr.x, pr.y - 96,
+                        "↩ " + GAME_LOC.t("status.return.name"), 0xc9a0ef);
+                    sfx("chpoc");
                     return;
                 }
                 if (trap.def.trap.effect === "alliesStrike") {

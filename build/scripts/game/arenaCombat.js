@@ -11,7 +11,8 @@
             // урон — разница между уроном атаки и жизнями цели ДО удара —
             // переходит в базу противника
             A.crushHit = function crushHit(attacker, dmg, hpBefore) {
-                if (!attacker || !attacker.def || !attacker.def.crush
+                if (!attacker || !attacker.def
+                    || (!attacker.def.crush && !epochCrush(attacker))
                     || !B.units.includes(attacker) || dmg <= 0) return;
                 const raw = dmg - hpBefore;
                 if (raw <= 0) return;

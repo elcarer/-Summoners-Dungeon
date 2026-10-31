@@ -180,6 +180,14 @@
                     trapOnMoveAct(u);
                     return true;
                 },
+                // тест-хук: клеточные ловушки под юнитом (посадка/шаг — детерминированный
+                // триггер без марша ИИ; та же triggerCellTraps, что у шага и призывов)
+                _cellTrap(col, row) {
+                    const u = unitAt(col, row);
+                    if (!u) return false;
+                    triggerCellTraps(u);
+                    return true;
+                },
                 // «Пень обряда» (тесты): панель и нажатия её кнопок
                 stumpState: () => ({ open: !!stumpPanel, picking: !!(B && B.picking),
                     side: stumpSide, top: stumpTop }),
@@ -359,6 +367,15 @@
                     if (!u) return false;
                     const killer = (killerCol !== undefined && killerCol !== null) ? unitAt(killerCol, killerRow) : null;
                     killUnit(u, killer || null);
+                    return true;
+                },
+                // тест-хук: одно действие «Скорости N» — удар по существу ВПЕРЕДИ
+                // (или шаг на пустую клетку); полная ветка атаки — crushHit/
+                // всплески/яд/лёд как у рывка (проверка «Сокрушения», аур)
+                _dash(col, row) {
+                    const u = unitAt(col, row);
+                    if (!u) return false;
+                    summonDashN(u, 1);
                     return true;
                 },
                 // тест-хук: принудительный итог (бои с растущей шкалой длинные —

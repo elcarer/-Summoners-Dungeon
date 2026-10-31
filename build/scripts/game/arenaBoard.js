@@ -578,6 +578,17 @@
                 }
             };
 
+            // «Стык эпох» (tim228): аура «Сокрушения» — все СУЩЕСТВА стороны
+            // владельца бьют с переливом лишнего урона в базу, пока жива
+            // хотя бы одна такая постройка (crushHit проверяет вместе с
+            // врождённым def.crush; гибель/Возврат постройки снимают сами)
+            A.epochCrush = function epochCrush(u) {
+                if (!u || !B || !B.units) return false;
+                return B.units.some((b) => b.side === u.side
+                    && b.def.type === "building" && b.def.epochAura
+                    && B.units.includes(b));
+            };
+
             // Метка «Возврата» на жетоне (кружок с оставшимися ходами).
             // Пересоздаётся после каждого тика — счётчик всегда виден
             A.returnMarkDraw = function returnMarkDraw(u) {
@@ -648,6 +659,23 @@
                 sfx("use"); // призыв (обе стороны)
                 B.units.push(u);
                 recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда
+                // «Возврат N» ПОСТРОЙКИ («Стык эпох» tim228, просил юзер):
+                // тот же тик returnTick в upkeep владельца, что у существ —
+                // блок «Возврата» ниже живёт только в ветке существ, поэтому
+                // постройке счётчик ставится отдельно. «В прошлом»
+                // (firstReturnPlus) усиливает и постройку — это «призыв»
+                if (def.type === "building" && def.returnN && !u.token) {
+                    let rv = def.returnN;
+                    if (!B.heroFlags.returnPlus[side]) {
+                        const hdR = heroDefOf(side);
+                        if (hdR && hdR.ability === "firstReturnPlus") {
+                            B.heroFlags.returnPlus[side] = true;
+                            rv += hdR.abilityVal || 2;
+                        }
+                    }
+                    u.ret = rv;
+                    returnMarkDraw(u);
+                }
                 // «Ковка оружия» (tim208): розыгрыш в этом же ходу — существо,
                 // появившееся ПОСЛЕ заклинания, тоже получает бонус (спека:
                 // «все существа, появившиеся на поле боя в этот ваш ход»)

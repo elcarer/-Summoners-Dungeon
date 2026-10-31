@@ -1525,6 +1525,20 @@
                     { global: layer ? layer.toGlobal({ x, y }) : { x, y } }),
                 hudNodes: () => hudBtns.filter((n) => !n.destroyed),
                 worldToScreen: (x, y) => (layer ? layer.toGlobal({ x, y }) : null),
+                // тест-хук: перепись деревьев в видимых чанках — {elem: {номер: шт}}
+                // (деревья по зонам стихий, просил юзер; __tree/__elem ставит
+                // renderTreesChunk)
+                treeCensus: () => {
+                    const out = {};
+                    if (!objLayer) return out;
+                    for (const o of objLayer.children) {
+                        if (o.destroyed || !o.__tree) continue;
+                        const e = o.__elem || "?";
+                        (out[e] = out[e] || {})[o.__tree] =
+                            (out[e][o.__tree] || 0) + 1;
+                    }
+                    return out;
+                },
             },
         };
     }
