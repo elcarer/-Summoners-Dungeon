@@ -6,9 +6,12 @@
     function createRewardScene(ctx) {
         const { scenes, G, ui, scheduler } = ctx;
         const { REWARD_POOL, CARDS } = globalThis.GAME_DATA;
-        const { T, cardFace, dimBg, button } = globalThis.GAME_UI;
+        const { T, cardFace, dimBg, button, cardZoomer } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
         let root = null, options = [], picked = null, draftMode = false, wonHero = null;
+        // правило UI: наведение на карту — копия растёт до полного размера
+        // (host-функция: root пересоздаётся в rebuild)
+        const zoomer = cardZoomer(ctx, { host: () => root });
 
         function pickThree() {
             // Награда — из колоды ПОБЕЖДЁННОГО противника (просил юзер):
@@ -123,6 +126,7 @@
                     dim: picked !== null && !isPicked,
                 });
                 card.position.set(x, y);
+                card.userData = { cardId: id, x, y, sc }; // тесты: узлы карт
                 if (isPicked) {
                     const glow = new PIXI.Graphics();
                     glow.roundRect(-168, -243, 336, 486, 15);
@@ -132,6 +136,9 @@
                 if (picked === null) {
                     card.eventMode = "static";
                     card.on("pointertap", () => choose(i));
+                    // правило UI: копия растёт с текущего масштаба карты
+                    card.on("pointerover", () => zoomer.show(id, x, y, card, sc));
+                    card.on("pointerout", () => zoomer.hide(false));
                 }
                 root.addChild(card);
             });
@@ -143,6 +150,11 @@
             options: () => [...options],
             picked: () => picked,
             pick: choose,
+            zoomState: () => zoomer.state(), // ховер-зум (тесты)
+            cardNodes: () => (root
+                ? root.children.filter((n) => n.userData && n.userData.cardId
+                    && !n.destroyed)
+                : []),
         };
 
         return {

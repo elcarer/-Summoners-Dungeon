@@ -141,6 +141,75 @@
         return c;
     }
 
+    // ── Ховер-зум карт в меню (правило UI, просил юзер) ────────────────────
+    // Наведение на уменьшенную карту: её КОПИЯ поверх плавно растёт до
+    // полного размера спрайта (scale 1), базовая карта на время показа
+    // прячется через alpha (dim-карта вернёт свою прозрачность; клики
+    // остаются на базовой — копия eventMode "none"), уведение — плавное
+    // сжатие и удаление копии. Копия кладётся в host — слой окна/сцены,
+    // а не в панель со скроллом (маска обрезала бы рост); для карт в
+    // скролл-панели вызывающая сторона передаёт позицию с поправкой на
+    // скролл (как showZoom в колоде). Обязателен для новых меню с картами.
+    // host — узел или функция (сцены пересоздают root в rebuild).
+    function cardZoomer(ctx, { host, from = 0.5, to = 1, yMin = 270, yMax = 810 } = {}) {
+        // один тикер на игру: зумеры живут в Set на контексте и убираются,
+        // как только копия удалена (узел уничтожен при закрытии окна — тоже)
+        const zooms = ctx.__cardZooms || (ctx.__cardZooms = new Set());
+        if (!ctx.__cardZoomTick) {
+            ctx.__cardZoomTick = () => {
+                for (const z of zooms) {
+                    if (z.node && !z.node.destroyed) {
+                        z.cur += (z.tgt - z.cur) * 0.22;
+                        if (Math.abs(z.tgt - z.cur) < 0.004) {
+                            z.cur = z.tgt;
+                            if (z.tgt === 0) z.dead = true; // сжалось — убрать
+                        }
+                        z.node.scale.set(z.cur);
+                    } else z.dead = true; // окно/сцена закрылись
+                    if (z.dead) {
+                        if (z.base && !z.base.destroyed) z.base.alpha = z.baseAlpha;
+                        if (z.node && !z.node.destroyed) z.node.destroy({ children: true });
+                        zooms.delete(z);
+                    }
+                }
+            };
+            ctx.app.ticker.add(ctx.__cardZoomTick);
+        }
+        let zoom = null; // активная копия (одна на зумер)
+        function hide(immediate) {
+            if (!zoom) return;
+            if (immediate || zoom.node.destroyed) {
+                if (zoom.base && !zoom.base.destroyed) zoom.base.alpha = zoom.baseAlpha;
+                if (!zoom.node.destroyed) zoom.node.destroy({ children: true });
+                zooms.delete(zoom);
+                zoom = null;
+            } else zoom.tgt = 0; // плавно сожмётся в тикере, затем удалится
+        }
+        function show(id, x, y, base, fromScale) {
+            hide(true);
+            const h = typeof host === "function" ? host() : host;
+            if (!h || h.destroyed) return;
+            // базу прячем на время показа копии (просил юзер — иначе видны
+            // обе); через alpha, не visible: невидимая карта остаётся
+            // кликабельной, а dim-карта вернёт свою прозрачность
+            let baseAlpha = 1;
+            if (base && !base.destroyed) { baseAlpha = base.alpha; base.alpha = 0; }
+            const node = cardFace(ctx, id, { scale: fromScale || from });
+            node.eventMode = "none"; // клики проходят к карте под копией
+            node.position.set(x, Math.max(yMin, Math.min(yMax, y)));
+            h.addChild(node); // поверх всех карт host-слоя
+            zoom = { id, node, cur: fromScale || from, tgt: to, base, baseAlpha };
+            zooms.add(zoom);
+        }
+        return {
+            show,
+            hide,
+            state: () => (zoom && !zoom.dead // dead — до-улитая тикером запись
+                ? { id: zoom.id, scale: Math.round(zoom.cur * 1000) / 1000, target: zoom.tgt }
+                : null),
+        };
+    }
+
     // Затемнённый полноэкранный фон сцены-меню
     function dimBg(ctx, alpha = 0.78) {
         const bg = new PIXI.Sprite(ctx.uiTex("bg_corridor_1.png"));
@@ -280,5 +349,5 @@
         return GAME_LOC.t(`hero.${heroId}.name`);
     }
 
-    globalThis.GAME_UI = { T, fit, button, chip, cardFace, backTexOf, dimBg, scrollPane, foeTitle };
+    globalThis.GAME_UI = { T, fit, button, chip, cardFace, cardZoomer, backTexOf, dimBg, scrollPane, foeTitle };
 })();

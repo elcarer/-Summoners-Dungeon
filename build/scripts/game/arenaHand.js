@@ -40,6 +40,9 @@
                 venomMark: { name: "status.venom.name", desc: "status.venom.desc", val: (u) => u.venom },
                 poisonMark: { name: "status.poison.name", desc: "status.poison.desc", val: (u) => u.poison },
                 entangleMark: { name: "status.entangle.name", desc: "status.entangle.desc", val: (u) => u.entangle },
+                // «Возврат N» (Время, W17): счётчик u.ret тикает в начале
+                // хода владельца; на нуле существо возвращается в руку
+                returnMark: { name: "status.return.name", desc: "status.return.desc", val: (u) => u.ret },
             };
             A.effectTip = null; // { key, node }
             A.effectTipHide = function effectTipHide() {

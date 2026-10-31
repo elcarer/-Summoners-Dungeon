@@ -348,6 +348,7 @@
         let winNode = null, winRefs = null, winObj = null; // открытое окно объекта
         let sellRows = []; // строки продажи магазина (для тестов)
         let refreshShop = null; // живое обновление окна магазина (пишет buildShopWin)
+        let shopZoomHook = null; // ховер-зум карт магазина (пишет buildShopWin)
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
 
         function blocked(px, py) {
@@ -755,6 +756,7 @@
             winObj = null;
             sellRows = [];
             refreshShop = null;
+            shopZoomHook = null;
             if (G.dungeon) G.dungeon.win = null;
         }
 
@@ -941,8 +943,11 @@
         function buildShopWin(o) {
             const t = GAME_LOC.t;
             const { CARDS, SHOP_BUY, SHOP_SELL } = globalThis.GAME_DATA;
-            const { T, button, cardFace, scrollPane } = globalThis.GAME_UI;
+            const { T, button, cardFace, scrollPane, cardZoomer } = globalThis.GAME_UI;
             const c = new PIXI.Container();
+            // правило UI: наведение на карту — копия растёт до полного
+            // размера спрайта (host — окно магазина, не скролл-панель)
+            const zoomer = cardZoomer(ctx, { host: c });
             c.eventMode = "static";
             const dim = new PIXI.Graphics();
             dim.rect(-3000, -2000, 7920, 5080);
@@ -994,7 +999,7 @@
             sellH.position.set(789, 138);
             sellH.eventMode = "none";
             c.addChild(sellH);
-            const sellPane = scrollPane(ctx, { x: 780, y: 195, w: 1050, h: 768, onScroll: () => {} });
+            const sellPane = scrollPane(ctx, { x: 780, y: 195, w: 1050, h: 768, onScroll: () => zoomer.hide(false) });
             c.addChild(sellPane.node);
             const sellHint = T(t("shop.sellHint"), 19, 0x8a7c5e, { wordWrap: true, wordWrapWidth: 1035 });
             sellHint.position.set(786, 972);
@@ -1014,6 +1019,10 @@
                     card.position.set(cx, cy);
                     card.eventMode = "static";
                     card.on("pointertap", () => { if (!shopBuy(i)) flashNoGold(); });
+                    // правило UI: копия растёт до полного размера (позиция
+                    // в окне — goodsBox смещён на 90,200)
+                    card.on("pointerover", () => zoomer.show(id, 90 + cx, 200 + cy, card));
+                    card.on("pointerout", () => zoomer.hide(false));
                     goodsBox.addChild(card);
                     const lbl = T(sold ? t("shop.soldOut") : t("shop.price", { n: price }),
                         21, sold ? 0x8a7c5e : 0xffe2a8);
@@ -1043,6 +1052,14 @@
                     card.position.set(cx, cy);
                     card.eventMode = "static";
                     if (canSell) card.on("pointertap", () => { shopSell(id); });
+                    // правило UI: копия растёт до полного размера; позиция
+                    // в окне — контент панели (780,195) с поправкой на скролл
+                    card.on("pointerover", () => {
+                        const st = sellPane.state;
+                        const iy = -st.t * Math.max(0, st.contentH - st.viewH);
+                        zoomer.show(id, 780 + cx, 195 + cy + iy, card);
+                    });
+                    card.on("pointerout", () => zoomer.hide(false));
                     c2.addChild(card);
                     const lbl = T(`×${free} · ${t("shop.price", { n: SHOP_SELL[CARDS[id].rarity] })}`,
                         19, canSell ? 0xd8c79d : 0x8a7c5e);
@@ -1077,7 +1094,9 @@
             // живое обновление окна при покупке/продаже (зовут shopBuy/shopSell
             // со уровня сцены — пишем в внешнюю переменную, не локальную).
             // goodsNodes перечитываем: карточки пересобраны, старые узлы мертвы
+            shopZoomHook = () => zoomer.state(); // тесты: ховер-зум карт
             refreshShop = function () {
+                zoomer.hide(true); // карточки пересобраны — старый зум мимо
                 goldT.text = String(G.gold);
                 // нижняя подсказка правой панели объясняет блокировку продажи
                 const locked = sellLocked();
@@ -1493,6 +1512,7 @@
             shopBuy: (i) => shopBuy(i),
             shopSell: (id) => shopSell(id),
             shopCardNode: (i) => (winRefs && winRefs.goodsNodes ? winRefs.goodsNodes[i] || null : null),
+            shopZoomState: () => (shopZoomHook ? shopZoomHook() : null),
             shopSellNode: (id) => {
                 const r = (sellRows || []).find((x) => x.id === id);
                 return r ? r.node : null;
