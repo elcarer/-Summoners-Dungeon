@@ -44,7 +44,7 @@
             };
 
             // ── Карта, разыгранная врагом (просил юзер): лицом на свободном
-            // месте слева от поля, со свечением по краю; между розыгрышами врага
+            // месте слева от поля; между розыгрышами врага
             // пауза ≥ 1 реальной секунды, и всё это время карта видна — игрок
             // понимает, что делает противник.
             A.enemyCard = null; // { id, node }
@@ -53,17 +53,6 @@
                 const node = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.75 });
                 node.eventMode = "none";
                 node.position.set(430, 420);
-                // свечение по ФАКТИЧЕСКОЙ кромке карты (просил юзер): жёсткая
-                // рамка с чужими размерами сидела криво — слои от широкого
-                // тусклого к узкому яркому поверх bounds лица карты
-                const b = node.getLocalBounds();
-                const frame = new PIXI.Graphics();
-                for (const [w, a] of [[30, 0.08], [18, 0.16], [10, 0.3], [4.5, 0.95]])
-                    frame.roundRect(b.x, b.y, b.width, b.height, 16)
-                        .stroke({ width: w, color: 0xff5a36, alpha: a });
-                frame.name = "glowFrame";
-                frame.eventMode = "none";
-                node.addChild(frame);
                 root.addChild(node);
                 enemyCard = { id: cardId, node };
             };
@@ -103,14 +92,6 @@
                 node.scale.set(0.75);
                 node.eventMode = "none";
                 node.position.set(430, 420);
-                const b = node.getLocalBounds();
-                const frame = new PIXI.Graphics();
-                for (const [w, a] of [[30, 0.08], [18, 0.16], [10, 0.3], [4.5, 0.95]])
-                    frame.roundRect(b.x, b.y, b.width, b.height, 16)
-                        .stroke({ width: w, color: 0xff5a36, alpha: a });
-                frame.name = "glowFrame";
-                frame.eventMode = "none";
-                node.addChild(frame);
                 root.addChild(node);
                 enemyCard = { id: null, node };
             };

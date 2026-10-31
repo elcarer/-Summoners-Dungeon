@@ -869,9 +869,9 @@
             rows.push(s);
         }
 
-        // ── 8b. бродячие отряды — «охрана» подземелий (просил юзер): по 3
+        // ── 8b. бродячие отряды — «охрана» подземелий (просил юзер): по 4
         // отряда у каждого данжа патрулируют окрестности. Маршрут — 5 точек
-        // в кольце 5–12 клеток от арки, у каждого отряда СВОЙ сектор 120°
+        // в кольце 5–12 клеток от арки, у каждого отряда СВОЙ сектор 90°
         // (маршруты не пересекаются и не сходятся в одну точку: до любой
         // точки чужого маршрута этого же данжа — не меньше 3 клеток).
         // Точки — только в компоненте связности арки (река/хребет не
@@ -900,22 +900,29 @@
                     }
                 }
                 const taken = []; // точки чужих маршрутов этого же данжа
-                for (let s = 0; s < 3; s++) {
+                for (let s = 0; s < 4; s++) {
                     const pts = [];
-                    for (let k = 0; k < 5; k++) {
-                        for (let tries = 0; tries < 60; tries++) {
-                            const ang = (s + rng()) * (Math.PI * 2 / 3);
-                            const r = 5 + rng() * 7; // 5–12 клеток от арки
-                            const gx = dp.gx + Math.round(Math.cos(ang) * r);
-                            const gy = dp.gy + Math.round(Math.sin(ang) * r);
-                            if (!ok(gx, gy) || !comp[gy * W + gx]) continue;
-                            if (taken.some((p) =>
-                                Math.hypot(p[0] - gx, p[1] - gy) < 3)) continue;
-                            pts.push([gx, gy]); taken.push(pts[pts.length - 1]);
-                            break;
+                    // 2 прохода: свой сектор 90°, при тесной стране (у края
+                    // карты/за рекой полсектора — вода) — полукруг вокруг
+                    // центра своего сектора (маршрут не растягивается)
+                    for (let pass = 0; pass < 2 && pts.length < 5; pass++) {
+                        for (let k = pts.length; k < 5; k++) {
+                            for (let tries = 0; tries < 60; tries++) {
+                                const ang = pass === 0
+                                    ? (s + rng()) * (Math.PI * 2 / 4)
+                                    : (s * 2 - 1 + rng() * 4) * (Math.PI * 2 / 8);
+                                const r = 5 + rng() * 7; // 5–12 клеток от арки
+                                const gx = dp.gx + Math.round(Math.cos(ang) * r);
+                                const gy = dp.gy + Math.round(Math.sin(ang) * r);
+                                if (!ok(gx, gy) || !comp[gy * W + gx]) continue;
+                                if (taken.some((p) =>
+                                    Math.hypot(p[0] - gx, p[1] - gy) < 3)) continue;
+                                pts.push([gx, gy]); taken.push(pts[pts.length - 1]);
+                                break;
+                            }
                         }
                     }
-                    if (!pts.length) continue; // тесно — отряда нет (не бывает)
+                    if (!pts.length) continue; // совсем негде — отряда нет
                     wanderers.push({
                         cave: dp.cave,
                         gx: pts[0][0], gy: pts[0][1], // спавн — первая точка

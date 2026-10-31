@@ -73,17 +73,16 @@
                     ? { id: cardIdOf(unitCard.unit.def), side: unitCard.unit.side,
                         col: unitCard.unit.col, row: unitCard.unit.row }
                     : null),
-                // карта, разыгранная врагом (тесты): что показано слева + свечение
+                // карта, разыгранная врагом (тесты): что показано слева;
+                // hasFrame — страж против возврата красной рамки (W19: убрана)
                 enemyCardState: () => (enemyCard
-                    ? (() => {
-                        const f = enemyCard.node.getChildByName("glowFrame");
-                        return { id: enemyCard.id, x: enemyCard.node.x, y: enemyCard.node.y,
-                            glow: f ? { w: Math.round(f.width), h: Math.round(f.height) } : null };
-                    })()
+                    ? { id: enemyCard.id, x: enemyCard.node.x, y: enemyCard.node.y,
+                        hasFrame: !!enemyCard.node.getChildByName("glowFrame") }
                     : null),
                 // тест-хуки показа карты врага (как в aiPlay): позиция
                 // эффекта заклинания из руки проверяемо привязана к карте
                 _showEnemyCard(id) { if (B && CARDS[id]) { showEnemyCard(id); return true; } return false; },
+                _showEnemyBack() { if (B) { showEnemyBack(); return true; } return false; },
                 _hideEnemyCard() { hideEnemyCard(); return true; },
                 // ловушки (тесты): у руны видно существо, на котором она висит
                 trapList: () => ({
