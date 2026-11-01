@@ -24,7 +24,13 @@
 // первый. Города пока без функционала (просил юзер — потом добавим).
 // БРОДЯЧИЕ ОТРЯДЫ (просил юзер): «охрана» подземелий — по 3 отряда у
 // каждой арки патрулируют окрестности; ОХРАННИКИ МОСТОВ — по стражу у
-// каждого моста через реку в зоне своей стихии (все 6 стихий). Все
+// каждого моста через реку в зоне своей стихии (все 6 стихий); ДИКИЕ
+// ВРАГИ ТОЧЕК СПАВНА (просил юзер W29) — ~12 на зону в проходимых
+// местах вне маршрутов стражей: стоят на месте (после погони
+// возвращаются), но заметят героя ВДВОЕ дальше (агро ×2); вид — из
+// спавн-пула стихии по редкостным весам, ядро колоды — 9 случайных
+// Обычных карт стихии при спавне, победа над одним усиливает всех
+// одноимённых (+1 макс. жизнь и +1 Редкая карта в ядро). Все
 // отряды — полноценные персонажи мира: спрайтшиты существ своей стихии,
 // ходят по сетке 4 направлениями (BFS) и разворачиваются как герой
 // (контроллер characters, виртуальный ввод). Маршруты генерит worldGen
@@ -96,8 +102,8 @@
         // Ходят как герой — сущности characters с виртуальным вводом:
         // спрайтшит существ своей стихии, анимации walk_* и разворот
         // делает контроллер, маршрут — BFS по 4 направлениям
-        // s = { kind: "cave"|"bridge", key, d, st, enc, id, sprite,
-        //       shadow, wp, path, aggro, repath }
+        // s = { kind: "cave"|"bridge"|"decay"|"wild", key, d, st, enc,
+        //       id, sprite, shadow, wp, path, aggro, repath }
         let squads = [];
         let tip = null; // { squad, node, hero } — подсказка на отряде (курсор)
 
@@ -141,10 +147,35 @@
                         alive: true, x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS };
                 }
             }
+            // дикие враги точек спавна (просил юзер W29): вид — из пула
+            // стихии по редкостным весам (детерминировано сидом мира и
+            // номером точки), колода — 9 случайных Обычных карт стихии
+            // плюс усиление за победы над одноимёнными (уровень вида —
+            // в wildLevel). Состав колоды живёт в сейве отряда
+            if (!G.world.wildLevel) G.world.wildLevel = {};
+            {
+                const D = globalThis.GAME_DATA;
+                if (map.wildSpawns)
+                    for (let i = 0; i < map.wildSpawns.length; i++) {
+                        const d = map.wildSpawns[i];
+                        const k = "wild:" + d.elem + ":" + i;
+                        if (G.world.wander[k]) continue;
+                        const enc = D.wildPick(d.elem, G.world.seed, i);
+                        if (!enc) continue;
+                        const lvl = G.world.wildLevel[enc] || 0;
+                        G.world.wander[k] = {
+                            alive: true,
+                            x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS,
+                            enc, hpBonus: lvl,
+                            deck: D.wildDeck(d.elem, lvl,
+                                (G.world.seed ^ ((i + 1) * 2654435761)) | 0),
+                        };
+                    }
+            }
             // миграция старых ключей "gob:0" → "cave:gob:0" (до v13)
             for (const k of Object.keys(G.world.wander))
                 if (!k.startsWith("cave:") && !k.startsWith("bridge:")
-                    && !k.startsWith("decay:")) {
+                    && !k.startsWith("decay:") && !k.startsWith("wild:")) {
                     G.world.wander["cave:" + k] = G.world.wander[k];
                     delete G.world.wander[k];
                 }
@@ -515,9 +546,15 @@
                 y: COMPONENTS.positionY[heroId],
             };
             G.worldFrom = true; // трофей/поражение ведут в открытый мир
+            // дикий враг играет СВОЕЙ колодой — сгенерённой при спавне
+            // (9 Обычных стихии + Редкие за победы над одноимёнными);
+            // усиление вида — hpBonus к базе (просил юзер W29)
+            const deck = s.kind === "wild" && s.st.deck
+                ? [...s.st.deck] : D.enemyDeck(s.enc, 1);
             G.activeEnemy = { x: s.st.x, y: s.st.y, enc: s.enc,
-                deck: D.enemyDeck(s.enc, 1), alive: true, boss: false,
-                wander: s.key };
+                deck, alive: true, boss: false,
+                wander: s.key, wild: s.kind === "wild",
+                hpBonus: s.kind === "wild" ? (s.st.hpBonus || 0) : 0 };
             if (ctx.sfx) ctx.sfx();
             scenes.go("arena");
         }
@@ -538,11 +575,12 @@
         // подземелье (dungeon.js showTip). Панель живёт в ui-слое и каждый
         // кадр следует за отрядом; показывается pointermove по клик-зоне
         // карты, отряды НЕ интерактивны (не съедают клики движения)
-        function squadDeckSummary(encId) {
-            const enc = globalThis.GAME_DATA.ENCOUNTERS[encId]
-                || globalThis.GAME_DATA.ENCOUNTERS.gob;
+        function squadDeckSummary(encId, deckOverride) {
+            const D = globalThis.GAME_DATA;
+            const enc = D.ENCOUNTERS[encId] || D.ENCOUNTERS.gob;
+            const src = deckOverride || enc.core;
             const counts = new Map();
-            for (const id of enc.core) counts.set(id, (counts.get(id) || 0) + 1);
+            for (const id of src) counts.set(id, (counts.get(id) || 0) + 1);
             return [...counts.entries()]
                 .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
                 .map(([id, n]) => `${n}× ${GAME_LOC.t("card." + id + ".name")}`)
@@ -567,18 +605,22 @@
             heroCard.scale.set(0.5);
             heroCard.position.set(0, 0);
             node.addChild(heroCard);
-            // инфо-панель (справа): имя, HP базы, колода — как в данже
+            // инфо-панель (справа): имя, HP базы, колода — как в данже.
+            // Дикие враги: база с усилением вида, колода — своя (W29)
+            const hpN = enc.baseHp
+                + (s.kind === "wild" ? (s.st.hpBonus || 0) : 0);
             const title = new PIXI.Text({
                 text: GAME_LOC.t("enc." + s.enc + ".title"),
                 style: { fontFamily: "Kereru", fontSize: 24, fill: 0xffe9b0 },
             });
             const hpLine = new PIXI.Text({
-                text: GAME_LOC.t("dungeon.tipBase", { n: enc.baseHp }),
+                text: GAME_LOC.t("dungeon.tipBase", { n: hpN }),
                 style: { fontFamily: "Kereru", fontSize: 18, fill: 0xff9c8c },
             });
             const deck = new PIXI.Text({
                 text: GAME_LOC.t("dungeon.tipDeck") + ": "
-                    + squadDeckSummary(s.enc),
+                    + squadDeckSummary(s.enc,
+                        s.kind === "wild" ? s.st.deck : null),
                 style: { fontFamily: "Kereru", fontSize: 18, fill: 0xd8c79d,
                     wordWrap: true, wordWrapWidth: 336, breakWords: true },
             });
@@ -960,13 +1002,17 @@
                     for (let i = 0; i < defs.length; i++) {
                         const d = defs[i];
                         const key = kind === "cave"
-                            ? "cave:" + d.cave + ":" + i : kind + ":" + i;
+                            ? "cave:" + d.cave + ":" + i
+                            : kind === "wild"
+                                ? "wild:" + d.elem + ":" + i
+                                : kind + ":" + i;
                         const st = G.world.wander[key];
                         if (!st || !st.alive) continue;
                         const s = {
                             kind, key, d, st, wp: 0, path: null, aggro: false,
                             repath: 0, id: null,
                             enc: kind === "cave" ? wanderEnc(d, i)
+                                : kind === "wild" ? st.enc
                                 : guardEncOf(d.elem),
                         };
                         if (!s.enc) continue; // данж/стихия ещё без отрядов
@@ -994,6 +1040,7 @@
                 if (map.wanderers) spawnSquads(map.wanderers, "cave");
                 if (map.bridgeGuards) spawnSquads(map.bridgeGuards, "bridge");
                 if (map.decayGuards) spawnSquads(map.decayGuards, "decay");
+                if (map.wildSpawns) spawnSquads(map.wildSpawns, "wild");
                 worldContainer.addChild(layer);
 
                 // герой — лист по стихии забега (Рост — эльф, Сила — гоблин)
@@ -1237,14 +1284,18 @@
                         // и до героя есть путь (через реку не гонимся);
                         // сорвать погоню — герой ушёл или отряд дошёл до края.
                         // Пока действует иммунитет после побега/поражения —
-                        // новые погони не срываются (герой отходит в покое)
+                        // новые погони не срываются (герой отходит в покое).
+                        // У диких врагов обнаружение ВДВОЕ больше (просил
+                        // юзер W29) — заметят и погонятся раньше стражей
+                        const aggroR = s.kind === "wild"
+                            ? WAND_AGGRO * 2 : WAND_AGGRO;
                         const hgx = Math.floor(hx / TS), hgy = Math.floor(hy / TS);
                         const sgx = Math.floor(sx / TS), sgy = Math.floor(sy / TS);
                         const battleCool = performance.now() < (G.world.battleCool || 0);
-                        if (!s.aggro && !battleCool && dHero < WAND_AGGRO
+                        if (!s.aggro && !battleCool && dHero < aggroR
                             && dRoute < WAND_LEASH
                             && bfsPath(sgx, sgy, hgx, hgy)) s.aggro = true;
-                        else if (s.aggro && (dHero > WAND_AGGRO * 1.4
+                        else if (s.aggro && (dHero > aggroR * 1.4
                             || dRoute > WAND_LEASH)) s.aggro = false;
                         if (s.aggro) {
                             // погоня: путь к герою, пересчёт раз в 0.4с
@@ -1390,6 +1441,8 @@
                         w: m.w, h: m.h, seed: m.seed, rows: m.rows,
                         ter: m.ter, zone: m.zone, spawn: m.spawn,
                         pois: m.pois.map((p) => ({ ...p })),
+                        wildSpawns: (m.wildSpawns || [])
+                            .map((d) => ({ ...d, route: d.route.map((r) => [...r]) })),
                     };
                 },
                 // слой местности (тайлы images/tiles): коды клеток 0..7
@@ -1467,6 +1520,36 @@
                             item(d, "decay:" + j, j))),
                     ].filter(Boolean) };
                 },
+                // ── дикие враги точек спавна (тесты, W29): список с
+                // живыми позициями, колодой и усилением вида ──────────
+                wild: () => {
+                    const m = G.world.map;
+                    const out = [];
+                    if (m && m.wildSpawns)
+                        for (let i = 0; i < m.wildSpawns.length; i++) {
+                            const d = m.wildSpawns[i];
+                            const key = "wild:" + d.elem + ":" + i;
+                            const st = G.world.wander && G.world.wander[key];
+                            if (!st) continue;
+                            const s = squads.find((x) => x.key === key);
+                            out.push({
+                                i, key, elem: d.elem, enc: st.enc,
+                                alive: st.alive, hpBonus: st.hpBonus || 0,
+                                deck: st.deck || [],
+                                gx: d.gx, gy: d.gy,
+                                x: s && s.id !== null
+                                    ? COMPONENTS.positionX[s.id] : st.x,
+                                y: s && s.id !== null
+                                    ? COMPONENTS.positionY[s.id] : st.y,
+                                aggro: s ? !!s.aggro : false,
+                                face: s && s.id !== null
+                                    ? characters.facingName(s.id) : null,
+                                walking: !!(s && s.id !== null
+                                    && COMPONENTS.ctrlMove[s.id]),
+                            });
+                        }
+                    return { list: out, level: G.world.wildLevel || {} };
+                },
                 // подсказка на отряде: состояние панели (как в подземелье)
                 hoverAt(x, y) {
                     hoverSquads({ x, y });
@@ -1475,7 +1558,8 @@
                 tipState: () => (tip ? {
                     enc: tip.squad.enc,
                     title: GAME_LOC.t("enc." + tip.squad.enc + ".title"),
-                    deck: squadDeckSummary(tip.squad.enc),
+                    deck: squadDeckSummary(tip.squad.enc,
+                        tip.squad.kind === "wild" ? tip.squad.st.deck : null),
                     heroImg: (globalThis.GAME_DATA.ENCOUNTERS[tip.squad.enc]
                         || {}).hero || null,
                 } : null),
@@ -1492,6 +1576,14 @@
                     return G.deck.length;
                 },
                 wanderFreeze: (v) => { G.world.wanderFreeze = !!v; return true; },
+                // все отряды сцены (тесты): вид, живой id, агро и позиция —
+                // общий срез по kind (cave/bridge/decay/wild)
+                squadsList: () => squads.map((s) => ({
+                    kind: s.kind, key: s.key, enc: s.enc,
+                    id: s.id, aggro: !!s.aggro,
+                    x: s.id !== null ? COMPONENTS.positionX[s.id] : null,
+                    y: s.id !== null ? COMPONENTS.positionY[s.id] : null,
+                })),
                 // мини-карта (правый нижний угол): бокс и маркер героя
                 mini: () => {
                     const mini = uiHud && uiHud.userData.mini;

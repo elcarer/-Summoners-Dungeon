@@ -21,7 +21,9 @@
 // стены-клетки здания (непроходимы). Генерация ДЕТЕРМИНИРОВАНА сидом:
 // один сид — одна карта. «Новая игра» крутит сид, сейв хранит его
 // (V — версия генератора: смена алгоритма инкрементирует её, старые
-// сейвы перегенерируются). Модуль чистый: PIXI не касается.
+// сейвы перегенерируются). Точки спавна диких врагов зон (8e, ~12 на
+// зону, просил юзер W29) — добавленные данные: рельеф не меняют, V не
+// инкрементируют. Модуль чистый: PIXI не касается.
 (function () {
     // V9: воды в зоне Тлена нет вовсе (русла обрываются у его границ),
     // болота отступают на клетку от границ зоны — без стыков с чужими
@@ -1189,9 +1191,66 @@
                 }
         }
 
+        // ── 8e. точки спавна ДИКИХ врагов (просил юзер W29): ~12 на зону
+        // в проходимых местах (не лес/гора/река/болото/стены), на равном
+        // удалении друг от друга (best-candidate сэмпл даёт ровное
+        // разрежение) и НЕ на маршрутах стражей мостов/данжей/Тлена и
+        // подземелий (не пересекаются с их патрулями). Не липнут к POI
+        // (площади/арки) и точкам появления героя. route = своя точка:
+        // стоящий враг «патрулирует» одно место, а после погони
+        // возвращается на него (поводок — как у стражей)
+        const wildSpawns = [];
+        {
+            const guardPts = [];
+            for (const w of wanderers)
+                for (const [gx, gy] of w.route) guardPts.push([gx, gy]);
+            for (const g of bridgeGuards)
+                for (const [gx, gy] of g.route) guardPts.push([gx, gy]);
+            for (const g of decayGuards)
+                for (const [gx, gy] of g.route) guardPts.push([gx, gy]);
+            const poiPts = pois.map((p) => [p.gx, p.gy]);
+            const spawnPts = ELEMS.map((e) => spawn[e]).filter(Boolean)
+                .map((s) => [s.gx, s.gy]);
+            const farAll = (x, y, pts, d) => pts.every(([px, py]) =>
+                Math.hypot(px - x, py - y) >= d);
+            for (let k = 0; k < 6; k++) {
+                const chosen = [];
+                for (let n = 0; n < 12; n++) {
+                    // смягчение: если зона тесная (чащи/болота/стражи),
+                    // порог разрежения опускается — точка всё равно
+                    // обязана быть проходимой и вне запретов
+                    for (const minD of [16, 10, 5, 0]) {
+                        let best = null, bd = -1;
+                        for (let t = 0; t < 60; t++) {
+                            const x = 3 + (rng() * (W - 6)) | 0;
+                            const y = 3 + (rng() * (H - 6)) | 0;
+                            const i = y * W + x;
+                            if (zone[i] !== k || rows[y][x] !== ".") continue;
+                            if (poiMask[i]) continue; // площади и стены зданий
+                            if (!farAll(x, y, guardPts, 8)) continue;
+                            if (!farAll(x, y, poiPts, 6)) continue;
+                            if (!farAll(x, y, spawnPts, 5)) continue;
+                            let md = Infinity;
+                            for (const c of chosen)
+                                md = Math.min(md, Math.hypot(c[0] - x, c[1] - y));
+                            if (chosen.length && md < minD) continue;
+                            if (md > bd) { bd = md; best = [x, y]; }
+                        }
+                        if (best) {
+                            chosen.push(best);
+                            wildSpawns.push({ elem: ELEMS[k],
+                                gx: best[0], gy: best[1], route: [best] });
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         return {
             v: V, w: W, h: H, seed,
             ter, zone, rows, pois, spawn, wanderers, bridgeGuards, decayGuards,
+            wildSpawns,
             centers: centers.map((c) => ({ x: Math.round(c.x), y: Math.round(c.y) })),
         };
     }

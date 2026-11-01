@@ -751,6 +751,29 @@
                             // снят с карты навсегда (состояние — в сейве)
                             if (G.activeEnemy.wander && G.world.wander)
                                 G.world.wander[G.activeEnemy.wander].alive = false;
+                            // дикий враг открытого мира (просил юзер W29):
+                            // победа усиливает ВСЕХ одноимённых живых —
+                            // +1 макс. жизнь и +1 случайная Редкая карта
+                            // в ядро каждому (уровень вида — в сейве)
+                            if (G.activeEnemy.wild && G.world.wander
+                                && globalThis.GAME_DATA.ENCOUNTERS[G.activeEnemy.enc]) {
+                                const kind = G.activeEnemy.enc;
+                                const wElem =
+                                    globalThis.GAME_DATA.ENCOUNTERS[kind].elem;
+                                if (G.world.wildLevel)
+                                    G.world.wildLevel[kind] =
+                                        (G.world.wildLevel[kind] || 0) + 1;
+                                for (const k of Object.keys(G.world.wander)) {
+                                    const st = G.world.wander[k];
+                                    if (!st.alive || st.enc !== kind) continue;
+                                    st.hpBonus = (st.hpBonus || 0) + 1;
+                                    if (st.deck) {
+                                        const rc = globalThis.GAME_DATA
+                                            .wildRareCard(wElem);
+                                        if (rc) st.deck.push(rc);
+                                    }
+                                }
+                            }
                             if (G.activeEnemy.boss) {
                                 G.dungeon.bossDead = true;
                                 // «Карта сокровищ» (просил юзер): только на

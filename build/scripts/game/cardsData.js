@@ -2168,6 +2168,23 @@
             baseHp: 16, elems: ["time"], starter: "time",
             img: "53", ability: "elemDeathDelay", abilityVal: 1,
         },
+        // ── «Простые» враги открытого мира (просил юзер W29): случайные
+        // враги точек спавна зон, способности нет. Ядро колоды НЕ
+        // фиксировано — 9 случайных Обычных карт стихии при спавне
+        // (dataCards.wildDeck); победа над одним усиливает всех
+        // одноимённых: +1 макс. жизнь и +1 Редкая карта в ядро
+        strSimple: { id: "strSimple", rarity: "common", baseHp: 8,
+                     elems: ["strength"], starter: "strength", img: "54" },
+        grwSimple: { id: "grwSimple", rarity: "common", baseHp: 8,
+                     elems: ["growth"], starter: "growth", img: "55" },
+        wisSimple: { id: "wisSimple", rarity: "common", baseHp: 8,
+                     elems: ["wisdom"], starter: "wisdom", img: "56" },
+        honSimple: { id: "honSimple", rarity: "common", baseHp: 8,
+                     elems: ["honor"], starter: "honor", img: "57" },
+        decSimple: { id: "decSimple", rarity: "common", baseHp: 8,
+                     elems: ["decay"], starter: "decay", img: "58" },
+        timSimple: { id: "timSimple", rarity: "common", baseHp: 8,
+                     elems: ["time"], starter: "time", img: "59" },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon", "tordin"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -2191,7 +2208,10 @@
         "darklord", // босс Логова Времени «Тёмный владыка» (просил юзер)
         // «Охранники мостов» открытого мира (просил юзер)
         "strGuard", "grwGuard", "wisGuard", "decGuard", "honGuard",
-        "timGuard"]; // «Охранник Времени» — зона Времени (просил юзер)
+        "timGuard", // «Охранник Времени» — зона Времени (просил юзер)
+        // «Простые» враги открытого мира (просил юзер W29)
+        "strSimple", "grwSimple", "wisSimple", "honSimple",
+        "decSimple", "timSimple"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

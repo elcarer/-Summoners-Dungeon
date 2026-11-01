@@ -35,6 +35,10 @@
                 const eHeroDef = enc.hero && HEROES[enc.hero] ? HEROES[enc.hero] : null;
                 const bossHp = G.activeEnemy && G.activeEnemy.boss
                     ? 2 * (G.run ? G.run.floor : 1) : 0;
+                // дикий враг открытого мира: усиление вида за победы над
+                // одноимёнными — +1 макс. жизни за каждую (просил юзер W29)
+                const wildHp = G.activeEnemy && G.activeEnemy.hpBonus
+                    ? G.activeEnemy.hpBonus : 0;
                 // драфт («Карта сокровищ»): колода игрока — 12 отобранных карт,
                 // НЕ G.deck (настоящая колода в мини-игре не участвует)
                 const pDeck = G.draftBattle && G.draft ? G.draft.picks : G.deck;
@@ -100,8 +104,10 @@
                     // бесплатна, пока в руке; не разыгранная — на верх
                     // колоды в начале хода противника (portalRefund)
                     pPortalFree: null, ePortalFree: null,
-                    enemyBase: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
-                    enemyBaseMax: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
+                    enemyBase: (eHeroDef ? eHeroDef.baseHp : enc.baseHp)
+                        + bossHp + wildHp,
+                    enemyBaseMax: (eHeroDef ? eHeroDef.baseHp : enc.baseHp)
+                        + bossHp + wildHp,
                     deck: shuffle([...pDeck]), discard: [], hand: [],
                     eDeck: shuffle([...eBase]),
                     eDeckBase: eBase,

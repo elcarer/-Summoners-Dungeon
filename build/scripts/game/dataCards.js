@@ -740,6 +740,26 @@
                            "tim221", "tim221",
                            "tim220", "tim220", "tim220",
                            "tim219", "tim219"] },
+        // ── «Простые» враги открытого мира (просил юзер W29): случайные
+        // враги точек спавна зон (worldGen wildSpawns). Поле wild —
+        // ступень редкости спавн-пула (выбор при спавне взвешенный:
+        // обычные чаще, редкие реже, эпические самые редкие). Ядро НЕ
+        // фиксировано: 9 случайных Обычных карт стихии генерятся при
+        // спавне отряда (wildDeck ниже; состав — в сейве отряда).
+        // Победа над таким врагом усиливает ВСЕХ одноимённых живых:
+        // +1 макс. жизнь и +1 случайная Редкая карта в ядро (arenaFlow).
+        strSimple: { scene: 1, baseHp: 8, elem: "strength", hero: "strSimple",
+                     wild: "common", core: [] },
+        grwSimple: { scene: 1, baseHp: 8, elem: "growth", hero: "grwSimple",
+                     wild: "common", core: [] },
+        wisSimple: { scene: 3, baseHp: 8, elem: "wisdom", hero: "wisSimple",
+                     wild: "common", core: [] },
+        decSimple: { scene: 1, baseHp: 8, elem: "decay", hero: "decSimple",
+                     wild: "common", core: [] },
+        honSimple: { scene: 5, baseHp: 8, elem: "honor", hero: "honSimple",
+                     wild: "common", core: [] },
+        timSimple: { scene: 6, baseHp: 8, elem: "time", hero: "timSimple",
+                     wild: "common", core: [] },
     };
     // Подземелья открытого мира: стихия (пул наград/драфта) и кап глубины.
     // У «Подземных ключей» шесть этажей; главарь «Безумный маг» стоит на
@@ -948,6 +968,78 @@
         }
         return deck;
     }
+    // ── Дикие враги открытого мира (просил юзер W29) ─────────────────────
+    // Спавн-пул: энкаунтеры с полем wild (ступень редкости). Выбор при
+    // спавне — взвешенный по редкости: обычные чаще, редкие реже,
+    // эпические самые редкие.
+    const WILD_WEIGHT = { common: 6, rare: 2, epic: 1 };
+    // детерминированный ГПСЧ (mulberry32) — как в worldGen: один сид —
+    // один и тот же враг в точке
+    function wildRng(a) {
+        return function () {
+            a |= 0; a = (a + 0x6D2B79F5) | 0;
+            let t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+    function wildPool(elem) {
+        return Object.keys(ENCOUNTERS).filter((id) =>
+            ENCOUNTERS[id].wild && (!elem || ENCOUNTERS[id].elem === elem));
+    }
+    // вид дикого врага для точки спавна (детерминировано сидом мира и
+    // номером точки); null — в пуле стихии пусто
+    function wildPick(elem, seed, salt) {
+        const pool = wildPool(elem);
+        if (!pool.length) return null;
+        const rng = wildRng((seed ^ ((salt | 0) * 2654435761)) | 0);
+        let total = 0;
+        const w = pool.map((id) => {
+            const wt = WILD_WEIGHT[ENCOUNTERS[id].wild] || 1;
+            total += wt;
+            return wt;
+        });
+        let roll = rng() * total;
+        for (let i = 0; i < pool.length; i++) {
+            roll -= w[i];
+            if (roll < 0) return pool[i];
+        }
+        return pool[pool.length - 1];
+    }
+    // коллекционные карты стихии заданной редкости: служебные токены без
+    // лица (gobA, skel, icePixie…) не имеют img — в пулы не попадают
+    function collectibleOf(elem, rarity) {
+        return Object.keys(CARDS).filter((id) => CARDS[id].elem === elem
+            && CARDS[id].rarity === rarity && CARDS[id].img);
+    }
+    // Ядро колоды простого врага: 9 случайных ОБЫЧНЫХ карт стихии
+    // (без повторов, пока карт хватает) + level случайных РЕДКИХ —
+    // усиление за победы над одноимёнными. Детерминировано сидом точки.
+    function wildDeck(elem, level, seed) {
+        const rng = wildRng(seed | 0);
+        const commons = collectibleOf(elem, "common");
+        const deck = [];
+        const bag = commons.slice();
+        for (let k = 0; k < 9 && commons.length; k++) {
+            if (!bag.length) bag.push(...commons); // карт меньше 9 — по кругу
+            deck.push(bag.splice((rng() * bag.length) | 0, 1)[0]);
+        }
+        if (level > 0) {
+            let rares = collectibleOf(elem, "rare");
+            if (!rares.length) rares = commons;
+            for (let k = 0; k < level; k++)
+                deck.push(rares[(rng() * rares.length) | 0]);
+        }
+        return deck;
+    }
+    // одна случайная Редкая карта стихии — живое усиление одноимённых
+    // при победе (состав уходит в сейв отряда, сид не нужен)
+    function wildRareCard(elem) {
+        let rares = collectibleOf(elem, "rare");
+        if (!rares.length) rares = collectibleOf(elem, "common");
+        return rares.length ? rares[(Math.random() * rares.length) | 0] : null;
+    }
+
     // Обычный враг для этажа подземелья: архетип из таблицы этажа СВОЕГО
     // данжа (пещеры / Роща Роста / Подземные ключи / Земли мёртвых /
     // Залы Чести).
@@ -981,5 +1073,6 @@
         STARTER_DECKS, STARTER_COLLECTIONS, HEROES, HERO_ORDER, HERO_FOE_ORDER,
         caveDeckFor,
         enemyDeck, mobForFloor, ELEM_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,
+        wildPool, wildPick, wildDeck, wildRareCard, WILD_WEIGHT,
     };
 })();

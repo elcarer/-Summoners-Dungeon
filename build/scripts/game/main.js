@@ -372,7 +372,7 @@
             // «Сохранить» из настроек при live делает сначала штатный автосейв
             live: false,
             dungeon: null, activeEnemy: null, battle: null,
-            world: { heroPos: null, out: false, wander: null }, // открытый мир: где герой + бродячие отряды
+            world: { heroPos: null, out: false, wander: null, wildLevel: {} }, // открытый мир: где герой + бродячие отряды
             worldFrom: false, // последний бой начался в открытом мире (трофей/реванш ведут в мир)
             dungeonStates: {}, // этажи подземелий, ключ «данж:этаж» (gob:1, grw:2…)
             // (враги/объекты этажа остаются как их оставили),
@@ -453,7 +453,7 @@
                 this.world = {
                     v: globalThis.GAME_WORLDGEN.V,
                     seed: (Math.random() * 0x7fffffff) | 0,
-                    heroPos: null, out: false, wander: null,
+                    heroPos: null, out: false, wander: null, wildLevel: {},
                 };
                 this.worldFrom = false;
                 this.dungeonStates = {};
@@ -491,6 +491,10 @@
                     // бродячие отряды: жив/мёртв и позиции (геометрия — из сида)
                     worldWander: this.world.wander
                         ? JSON.parse(JSON.stringify(this.world.wander)) : null,
+                    // дикие враги: уровень видов (победы над одноимёнными
+                    // усиливают всех — W29); составы колод — в worldWander
+                    worldWild: this.world.wildLevel
+                        ? JSON.parse(JSON.stringify(this.world.wildLevel)) : null,
                     // глобальная карта: сейв хранит только сид — карта
                     // регенерируется детерминированно (worldGen.js)
                     worldV: globalThis.GAME_WORLDGEN.V,
@@ -713,6 +717,10 @@
                 // отряды той же версии генератора: жив/мёртв и позиции
                 wander: r.worldV === globalThis.GAME_WORLDGEN.V
                     && r.worldWander ? r.worldWander : null,
+                // дикие враги: уровень видов (старые сейвы — пусто,
+                // ensureWander создаст с нуля)
+                wildLevel: r.worldV === globalThis.GAME_WORLDGEN.V
+                    && r.worldWild ? r.worldWild : null,
                 map: null,
             };
             // сюжетная линия забега (старые сейвы — без неё: первый
