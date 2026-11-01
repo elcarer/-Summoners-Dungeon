@@ -436,6 +436,7 @@
                     ring.ellipse(0, 12, 45, 15);
                     ring.fill({ color: u.side === "p" ? 0x2f4f7a : 0x7a3430, alpha: 0.45 });
                     ring.eventMode = "none";
+                    ring.name = "ring"; // переворот стороны (defectFlip) перекрашивает
                     c.addChild(ring);
                     const body = new PIXI.AnimatedSprite(sheet.animations[face], false);
                     body.anchor.set(0.5, 0.85); // ноги (y≈0.93 кадра) чуть ниже центра клетки
@@ -487,6 +488,47 @@
                 c.zIndex = u.row; // общий z-order поля (см. unitsLayer)
                 c.eventMode = "none"; // клики — всегда в клетки поля под жетоном
                 return c;
+            };
+            // «Взбунтовавшийся мех» (tim240, просил юзер): существо
+            // переходит на сторону противника. Позиция и статы остаются,
+            // сторона (и её визуал) меняется: командная тень, разворот
+            // спрайта к новой стороне, цвет рамки у безликих жетонов.
+            // Ауры пересчитываются — бонусы сторон разъехались
+            A.defectFlip = function defectFlip(u) {
+                if (!u || !B.units.includes(u)) return;
+                u.side = u.side === "p" ? "e" : "p";
+                const ring = u.node.getChildByName("ring");
+                if (ring) {
+                    ring.clear();
+                    ring.ellipse(0, 12, 45, 15);
+                    ring.fill({ color: u.side === "p" ? 0x2f4f7a : 0x7a3430, alpha: 0.45 });
+                }
+                const body = u.node.getChildByName("body");
+                if (body) {
+                    const face = u.side === "p" ? "walk_back" : "walk_front";
+                    const sheet = sheetOf(u);
+                    if (sheet && sheet.animations[face]) {
+                        body.textures = sheet.animations[face];
+                        body.gotoAndStop(0);
+                        body.userData_face = face;
+                    }
+                } else {
+                    const g = u.node.children.find((ch) => ch instanceof PIXI.Graphics);
+                    if (g) {
+                        g.clear();
+                        g.roundRect(-45, -45, 90, 90, 15);
+                        g.fill(u.def.color);
+                        g.stroke({ width: 3.75, color: u.side === "p" ? 0x9fc4ef : 0xef9f8c });
+                    }
+                }
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 96,
+                    "⇄ " + GAME_LOC.t("status.defect.name"), 0xb07ad5);
+                fxEvent("debuff", { x: p.x, y: p.y - 12, scale: 0.85 });
+                punch(u.node);
+                sfx("chpoc");
+                recalcAuras();
+                refreshHud();
             };
 
             // ── Ауры строений + перманентные бонусы ──────────────────────────

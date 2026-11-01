@@ -24,7 +24,7 @@
 // первый. Города пока без функционала (просил юзер — потом добавим).
 // БРОДЯЧИЕ ОТРЯДЫ (просил юзер): «охрана» подземелий — по 3 отряда у
 // каждой арки патрулируют окрестности; ОХРАННИКИ МОСТОВ — по стражу у
-// каждого моста через реку в зоне своей стихии (Время — позже). Все
+// каждого моста через реку в зоне своей стихии (все 6 стихий). Все
 // отряды — полноценные персонажи мира: спрайтшиты существ своей стихии,
 // ходят по сетке 4 направлениями (BFS) и разворачиваются как герой
 // (контроллер characters, виртуальный ввод). Маршруты генерит worldGen
@@ -135,7 +135,7 @@
                 if (!map[list]) continue;
                 for (let j = 0; j < map[list].length; j++) {
                     const d = map[list][j];
-                    if (!guardEncOf(d.elem)) continue; // Время — стражей ещё нет
+                    if (!guardEncOf(d.elem)) continue; // стихии без стражей нет
                     const k = kind + ":" + j;
                     if (!G.world.wander[k]) G.world.wander[k] = {
                         alive: true, x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS };
@@ -160,10 +160,12 @@
             return tab[(GEN.hash2(G.world.seed, i * 131 + d.cave.length * 17, 7)
                 * tab.length) | 0];
         }
-        // энкаунтер охранника моста по стихии (Время — позже, просил юзер)
+        // энкаунтер охранника моста по стихии (Время — «Охранник Времени»,
+        // просил юзер W28)
         function guardEncOf(elem) {
             return { strength: "strGuard", growth: "grwGuard",
-                wisdom: "wisGuard", decay: "decGuard", honor: "honGuard" }[elem] || null;
+                wisdom: "wisGuard", decay: "decGuard", honor: "honGuard",
+                time: "timGuard" }[elem] || null;
         }
 
         function walkable(gx, gy) {

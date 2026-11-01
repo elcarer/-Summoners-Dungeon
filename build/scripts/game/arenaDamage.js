@@ -83,6 +83,19 @@
 
 
             A.killUnit = function killUnit(u, killer) {
+                // «Ремонт» (tim239, просил юзер): помеченное заклинанием
+                // существо/постройка не умирает — карта возвращается в руку
+                // владельца (bounceUnit, каскадов смерти нет — гибели не
+                // было). Возвращает false — «смерти не случилось»: boomRet
+                // взрыв не делает. У токена карты призыва нет — просто убран
+                if (u && u.repair && B.units.includes(u)) {
+                    const rp = cellXY(u.col, u.row);
+                    bounceUnit(u);
+                    floatText(rp.x, rp.y - 96,
+                        "🔧 " + GAME_LOC.t("spell.repair.name"), 0x9fd489);
+                    sfx("chpoc");
+                    return false;
+                }
                 if (u && B.units.includes(u)) {
                     const dp = cellXY(u.col, u.row);
                     fxEvent("death", {
@@ -215,7 +228,7 @@
                     const he = hd && hd.elems && hd.elems[0];
                     if (hd && he && u.def.elem === he
                         && ["elemDeathSnipe", "elemDeathHp", "elemDeathLoot",
-                            "elemDeathReturn", "elemDeathMend"]
+                            "elemDeathReturn", "elemDeathMend", "elemDeathDelay"]
                             .includes(hd.ability)) {
                         guardDeathAct(u.side, hd);
                     }
@@ -257,6 +270,7 @@
                 exhumingReplay(u); // «Выкапливание»: существо возвращается после смерти
                 if (ambush) ambushRiseAct(ambush.side, ambush.trap,
                     ambush.col, ambush.row); // «Засадный отряд»
+                return true;
             };
 
             // Способности «Охранников мостов» (просил юзер). Срабатывают
@@ -272,6 +286,9 @@
             //                   карту с руки на выбор
             //   elemDeathMend   «Охранник Чести» (46): если у базы 3 жизни
             //                   и меньше — вылечить ей 1 жизнь
+            //   elemDeathDelay  «Охранник Времени» (53): случайное своё
+            //                   существо в «Сдвиге» приходит на 1 ход
+            //                   раньше (значок-счётчик тает на 1)
             // Выбор сброса ИГРОКА откладывается в очередь pendingDiscard —
             // панель откроется в начале его хода (механизм «Торговца»):
             // гибель существа часто случается в ход врага, и модальная
@@ -325,6 +342,24 @@
                     }
                     if (side === "p") B.pendingDiscard = (B.pendingDiscard || 0) + 1;
                     else dropWorst();
+                } else if (hd.ability === "elemDeathDelay") {
+                    // «Охранник Времени» (53, просил юзер): случайное СВОЁ
+                    // существо в «Сдвиге» (значок-счётчик ещё тает, left > 0;
+                    // постройки «Сдвига» не считаются — в спеке «существо»)
+                    // приходит на 1 ход раньше. left 0 — значок уже ждёт
+                    // клетку, ускорять ниже нуля нельзя
+                    const wait = (B.delayed[side] || []).filter((e) =>
+                        e.left > 0 && CARDS[e.cardId]
+                        && CARDS[e.cardId].type === "unit");
+                    if (wait.length) {
+                        const e = wait[(Math.random() * wait.length) | 0];
+                        e.left -= 1;
+                        A.delayDrawNode(e);
+                        const dp = cellXY(e.col, e.row);
+                        floatText(dp.x, dp.y - 96,
+                            "⏳ −" + (hd.abilityVal || 1), 0xc9a0ef);
+                        sfx("chpoc");
+                    }
                 }
             };
 
@@ -651,6 +686,14 @@
                     killUnit(target, killer);
                     return;
                 }
+                // «Взбунтовавшийся мех» (tim240, просил юзер): пережив
+                // ФАКТИЧЕСКИЙ урон (полностью съеденный «Защитой» уроном
+                // не считается), переходит на сторону противника. Гибель
+                // от урона — обычная смерть, переворота нет
+                if (amt > 0 && target.def.defect && target.def.type === "unit"
+                    && B.units.includes(target)) {
+                    defectFlip(target);
+                }
                 // «Друид глубокой чащи» (grw24): пережив ФАКТИЧЕСКИЙ урон
                 // (защита, съевшая всё, уроном не считается), призывает Волка
                 summonDruidWolf(target, amt);
@@ -724,6 +767,23 @@
                     color: side === "p" ? 0xff7a5e : 0xffb26e,
                 });
                 punch(root.hud);
+                // «Тёмный владыка» (darklord, босс данжа Времени, просил
+                // юзер): ПЕРВЫЙ за бой урон его базе отражается — базе
+                // противника наносится столько же. Флаг ставится ДО
+                // отражения — рекурсии нет; редирект «Домами на деревьях»
+                // выше до сюда не доходит (база урона не получала)
+                if (!B.heroFlags.baseReflect[side]) {
+                    const hdr = heroDefOf(side);
+                    if (hdr && hdr.ability === "baseReflect") {
+                        B.heroFlags.baseReflect[side] = true;
+                        const op = side === "p" ? "e" : "p";
+                        floatText(960, side === "p" ? 800 : 280,
+                            "⟲ " + GAME_LOC.t("hero.darklord.name"), 0xb07ad5);
+                        sfx("rocket");
+                        damageBase(op, amount,
+                            { x: 960, y: op === "p" ? 840 : 240, fill: 0xb07ad5 });
+                    }
+                }
                 // «Неусыпный гарнизон» (hon194): база получила урон — ловушка
                 // снимается и заселяет два ближайших к базе ряда Прихожанами
                 // (arenaTraps/garrisonRise)

@@ -447,6 +447,32 @@
                     s: 0.72, arc: 70, life: 0.42 / animK(), a1: burn ? 0 : 1,
                 });
             };
+            // Пересмешивание сброса в колоду (просил юзер W28): рубашки
+            // летят дугой из слота сброса в слот колоды — зеркально добору,
+            // у обеих сторон. Крупный сброс показываем горсткой рубашек
+            // (6 достаточно, чтобы прочитать жест), растворяются у колоды
+            A.flyReshuffle = function flyReshuffle(side, n) {
+                if (!root || !root.cardFxLayer || !B || B.stopped || !(n > 0)) return;
+                const from = handAnchor(side, "discard");
+                const deckR = side === "p" ? -0.55 : 0.55;
+                const backTex = side === "p" ? playerBackTex() : enemyBackTex();
+                const cap = Math.min(n, 6);
+                for (let j = 0; j < cap; j++) {
+                    const node = new PIXI.Container();
+                    const spr = new PIXI.Sprite(uiTex(backTex));
+                    spr.anchor.set(0.5);
+                    spr.scale.set(0.74); // рубашка 230×338 — как слоты колод
+                    node.addChild(spr);
+                    node.position.set(from.x + (Math.random() - 0.5) * 16,
+                        from.y + (Math.random() - 0.5) * 10);
+                    node.rotation = 0.42;
+                    handFlight(node, {
+                        target: () => handAnchor(side, "deck"),
+                        r: deckR, s: 0.74, arc: 90,
+                        life: 0.4 / animK(), delay: j * 0.06 / animK(), a1: 0,
+                    });
+                }
+            };
             // Откуда прилетит карта, вернувшаяся в руку извне добора
             // («Мастера огня», «Трусливый гоблин») — из сброса стороны
             A.markFlyFrom = function markFlyFrom(cardId, side, what = "discard") {

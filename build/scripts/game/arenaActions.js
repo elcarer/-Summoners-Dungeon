@@ -656,6 +656,28 @@
                 sfx("up");
             };
 
+            // «Ремонт» (tim239, просил юзер): метка «при смерти — в руку
+            // владельца» на существо/постройку. Общая для игрока
+            // (applySpellPInner) и ИИ (enemyCastSpellEffect); перехват —
+            // в killUnit (arenaDamage) ДО каскадов смерти
+            A.repairTarget = function repairTarget(u) {
+                u.repair = true;
+                const p = cellXY(u.col, u.row);
+                const mark = new PIXI.Graphics();
+                mark.circle(0, 0, 10.5);
+                mark.fill({ color: 0x2a5a34 });
+                mark.stroke({ width: 3, color: 0x9fd489 });
+                mark.position.set(-36, -54);
+                mark.name = "repairMark";
+                mark.eventMode = "none";
+                u.node.addChild(mark);
+                floatText(p.x, p.y - 60,
+                    "🔧 " + GAME_LOC.t("spell.repair.name"), 0x9fd489);
+                fxEvent("heal", { x: p.x, y: p.y - 12, scale: 0.85 });
+                punch(u.node);
+                sfx("up");
+            };
+
             // Эффекты заклинаний игрока, валидация цели внутри (false — цель не
             // годится, тогда и оплаты/сброса/панелей не будет). Отделено от
             // оплаты карты, чтобы «Горящие руны» могли повторить эффект
@@ -707,13 +729,15 @@
                     if (!target || target.col === undefined) return false;
                     return applyTokenShift("p", target);
                 }
-                if (tg === "anyObj" && def.spell.dome) { // «Силовой купол»
+                if (tg === "anyObj" && (def.spell.dome || def.spell.repair)) {
+                    // «Силовой купол» / «Ремонт»: цель — любое существо
+                    // или постройка (тип цели отсеян входом, клик/хук)
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
-                    // тип цели отсеян входом (клик/хук); повторный купол на
-                    // ту же цель бессмыслен, но и безвреден — не запрещаем
                     if (!u) return false;
-                    domeTarget(u);
+                    if (def.spell.dome) domeTarget(u); // повторный купол
+                    // бессмыслен, но и безвреден — не запрещаем
+                    else repairTarget(u); // «Ремонт»: повтор тоже безвреден
                     return true;
                 }
                 if (tg === "anyUnit") { // усиление/Смыв/Слабость

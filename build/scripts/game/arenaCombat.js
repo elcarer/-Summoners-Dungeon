@@ -47,6 +47,20 @@
                     }
                 }
             };
+            // «Поджигатель» (tim238, просил юзер): при атаке существа или
+            // постройки его урон получают ВСЕ существа и постройки по
+            // соседству (верт/гориз) с АТАКОВАННЫМ — обеих сторон (в спеке
+            // «всем»), атакующий и атакованный исключены. Бьёт только при
+            // атаке СУЩЕСТВОМ/ПОСТРОЙКОЙ — удар по базе без всплеска
+            A.fireSplash = function fireSplash(attacker, target) {
+                if (!attacker || !attacker.def || !attacker.def.fireSplash
+                    || !B.units.includes(attacker) || !target) return;
+                for (const v of B.units.slice()) {
+                    if (v === attacker || v === target || !B.units.includes(v)) continue;
+                    if (Math.abs(v.col - target.col) + Math.abs(v.row - target.row) !== 1) continue;
+                    damageUnit(v, attacker.curAtk, attacker, "sword");
+                }
+            };
             // «Круговая атака» (grw34): цель наносит 1 урон каждому соседу
             // (верт/гориз) — существам и постройкам обеих сторон (фикс 1,
             // аура алтаря не добавляется)

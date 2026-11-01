@@ -18,9 +18,12 @@
                 const drawn = [];
                 for (let k = 0; k < count; k++) {
                     if (!B.deck.length) {
-                        // пересмешивание сброса игрока: бьют «Руномаги царства»
-                        // (tim233), у «Катка» (tim236) тает базовый урон
+                        // пересмешивание сброса игрока: рубашки летят из
+                        // сброса в колоду (просил юзер W28), бьют «Руномаги
+                        // царства» (tim233), у «Катка» (tim236) тает базовый урон
+                        const n = B.discard.length;
                         B.deck = shuffle(B.discard); B.discard = [];
+                        A.flyReshuffle("p", n);
                         A.runeReshuffleTick("p");
                         A.recalcAuras();
                     }
@@ -41,9 +44,12 @@
                 const drawn = [];
                 for (let k = 0; k < count; k++) {
                     if (!B.eDeck.length) {
-                        // пересмешивание сброса врага: бьют «Руномаги царства»
-                        // (tim233), у «Катка» (tim236) тает базовый урон
+                        // пересмешивание сброса врага: рубашки летят из
+                        // сброса в колоду (просил юзер W28), бьют «Руномаги
+                        // царства» (tim233), у «Катка» (tim236) тает базовый урон
+                        const n = B.eDiscard.length;
                         B.eDeck = shuffle(B.eDiscard); B.eDiscard = [];
+                        A.flyReshuffle("e", n);
                         A.runeReshuffleTick("e");
                         A.recalcAuras();
                     }
@@ -392,6 +398,7 @@
                 damageUnit(occ, u.curAtk, u, "sword");
                 crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
                 thicketSplash(u, occ); // «Древоброд глухой чащи»: всплеск
+                fireSplash(u, occ); // «Поджигатель»: урон соседям атакованного
                 venomApply(u, occ); // «Ядовитость»
                 frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
                 frostNeighbors(u); // «Старший ледовик»: лёд соседям-существам
@@ -440,6 +447,7 @@
                             damageUnit(occ, u.curAtk, u, "sword");
                             crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
                             thicketSplash(u, occ); // «Древоброд глухой чащи»: всплеск вокруг себя
+                            fireSplash(u, occ); // «Поджигатель»: урон соседям атакованного
                             venomApply(u, occ); // «Ядовитость»
                             frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
                             frostNeighbors(u); // «Старший ледовик»: лёд соседям-существам
@@ -521,6 +529,7 @@
                                 damageUnit(occ, u.curAtk, u, "sword");
                                 crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
                                 thicketSplash(u, occ); // «Древоброд глухой чащи»: всплеск вокруг себя
+                                fireSplash(u, occ); // «Поджигатель»: урон соседям атакованного
                                 venomApply(u, occ); // «Ядовитость»
                                 frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
                                 frostNeighbors(u); // «Старший ледовик»: лёд соседям-существам

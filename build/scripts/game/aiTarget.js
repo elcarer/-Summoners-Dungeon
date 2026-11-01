@@ -436,6 +436,11 @@
                 if (s.dome && !B.units.some((v) => v.side === "e" && !v.dome
                     && (v.def.type === "unit" || v.def.type === "building")))
                     return false;
+                // «Ремонт» (tim239): есть своё существо/постройка ещё
+                // БЕЗ метки, иначе карту переводить зря
+                if (s.repair && !B.units.some((v) => v.side === "e" && !v.repair
+                    && (v.def.type === "unit" || v.def.type === "building")))
+                    return false;
                 if (s.sacrifice && !aiSacrificePick()) return false;
                 // «Взрыв твари» (dec150) — есть своё существо с суммой ⚔+♥ 3+
                 // (иначе карта переводится зря)

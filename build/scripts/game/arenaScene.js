@@ -83,6 +83,7 @@
                         honorRelay: { p: false, e: false },
                         speedAtk: { p: false, e: false },
                         epicDiscount: { p: false, e: false },
+                        baseReflect: { p: false, e: false }, // «Тёмный владыка»: первый урон базе отражён
                         // «Опасности парадоксов» (paradox, противник 5-го
                         // этажа данжа Времени): первая за бой ловушка
                         // стороны, разыгранная картой, повторяется

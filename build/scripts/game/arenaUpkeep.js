@@ -519,9 +519,11 @@
                     if (u.def.boomRet) {
                         const pw = Math.max(1, u.hp); // жизни на момент взрыва
                         const bc = u.col, br = u.row;
+                        // «Ремонт» (tim239) перехватил смерть — умирания не
+                        // было, взрыв не делается (killUnit вернул false)
+                        if (!killUnit(u, null)) continue;
                         const bp = cellXY(bc, br);
                         floatText(bp.x, bp.y - 96, "💥", 0xffa45e);
-                        killUnit(u, null);
                         for (const v of B.units.slice()) {
                             if (v.side === side || !B.units.includes(v)) continue;
                             if (Math.abs(v.col - bc) + Math.abs(v.row - br) !== 1)

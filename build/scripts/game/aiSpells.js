@@ -58,6 +58,20 @@
                     }
                     return;
                 }
+                if (s.repair) { // «Ремонт» (tim239): страховка самому ценному
+                    // своему существу/постройке ещё БЕЗ метки (сумма ⚔+♥)
+                    const own = B.units.filter((v) => v.side === "e" && !v.repair
+                        && (v.def.type === "unit" || v.def.type === "building"));
+                    const best = own.slice()
+                        .sort((a, b) => ((b.curAtk + b.hp) - (a.curAtk + a.hp))
+                            || (a.row - b.row))[0];
+                    const t = focus && own.includes(focus) ? focus : best;
+                    if (t) {
+                        aimOff(t);
+                        repairTarget(t);
+                    }
+                    return;
+                }
                 if (s.target === "anyUnit" && !s.nova) { // усиление/очарование — лучшему
                     // «Гидроудар» (wis99): 1 урон + сдвиг К ЕГО базе,
                     // цель — самая опасная (фокус руны, если годится)
