@@ -638,6 +638,17 @@
                 const rows = deployRows("e");
                 const free = freeCells(rows);
                 if (!free.length) return null;
+                // «Сдвиг» (Время, просил юзер): на метки «Сдвига» ИГРОКА ИИ
+                // ставит ПОСТРОЙКИ в первую очередь — постройка не марширует,
+                // стоит на клетке и блокирует прибытие задержанного существа
+                // игрока, пока жива (значок ждёт с нулём до освобождения).
+                // Свои метки не занимаем — заблокируем собственный призыв
+                const pmarks = free.filter(([c, r]) => B.delayed && B.delayed.p
+                    && B.delayed.p.some((e) => e.col === c && e.row === r
+                        && e.left <= 2)
+                    && !B.delayed.e.some((e) => e.col === c && e.row === r));
+                if (pmarks.length)
+                    return pmarks[(Math.random() * pmarks.length) | 0];
                 if (def.campAura || def.campfire || def.sprout || def.groveAura
                     || def.monolith || def.elementalCircle || def.altarSword) {
                     let best = [], bestScore = -Infinity;
