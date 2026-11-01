@@ -82,7 +82,23 @@
                         honorDash: { p: false, e: false },
                         honorRelay: { p: false, e: false },
                         speedAtk: { p: false, e: false },
-                        epicDiscount: { p: false, e: false } },
+                        epicDiscount: { p: false, e: false },
+                        // «Опасности парадоксов» (paradox, противник 5-го
+                        // этажа данжа Времени): первая за бой ловушка
+                        // стороны, разыгранная картой, повторяется
+                        // в случайную клетку (armTrap)
+                        trapReplay: { p: false, e: false } },
+                    // «Временная петля» (tim229): сторона получает
+                    // дополнительный ход — флаг тратится в момент
+                    // смены хода (endTurn/панель сброса/enemyTurn)
+                    extraTurn: { p: false, e: false },
+                    // «Мастер порталов» (tim231): раз за ход (turnNo)
+                    // сторона смотрит верхнюю карту колоды
+                    portalSeen: { p: 0, e: 0 },
+                    // карта, взятая с верха колоды Мастером порталов:
+                    // бесплатна, пока в руке; не разыгранная — на верх
+                    // колоды в начале хода противника (portalRefund)
+                    pPortalFree: null, ePortalFree: null,
                     enemyBase: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
                     enemyBaseMax: (eHeroDef ? eHeroDef.baseHp : enc.baseHp) + bossHp,
                     deck: shuffle([...pDeck]), discard: [], hand: [],

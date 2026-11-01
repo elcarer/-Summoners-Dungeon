@@ -698,6 +698,36 @@
                 const p = unit ? cellXY(unit.col, unit.row) : cellXY(col, row);
                 fxEvent("seal", { x: p.x, y: p.y + 8, color: 0xb07ad5, scale: 0.85 });
                 sfx("mine");
+                // «Опасности парадоксов» (paradox, противник 5-го этажа данжа
+                // Времени, просил юзер): ПЕРВАЯ за бой ловушка стороны,
+                // разыгранная КАРТОЙ, повторяется в случайную клетку поля боя
+                // без траты энергии. Только клеточные (руна/споры вешаются на
+                // существо — «в случайную клетку» им нечего ставить; флаг не
+                // тратится и дождётся первой клеточной). Повтор — тот же
+                // armTrap: «Битва умов» противника может съесть и повтор,
+                // а trapReplay-флаг уже потрачен — рекурсии нет.
+                if (!unit) {
+                    const hd = heroDefOf(side);
+                    if (hd && hd.ability === "trapReplay"
+                        && !B.heroFlags.trapReplay[side]) {
+                        B.heroFlags.trapReplay[side] = true;
+                        const free = [];
+                        for (let r = 0; r < GRID; r++)
+                            for (let c = 0; c < GRID; c++)
+                                if (!unitAt(c, r) && !B.traps[side].some((t) =>
+                                    !t.unit && t.col === c && t.row === r))
+                                    free.push([c, r]);
+                        if (free.length) {
+                            const [c2, r2] = free[(Math.random() * free.length) | 0];
+                            armTrap(side, cardId, c2, r2);
+                            const p2 = cellXY(c2, r2);
+                            floatText(p2.x, p2.y - 66, "?!", 0xe08cd0);
+                            fxEvent("seal", { x: p2.x, y: p2.y + 8,
+                                color: 0xb07ad5, scale: 0.85 });
+                            sfx("mine");
+                        }
+                    }
+                }
                 return true;
             };
             A.triggerTraps = function triggerTraps(side, killer) {

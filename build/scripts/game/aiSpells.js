@@ -647,6 +647,28 @@
                         sfx("aqua");
                     }
                 }
+                // «Временная петля» (tim229): после этого хода враг играет
+                // ещё раз — флаг тратится в конце enemyTurn
+                if (s.extraTurn) {
+                    B.extraTurn.e = true;
+                    floatText(960, 430,
+                        "⏳ " + GAME_LOC.t("time.loop.extra"), 0xc9a0ef);
+                    fxEvent("seal", { x: 960, y: 430, color: 0xc9a0ef, scale: 1.4 });
+                    sfx("chpoc");
+                }
+                // «Царский совет» (tim230): все жетоны ловушек ИГРОКА
+                // снимаются с поля боя (клеточные и руны-жетоны)
+                if (s.trapSweep) {
+                    const swept = B.traps.p.length;
+                    B.traps.p = [];
+                    redrawTraps();
+                    for (let i = 0; i < Math.min(swept, 3); i++)
+                        fxEvent("seal", { x: 960 + (i - 1) * 140, y: 660,
+                            color: 0x8a5ab0, scale: 0.9 });
+                    floatText(960, 600,
+                        "✕ " + GAME_LOC.t("time.sweep.done"), 0xef9f8c);
+                    sfx("mine");
+                }
                 // «Управление временем» (tim223): лучший жетон и направление
                 // выбрал aiTokenPick (гейт проверил, что есть что менять)
                 if (s.tokenShift) {

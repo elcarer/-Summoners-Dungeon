@@ -429,6 +429,8 @@
             A.aiSpellPlayable = function aiSpellPlayable(def, forReplay = false) {
                 const s = def.spell;
                 if (s.copyLast) return aiReplayOk();
+                // «Царский совет» (tim230): снимать нечего — карту переводить зря
+                if (s.trapSweep && !B.traps.p.length) return false;
                 if (s.sacrifice && !aiSacrificePick()) return false;
                 // «Взрыв твари» (dec150) — есть своё существо с суммой ⚔+♥ 3+
                 // (иначе карта переводится зря)

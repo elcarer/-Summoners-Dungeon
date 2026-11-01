@@ -52,6 +52,10 @@
                 // «Пень обряда»: в начале хода — взгляд на верхнюю карту колоды
                 if (B.units.some((b) => b.side === "p" && b.def.type === "building"
                     && b.def.riteStump)) openStumpPanel();
+                // «Мастер порталов» (tim231): раз за ход — верхняя карта
+                // колоды-ловушка может быть разыграна бесплатно (панель
+                // после марша, как у «Пня обряда»)
+                portalMasterTick("p");
             };
 
             // ── Действия игрока ────────────────────────────────────────────────
@@ -61,7 +65,7 @@
                 // улетание карты в сброс (анимации руки, просил юзер):
                 // позиция снимается ДО splice; узел мог быть пересобран
                 // эффектами заклинания — тогда слот по расчёту веера
-                const burn = B.scorch.p.has(cardId);
+                const burn = B.scorch.p.has(cardId) || CARDS[cardId].burn;
                 const nd = handNode(handIdx);
                 flyToDiscard(cardId,
                     nd && !nd.destroyed && nd.__handIdx === handIdx
@@ -1073,6 +1077,30 @@
                     } else return false;
                 }
                 if (def.spell.draw) drawCards(def.spell.draw);
+                // «Временная петля» (tim229): после этого хода сторона
+                // играет ещё раз — флаг тратится в точке смены хода
+                // (endTurn/панель сброса/enemyTurn)
+                if (def.spell.extraTurn) {
+                    B.extraTurn.p = true;
+                    floatText(960, 540,
+                        "⏳ " + GAME_LOC.t("time.loop.extra"), 0xc9a0ef);
+                    fxEvent("seal", { x: 960, y: 540, color: 0xc9a0ef, scale: 1.4 });
+                    sfx("chpoc");
+                }
+                // «Царский совет» (tim230): все жетоны ловушек противника
+                // снимаются с поля боя (клеточные и руны-жетоны; споры —
+                // не жетон ловушки, остаются)
+                if (def.spell.trapSweep) {
+                    const swept = B.traps.e.length;
+                    B.traps.e = [];
+                    redrawTraps();
+                    for (let i = 0; i < Math.min(swept, 3); i++)
+                        fxEvent("seal", { x: 960 + (i - 1) * 140, y: 300,
+                            color: 0x8a5ab0, scale: 0.9 });
+                    floatText(960, 430,
+                        "✕ " + GAME_LOC.t("time.sweep.done"), 0x8cd0ef);
+                    sfx("mine");
+                }
                 // «Добыча кристаллов» (tim211): +1⚡ за каждую единицу
                 // «Сдвига» каждого своего существа, ждущего на поле (значки)
                 if (def.spell.crystalHarvest) {

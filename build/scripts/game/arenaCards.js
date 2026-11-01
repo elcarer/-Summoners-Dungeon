@@ -10,6 +10,15 @@
             A.effCost = function effCost(cardId, side = "p", target = null) {
                 const def = CARDS[cardId];
                 if (!def) return 0;
+                // «Мастер порталов» (tim231): карта, взятая с верха колоды
+                // его способностью, разыгрывается без траты энергии, пока
+                // лежит в руке владельца (не разыгранная — вернётся на
+                // верх колоды portalRefund-ом в начале хода противника)
+                if (B) {
+                    const free = side === "p" ? B.pPortalFree : B.ePortalFree;
+                    if (free === cardId
+                        && (side === "p" ? B.hand : B.eHand).includes(cardId)) return 0;
+                }
                 let d = isGoblin(def) && B ? goblinDiscount(side) : 0;
                 // «Мастер холода» (wisMaster): заклинания стихии «Мудрость»
                 // ценой 4 стоят на 1 энергию меньше (способность обеих сторон)

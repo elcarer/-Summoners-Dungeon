@@ -892,7 +892,12 @@
                     closeDiscardPanel();
                     layoutHand();
                     refreshHud();
-                    enemyTurn(); // сброс завершён — ход переходит врагу
+                    if (B.extraTurn && B.extraTurn.p) {
+                        // «Временная петля» (tim229): вместо хода врага — ещё
+                        // один ход игрока (как в endTurn)
+                        B.extraTurn.p = false;
+                        playerTurnStart();
+                    } else enemyTurn(); // сброс завершён — ход переходит врагу
                 } else {
                     layoutHand();
                     buildDiscardPanel(); // пересборка: новый состав руки и счётчик

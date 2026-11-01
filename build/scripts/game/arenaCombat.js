@@ -871,8 +871,13 @@
                     B.lastSpell.e = pick.id;
                 }
                 afterSpellPlayed(); // «Заклинатель клинков» реагирует и на это
-                noteDiscard(1, side, [pick.id]);
-                discard.push(pick.id);
+                if (def.burn) { // «Сожжение» (tim229): свободный каст тоже сжигает
+                    floatText(fp.x, fp.y + 60, `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
+                    sfx("rocket");
+                } else {
+                    noteDiscard(1, side, [pick.id]);
+                    discard.push(pick.id);
+                }
             };
 
             // Цель свободного каста у игрока: атакующий (focus), если заклинание

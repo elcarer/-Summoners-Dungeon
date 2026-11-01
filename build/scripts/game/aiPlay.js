@@ -12,6 +12,7 @@
                 B.spellTarget = false;
                 tokenPanelClose(); // панель «Управления временем» не переживает смену хода
                 cryptRefund("p"); // «Склеп»: не разыгранная игроком карта — назад в сброс
+                portalRefund("p"); // «Мастер порталов»: не разыгранная карта — на верх колоды
                 layoutHand();
                 redrawHighlight();
                 refreshHud();
@@ -25,6 +26,7 @@
                 if (B.stopped) return;
                 upkeep("e"); // грибницы врага
                 riteStumpTick("e"); // пень обряда врага подсмотрел и решил
+                portalMasterTick("e"); // «Мастер порталов»: ловушка с верха колоды — бесплатно
                 poisonTick("e"); // яд: до марша (просил юзер)
                 returnTick("e"); // «Возврат» (Время): счётчики тают, созревшие — в руку
                 trapReturnTick("e"); // «Возврат» ЛОВУШКИ (tim221): созревшая — в руку
@@ -35,6 +37,7 @@
                 await aiPlay();
                 if (B.stopped || B.phase === "over") return;
                 cryptRefund("e"); // «Склеп» врага: не разыгранная карта — назад в сброс
+                portalRefund("e"); // «Мастер порталов»: не разыгранная — на верх колоды
                 // шкала врага — мягкое правило добора (просил юзер), см. enemyDrawPlan
                 const eCards = enemyDrawPlan();
                 drawEnemy(eCards);
@@ -42,6 +45,13 @@
                 refreshHud();
                 await delay(0.25 / animK());
                 if (B.stopped) return;
+                // «Временная петля» (tim229) врага: вместо хода игрока — ещё
+                // один его ход (полный: upkeep, марш, aiPlay)
+                if (B.extraTurn && B.extraTurn.e) {
+                    B.extraTurn.e = false;
+                    await enemyTurn();
+                    return;
+                }
                 await playerTurnStart();
             };
 
@@ -412,7 +422,7 @@
                                 noteDiscard(1, "e", [sp]);
                                 B.scorch.e.delete(sp); // метка ушла вместе с картой
                             }
-                            if (B.scorch.e.has(cardId)) { // «Сожжение»: карта удалена из боя
+                            if (B.scorch.e.has(cardId) || def.burn) { // «Сожжение»: карта удалена из боя
                                 B.scorch.e.delete(cardId);
                                 floatText(960, 640, `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
                                 sfx("rocket");

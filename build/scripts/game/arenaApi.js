@@ -19,6 +19,11 @@
                     if (B.hand.length > HAND_MAX) {
                         handFxTick(1e9); handFxTick(1e9); // полёты добора доиграть —
                         buildDiscardPanel(); // лимит — на конце хода
+                    } else if (B.extraTurn && B.extraTurn.p) {
+                        // «Временная петля» (tim229): вместо хода врага —
+                        // ещё один ход игрока (полный: upkeep, марш, розыгрыш)
+                        B.extraTurn.p = false;
+                        playerTurnStart();
                     } else enemyTurn();
                 },
                 // шкала «карты↔энергия»: total сфер (3 + ход−1), split — доля в карты
@@ -457,6 +462,13 @@
                 // тест-хуки «Торговца» (hon183): панель сброса по выбору
                 _openTradePanel() { buildDiscardPanel("trade"); return true; },
                 _pickDiscard(idx) { pickDiscard(idx); return true; },
+                // тест-хуки «Мастера порталов» (tim231): панель Да/Нет
+                portalState: () => ({
+                    open: !!portalPanel,
+                    free: B ? B.pPortalFree : null,
+                    seen: B ? B.portalSeen.p : 0 }),
+                _portalTake(cardId) { portalTake(cardId); return true; },
+                _portalKeep() { closePortalPanel(); return true; },
                 // анимации руки (тесты): мгновенно доиграть полёты/твины
                 // (дважды — второй прогон добирает твины после прилётов)
                 _handSettle() {

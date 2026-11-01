@@ -465,6 +465,136 @@
                 return frame;
             };
 
+            // ── «Мастер порталов» (tim231, просил юзер): раз за ход (turnNo)
+            // в начале хода владельца смотрит верхнюю карту его колоды; если
+            // это ловушка — можно разыграть её без траты энергии. Карта
+            // берётся в руку (метка pPortalFree/ePortalFree делает её
+            // бесплатной в effCost, пока она в руке); не разыгранная —
+            // возвращается на верх колоды в начале хода противника
+            // (portalRefund). Игрок решает в панели, ИИ берёт сразу и
+            // разыграет в aiPlay. Розыгрыш невозможен — карта остаётся наверху.
+            A.trapPlayableNow = function trapPlayableNow(side, def) {
+                const foe = side === "p" ? "e" : "p";
+                const e2 = def.trap.effect;
+                if (e2 === "castRandom" || e2 === "sporeCurse")
+                    return B.units.some((v) => v.side === foe && v.def.type === "unit");
+                if (e2 === "ambushRise")
+                    return B.units.some((v) => v.side === side
+                        && v.def.type === "building");
+                if (e2 === "entangle") return true; // «Опутывание» — на любую клетку
+                for (let r = 0; r < GRID; r++)
+                    for (let c = 0; c < GRID; c++)
+                        if (!unitAt(c, r)) return true;
+                return false;
+            };
+            A.portalMasterTick = function portalMasterTick(side) {
+                if (!B || B.phase === "over" || B.stopped) return false;
+                if (B.portalSeen[side] === B.turnNo) return false;
+                const master = B.units.some((v) => v.side === side
+                    && v.def.portalMaster && B.units.includes(v));
+                if (!master) return false;
+                const deck = side === "p" ? B.deck : B.eDeck;
+                if (!deck.length) return false;
+                const id = deck[deck.length - 1];
+                const def = CARDS[id];
+                if (!def || def.type !== "trap") return false; // не ловушка — молча смотрим
+                B.portalSeen[side] = B.turnNo;
+                if (!trapPlayableNow(side, def)) return false; // разыграть не выйдет
+                if (side === "p") {
+                    openPortalPanel(id);
+                    return true;
+                }
+                // ИИ: карта в руку — бесплатная (effCost по метке), aiPlay
+                // сыграет её на общих основаниях; не выйдет — вернётся на
+                // верх колоды portalRefund-ом в конце хода
+                deck.pop();
+                B.eHand.push(id);
+                B.ePortalFree = id;
+                const p = cellXY(2, 0);
+                floatText(p.x, p.y - 120,
+                    "⤒ " + GAME_LOC.t(`card.${id}.name`), 0xc9a0ef);
+                sfx("chpoc");
+                return true;
+            };
+            // Не разыгранная карта Мастера порталов — на верх колоды владельца
+            // (метка снимается). Зовётся в начале хода ПРОТИВНОЙ стороны
+            // рядом с cryptRefund и в конце хода владельца (ИИ)
+            A.portalRefund = function portalRefund(side) {
+                if (!B) return;
+                const key = side === "p" ? "pPortalFree" : "ePortalFree";
+                const id = B[key];
+                if (!id) return;
+                B[key] = null;
+                const hand = side === "p" ? B.hand : B.eHand;
+                const deck = side === "p" ? B.deck : B.eDeck;
+                const hi = hand.indexOf(id);
+                if (hi < 0) return; // сыграна — метка просто снята
+                hand.splice(hi, 1);
+                deck.push(id); // вершина колоды — конец массива (drawCards.pop)
+                if (side === "p") layoutHand();
+            };
+            A.portalPanel = null;
+            A.closePortalPanel = function closePortalPanel() {
+                if (!portalPanel) return;
+                portalPanel.destroy({ children: true });
+                portalPanel = null;
+                if (B) B.picking = false;
+            };
+            A.openPortalPanel = function openPortalPanel(cardId) {
+                closePortalPanel();
+                B.picking = true;
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("portal.title"), 39, 0xf0c96a,
+                    { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 297);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("portal.hint"), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 354);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const face = globalThis.GAME_UI.cardFace(ctx, cardId, { scale: 0.72 });
+                face.position.set(960, 545);
+                node.addChild(face);
+                node.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("portal.keep"), x: 710, y: 762, scale: 1,
+                    onTap: closePortalPanel, // «Оставить» — карта остаётся наверху
+                }));
+                node.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("portal.play"), x: 1210, y: 762, scale: 1,
+                    onTap: () => portalTake(cardId),
+                }));
+                root.addChild(node);
+                portalPanel = node;
+            };
+            // «Разыграть»: карта с верха колоды — в руку владельца с меткой
+            // бесплатного розыгрыша, карта сразу выбрана (игрок кликает
+            // клетку/существо — обычная ветка ловушек onCellTap)
+            A.portalTake = function portalTake(cardId) {
+                const di = B.deck.lastIndexOf(cardId);
+                closePortalPanel();
+                if (di < 0) return;
+                B.deck.splice(di, 1);
+                B.hand.push(cardId);
+                B.pPortalFree = cardId;
+                B.selected = B.hand.length - 1;
+                B.spellTarget = false;
+                sfx("chpoc");
+                floatText(960, 640, "⤒ " + GAME_LOC.t(`card.${cardId}.name`), 0xc9a0ef);
+                layoutHand();
+                redrawHighlight();
+                refreshHud();
+            };
+
             // ── Панель «Глубокое путешествие» (str26): верхние карты колоды ────
             // (снимаются с колоды сразу при касте) — выбрать карту ПРИЗЫВА и
             // сыграть её бесплатно. Из остальных: 1 случайная — в руку, прочие —
