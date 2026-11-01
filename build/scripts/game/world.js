@@ -1539,6 +1539,18 @@
                     }
                     return out;
                 },
+                // тест-хук: перепись флипов деревьев в видимых чанках —
+                // {flipped, straight} (зеркалирование 50%, просил юзер)
+                treeFlipCensus: () => {
+                    const out = { flipped: 0, straight: 0 };
+                    if (!objLayer) return out;
+                    for (const o of objLayer.children) {
+                        if (o.destroyed || !o.__tree) continue;
+                        if (o.scale.x < 0) out.flipped++;
+                        else out.straight++;
+                    }
+                    return out;
+                },
             },
         };
     }

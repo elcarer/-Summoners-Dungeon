@@ -521,6 +521,17 @@
                         + Math.min(1.5, aiThreat(near) * 0.12);
                     if (near.row - 1 === row) score += 0.6; // прямо на его пути
                 }
+                // «Сдвиг» (Время, просил юзер): метки «Сдвига» — чужие
+                // занимаем (прибытие задержанного существа противника
+                // блокируется, пока наш стоит на клетке; значок с малым
+                // счётчиком ценнее — заблокировать успеем наверняка),
+                // свои не трогаем (заблокируем собственный призыв)
+                const pmark = B.delayed && B.delayed.p
+                    && B.delayed.p.find((e) => e.col === col && e.row === row);
+                if (pmark) score += pmark.left <= 2 ? 3.2 : 1.2;
+                const emark = B.delayed && B.delayed.e
+                    && B.delayed.e.find((e) => e.col === col && e.row === row);
+                if (emark) score -= 2.5;
                 // открытая колонка к базе игрока — давление
                 const foesAhead = B.units.some((v) => v.side === "p"
                     && v.col === col && v.row > row);
