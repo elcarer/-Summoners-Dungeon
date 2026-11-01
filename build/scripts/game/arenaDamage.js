@@ -563,6 +563,15 @@
                         fxEvent("ward", { x: bp.x, y: bp.y - 12, scale: 0.62 });
                     }
                 }
+                // «Силовой купол» (tim234, просил юзер): ЛЮБОЙ урон по
+                // существу/постройке под куполом уменьшается до 1 (после
+                // брони: броня может съесть и этот 1; купол держится до
+                // гибели цели)
+                if (target.dome && amt > 1) {
+                    amt = 1;
+                    const dp = cellXY(target.col, target.row);
+                    floatText(dp.x, dp.y - 78, "◈", 0x8cd0ef);
+                }
                 target.hp -= amt;
                 procEnchantFire(killer);
                 procSpores(killer, amt); // «Призрачные споры» отражают урон по базе

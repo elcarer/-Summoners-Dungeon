@@ -431,6 +431,11 @@
                 if (s.copyLast) return aiReplayOk();
                 // «Царский совет» (tim230): снимать нечего — карту переводить зря
                 if (s.trapSweep && !B.traps.p.length) return false;
+                // «Силовой купол» (tim234): некому — есть своё существо или
+                // постройка ещё БЕЗ купола, иначе карту переводить зря
+                if (s.dome && !B.units.some((v) => v.side === "e" && !v.dome
+                    && (v.def.type === "unit" || v.def.type === "building")))
+                    return false;
                 if (s.sacrifice && !aiSacrificePick()) return false;
                 // «Взрыв твари» (dec150) — есть своё существо с суммой ⚔+♥ 3+
                 // (иначе карта переводится зря)

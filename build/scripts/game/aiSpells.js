@@ -44,6 +44,20 @@
                     aimOff(best);
                     if (best) wolfVolley(best);
                 }
+                if (s.dome) { // «Силовой купол» (tim234): своё самое ценное
+                    // существо/постройка без купола (сумма ⚔+♥)
+                    const own = B.units.filter((v) => v.side === "e" && !v.dome
+                        && (v.def.type === "unit" || v.def.type === "building"));
+                    const best = own.slice()
+                        .sort((a, b) => ((b.curAtk + b.hp) - (a.curAtk + a.hp))
+                            || (a.row - b.row))[0];
+                    const t = focus && own.includes(focus) ? focus : best;
+                    if (t) {
+                        aimOff(t);
+                        domeTarget(t);
+                    }
+                    return;
+                }
                 if (s.target === "anyUnit" && !s.nova) { // усиление/очарование — лучшему
                     // «Гидроудар» (wis99): 1 урон + сдвиг К ЕГО базе,
                     // цель — самая опасная (фокус руны, если годится)
@@ -358,6 +372,7 @@
                             .sort((a, b) => aiCardPower(CARDS[b]) - aiCardPower(CARDS[a]))[0];
                         B.eDiscard.splice(B.eDiscard.indexOf(best), 1);
                         B.eHand.push(best);
+                        A.recalcAuras(); // «Каток» (tim236): сброс стал короче
                         sfx("chpoc");
                         refreshHud();
                     }
@@ -763,6 +778,7 @@
                         disc.splice(disc.indexOf(k.id), 1);
                         B.eHand.push(k.id);
                         B.scorch.e.add(k.id); // сожжётся после розыгрыша
+                        A.recalcAuras(); // «Каток» (tim236): сброс стал короче
                     }
                 }
                 if (s.excavate) { // «Раскопки»: худшую свою постройку — в сброс, из сброса — лучшую

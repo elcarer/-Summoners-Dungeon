@@ -181,7 +181,8 @@
             A.HAND_Y = 1131;
             A.HAND_SCALE = 1; // картинка 230×338 в масштабе 1
             A.cardBottom = function cardBottom(def) { // подпись нижней плашки (фолбэк без картинки)
-                if (def.type === "unit") return { text: `${def.atk}⚔ ${def.hp}♥ ${def.speed}→`, small: false };
+                // «Каток» (tim236): урон динамический (сброс) — на карте «*»
+                if (def.type === "unit") return { text: `${def.discardAtk ? "*" : def.atk}⚔ ${def.hp}♥ ${def.speed}→`, small: false };
                 const key = `card.${Object.keys(CARDS).find((k) => CARDS[k] === def)}.desc`;
                 return { text: GAME_LOC.t(key), small: true };
             };

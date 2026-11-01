@@ -17,7 +17,13 @@
                 // только в конце хода (панель сброса)
                 const drawn = [];
                 for (let k = 0; k < count; k++) {
-                    if (!B.deck.length) { B.deck = shuffle(B.discard); B.discard = []; }
+                    if (!B.deck.length) {
+                        // пересмешивание сброса игрока: бьют «Руномаги царства»
+                        // (tim233), у «Катка» (tim236) тает базовый урон
+                        B.deck = shuffle(B.discard); B.discard = [];
+                        A.runeReshuffleTick("p");
+                        A.recalcAuras();
+                    }
                     if (!B.deck.length) break;
                     const id = B.deck.pop();
                     B.hand.push(id);
@@ -34,7 +40,13 @@
             A.drawEnemy = function drawEnemy(count) {
                 const drawn = [];
                 for (let k = 0; k < count; k++) {
-                    if (!B.eDeck.length) { B.eDeck = shuffle(B.eDiscard); B.eDiscard = []; }
+                    if (!B.eDeck.length) {
+                        // пересмешивание сброса врага: бьют «Руномаги царства»
+                        // (tim233), у «Катка» (tim236) тает базовый урон
+                        B.eDeck = shuffle(B.eDiscard); B.eDiscard = [];
+                        A.runeReshuffleTick("e");
+                        A.recalcAuras();
+                    }
                     // «Подкрепление»: и колода, и сброс пусты — свежая тасовка
                     // базовой колоды врага (иначе в затяжном бою ИИ остаётся
                     // без карт и копит энергию — просил юзер)
@@ -437,7 +449,10 @@
                             refreshHud();
                             if (checkEnd()) return;
                         }
-                    } else for (let step = 0; step < u.def.speed; step++) {
+                    // «Герой прошлого» (tim232): полученная «Скорость 1»
+                    // (spdBonus) складывается с собственной скоростью
+                    } else for (let step = 0;
+                        step < (u.def.speed || 0) + (u.spdBonus || 0); step++) {
                         if (B.stopped || !B.units.includes(u)) break;
                         // «Крепость» (hon176): существо по соседству с чужой
                         // крепостью не перемещается — весь марш уходит в

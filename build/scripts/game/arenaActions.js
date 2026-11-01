@@ -183,6 +183,7 @@
                 const di = B.discard.lastIndexOf(cardId);
                 if (di < 0) return deny();
                 B.discard.splice(di, 1);
+                A.recalcAuras(); // «Каток» (tim236): сброс стал короче
                 B.hand.push(cardId);
                 B.cryptTaken = cardId;
                 floatText(p.x, p.y - 96,
@@ -433,13 +434,15 @@
                             : tg === "anyUnitOrFoe" ? u.def.type === "unit" // «Негативный поток»: существо или база врага
                             : tg === "enemyUnit" ? u.def.type === "unit" // «Тёмный контроль»: только существо врага
                             : tg === "ownBuilding" ? u.def.type === "building"
+                            : tg === "anyObj" ? true // «Силовой купол»: любое существо или постройка
                             : u.def.type === "unit");
                     const sideOk = !u
                         || ((tg === "ownUnit" || tg === "ownBuilding") ? u.side === "p"
                         : tg === "enemyUnit" ? u.side !== "p" : true);
                     const known = tg === "anyUnit" || tg === "anyUnitDmg"
                         || tg === "anyUnitOrFoe" || tg === "enemyUnit"
-                        || tg === "ownUnit" || tg === "ownBuilding";
+                        || tg === "ownUnit" || tg === "ownBuilding"
+                        || tg === "anyObj";
                     // «Ледяной удар»: у цели должен быть хотя бы один сосед-
                     // существо, иначе заклинание не разыгрывается
                     const effectOk = !sdef.spell.iceStrike || !!iceStrikeVictim(u);
@@ -631,6 +634,28 @@
                 return true;
             };
 
+            // «Силовой купол» (tim234, просил юзер): установка метки купола
+            // на существо/постройку — любой урон по ней режется до 1
+            // (гейт в damageUnit). Общая для игрока (applySpellPInner) и
+            // ИИ (enemyCastSpellEffect); держится до гибели цели
+            A.domeTarget = function domeTarget(u) {
+                u.dome = true;
+                const p = cellXY(u.col, u.row);
+                const mark = new PIXI.Graphics();
+                mark.circle(0, 0, 10.5);
+                mark.fill({ color: 0x2a4a6c });
+                mark.stroke({ width: 3, color: 0x8cd0ef });
+                mark.position.set(-36, -54);
+                mark.name = "domeMark";
+                mark.eventMode = "none";
+                u.node.addChild(mark);
+                floatText(p.x, p.y - 60,
+                    "◈ " + GAME_LOC.t("spell.dome.name"), 0x8cd0ef);
+                fxEvent("ward", { x: p.x, y: p.y - 12, scale: 0.85 });
+                punch(u.node);
+                sfx("up");
+            };
+
             // Эффекты заклинаний игрока, валидация цели внутри (false — цель не
             // годится, тогда и оплаты/сброса/панелей не будет). Отделено от
             // оплаты карты, чтобы «Горящие руны» могли повторить эффект
@@ -681,6 +706,15 @@
                 if (def.spell.tokenShift) {
                     if (!target || target.col === undefined) return false;
                     return applyTokenShift("p", target);
+                }
+                if (tg === "anyObj" && def.spell.dome) { // «Силовой купол»
+                    if (!target || target.col === undefined) return false;
+                    const u = unitAt(target.col, target.row);
+                    // тип цели отсеян входом (клик/хук); повторный купол на
+                    // ту же цель бессмыслен, но и безвреден — не запрещаем
+                    if (!u) return false;
+                    domeTarget(u);
+                    return true;
                 }
                 if (tg === "anyUnit") { // усиление/Смыв/Слабость
                     if (!target || target.col === undefined) return false;
@@ -1277,6 +1311,7 @@
                         if (si >= 0) B.discard.splice(si, 1);
                     }
                 }
+                A.recalcAuras(); // «Каток» (tim236): сброс мог стать короче
                 floatText(960, 640, `🔥 ${GAME_LOC.t(`card.${cardId}.name`)}`, 0xffb26e);
             };
 

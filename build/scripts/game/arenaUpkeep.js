@@ -510,6 +510,33 @@
                         returnMarkDraw(u);
                         continue;
                     }
+                    // «Большой бум» (tim235, просил юзер): «Возврат» постройки
+                    // срабатывает как взрыв — она умирает и наносит урон,
+                    // равный своим ТЕКУЩИМ жизням, всем соседним (верт/гориз)
+                    // вражеским существам, вражеским постройкам и базе
+                    // противника («Дома на деревьях» перехватывают удар по
+                    // базе, как всегда)
+                    if (u.def.boomRet) {
+                        const pw = Math.max(1, u.hp); // жизни на момент взрыва
+                        const bc = u.col, br = u.row;
+                        const bp = cellXY(bc, br);
+                        floatText(bp.x, bp.y - 96, "💥", 0xffa45e);
+                        killUnit(u, null);
+                        for (const v of B.units.slice()) {
+                            if (v.side === side || !B.units.includes(v)) continue;
+                            if (Math.abs(v.col - bc) + Math.abs(v.row - br) !== 1)
+                                continue;
+                            damageUnit(v, pw, null, "rocket");
+                        }
+                        if (B.stopped || B.phase === "over") return;
+                        const op = side === "p" ? "e" : "p";
+                        damageBase(op, pw,
+                            { x: 960, y: op === "p" ? 840 : 240, fill: 0xffa45e });
+                        refreshHud();
+                        sfx("rocket");
+                        if (checkEnd()) return;
+                        continue;
+                    }
                     const p = cellXY(u.col, u.row);
                     if (u.node && !u.node.destroyed) {
                         const mk = u.node.getChildByName("returnMark");
@@ -546,6 +573,29 @@
                         layoutHand();
                     } else B.eHand.push(cardIdOf(t.def));
                     sfx("chpoc");
+                }
+            };
+
+            // «Руномаг царства» (tim233, просил юзер): при замешивании сброса
+            // владельца в колоду наносит 3 урона случайному вражескому
+            // СУЩЕСТВУ (постройки — не существа). Несколько Руномагов бьют
+            // каждый сам; умерший от отражённого урона Руномаг свой удар
+            // отменяет. Зовётся из точек пересмешивания сброса
+            // (drawCards/drawEnemy в arenaFlow)
+            A.runeReshuffleTick = function runeReshuffleTick(side) {
+                if (!B || !B.units) return;
+                const runes = B.units.filter((v) => v.side === side
+                    && v.def.runeReshuffle && B.units.includes(v));
+                for (const r of runes) {
+                    if (!B.units.includes(r)) continue;
+                    const foes = B.units.filter((v) => v.side !== side
+                        && v.def.type === "unit" && B.units.includes(v));
+                    if (!foes.length) continue;
+                    const rp = cellXY(r.col, r.row);
+                    floatText(rp.x, rp.y - 96, "✦", 0xc9a0ef);
+                    damageUnit(foes[(Math.random() * foes.length) | 0],
+                        3, null, "rocket");
+                    if (B.stopped || B.phase === "over") return;
                 }
             };
 

@@ -223,6 +223,24 @@
                 ctx.ui.addChild(root);
                 heroStartDraw("p"); // способность героя: добор в начале боя
                 heroStartDraw("e");
+                // «Поиск ответов» (answers, 6-й этаж данжа Времени, просил
+                // юзер): в начале игры добрать 3 карты и после этого
+                // сбросить 3 карты с руки (авто — случайные)
+                for (const sd of ["p", "e"]) {
+                    const hd = sd === "p" ? heroDef : eHeroDef;
+                    if (hd && hd.ability === "openTutor" && hd.abilityVal) {
+                        const n = hd.abilityVal;
+                        if (sd === "p") drawCards(n); else drawEnemy(n);
+                        const hand = sd === "p" ? B.hand : B.eHand;
+                        for (let k = 0; k < n && hand.length; k++) {
+                            const i = (Math.random() * hand.length) | 0;
+                            const id = hand.splice(i, 1)[0];
+                            (sd === "p" ? B.discard : B.eDiscard).push(id);
+                            noteDiscard(1, sd, [id]);
+                        }
+                        A.recalcAuras(); // «Каток»: сброс уже влияет на урон
+                    }
+                }
                 // «Великая битва» (honGreatBattle): способность героя хотя бы
                 // у одной из сторон — в начале боя призываются ОБА
                 // (случайное существо из колоды, без энергии)

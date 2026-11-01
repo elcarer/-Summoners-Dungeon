@@ -554,11 +554,16 @@
                         hp += (u.def.aura && u.def.aura.hp) || 0;
                     }
                     for (const u of B.units) if (u.side === side && u.def.type === "unit") {
+                        // «Каток» (tim236): базовый урон равен числу карт
+                        // в сбросе владельца (def.atk у карты нет)
+                        const baseAtk = u.def.discardAtk
+                            ? (side === "p" ? B.discard.length : B.eDiscard.length)
+                            : u.def.atk;
                         // «Шипастые лозы» уводят бонус в минус — урон не ниже нуля;
                         // atkPenalty — постоянная убыль «Песчаного духа» (wis109);
                         // atkZero — «Ловушка-пузырь» (wis119): урон ровно 0
                         const newAtk = u.atkZero ? 0
-                            : Math.max(0, u.def.atk + (u.bonusAtk || 0)
+                            : Math.max(0, baseAtk + (u.bonusAtk || 0)
                                 + (u.atkPenalty || 0) + atk - tarDebuff(u)
                                 + (u.def.subtype === "skeleton" ? kings : 0));
                         if (u.curAtk !== newAtk) {
@@ -905,6 +910,22 @@
                             floatText(hpA.x, hpA.y - 75, `+${def.healArrive}♥`, 0x9fd489);
                             sfx("up");
                         }
+                    }
+                    // «Герой прошлого» (tim232, просил юзер): появляется по
+                    // соседству (верт/гориз) с СВОИМ существом — получает
+                    // «Скорость 1»: рывок сразу после появления (summonDash,
+                    // как у «Часового механизма») и постоянный шаг в марш
+                    // (spdBonus читается в marchSide)
+                    if (def.nearSpeed && B.units.some((v) => v !== u
+                        && v.side === side && v.def.type === "unit"
+                        && B.units.includes(v)
+                        && Math.abs(v.col - col) + Math.abs(v.row - row) === 1)) {
+                        u.spdBonus = 1;
+                        summonDash(u);
+                        const spN = cellXY(col, row);
+                        floatText(spN.x, spN.y - 96,
+                            "» " + GAME_LOC.t("status.speed.name"), 0xb7d0ef);
+                        sfx("step");
                     }
                     // «Секироносец царства» (tim220): при появлении наносит 1
                     // урон случайному соседнему (верт/гориз) существу ВРАГА
