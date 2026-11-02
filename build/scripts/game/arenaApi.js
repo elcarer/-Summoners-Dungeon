@@ -493,6 +493,10 @@
                         : null;
                 },
                 _enemyFlyTo(col, row) { enemyFlyCard(cellXY(col, row)); return true; },
+                // тест-хук W32: выметание руки ВРАГА заклинанием (проба
+                // улёта рубашек в его сброс) — тот же код, что у «Запутать
+                // руны»/«Мозгового штурма» на стороне врага
+                _sweepEnemyHand(n) { discardHandDraw("e", Math.max(1, n | 0)); return true; },
                 // тест-хуки боевых хуков атаки: марш одной стороны и тик яда
                 // (проба сокрушения/чащи/ядовитости без полного хода ИИ)
                 async _march(side) { await marchSide(side); return true; },

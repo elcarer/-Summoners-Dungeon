@@ -326,3 +326,30 @@
   хранится рядом с active/done/announced/pending.
 - mini.sh печатает только tail -6 лога пробы: полный вывод —
   /tmp/test_out.log (грепать его, не stdout mini.sh).
+
+## Волна W32
+
+- worldApi.deckAdd(n) ДОТЯГИВАЕТ колоду ДО n карт (`while length < n`),
+  а не добавляет n: deckAdd(4) при колоде 12 ничего не даст (вход в данж
+  16 не откроется). Для «+N» считать вручную.
+- deckApi.add/remove работают только с ОТКРЫТОЙ сценой дек (root !==
+  null, иначе false) — «remove вернул false» вне сцены значит «сцена не
+  открыта», а не «замок минимума». В пробах сперва G.uiReturn=…;
+  scenes.go("deck").
+- NPC города «остывает» после разговора, пока герой не отойдёт дальше
+  1.25 клетки (o.cool) — повторный разговор по setHeroPos на месте не
+  откроется: увести героя и вернуть.
+- GAME_DATA/GAME_CARD_DATA — глобалы СТРАНИЦЫ: проверки редкости/стихии
+  в пробах — только внутри inst/evalJs, не в node (.every в node —
+  ReferenceError).
+- evalJs считает ВЫРАЖЕНИЕ: `return` вне функции и `await` вне async —
+  SyntaxError. await-версия — обёртка `(async () => { … })()` с
+  awaitPromise=true; returnByValue отдаёт объект КАК ЕСТЬ (без
+  stringify/parse — JSON.parse от объекта падает).
+- Сброс руки врага может МГНОВЕННО пересмешаться в его колоду: если
+  eDeck врага пуст, drawEnemy reshuffle-ит свежий сброс — проверка
+  «eDiscard вырос на N» ненадёжна, проверять консервацию
+  eHand+eDeck+eDiscard и число полётов (_cardFx).
+- cardFace(1) — не 230×338: лицо масштабируется к ВЫСОТЕ 495
+  (495/tex.height), т.е. ~337×495. Ряды карт считать из 495.
+  cardZoomer(ctx, {host}) требует ctx.app (тикер на контексте).

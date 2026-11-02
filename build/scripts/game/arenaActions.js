@@ -129,7 +129,7 @@
                                 r: nd.rotation, s: nd.scale.x }
                             : { x: handCardCenter(hi).x,
                                 y: handCardCenter(hi).y, r: 0, s: 1 });
-                }
+                } else flyEnemyDiscard(); // у врага рубашка — к его сбросу (W32)
                 hand.splice(hi, 1);
                 discard.push(mark);
                 if (side === "p") { layoutHand(); refreshHud(); }

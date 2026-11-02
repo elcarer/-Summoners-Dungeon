@@ -447,6 +447,28 @@
                     s: 0.72, arc: 70, life: 0.42 / animK(), a1: burn ? 0 : 1,
                 });
             };
+            // Полёт сбрасываемой карты руки ВРАГА в его сброс (W32, просил
+            // юзер: сброс с руки — с анимацией у обеих сторон, у игрока так
+            // с W18). Рубашка летит из зоны руки врага к слоту его сброса,
+            // зеркально улетанию карт игрока. delay — stagger при выметании
+            A.flyEnemyDiscard = function flyEnemyDiscard(from, delay = 0) {
+                if (!root || !root.cardFxLayer || !B || B.stopped) return;
+                const f = from || {
+                    x: 1520 + (Math.random() - 0.5) * 70,
+                    y: 185 + (Math.random() - 0.5) * 24,
+                };
+                const node = new PIXI.Sprite(uiTex(enemyBackTex()));
+                node.anchor.set(0.5);
+                node.position.set(f.x, f.y);
+                node.rotation = 0.3;
+                node.scale.set(0.74);
+                node.eventMode = "none";
+                handFlight(node, {
+                    target: () => handAnchor("e", "discard"),
+                    r: 0.42, s: 0.72, arc: 70,
+                    life: 0.42 / animK(), delay: delay / animK(), a1: 1,
+                });
+            };
             // Пересмешивание сброса в колоду (просил юзер W28): рубашки
             // летят дугой из слота сброса в слот колоды — зеркально добору,
             // у обеих сторон. Крупный сброс показываем горсткой рубашек

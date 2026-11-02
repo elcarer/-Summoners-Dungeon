@@ -106,6 +106,15 @@
                                 r: nd.rotation, s: nd.scale.x });
                     });
                 }
+                // у врага рубашки сбрасываемой руки летят в его сброс
+                // (W32, просил юзер: анимации сброса у обеих сторон)
+                if (side === "e" && root && root.cardFxLayer && !B.stopped) {
+                    let keepSeen2 = false;
+                    hand.forEach((id, i2) => {
+                        if (keepId && id === keepId && !keepSeen2) { keepSeen2 = true; return; }
+                        flyEnemyDiscard(null, i2 * 0.05);
+                    });
+                }
                 const old = hand.splice(0, hand.length);
                 let kept = false, burned = 0, dropped = 0;
                 const droppedIds = [];

@@ -18,6 +18,9 @@
 // силуэт, не падает; при добавлении арта включить в предзагрузку
 // main.js — там уже guarded-загрузка), герой images/heroes/<img>.png
 // (грузится всегда).
+// W32 (юзер): награда q1 — 4 ОБЫЧНЫЕ карты стихии героя только в
+// КОЛЛЕКЦИЮ (колоду до гейта арки 16 игрок собирает сам в редакторе),
+// в окне награды — ряд этих карт с ховер-зумом (cardZoomer, W20).
 (function () {
     // kind: "wild" — победы над БРОДЯЧИМИ отрядами открытого мира
     // (счётчик kills), "win" — победа над любым врагом подземелья своей
@@ -219,9 +222,37 @@
         }
     }
 
-    // Награда картами: q1 — 4 обычных из пула стихии ПРЯМО В КОЛОДУ
-    // (гейт арки 16 карт должен открыться сам), q4 — редкая стихии.
-    // Карты одновременно попадают в коллекцию
+    // Награда картами. q1 (W32, юзер): 4 ОБЫЧНЫЕ карты стихии героя —
+    // только в КОЛЛЕКЦИЮ (колоду до гейта арки 16 игрок собирает сам в
+    // редакторе); берём РАЗНЫЕ, сперва добавимые в колоду (копий в
+    // колоде < DECK_COPIES) — иначе награда рискует стать мёртвым весом.
+    // q4 — редкая стихии: коллекция + сразу в колоду (как было)
+    function rollCommonCards(G, n) {
+        const CD = globalThis.GAME_CARD_DATA;
+        const D = globalThis.GAME_DATA;
+        const commons = Object.keys(CD.CARDS).filter((c) =>
+            CD.CARDS[c].elem === G.elem && CD.CARDS[c].rarity === "common");
+        const shuffle = (arr) => {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = (Math.random() * (i + 1)) | 0;
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        };
+        const inDeck = (id) => G.deck.filter((x) => x === id).length;
+        const addable = shuffle(commons.filter((c) =>
+            inDeck(c) < (D.DECK_COPIES || 3)));
+        const rest = shuffle(commons.filter((c) => addable.indexOf(c) < 0));
+        const out = addable.slice(0, n);
+        while (out.length < n && rest.length) out.push(rest.shift());
+        while (out.length < n && addable.length)
+            out.push(addable[(Math.random() * addable.length) | 0]);
+        return out;
+    }
+    function grantToCollection(G, ids) {
+        for (const id of ids || [])
+            G.collection[id] = (G.collection[id] || 0) + 1;
+    }
     function grantCards(G, n, rare) {
         const D = globalThis.GAME_DATA;
         const CD = globalThis.GAME_CARD_DATA;
@@ -376,7 +407,7 @@
         const ctx = cur.ctx, G = ctx.G;
         const q = QUESTS.find((x) => x.id === cur.questId);
         const t = (k, v) => GAME_LOC.t(k, v);
-        const { button } = globalThis.GAME_UI;
+        const { button, cardFace } = globalThis.GAME_UI;
         const w = 900, h = 640, top = 540 - h / 2, x0 = 960 - w / 2;
         const panel = new PIXI.Graphics();
         panel.roundRect(x0, top, w, h, 18);
@@ -431,6 +462,32 @@
         reward.eventMode = "none";
         cur.node.addChild(reward);
         y = Math.min(y + 44 + reward.height + 16, CAP - 34);
+        // ряд обычных карт награды q1 (W32, юзер): лица с ховер-зумом
+        // «как и везде» (cardZoomer, W20); в коллекцию — кнопкой «Забрать»
+        if (cur.kind === "reward" && q.cards) {
+            cur.rewardCards = rollCommonCards(G, q.cards);
+            cur.cardUi = [];
+            const sc = 0.28, hh = 495 * sc / 2; // полувысота лица cardFace
+            const n = cur.rewardCards.length;
+            const spread = Math.min(150, 760 / Math.max(1, n));
+            const cy = Math.min(y + 80, CAP - hh - 6);
+            cur.rewardCards.forEach((id, i) => {
+                const card = cardFace(ctx, id, { scale: sc });
+                const cx = 960 + (i - (n - 1) / 2) * spread;
+                card.position.set(cx, cy);
+                card.eventMode = "static";
+                card.on("pointerover", () => {
+                    if (cur.zoomer) cur.zoomer.show(id, cx, cy, card, sc);
+                });
+                card.on("pointerout", () => {
+                    if (cur.zoomer) cur.zoomer.hide(false);
+                });
+                cur.node.addChild(card);
+                cur.cardUi.push({ id, x: cx, y: cy });
+                (cur.cardNodes = cur.cardNodes || []).push(card);
+            });
+            y = Math.min(cy + hh + 12, CAP);
+        }
         // чекбокс стрелки-указателя — в окне ПРОСМОТРА (W31, юзер)
         if (cur.kind === "review") {
             const on = () => !!(G.settings && G.settings.questArrow !== false);
@@ -492,7 +549,10 @@
         } else { // reward: золото/карты, следующий квест ждёт Глома
             cur.primary = mkBtn(t("quest.claim"), 960, () => {
                 G.gold += q.gold;
-                if (q.cards) grantCards(G, q.cards, false);
+                // обычные наградные — В КОЛЛЕКЦИЮ (W32); ряд карт мог не
+                // успеть построиться — тогда катаем на месте
+                if (q.cards) grantToCollection(G, cur.rewardCards
+                    || rollCommonCards(G, q.cards));
                 if (q.rare) grantCards(G, 1, true);
                 G.quests.done[q.id] = true;
                 G.quests.pending = null;
@@ -529,6 +589,9 @@
             li: 0, shown: 0, typing: false, acc: 0,
             primary: null, checkbox: null, vn: null, typer: null,
         };
+        // ховер-зум наградных карт (W32): host — узел диалога, копия
+        // растёт до полного размера, как на экране награды/в магазине
+        cur.zoomer = globalThis.GAME_UI.cardZoomer(ctx, { host: () => cur.node });
         if (lines) {
             // ── окно реплик (новелла) ────────────────────────────────────
             const vn = new PIXI.Container();
@@ -667,6 +730,13 @@
                 goal: q ? questGoal(cur.ctx.G, q) : "",
                 reward: q ? GAME_LOC.t(`quest.${q.id}.reward`) : "",
                 gold: q ? q.gold : 0,
+                // наградные карты (W32): id ряда и его геометрия (пробы),
+                // состояние ховер-зума
+                cards: cur.phase === "final" && cur.rewardCards
+                    ? [...cur.rewardCards] : null,
+                cardUi: cur.phase === "final" && cur.cardUi
+                    ? cur.cardUi.map((c) => ({ ...c })) : null,
+                zoom: cur.zoomer ? cur.zoomer.state() : null,
                 arrowOn: cur.checkbox ? !!cur.checkbox() : null,
                 buttons: cur.phase === "final"
                     ? (cur.kind === "announce"
@@ -688,5 +758,8 @@
             cur.declineBtn.emit("pointertap");
             return true;
         },
+        // пробы: узлы ряда наградных карт (эмит pointerover/out без мыши)
+        rewardCardNodes: () => (cur && cur.cardNodes
+            ? cur.cardNodes.filter((n) => !n.destroyed) : []),
     };
 })();

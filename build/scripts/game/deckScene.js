@@ -15,10 +15,12 @@
             HERO_ORDER, HERO_FOE_ORDER } = globalThis.GAME_DATA;
         const { T, fit, button, chip, cardFace, dimBg, scrollPane } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
-        // минимум колоды: открытый мир живёт по DECK_MIN = 12 (стартовые
-        // колоды), подземелья требуют свои 16+ этаж (просил юзер —
-        // dataCards.caveDeckFor); редактор показывает минимум контекста
-        const deckMinNow = () => (G.dungeon
+        // минимум колоды: открытый мир и ГОРОД живут по DECK_MIN = 12
+        // (стартовые колоды; город — мирная сцена мира, а не данж — W32
+        // юзер: «16 карт+ — правило для подземелья»), подземелья требуют
+        // свои 16+ этаж (просил юзер — dataCards.caveDeckFor); редактор
+        // показывает минимум контекста
+        const deckMinNow = () => (G.dungeon && !G.dungeon.city
             ? globalThis.GAME_DATA.caveDeckFor(
                 G.run && G.run.floor ? G.run.floor : 1)
             : DECK_MIN);
@@ -628,6 +630,8 @@
                 .filter((id) => (G.collection[id] || 0) > 0 && passes(id)),
             deckListIds: () => [...new Set(G.deck)].filter(passes),
             counts() { return { deck: G.deck.length, collection: { ...G.collection } }; },
+            // минимум колоды текущего контекста (тесты: город 12 / данж 16+)
+            minNow: () => deckMinNow(),
             scroll(side, dy) {
                 if (side === "heroes") { if (heroesPane) heroesPane.scrollBy(dy); return; }
                 (side === "left" ? leftPane : rightPane).scrollBy(dy);

@@ -397,6 +397,12 @@
                     if (pv < ws) { ws = pv; wi = i; }
                 }
                 if (wi < 0) return;
+                // позиция узла руки ДО splice (анимации руки, просил юзер)
+                const nd = side === "p" ? handNode(wi) : null;
+                const from = nd && !nd.destroyed && nd.__handIdx === wi
+                    ? { x: nd.x, y: nd.y - 169 * nd.scale.y,
+                        r: nd.rotation, s: nd.scale.x }
+                    : null;
                 const id = hand.splice(wi, 1)[0];
                 if (scorch && scorch.has(id)) {
                     scorch.delete(id);
@@ -405,6 +411,11 @@
                 } else {
                     discard.push(id);
                     noteDiscard(1, side, [id]);
+                    if (side === "p") { // улетание в сброс (анимации руки)
+                        flyToDiscard(id,
+                            from || { x: handCardCenter(wi).x,
+                                y: handCardCenter(wi).y, r: 0, s: 1 });
+                    } else flyEnemyDiscard(); // рубашка — к сбросу врага (W32)
                     const p = side === "p" ? { x: 960, y: 840 } : { x: 960, y: 240 };
                     floatText(p.x, p.y, "⤓ " + GAME_LOC.t(`card.${id}.name`), 0xc9b98c);
                 }

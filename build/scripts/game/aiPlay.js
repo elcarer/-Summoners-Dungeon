@@ -415,9 +415,11 @@
                             consumeEpicDiscount(cardId, "e"); // «Архилич»
                             heroFirstSpellEnergy("e"); // «Дуновение опасности»
                             // рука ИИ тоже не больше 7 — излишек панельных доборов
-                            // сбрасывается случайно (как панель сброса у игрока)
+                            // сбрасывается случайно (как панель сброса у игрока);
+                            // рубашки улетают в его сброс (W32, анимации руки)
                             while (B.eHand.length > HAND_MAX) {
                                 const sp = B.eHand.splice((Math.random() * B.eHand.length) | 0, 1)[0];
+                                flyEnemyDiscard();
                                 B.eDiscard.push(sp);
                                 noteDiscard(1, "e", [sp]);
                                 B.scorch.e.delete(sp); // метка ушла вместе с картой
