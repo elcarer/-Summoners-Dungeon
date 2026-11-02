@@ -545,11 +545,10 @@
                 return n;
             };
 
-            // snd — звук удара: "sword" (атака существом), "acid" (ловушка),
-            // "rocket" (заклинание), по умолчанию "dam"
-
-            // snd — звук удара: "sword" (атака существом), "acid" (ловушка),
-            // "rocket" (заклинание), по умолчанию "dam"
+            // snd — МЕТКА удара: нужна и визуалу (цвет всплеска, slash),
+            // и звуку; старые метки волн переводим в семантические ключи
+            // W34: атака ("sword"/"dam") → crash, заклинания ("rocket"/
+            // "monolith") → chpoc, ловушки ("acid") → mine, яд ("poison")
             A.damageUnit = function damageUnit(target, amount, killer = null, snd = "dam") {
                 // «Защита от заклинаний» (u.spellWard): пока идёт разрешение
                 // заклинания (A.spellCasting ставят applySpellP /
@@ -619,7 +618,7 @@
                 if (amt > 0) {
                     fxEvent("impact", {
                         x: p.x, y: p.y - 16,
-                        color: snd === "acid" ? 0x9fd46a
+                        color: (snd === "acid" || snd === "poison") ? 0x9fd46a
                             : snd === "rocket" ? 0xffa45e
                             : snd === "monolith" ? 0xd0b0ef : 0xffb26e,
                         power: Math.min(1.8, 0.72 + amt * 0.12),
@@ -628,7 +627,11 @@
                     });
                 }
                 punch(target.node);
-                sfx(snd);
+                // звук по метке: см. комментарий над damageUnit
+                sfx(snd === "sword" || snd === "dam" ? "crash"
+                    : snd === "rocket" || snd === "monolith" ? "chpoc"
+                    : snd === "acid" ? "mine"
+                    : snd === "poison" ? "chpoc" : snd);
                 // «Проклятый обелиск» (dec136): урон, нанесённый постройке
                 // СУЩЕСТВОМ (атака/спецудар; заклинания и ловушки бьют без
                 // killer-существа), столько же бьёт базу противника обелиска —

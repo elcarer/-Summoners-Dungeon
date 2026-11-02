@@ -289,7 +289,7 @@
                     if (u.side !== side || u.def.type !== "unit" || !(u.poison > 0)) continue;
                     const p = cellXY(u.col, u.row);
                     floatText(p.x, p.y - 60, `☠ −${u.poison}`, 0xb7d178);
-                    damageUnit(u, u.poison, null, "acid");
+                    damageUnit(u, u.poison, null, "poison");
                     if (B.units.includes(u)) { // умерло от тика — маркер не трогаем
                         u.poison += 1;
                         const mark = u.node.getChildByName("poisonMark");

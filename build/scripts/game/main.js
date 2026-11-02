@@ -756,6 +756,11 @@
             if (!G.dungeon) G.dungeon = G.dungeonStates[(r.cave || "gob") + ":" + r.floor] || null;
             if (G.dungeon)
                 G.dungeonStates[G.dungeon.cave + ":" + G.dungeon.floor] = G.dungeon;
+            if (G.dungeon)
+                // «Продолжить» ставит героя к прибытию у лестницы: без
+                // остывание — мгновенный подъём на этаж выше (остальные
+                // пути входа ставят его же: world.js, спуск dungeon.js)
+                G.dungeon.ladderCoolMs = 2000;
             // города (W30): ключ «стихия»; состояние другой геометрии не поднимается
             G.cityStates = {};
             for (const k in (r.cityStates || {})) {
