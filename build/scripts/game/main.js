@@ -162,7 +162,7 @@
                 await assets.loadTexture("./images/npc/glom.png");
         } catch (e) { /* арта ещё нет — окно с силуэтом */ }
         // здания городов (арт юзера, W34): магазин/кузница/дом Глома 384×256
-        // (6×4 клетки 64px, 1:1) и ратуша 384×384 (6×6)
+        // и ратуша 384×384; W36 — рисуются в полразмера (пятно 3×2 / 3×3)
         for (const f of ["shop", "armory", "town_hall", "glom_house"])
             uiTextures[`buildings/${f}.png`] =
                 await assets.loadTexture(`./images/buildings/${f}.png`);
