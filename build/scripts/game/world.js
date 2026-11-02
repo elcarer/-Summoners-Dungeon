@@ -869,6 +869,56 @@
             return true;
         }
 
+        // ── ГОРОД (W30, юзер): вход в СТАРТОВЫЙ город зоны — как в данж.
+        // Состояние живёт в G.cityStates (отдельно от этажей подземелий,
+        // чтобы не путать архив «данж:этаж»), сцена — dungeon в режиме
+        // города (st.city): стены — набор тайлов данжа стихии, пол —
+        // поверхность зоны; внутри торговец картами и NPC Глом, врагов нет
+        function cityStateFor(elem) {
+            const D = globalThis.GAME_DATA;
+            const caveId = Object.keys(D.CAVES).find(
+                (k) => D.CAVES[k].elem === elem) || "gob";
+            const saved = G.cityStates && G.cityStates[elem];
+            if (saved && saved.v === globalThis.GAME_DUNGEON.MAP_V) return saved;
+            const st = globalThis.GAME_DUNGEON.newDungeonState(caveId, 1);
+            st.city = true; // режим города (сцена dungeon)
+            st.elem = elem; // зона (пол-поверхность и HUD)
+            st.enemies = []; // в городе мирно
+            st.exit = null; // спуска в городе нет
+            // объекты города: магазин карт + Старина Глом (квестодатель)
+            const centers = (st.lootCenters && st.lootCenters.length
+                ? st.lootCenters : st.roomCenters.slice(1));
+            st.objects = centers.slice(0, 2).map(([col, row], i) => ({
+                type: i === 0 ? "shop" : "npc",
+                col, row, taken: false,
+                stock: i === 0
+                    ? Array.from({ length: 6 }, () => D.rollLootCard(elem))
+                    : null,
+                sold: i === 0
+                    ? [false, false, false, false, false, false] : null,
+            }));
+            if (G.cityStates) G.cityStates[elem] = st;
+            return st;
+        }
+        function enterCity() {
+            const m = G.world.map;
+            const tw = m && m.pois && m.pois.find((p) => p.spawnTown);
+            if (!tw) return false;
+            if (heroId !== null)
+                G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
+            G.cityOut = tw.elem || G.elem; // выход — к дверям этого города
+            const st = cityStateFor(tw.elem || G.elem);
+            // прибытие к лестнице-выходу; 2с «остывание» лестницы — герой
+            // встаёт рядом с ней, и первый же кадр не выкидывает в мир
+            // (тот же приём, что у входа в данж)
+            if (st.spawn) st.heroPos = { ...st.spawn };
+            st.ladderCoolMs = 2000;
+            G.dungeon = st;
+            if (ctx.sfx) ctx.sfx();
+            scenes.go("dungeon");
+            return true;
+        }
+
         return {
             enter() {
                 if (ctx.music) ctx.music("menu"); // трек мира (пока общий с меню)
@@ -881,7 +931,11 @@
                 // ГОРОДА (не столицы, просил юзер), общая для всех стихий
                 const spawnPx = px(map.spawn[G.elem] || map.spawn.strength);
                 let hp = G.world.heroPos ? { ...G.world.heroPos } : null;
-                if (G.world.out) {
+                if (G.cityOut) { // вышли из города — к его дверям (W30)
+                    const tw = map.pois.find((p) => p.spawnTown);
+                    hp = tw ? freeCellNear(px(tw).x, px(tw).y) : spawnPx;
+                    G.cityOut = null;
+                } else if (G.world.out) {
                     const at = cavePoi(G.world.outCave) || cavePoi("gob");
                     hp = freeCellNear(px(at).x, px(at).y);
                     G.world.out = false;
@@ -1351,8 +1405,14 @@
                 // всплывает предупреждение (кулдаун 2.5с — без спама)
                 if (!ctx.questModal && layer)
                 for (const p of G.world.map.pois) {
-                    if (p.kind !== "dungeon") continue;
                     const c = px(p);
+                    // СТАРТОВЫЙ город (W30): касание — вход как в данж;
+                    // прочие города пока «Скоро…» (тот же кулдаун)
+                    if (Math.hypot(c.x - hx, c.y - hy) < TS * 0.85 && p.spawnTown) {
+                        enterCity();
+                        return;
+                    }
+                    if (p.kind !== "dungeon") continue;
                     if (Math.hypot(c.x - hx, c.y - hy) < TS * 0.85) {
                         const deniedAt = p.denyAt || p.soonAt;
                         if (globalThis.GAME_DATA.CAVES[p.cave]
@@ -1465,6 +1525,7 @@
                     return true;
                 },
                 enterCave: (cave) => enterCave(cave),
+                enterCity: () => enterCity(), // тесты W30: вход в стартовый город
                 soonCount: () => soonCount,
                 // ── бродячие отряды (тесты): список с живыми позициями и
                 // заморозка ИИ — пробы с прогулками по миру не ловят бои.

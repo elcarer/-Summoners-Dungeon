@@ -375,6 +375,8 @@
             world: { heroPos: null, out: false, wander: null, wildLevel: {} }, // открытый мир: где герой + бродячие отряды
             worldFrom: false, // последний бой начался в открытом мире (трофей/реванш ведут в мир)
             dungeonStates: {}, // этажи подземелий, ключ «данж:этаж» (gob:1, grw:2…)
+            cityStates: {}, // города (W30): ключ «стихия» — состояние входного города зоны
+            cityOut: null, // стихия города, из которого вышли (выход к его дверям)
             // (враги/объекты этажа остаются как их оставили),
             rewardDeck: null, // колода побеждённого — пул трофея «1 из 3»
             wonHero: null, // карта персонажа, завоёванная в последнем бою
@@ -457,6 +459,8 @@
                 };
                 this.worldFrom = false;
                 this.dungeonStates = {};
+                this.cityStates = {};
+                this.cityOut = null;
                 this.activeEnemy = null;
                 this.battle = null;
                 this.rewardDeck = null;
@@ -486,6 +490,8 @@
                     gold: this.gold,
                     dungeon: this.dungeon ? JSON.parse(JSON.stringify(this.dungeon)) : null,
                     dungeonStates: JSON.parse(JSON.stringify(this.dungeonStates || {})),
+                    cityStates: JSON.parse(JSON.stringify(this.cityStates || {})),
+                    cityOut: this.cityOut || null,
                     worldPos: this.world.heroPos,
                     worldOut: this.world.out,
                     // бродячие отряды: жив/мёртв и позиции (геометрия — из сида)
@@ -696,6 +702,13 @@
             if (!G.dungeon) G.dungeon = G.dungeonStates[(r.cave || "gob") + ":" + r.floor] || null;
             if (G.dungeon)
                 G.dungeonStates[G.dungeon.cave + ":" + G.dungeon.floor] = G.dungeon;
+            // города (W30): ключ «стихия»; состояние другой геометрии не поднимается
+            G.cityStates = {};
+            for (const k in (r.cityStates || {})) {
+                const st = r.cityStates[k];
+                if (st && st.v === mapV) G.cityStates[st.elem || k] = st;
+            }
+            G.cityOut = r.cityOut || null;
             // глубина у каждого подземелья своя; активное — где герой
             G.run.floor = r.floor;
             G.run.cave = G.dungeon ? G.dungeon.cave : (r.cave || "gob");

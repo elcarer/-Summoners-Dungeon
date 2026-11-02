@@ -18,6 +18,11 @@
     // пещеры, Роща Роста и «Подземные ключи» — одной глубины 6
     const CAVES = () => globalThis.GAME_DATA.CAVES;
     const caveOf = (id) => CAVES()[id] || CAVES().gob;
+    // ГОРОД (W30, юзер): поверхность пола — местность зоны стихии
+    // (листы вариантов заливки worldTiles 4×4 по 32px), стены — набор
+    // тайлов данжа той же стихии
+    const CITY_VARIANTS = { strength: "dirt", growth: "grass",
+        wisdom: "magic", decay: "waste", honor: "sand", time: "snow" };
     const MAX_FLOOR = 6;
     // Набор тайлов по данжу — папка images/dungeon_tiles/<имя> (просил юзер:
     // у каждого данжа свой арт): Сила — goblins_lair, Рост — growth_lair,
@@ -465,8 +470,24 @@
             // полу прозрачна нарочно — сквозь неё должен просвечивать пол,
             // а не чёрный фон. В толще и на нерисованых стенах-рамке пола
             // нет — там вообще без тайлов
+            // город (W30): пол — варианты поверхности зоны, 2×2 квадрата
+            // 32px на клетку 64px, детерминированно по координате
+            const city = myState && myState.city;
+            const vsheet = city
+                ? ctx.worldSheets[CITY_VARIANTS[caveOf(myState.cave).elem] || "dirt"]
+                : null;
             for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
                 if (MAPROWS[j][i] === "#" && !wallDrawn(i, j)) continue;
+                if (vsheet && vsheet.textures.length) {
+                    const texs = vsheet.textures;
+                    for (let sy = 0; sy < 2; sy++) for (let sx = 0; sx < 2; sx++) {
+                        const sp = new PIXI.Sprite(
+                            texs[hsh(i * 2 + sx, j * 2 + sy) % texs.length]);
+                        sp.position.set(i * TS + sx * 32, j * TS + sy * 32);
+                        c.addChild(sp);
+                    }
+                    continue;
+                }
                 const sp = new PIXI.Sprite(uiTex(`dungeon_tiles/${lair}/floor/${hsh(i, j) % FLOORS}.png`));
                 sp.position.set(i * TS, j * TS);
                 c.addChild(sp);
@@ -585,6 +606,25 @@
                 ring.circle(0, 0, 24);
                 ring.stroke({ width: 2.5, color: 0xcfa94e });
                 c.addChild(ring);
+            }
+            if (obj.type === "npc") {
+                // Старина Глом (W30): Graphics-силуэт (портрет юзера —
+                // в окне диалога), золотое кольцо как у магазина
+                const ring = new PIXI.Graphics();
+                ring.circle(0, 0, 24);
+                ring.stroke({ width: 2.5, color: 0xcfa94e });
+                c.addChild(ring);
+                const hood = new PIXI.Graphics();
+                hood.circle(0, -8, 10); // капюшон
+                hood.fill(0x5a4632);
+                hood.roundRect(-9, -2, 18, 16, 6); // плечи-плащ
+                hood.fill(0x5a4632);
+                hood.circle(0, -7, 5.5); // лицо-тень
+                hood.fill(0x241a10);
+                c.addChild(hood);
+                c.position.set(obj.col * TS + TS / 2, obj.row * TS + TS / 2);
+                c.zIndex = (obj.row + 1) * TS;
+                return c;
             }
             const tex = obj.type === "gold" ? "icon_gold.png"
                 : obj.type === "chest" ? "icon_bag.png"
@@ -788,6 +828,13 @@
         function openObject(o) {
             path = null;
             winObj = o;
+            if (o.type === "npc") {
+                // Старина Глом (W30): окно квеста; объект не «тратится»,
+                // повторный разговор после отхода — снова у Глома
+                o.cool = true;
+                globalThis.GAME_QUESTS.talkTo(ctx);
+                return;
+            }
             G.dungeon.win = { idx: G.dungeon.objects.indexOf(o) };
             winNode = o.type === "shop" ? buildShopWin(o)
                 : o.type === "map" ? buildMapWin(o) : buildLootWin(o);
@@ -850,6 +897,8 @@
         function startDraft(o) {
             closeModal();
             G.draft = { picks: [], ePicks: [], objIdx: G.dungeon.objects.indexOf(o) };
+            // квест «Дно» (W30): участие в драфте — галочка чек-листа
+            if (globalThis.GAME_QUESTS) globalThis.GAME_QUESTS.markDraft(G);
             if (ctx.sfx) ctx.sfx();
             scenes.go("draft");
         }
@@ -1193,6 +1242,16 @@
                     }
                 }
                 if (!st.ladder && st.spawn) st.ladder = { x: st.spawn.x, y: st.spawn.y - TS };
+                if (st.city) {
+                    // город (W30): страховки сейвов — торговец без sold,
+                    // врагов в городе нет и не будет
+                    st.enemies = [];
+                    for (const o of st.objects)
+                        if (o.type === "shop" && !o.sold)
+                            o.sold = [false, false, false, false, false, false];
+                } else if (globalThis.GAME_QUESTS) {
+                    globalThis.GAME_QUESTS.noteFloor(G, st.floor); // «Дно»: галочка дна
+                }
                 closeModal(); // окно объекта не переживает уход из сцены
                 layer = new PIXI.Container();
                 layer.sortableChildren = true;
@@ -1389,7 +1448,9 @@
                     uiHud.userData.toast.text = st.toast;
                     uiHud.userData.toast.alpha = Math.min(1, st.toastT);
                 } else uiHud.userData.toast.alpha = 0;
-                uiHud.userData.floorT.text = GAME_LOC.t("dungeon.floor", { n: st.floor });
+                uiHud.userData.floorT.text = st.city
+                    ? GAME_LOC.t("city.name")
+                    : GAME_LOC.t("dungeon.floor", { n: st.floor });
                 uiHud.userData.goldT.text = String(G.gold);
 
                 // ── триггеры: окно объекта, враги, выход ───────────────────
@@ -1408,7 +1469,7 @@
                         if (d < TS * 0.85) { openObject(o); break; }
                     }
                 }
-                if (!st.win && !ctx.questModal) for (const t of tokens) {
+                if (!st.win && !ctx.questModal && !st.city) for (const t of tokens) {
                     if (!t.enemy.alive) continue;
                     if (Math.hypot(t.enemy.x - hx, t.enemy.y - hy) < TS * 0.85) {
                         // мгновенный стоп у энкаунтера (просил юзер): гасим
@@ -1450,6 +1511,16 @@
                     && Math.hypot(st.ladder.x - hx, st.ladder.y - hy) < TS * 1.02) {
                     const from = st.floor;
                     st.heroPos = { x: hx, y: hy };
+                    if (st.city) {
+                        // выход из города (W30): состояние — в G.cityStates
+                        // (НЕ в архив «данж:этаж»), герой — к дверям города
+                        G.cityStates[st.elem] = st;
+                        G.dungeon = null;
+                        G.cityOut = st.elem;
+                        if (G.saveRun) G.saveRun();
+                        scenes.go("world");
+                        return;
+                    }
                     G.dungeonStates[stKey(st.cave, from)] = st; // этаж — в архив как оставили
                     if (from <= 1) {
                         G.dungeon = null;

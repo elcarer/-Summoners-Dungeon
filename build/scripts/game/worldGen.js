@@ -28,7 +28,7 @@
     // V9: воды в зоне Тлена нет вовсе (русла обрываются у его границ),
     // болота отступают на клетку от границ зоны — без стыков с чужими
     // биомами
-    const V = 14; // v14 — охранники Тлена (map.decayGuards, просил юзер)
+    const V = 15; // v15 — стартовый город (map.spawnTown, вход внутрь, W30)
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // деревья лесных массивов по зонам стихий (просил юзер): вместо
@@ -863,6 +863,7 @@
                 const tw = towns.length
                     ? towns[(rng() * towns.length) | 0]
                     : pois.find((p) => p.kind === "capital");
+                if (tw) tw.spawnTown = true; // стартовый город стихии (W30): вход внутрь как в данж
                 spawn[ELEMS[k]] = nearTown(tw);
             }
         }
