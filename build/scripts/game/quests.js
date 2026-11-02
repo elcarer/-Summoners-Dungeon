@@ -317,7 +317,10 @@
     let cur = null;
 
     const VN_W = 1240, VN_H = 300, VN_BOTTOM = 56; // окно реплик
-    const TXT_X = 600, TXT_W = 700; // текст между портретами
+    const VN_PAD = 30; // зазор текстовый фрейм ↔ портрет (W33, юзер:
+    // арт Глома квадратный — портрет шире прежнего силуэта, фиксированный
+    // TXT_X=600 налезал на арт; рамка теперь считается по фактическим
+    // спрайтам с РАВНЫМИ зазорами с обеих сторон)
 
     function closeDialog() {
         if (!cur) return;
@@ -339,7 +342,9 @@
             const tex = ctx.uiTex("npc/glom.png");
             const sp = new PIXI.Sprite(tex);
             sp.anchor.set(0.5, 1);
-            sp.scale.set(230 / Math.max(tex.height, 1));
+            // высота 230, но широкое будущее арт не раздвинет окно (кап 260)
+            sp.scale.set(Math.min(230 / Math.max(tex.height, 1),
+                260 / Math.max(tex.width, 1)));
             return sp;
         } catch (e) {
             const g = new PIXI.Graphics();
@@ -360,7 +365,8 @@
         const tex = ctx.uiTex(`heroes/${h.img}.png`);
         const sp = new PIXI.Sprite(tex);
         sp.anchor.set(0.5, 1);
-        sp.scale.set(230 / Math.max(tex.height, 1));
+        sp.scale.set(Math.min(230 / Math.max(tex.height, 1),
+            260 / Math.max(tex.width, 1)));
         return sp;
     }
 
@@ -610,21 +616,27 @@
             hero.position.set(bx + VN_W - 160, by + VN_H - 22);
             hero.eventMode = "none";
             vn.addChild(hero);
+            // текстовый фрейм МЕЖДУ портретами: левый/правый край — по
+            // фактическим спрайтам с равным зазором VN_PAD (у Арта Глома
+            // ширина 230, у карточного арта героя ~156 — константа врала)
+            const txX = Math.round(npc.x + npc.width / 2 + VN_PAD);
+            const txR = Math.round(hero.x - hero.width / 2 - VN_PAD);
+            const txW = Math.max(360, txR - txX);
             const nameL = T("", 26, 0xf0c96a,
                 { stroke: { color: 0x241505, width: 6 } });
             nameL.anchor.set(0, 0);
-            nameL.position.set(TXT_X, by + 26);
+            nameL.position.set(txX, by + 26);
             nameL.eventMode = "none";
             vn.addChild(nameL);
             const body = T("", 26, 0xf3e6c2,
-                { wordWrap: true, wordWrapWidth: TXT_W, align: "left" });
+                { wordWrap: true, wordWrapWidth: txW, align: "left" });
             body.anchor.set(0, 0);
-            body.position.set(TXT_X, by + 64);
+            body.position.set(txX, by + 64);
             body.eventMode = "none";
             vn.addChild(body);
             const hint = T(GAME_LOC.t("quest.next"), 20, 0x8c7f60);
             hint.anchor.set(1, 0.5);
-            hint.position.set(bx + VN_W - 260, by + VN_H - 26);
+            hint.position.set(txR, by + VN_H - 26);
             hint.eventMode = "none";
             vn.addChild(hint);
             node.addChild(vn);
@@ -737,6 +749,17 @@
                 cardUi: cur.phase === "final" && cur.cardUi
                     ? cur.cardUi.map((c) => ({ ...c })) : null,
                 zoom: cur.zoomer ? cur.zoomer.state() : null,
+                // текстовый фрейм фазы реплик (W33, пробы): левый край,
+                // ширина переноса и фактические зазоры до портретов
+                txt: cur.vn ? {
+                    x: Math.round(cur.nameL.position.x),
+                    w: Math.round(cur.body.style.wordWrapWidth),
+                    padL: Math.round(cur.nameL.position.x
+                        - (cur.npcSp.x + cur.npcSp.width / 2)),
+                    padR: Math.round((cur.heroSp.x - cur.heroSp.width / 2)
+                        - (cur.nameL.position.x
+                            + cur.body.style.wordWrapWidth)),
+                } : null,
                 arrowOn: cur.checkbox ? !!cur.checkbox() : null,
                 buttons: cur.phase === "final"
                     ? (cur.kind === "announce"
