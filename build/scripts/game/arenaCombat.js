@@ -110,7 +110,7 @@
                 floatText(p.x, p.y - 39, "−1⚔", 0x8cd0ef);
                 fxEvent("ice", { x: p.x, y: p.y - 12, scale: 0.72 });
                 punch(target.node);
-                sfx("aqua");
+                sfx("chpoc");
                 heroElementalDraw(attacker); // «Сонм духов»: способность элементаля
             };
 
@@ -443,7 +443,7 @@
                 } else B.eHand.push(cardId);
                 const p = side === "p" ? { x: 960, y: 840 } : { x: 960, y: 240 };
                 floatText(p.x, p.y, "↩ " + GAME_LOC.t(`card.${cardId}.name`), 0xb7d0ef);
-                sfx("up");
+                sfx("chpoc");
                 refreshHud();
             };
             // «Скелет послушника» (dec148): после появления разыгрывает
@@ -542,7 +542,7 @@
                         damageUnit(t, 1, null, "rocket");
                     }
                 }
-                sfx("rocket");
+                sfx("chpoc");
             };
             A.noteDiscard = function noteDiscard(n = 1, side = null, ids = null) {
                 if (!B) return;
@@ -635,7 +635,7 @@
                     punch(t.node);
                     damageUnit(t, 2, null, "dam");
                 }
-                if (strikes > 0) sfx("rocket");
+                if (strikes > 0) sfx("chpoc");
                 refreshHud();
                 checkEnd();
                 return strikes;
@@ -902,7 +902,7 @@
                 afterSpellPlayed(); // «Заклинатель клинков» реагирует и на это
                 if (def.burn) { // «Сожжение» (tim229): свободный каст тоже сжигает
                     floatText(fp.x, fp.y + 60, `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
-                    sfx("rocket");
+                    sfx("chpoc");
                 } else {
                     noteDiscard(1, side, [pick.id]);
                     discard.push(pick.id);

@@ -556,7 +556,7 @@
                 deck, alive: true, boss: false,
                 wander: s.key, wild: s.kind === "wild",
                 hpBonus: s.kind === "wild" ? (s.st.hpBonus || 0) : 0 };
-            if (ctx.sfx) ctx.sfx();
+            if (ctx.sfx) ctx.sfx("rocket"); // начало боя (W34, юзер)
             scenes.go("arena");
         }
 
@@ -865,7 +865,7 @@
             // блокировала выход до конца сессии (баг W22)
             st.ladderCoolMs = 2000;
             G.dungeon = st;
-            if (ctx.sfx) ctx.sfx();
+            if (ctx.sfx) ctx.sfx("coins"); // вход в подземелье (W34, юзер)
             scenes.go("dungeon");
             return true;
         }
@@ -876,28 +876,15 @@
         // города (st.city): стены — набор тайлов данжа стихии, пол —
         // поверхность зоны; внутри торговец картами и NPC Глом, врагов нет
         function cityStateFor(elem) {
-            const D = globalThis.GAME_DATA;
-            const caveId = Object.keys(D.CAVES).find(
-                (k) => D.CAVES[k].elem === elem) || "gob";
             const saved = G.cityStates && G.cityStates[elem];
-            if (saved && saved.v === globalThis.GAME_DUNGEON.MAP_V) return saved;
-            const st = globalThis.GAME_DUNGEON.newDungeonState(caveId, 1);
-            st.city = true; // режим города (сцена dungeon)
-            st.elem = elem; // зона (пол-поверхность и HUD)
-            st.enemies = []; // в городе мирно
-            st.exit = null; // спуска в городе нет
-            // объекты города: магазин карт + Старина Глом (квестодатель)
-            const centers = (st.lootCenters && st.lootCenters.length
-                ? st.lootCenters : st.roomCenters.slice(1));
-            st.objects = centers.slice(0, 2).map(([col, row], i) => ({
-                type: i === 0 ? "shop" : "npc",
-                col, row, taken: false,
-                stock: i === 0
-                    ? Array.from({ length: 6 }, () => D.rollLootCard(elem))
-                    : null,
-                sold: i === 0
-                    ? [false, false, false, false, false, false] : null,
-            }));
+            // планировка города своей версии (cityV, W34) — иначе пересбор:
+            // новый генератор живёт в GAME_DUNGEON.newCityState
+            if (saved && saved.v === globalThis.GAME_DUNGEON.MAP_V
+                && saved.cityV === globalThis.GAME_DUNGEON.CITY_V) return saved;
+            // столица — стартовый город СВОЕЙ стихии (8 районов, дом Глома);
+            // прочие города — обычные (5 районов)
+            const st = globalThis.GAME_DUNGEON.newCityState(
+                elem, elem === G.elem);
             if (G.cityStates) G.cityStates[elem] = st;
             return st;
         }
@@ -934,7 +921,7 @@
             if (st.spawn) st.heroPos = { ...st.spawn };
             st.ladderCoolMs = 2000;
             G.dungeon = st;
-            if (ctx.sfx) ctx.sfx();
+            if (ctx.sfx) ctx.sfx("enter"); // вход в город (W34, юзер)
             scenes.go("dungeon");
             return true;
         }
@@ -1238,6 +1225,7 @@
             update(ticker) {
                 if (heroId === null || !uiHud) return;
                 const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
+                if (ctx.footstep) ctx.footstep(hx, hy); // шаги героя (W34)
                 // чанки экрана + запас (пересобираются только при выходе
                 // камеры за набор) и видимость POI (просил юзер: рисуется
                 // только экран плюс запас, остальное — когда доедет)
@@ -1411,11 +1399,19 @@
                         const hgx = Math.floor(hx / TS), hgy = Math.floor(hy / TS);
                         const sgx = Math.floor(sx / TS), sgy = Math.floor(sy / TS);
                         const battleCool = performance.now() < (G.world.battleCool || 0);
+                        const wasAggro = s.aggro;
                         if (!s.aggro && !battleCool && dHero < aggroR
                             && dRoute < WAND_LEASH
                             && bfsPath(sgx, sgy, hgx, hgy)) s.aggro = true;
                         else if (s.aggro && (dHero > aggroR * 1.4
                             || dRoute > WAND_LEASH)) s.aggro = false;
+                        // бродячий монстр заметил героя (W34, юзер):
+                        // сигнал «обнаружения», не чаще раза в 2.5с
+                        if (s.aggro && !wasAggro && ctx.sfx
+                            && performance.now() >= (G.world.alertCool || 0)) {
+                            G.world.alertCool = performance.now() + 2500;
+                            ctx.sfx("alert");
+                        }
                         if (s.aggro) {
                             // погоня: путь к герою, пересчёт раз в 0.4с
                             // (герой бежит — маршрут перестраивается)

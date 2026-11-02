@@ -172,7 +172,7 @@
                     const p = cellXY(v.col, v.row);
                     floatText(p.x, p.y - 66, `+${k}⚔ +${k}♥`, 0x9fd489);
                     punch(v.node);
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 // ловушки стороны погибшего: триггер «при гибели своего существа»
                 if (killer && killer.def && killer.def.type === "unit" && killer.side !== u.side) {
@@ -206,7 +206,7 @@
                     const p = cellXY(v.col, v.row);
                     floatText(p.x, p.y - 66, `+${a}⚔ +${h}♥`, 0x9fd489);
                     punch(v.node);
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 // «Жажда смерти» (decThirst, heroes/30): ПЕРВАЯ за бой гибель
                 // СВОЕГО существа лечит базу владельца на 3
@@ -216,7 +216,7 @@
                         && !B.heroFlags.firstDeathHeal[u.side]) {
                         B.heroFlags.firstDeathHeal[u.side] = true;
                         healBase(u.side, 3);
-                        sfx("up");
+                        sfx("chpoc");
                     }
                 }
                 // «Охранники мостов» (heroes 42–46, просил юзер): при
@@ -374,7 +374,7 @@
                 const p = cellXY(killer.col, killer.row);
                 floatText(p.x, p.y - 66, "+1⚡", 0xffd98c);
                 punch(killer.node);
-                sfx("aqua");
+                sfx("chpoc");
             };
 
             // «Лич» (dec131, просил юзер): убив существо (любой стороны),
@@ -560,7 +560,7 @@
                     floatText(wp.x, wp.y - 66,
                         "✦ " + GAME_LOC.t("spell.ward.name"), 0x8cd0ef);
                     fxEvent("ward", { x: wp.x, y: wp.y - 14, scale: 0.72 });
-                    sfx("aqua");
+                    sfx("chpoc");
                     return;
                 }
                 // «Защита N» («Защитный кокон») режет входящий урон до нуля;
@@ -674,7 +674,7 @@
                     if (target.side === "p") B.energy += 1; else B.eEnergy += 1;
                     const op = cellXY(target.col, target.row);
                     floatText(op.x, op.y - 84, "+1⚡", 0x8cd0ef);
-                    sfx("aqua");
+                    sfx("chpoc");
                 }
                 if (target.hp <= 0) { killUnit(target, killer); return; }
                 // «Гоблин-асассин»: существо, оставшееся после его урона
@@ -713,7 +713,7 @@
                 floatText(p.x, p.y - 36, `+${n}`, 0x9fd489);
                 fxEvent("heal", { x: p.x, y: p.y - 10, scale: 0.78 });
                 punch(u.node);
-                sfx("up");
+                sfx("chpoc");
             };
 
             // Лечение базы стороны — единая точка для всех источников
@@ -779,7 +779,7 @@
                         const op = side === "p" ? "e" : "p";
                         floatText(960, side === "p" ? 800 : 280,
                             "⟲ " + GAME_LOC.t("hero.darklord.name"), 0xb07ad5);
-                        sfx("rocket");
+                        sfx("chpoc");
                         damageBase(op, amount,
                             { x: 960, y: op === "p" ? 840 : 240, fill: 0xb07ad5 });
                     }

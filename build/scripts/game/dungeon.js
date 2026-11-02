@@ -72,7 +72,11 @@
         "#..........##................#",
         "##############################",
     ];
-    const W = ROWS[0].length, H = ROWS.length;
+    // Сетка ГЕНЕРАЦИИ ДАНЖА — всегда 30×17 (genMap/newDungeonState/
+    // retreatCell живут по ней). АКТИВНАЯ карта (W/H) — то, что на экране:
+    // город шире и выше данжа, размер ставится в enter() по st.rows (W34)
+    const DW = ROWS[0].length, DH = ROWS.length;
+    let W = DW, H = DH;
     // АКТИВНАЯ раскладка: строки сгенерированного этажа (st.rows).
     // До первого входа — старая фиксированная карта (заглушка для
     // collide в main.js; мир при входе ставит свои строки)
@@ -173,19 +177,19 @@
         const rng = mulberry32(((globalThis.__MAP_SEED != null
             ? globalThis.__MAP_SEED : (Math.random() * 2 ** 31) | 0)
             + floor * 104729 + cave.length * 7919 + cave.charCodeAt(0) * 313) | 0);
-        const g = Array.from({ length: H }, () => Array(W).fill("#"));
-        const carve = (x, y) => { if (x > 0 && y > 0 && x < W - 1 && y < H - 1) g[y][x] = "."; };
+        const g = Array.from({ length: DH }, () => Array(DW).fill("#"));
+        const carve = (x, y) => { if (x > 0 && y > 0 && x < DW - 1 && y < DH - 1) g[y][x] = "."; };
         const rooms = [];
         // стартовая комната — первой: пошире (клик-тесты ходят по ней),
         // в левой-верхней четверти
         rooms.push({ x: 2 + ((rng() * 3) | 0), y: 2 + ((rng() * 2) | 0), w: 6 + ((rng() * 3) | 0), h: 4 });
-        const fits = (r) => r.x >= 2 && r.y >= 2 && r.x + r.w <= W - 2 && r.y + r.h <= H - 2 &&
+        const fits = (r) => r.x >= 2 && r.y >= 2 && r.x + r.w <= DW - 2 && r.y + r.h <= DH - 2 &&
             !rooms.some((o) => r.x < o.x + o.w + 1 && r.x + r.w + 1 > o.x &&
                                 r.y < o.y + o.h + 1 && r.y + r.h + 1 > o.y);
         for (let n = 0; n < 300 && rooms.length < 4 + ((rng() * 3) | 0); n++) {
             const r = { w: 5 + ((rng() * 4) | 0), h: 3 + ((rng() * 3) | 0) };
-            r.x = 2 + ((rng() * (W - 4 - r.w)) | 0);
-            r.y = 2 + ((rng() * (H - 4 - r.h)) | 0);
+            r.x = 2 + ((rng() * (DW - 4 - r.w)) | 0);
+            r.y = 2 + ((rng() * (DH - 4 - r.h)) | 0);
             if (fits(r)) rooms.push(r);
         }
         const center = (r) => [r.x + (r.w >> 1), r.y + (r.h >> 1)];
@@ -252,7 +256,7 @@
         const narrow = (x, y) => (g[y][x - 1] === "#" && g[y][x + 1] === "#") ||
                                  (g[y - 1][x] === "#" && g[y + 1][x] === "#");
         const cands = [];
-        for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+        for (let y = 1; y < DH - 1; y++) for (let x = 1; x < DW - 1; x++) {
             if (g[y][x] !== "." || inRoom(x, y) >= 0) continue;
             const door = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inRoom(x + dx, y + dy) > 0);
             if (door && narrow(x, y)) cands.push([x, y]);
@@ -265,7 +269,7 @@
             if (Math.abs(x - sx) + Math.abs(y - sy) < 4) continue;
             if (Math.abs(x - bx) + Math.abs(y - by) < 3) continue;
             let apart = true;
-            for (let j = 0; j < H && apart; j++) for (let i = 0; i < W && apart; i++)
+            for (let j = 0; j < DH && apart; j++) for (let i = 0; i < DW && apart; i++)
                 if (g[j][i] === "e" && Math.abs(i - x) + Math.abs(j - y) < 5) apart = false;
             if (!apart) continue;
             g[y][x] = "e";
@@ -273,11 +277,11 @@
         }
         // мало узких дверей (редкая раскладка) — добираем любыми
         // коридорными клетками подальше от героя
-        for (let y = 1; y < H - 1 && placed < 3; y++) for (let x = 1; x < W - 1 && placed < 3; x++) {
+        for (let y = 1; y < DH - 1 && placed < 3; y++) for (let x = 1; x < DW - 1 && placed < 3; x++) {
             if (g[y][x] !== "." || inRoom(x, y) >= 0) continue;
             if (Math.abs(x - sx) + Math.abs(y - sy) < 5) continue;
             let apart = true;
-            for (let j = 0; j < H && apart; j++) for (let i = 0; i < W && apart; i++)
+            for (let j = 0; j < DH && apart; j++) for (let i = 0; i < DW && apart; i++)
                 if (g[j][i] === "e" && Math.abs(i - x) + Math.abs(j - y) < 5) apart = false;
             if (!apart) continue;
             g[y][x] = "e";
@@ -304,7 +308,7 @@
         };
         const bossId = caveOf(caveId).boss; // главарь данжа (boss / grwBoss / wisBoss)
         const rows = st.rows;
-        for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+        for (let j = 0; j < DH; j++) for (let i = 0; i < DW; i++) {
             const ch = rows[j][i];
             const x = i * TS + TS / 2, y = j * TS + TS / 2;
             if (ch === "H") { st.heroPos = { x, y }; st.spawn = { x, y }; }
@@ -324,13 +328,132 @@
         return st;
     }
 
+    // ── ГОРОД (W34, юзер): этаж данжа, КОМНАТЫ УКРУПНЕНЫ до КВАРТАЛОВ ────
+    // Та же генерация, что у этажа (стены тайлами данжа, комнаты,
+    // коридоры-проходы) — юзер: «стенки хорошо смотрелись», «просто
+    // увеличьте пространство комнат до кварталов». Комнаты крупные,
+    // в них стоят здания юзера: ратуша 6×6, магазин/кузница/дом Глома
+    // 6×4 (пятно "%" непроходимо, вход — клетка-дверь снизу). Пол —
+    // ЕДИНЫЙ лист поверхности зоны (без подсыпок). Обычный город —
+    // 5 районов (центр с ратушей + 4 квартала); столица (стартовый
+    // город героя) — 8 районов, только в ней дом Глома и сам Глом.
+    const CITY_V = 3; // версия планировки города: старые cityStates пересобираются
+    function newCityState(elem, capital) {
+        const D = globalThis.GAME_DATA;
+        const caveId = Object.keys(D.CAVES).find(
+            (k) => D.CAVES[k].elem === elem) || "gob";
+        const CW = capital ? 48 : 40, CH = capital ? 38 : 30;
+        const g = Array.from({ length: CH }, () => Array(CW).fill("#"));
+        const carve = (x0, y0, x1, y1) => {
+            for (let y = y0; y <= y1; y++)
+                for (let x = x0; x <= x1; x++) g[y][x] = ".";
+        };
+        // комнаты-кварталы: [x0, y0, x1, y1] — всё между ними стены
+        // (толща не рисуется, кромки — тайлами данжа, как в подземелье)
+        const rooms = capital ? [
+            [19, 15, 28, 24], // центральная (ратуша)
+            [2, 2, 20, 11],   // северо-западная (магазин)
+            [27, 2, 45, 11],  // северо-восточная
+            [2, 14, 16, 27],  // западная (кузница)
+            [31, 14, 45, 27], // восточная (дом Глома)
+            [2, 29, 16, 36],  // юго-западная
+            [19, 29, 28, 36], // южная
+            [31, 29, 45, 36], // юго-восточная
+        ] : [
+            [15, 10, 24, 19], // центральная (ратуша)
+            [2, 2, 12, 8],    // северо-западная (магазин)
+            [27, 2, 37, 8],   // северо-восточная (кузница)
+            [2, 21, 12, 27],  // юго-западная
+            [27, 21, 37, 27], // юго-восточная
+        ];
+        for (const [x0, y0, x1, y1] of rooms) carve(x0, y0, x1, y1);
+        // здания: прижаты к верху своей комнаты, фасад и дверь — вниз
+        const blds = [];
+        const put = (x0, y0, w, h, type, file) => {
+            for (let j = y0; j < y0 + h; j++)
+                for (let i = x0; i < x0 + w; i++) g[j][i] = "%";
+            const door = [x0 + (w >> 1) - 1, y0 + h]; // клетка-дверь снизу
+            blds.push({ type, build: file, gx: x0, gy: y0, w, h,
+                col: door[0], row: door[1] });
+        };
+        const hall = rooms[0];
+        if (capital) {
+            put(21, 17, 6, 6, "townHall", "town_hall.png");
+            put(5, 4, 6, 4, "shop", "shop.png");     // северо-западная
+            put(4, 16, 6, 4, "armory", "armory.png"); // западная
+            put(37, 16, 6, 4, "glomHouse", "glom_house.png"); // восточная
+        } else {
+            put(17, 12, 6, 6, "townHall", "town_hall.png");
+            put(4, 4, 6, 4, "shop", "shop.png");
+            put(29, 4, 6, 4, "armory", "armory.png");
+        }
+        // коридоры-проходы: от низа центральной комнаты к низам остальных
+        // кварталов + дуги по периметру (L-форма, как в генераторе данжей —
+        // прорезают стены, соединяют все комнаты; здания прижаты к верхам
+        // комнат, коридоры идут по низам — пятна не задевают)
+        const corridor = (a, b) => {
+            const [ax, ay] = a, [bx, by] = b;
+            const sx0 = Math.min(ax, bx), sx1 = Math.max(ax, bx);
+            for (let x = sx0; x <= sx1; x++) g[ay][x] = ".";
+            const sy0 = Math.min(ay, by), sy1 = Math.max(ay, by);
+            for (let y = sy0; y <= sy1; y++) g[y][bx] = ".";
+        };
+        const lows = rooms.map(([x0, y0, x1, y1]) =>
+            [x0 + ((x1 - x0) >> 1), y1]); // центр НИЗА комнаты (пол)
+        const hub = lows[0]; // низ центральной комнаты — развязка
+        for (let i = 1; i < lows.length; i++) corridor(hub, lows[i]);
+        if (capital) {
+            corridor(lows[1], lows[2]); // дуга по северу
+            corridor(lows[5], lows[6]); // дуги по югу
+            corridor(lows[6], lows[7]);
+        } else {
+            corridor(lows[1], lows[2]);
+            corridor(lows[3], lows[4]);
+        }
+        const objects = blds.map((b) => {
+            const o = { ...b, taken: false };
+            if (o.type === "shop") { // торговец картами живёт в магазине
+                o.stock = Array.from({ length: 6 }, () => D.rollLootCard(elem));
+                o.sold = [false, false, false, false, false, false];
+            }
+            return o;
+        });
+        const house = blds.find((b) => b.type === "glomHouse");
+        const glomHome = house ? {
+            x: (house.col + 1) * TS + TS / 2, // появляется у двери дома
+            y: house.row * TS + TS / 2,
+        } : null;
+        const st = {
+            v: MAP_V, cityV: CITY_V, city: true, isCapital: !!capital,
+            elem, cave: caveId, floor: 1,
+            enemies: [], exit: null, exitCool: false, bossDead: true,
+            toast: null, toastT: 0, win: null,
+            rows: g.map((r) => r.join("")),
+            roomCenters: rooms.map(([x0, y0, x1, y1]) =>
+                [x0 + ((x1 - x0) >> 1), y0 + ((y1 - y0) >> 1)]),
+            lootCenters: [], objects,
+            districts: rooms.length, // районов-комнат: 5 / 8
+            glom: house ? {
+                state: "hidden", // hidden → walking → talking → idle
+                x: glomHome.x, y: glomHome.y,
+            } : null,
+            glomHome,
+        };
+        // прибытие: центральная комната, слева от ратуши; лестница-выход
+        // клеткой выше (лестницу 2с «остужает» enterCity — первый кадр
+        // не выкидывает в мир)
+        st.ladder = { x: (hall[0] + 2) * TS + TS / 2, y: (hall[3] - 1) * TS + TS / 2 };
+        st.spawn = { x: st.ladder.x, y: st.ladder.y + TS };
+        return st;
+    }
+
     // Поражение в бою (просил юзер): герой отступает на свободную
     // соседнюю клетку врага — враг остаётся на месте, реванш по касанию.
     // Клетка врага всегда проходима, соседи по карте; если кругом стены —
     // возвращаем на место (бой перезапустится касанием, не падаем).
     function retreatCell(enemy) {
         const cx = Math.round(enemy.x / TS - 0.5), cy = Math.round(enemy.y / TS - 0.5);
-        const open = (gx, gy) => gx >= 0 && gy >= 0 && gx < W && gy < H && MAPROWS[gy][gx] !== "#";
+        const open = (gx, gy) => gx >= 0 && gy >= 0 && gx < DW && gy < DH && MAPROWS[gy][gx] !== "#";
         const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
         for (let i = dirs.length - 1; i > 0; i--) {
             const j = (Math.random() * (i + 1)) | 0;
@@ -343,13 +466,18 @@
     }
 
     function createDungeonScene(ctx) {
-        const { COMPONENTS, camera, characters, charInput, ECS, world, scenes, G, worldContainer, uiTex } = ctx;
+        const { COMPONENTS, camera, characters, charInput, ECS, world, scenes, G, worldContainer, uiTex, creatureSheets } = ctx;
         let layer = null, heroId = null, heroSprite = null, heroShadow = null,
             tokens = [], uiHud = null;
         let myState = null; // состояние, которым живёт этот инстанс сцены:
         // подъём/спуск меняет G.dungeon ДО переключения сцены — тогда
         // heroPos в exit() пишет уже не этому состоянию
         let objNodes = []; // спрайты объектов комнат (куча/сундук/магазин)
+        // Глом в городе (W34): живой агент у своего дома в столице.
+        // Скрыт, пока герой не подойдёт к дому; выходит, идёт к герою,
+        // начинает разговор. Сущность characters — как у отрядов мира
+        let glomId = null, glomNode = null, glomShadow = null,
+            glomPath = null, glomPathT = 0;
         let winNode = null, winRefs = null, winObj = null; // открытое окно объекта
         let sellRows = []; // строки продажи магазина (для тестов)
         let refreshShop = null; // живое обновление окна магазина (пишет buildShopWin)
@@ -361,7 +489,8 @@
         function blocked(px, py) {
             const gx = Math.floor(px / TS), gy = Math.floor(py / TS);
             if (gx < 0 || gy < 0 || gx >= W || gy >= H) return true;
-            return MAPROWS[gy][gx] === "#";
+            const ch = MAPROWS[gy][gx];
+            return ch === "#" || ch === "%"; // стены и пятна застройки (W34)
         }
 
         // ── Клик-перемещение: BFS по клеткам + ведение героя по пути ────────
@@ -369,7 +498,9 @@
         // осями (ctrlVI/ctrlVJ — механизм ИИ): работают коллизии-скольжение и
         // походка из character-системы. Клавиши движения путь отменяют.
         function walkable(gx, gy) {
-            return gx >= 0 && gy >= 0 && gx < W && gy < H && MAPROWS[gy][gx] !== "#";
+            if (gx < 0 || gy < 0 || gx >= W || gy >= H) return false;
+            const ch = MAPROWS[gy][gx];
+            return ch !== "#" && ch !== "%"; // улицы/площадь/земля — ходибельно
         }
         function bfsPath(sx, sy, tx, ty) {
             if (sx === tx && sy === ty) return null;
@@ -595,8 +726,18 @@
 
         // Объект комнаты на карте: иконка юзера (куча/сундук/магазин) на
         // тёмной подложке-тени; у магазина — золотой ободок «здание».
+        // Здание города (W34) — спрайт юзера во всю пятну застройки:
+        // 384×256 (6×4 клетки) или ратуша 384×384 (6×6), 1:1 к клетке 64.
         function makeObjectNode(obj) {
             const c = new PIXI.Container();
+            if (obj.build) {
+                const sp = new PIXI.Sprite(uiTex(`buildings/${obj.build}`));
+                sp.anchor.set(0.5, 1); // низ-центр: стоит на кромке пятна
+                sp.position.set((obj.gx + obj.w / 2) * TS, (obj.gy + obj.h) * TS);
+                c.addChild(sp);
+                c.zIndex = (obj.gy + obj.h) * TS - 0.5; // y-sort: герой за/перед
+                return c;
+            }
             const shadow = new PIXI.Graphics();
             shadow.circle(0, 0, 19);
             shadow.fill({ color: 0x120d09, alpha: 0.55 });
@@ -644,6 +785,31 @@
                 objNodes[i].node.destroy({ children: true });
                 objNodes.splice(i, 1);
             }
+        }
+
+        // Глом выходит из-за дома (W34): AnimatedSprite листа glom_256
+        // (арт юзера, 4 ряда × 6 кадров), тот же контроллер персонажа,
+        // что у героя и отрядов мира — ходьба и развороты сами
+        function spawnGlom(gl) {
+            const sheet = (creatureSheets && creatureSheets.glom)
+                || ctx.heroSheets.strength;
+            glomNode = new PIXI.AnimatedSprite(sheet.animations.walk_front, false);
+            glomNode.anchor.set(0.5, 1);
+            glomNode.scale.set(0.375); // как герой — ~96px
+            glomShadow = new PIXI.Graphics();
+            glomShadow.ellipse(0, 0, 15, 6.5);
+            glomShadow.fill({ color: 0x120d09, alpha: 0.45 });
+            layer.addChild(glomShadow);
+            layer.addChild(glomNode);
+            glomId = characters.spawn({
+                x: gl.x, y: gl.y, sprite: glomNode, anims: sheet.animations,
+                speed: 200, fps: sheet.fps, halfW: 8, halfH: 6,
+            });
+            ECS.addComponent(world, glomId, "ctrlVI", 0);
+            ECS.addComponent(world, glomId, "ctrlVJ", 0);
+            glomNode.zIndex = gl.y;
+            glomShadow.position.set(gl.x, gl.y - 4.5);
+            glomShadow.zIndex = gl.y - 0.5;
         }
 
         // Иконка-кнопка HUD (настройки/колода): спрайт-иконка без подписи
@@ -833,6 +999,16 @@
                 // повторный разговор после отхода — снова у Глома
                 o.cool = true;
                 globalThis.GAME_QUESTS.talkTo(ctx);
+                return;
+            }
+            if (o.type === "armory" || o.type === "townHall"
+                || o.type === "glomHouse") {
+                // кузница/ратуша/дом Глома (W34): здание стоит, функционал
+                // добавляется позже; дом Глома — просто декорация, Глом
+                // сам подходит к герою (квестовая сценка)
+                o.cool = true;
+                showToast(GAME_LOC.t("world.soon"));
+                winObj = null;
                 return;
             }
             G.dungeon.win = { idx: G.dungeon.objects.indexOf(o) };
@@ -1209,9 +1385,15 @@
                 if (!G.dungeon || G.dungeon.v !== MAP_V)
                     G.dungeon = newDungeonState(G.run.cave, G.run.floor);
                 if (!G.dungeon.cave) G.dungeon.cave = "gob";
+                // город другой планировки (cityV старше W34) — пересобирается
+                // по новым правилам; floors данжей это не задевает
+                if (G.dungeon.city && G.dungeon.cityV !== CITY_V)
+                    G.dungeon = newCityState(G.dungeon.elem || "strength",
+                        !!G.dungeon.isCapital);
                 const st = G.dungeon;
                 myState = st;
                 MAPROWS = st.rows || ROWS; // активная раскладка этажа
+                W = MAPROWS[0].length; H = MAPROWS.length; // город шире/выше данжа
                 ctx.collide.rows = MAPROWS; // коллизии героя — по карте этажа
                 ctx.collide.ts = TS; // клетка этажа — 64px (тайлы данжа)
                 // сейв стоя на лестнице не должен мгновенно поднимать героя
@@ -1224,9 +1406,10 @@
                 for (const o of st.objects)
                     if (o.type === "shop" && !o.sold) o.sold = [false, false, false, false, false, false];
                 // сейвы до «объектов вне стартовой комнаты»: в стартовой
-                // комнате героя объектов больше не бывает — выкидываем
-                {
-                    const [sc, sr] = (st.roomCenters || ROOM_CENTERS)[0];
+                // комнате героя объектов больше не бывает — выкидываем.
+                // У города своих комнат нет (здания в кварталах) — не трогаем
+                if (!st.city && st.roomCenters && st.roomCenters.length) {
+                    const [sc, sr] = st.roomCenters[0];
                     const n0 = st.objects.length;
                     st.objects = st.objects.filter((o) => o.col !== sc || o.row !== sr);
                     if (st.objects.length !== n0) st.win = null;
@@ -1253,6 +1436,14 @@
                     globalThis.GAME_QUESTS.noteFloor(G, st.floor); // «Дно»: галочка дна
                 }
                 closeModal(); // окно объекта не переживает уход из сцены
+                // Глом (W34): сцена переехала — он снова за домом
+                if (st.city && st.glom && st.glomHome) {
+                    st.glom.state = "hidden";
+                    st.glom.x = st.glomHome.x;
+                    st.glom.y = st.glomHome.y;
+                    glomId = null; glomNode = null; glomShadow = null;
+                    glomPath = null;
+                }
                 layer = new PIXI.Container();
                 layer.sortableChildren = true;
                 // клик-зона на всю карту (ниже всех — рисуется прозрачной):
@@ -1297,6 +1488,10 @@
                 for (const o of st.objects) if (!o.taken) {
                     const node = makeObjectNode(o);
                     layer.addChild(node);
+                    // здания города (W34) стоят НА ЗЕМЛЕ — не качаются
+                    // (юзер: «дома должны просто стоять»); качаются только
+                    // иконки-объекты данжа (куча/сундук/магазин-иконка)
+                    if (o.build) continue;
                     objNodes.push({ obj: o, node, base: node.y, phase: Math.random() * 6.28 });
                 }
                 worldContainer.addChild(layer);
@@ -1362,6 +1557,9 @@
                 // настройки, колода, «этаж пройден») — «Продолжить» в меню
                 if (st && G.saveRun) G.saveRun();
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
+                if (glomId !== null) { characters.remove(glomId); glomId = null; } // Глом (W34)
+                glomNode = null;
+                glomShadow = null;
                 heroSprite = null;
                 heroShadow = null;
                 path = null;
@@ -1377,6 +1575,7 @@
                 const st = G.dungeon;
                 if (!st || heroId === null || !uiHud) return;
                 const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
+                if (ctx.footstep) ctx.footstep(hx, hy); // шаги героя (W34)
                 const dt = ticker.deltaMS / 1000;
 
                 // Эскейп — дублирует кнопку «выход» открытого меню (просил
@@ -1469,6 +1668,92 @@
                         if (d < TS * 0.85) { openObject(o); break; }
                     }
                 }
+                // ── Глом у своего дома (W34, юзер): квестовая сценка ───────
+                // Герой входит в город — Глома нет, у дома стоит сам дом.
+                // Подошёл к дому — Глом выходит, идёт к герою, начинается
+                // квестовый диалог. Разошлись — «остывает» и ждёт, куда
+                // дошёл (повторный разговор — подойти снова, как у объектов)
+                if (st.city && st.isCapital && st.glom && !st.win
+                    && globalThis.GAME_QUESTS) {
+                    const gl = st.glom;
+                    if (gl.state === "hidden") {
+                        const house = st.objects.find((o) => o.type === "glomHouse");
+                        const q = G.quests;
+                        const busy = house && q && (q.pending || q.active);
+                        const hcx = (house.gx + house.w / 2) * TS,
+                            hcy = (house.gy + house.h / 2) * TS;
+                        if (busy && !ctx.questModal
+                            && Math.hypot(hx - hcx, hy - hcy) < TS * 4) {
+                            spawnGlom(gl); // вышел из-за дома
+                            gl.state = "walking";
+                        }
+                    } else if (glomId !== null) {
+                        const gx2 = COMPONENTS.positionX[glomId],
+                            gy2 = COMPONENTS.positionY[glomId];
+                        gl.x = gx2; gl.y = gy2;
+                        glomNode.zIndex = gy2;
+                        glomShadow.position.set(gx2, gy2 - 4.5);
+                        glomShadow.zIndex = gy2 - 0.5;
+                        if (gl.state === "walking") {
+                            if (ctx.questModal) { // окно открыто — стоит
+                                COMPONENTS.ctrlVI[glomId] = 0;
+                                COMPONENTS.ctrlVJ[glomId] = 0;
+                            } else {
+                                const dHero = Math.hypot(hx - gx2, hy - gy2);
+                                if (dHero < TS * 0.95) {
+                                    // дошёл — начинает разговор
+                                    gl.state = "talking";
+                                    COMPONENTS.ctrlVI[glomId] = 0;
+                                    COMPONENTS.ctrlVJ[glomId] = 0;
+                                    globalThis.GAME_QUESTS.talkTo(ctx);
+                                } else if (dHero > TS * 10) {
+                                    gl.state = "idle"; // герой убежал — поводок
+                                } else {
+                                    // путь к герою по клеткам (пересчёт
+                                    // 0.4с), ось на очередную клетку —
+                                    // как у отрядов мира
+                                    glomPathT -= dt * 1000;
+                                    if (!glomPath || !glomPath.length
+                                        || glomPathT <= 0) {
+                                        glomPathT = 400;
+                                        glomPath = bfsPath(
+                                            Math.floor(gx2 / TS), Math.floor(gy2 / TS),
+                                            Math.floor(hx / TS), Math.floor(hy / TS));
+                                    }
+                                    let vx = 0, vy = 0;
+                                    if (glomPath && glomPath.length) {
+                                        const t0 = glomPath[0];
+                                        if (Math.hypot(t0.x - gx2, t0.y - gy2) < 5)
+                                            glomPath.shift();
+                                        const t1 = glomPath[0];
+                                        if (t1) {
+                                            const dx = t1.x - gx2, dy = t1.y - gy2;
+                                            const dd = Math.hypot(dx, dy) || 1;
+                                            vx = dx / dd; vy = dy / dd;
+                                        }
+                                    }
+                                    COMPONENTS.ctrlVI[glomId] = vx;
+                                    COMPONENTS.ctrlVJ[glomId] = vy;
+                                }
+                            }
+                        }
+                        if (gl.state !== "walking") {
+                            // диалог закрыт — Глом «остывает», как объекты
+                            if (!ctx.questModal && gl.state === "talking") {
+                                gl.state = "idle";
+                                gl.cool = true;
+                            }
+                            const d = Math.hypot(hx - gl.x, hy - gl.y);
+                            const idleG = !path && !charInput.ix && !charInput.iy;
+                            if (gl.cool) {
+                                if (d > TS * 1.25) gl.cool = false;
+                            } else if (idleG && d < TS * 0.85) {
+                                gl.cool = true;
+                                globalThis.GAME_QUESTS.talkTo(ctx);
+                            }
+                        }
+                    }
+                }
                 if (!st.win && !ctx.questModal && !st.city) for (const t of tokens) {
                     if (!t.enemy.alive) continue;
                     if (Math.hypot(t.enemy.x - hx, t.enemy.y - hy) < TS * 0.85) {
@@ -1491,6 +1776,7 @@
                         }
                         G.worldFrom = false; // бой из подземелья — трофей вернёт сюда
                         G.activeEnemy = t.enemy;
+                        if (ctx.sfx) ctx.sfx("rocket"); // начало боя (W34)
                         scenes.go("arena");
                         return;
                     }
@@ -1653,12 +1939,26 @@
             // лестница наверх у старта этажа и предел глубины данжа (тесты)
             ladderAt: () => (G.dungeon && G.dungeon.ladder ? { ...G.dungeon.ladder } : null),
             maxFloor: (cave) => caveOf(cave || (G.dungeon && G.dungeon.cave) || "gob").maxFloor,
+            // город (тесты W34): районы, здания (пятна и двери), Глом
+            cityInfo: () => {
+                const st = G.dungeon;
+                if (!st || !st.city) return null;
+                return {
+                    isCapital: !!st.isCapital, districts: st.districts,
+                    w: st.rows[0].length, h: st.rows.length,
+                    buildings: st.objects.filter((o) => o.build).map((o) => ({
+                        type: o.type, gx: o.gx, gy: o.gy, w: o.w, h: o.h,
+                        door: [o.col, o.row],
+                    })),
+                    glom: st.glom ? { ...st.glom } : null,
+                };
+            },
         };
     }
 
     globalThis.GAME_DUNGEON = {
-        createDungeonScene, newDungeonState, stateFor, deckNeed, retreatCell,
-        genObjects, MAX_FLOOR, MAP_V,
+        createDungeonScene, newDungeonState, newCityState, stateFor, deckNeed,
+        retreatCell, genObjects, MAX_FLOOR, MAP_V, CITY_V,
         get ROWS() { return MAPROWS; }, // активная раскладка этажа
     };
 })();

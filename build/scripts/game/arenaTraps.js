@@ -64,7 +64,7 @@
                     const p = cellXY(u.col, u.row);
                     floatText(p.x, p.y - 39, "+1⚔", 0x9fd489);
                     punch(u.node);
-                    sfx("up");
+                    sfx("chpoc");
                     heroElementalDraw(u); // «Сонм духов»: способность элементаля
                 }
             };
@@ -396,7 +396,7 @@
                     const p2 = cellXY(u.col, u.row);
                     floatText(p2.x, p2.y - 84, "⚔↺", 0xe08cd0);
                     punch(u.node);
-                    sfx("sword");
+                    sfx("crash");
                     damageUnit(u, u.curAtk, null, "sword");
                     refreshHud();
                     checkEnd();
@@ -441,7 +441,7 @@
                         const ap = cellXY(a.col, a.row);
                         floatText(ap.x, ap.y - 60, "⚔", 0xffb26e);
                         punch(a.node);
-                        sfx("sword");
+                        sfx("crash");
                         const hpBefore = u.hp;
                         damageUnit(u, a.curAtk, a, "sword");
                         crushHit(a, a.curAtk, hpBefore); // «Сокрушение»
@@ -467,7 +467,7 @@
                     const p2 = cellXY(u.col, u.row);
                     floatText(p2.x, p2.y - 39, "⚔=0", 0x8cd0ef);
                     fxEvent("ice", { x: p2.x, y: p2.y - 8, scale: 0.72 });
-                    sfx("aqua");
+                    sfx("chpoc");
                     refreshHud();
                     checkEnd();
                     return;
@@ -492,7 +492,7 @@
                     u.hp -= (trap.def.trap.hp || 1);
                     const hn = u.node.getChildByName("hp");
                     if (hn) hn.text = String(Math.max(0, u.hp));
-                    sfx("acid");
+                    sfx("mine");
                     if (u.hp <= 0) killUnit(u, null);
                     refreshHud();
                     checkEnd();
@@ -517,7 +517,7 @@
                     const p2 = cellXY(cell.col, cell.row);
                     floatText(p2.x, p2.y - 66,
                         "⏳ " + GAME_LOC.t("status.delay.name"), 0xc9a0ef);
-                    sfx("acid");
+                    sfx("mine");
                     if (left > 0) {
                         delayPlace(us, id, cell.col, cell.row,
                             { token: wasToken, left });
@@ -584,7 +584,7 @@
                     floatText(p2.x, p2.y - 39, "−4⚔", 0xef9f8c);
                     fxEvent("debuff", { x: p2.x, y: p2.y - 12, scale: 0.72 });
                     punch(u.node);
-                    sfx("acid");
+                    sfx("mine");
                     refreshHud();
                     checkEnd();
                     return;

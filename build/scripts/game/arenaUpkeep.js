@@ -163,7 +163,7 @@
                     if (b.side !== side || b.def.type !== "building") continue;
                     if (b.def.mycelium) {
                         if (side === "p") B.energy += 1; else B.eEnergy += 1;
-                        sfx("aqua");
+                        sfx("chpoc");
                         const p = cellXY(b.col, b.row);
                         floatText(p.x, p.y - 60, "+1⚡", 0xffd98c);
                         damageUnit(b, 1, null, "dam");
@@ -204,7 +204,7 @@
                         if (side === "p") drawCards(1); else drawEnemy(1);
                         const p = cellXY(b.col, b.row);
                         floatText(p.x, p.y - 66, `+1 ${GAME_LOC.t("card.wis105.name")}`, 0xffd98c);
-                        sfx("chpoc");
+                        // (звук взятия карты дал drawCards — W34)
                         damageUnit(b, 1, null, "dam");
                     }
                     if (b.def.elementalCircle) elementalCircleTick(b);
@@ -226,7 +226,7 @@
                             floatText(vp.x, vp.y - 60, "−1♥", 0xef9f8c);
                             punch(victim.node);
                             fxEvent("debuff", { x: vp.x, y: vp.y - 10, scale: 0.8 });
-                            sfx("acid");
+                            sfx("chpoc");
                             if (victim.hp <= 0) killUnit(victim, null);
                         }
                     }
@@ -273,7 +273,7 @@
                             addUnit(side, "skel", b.col, r, { token: true });
                             const p = cellXY(b.col, r);
                             floatText(p.x, p.y - 60, "+1", 0x9fd489);
-                            sfx("use");
+                            sfx("aqua");
                         }
                     }
                     // «Требушет империи» (hon178): в начале хода владельца
@@ -285,7 +285,7 @@
                             side === "p"
                                 ? { x: 960, y: 60, fill: 0xff8f6e }
                                 : { x: 960, y: 840, fill: 0xff5f4e });
-                        sfx("rocket");
+                        sfx("chpoc");
                     }
                 }
                 // «Весёлый штормовик» (wis110): в начале хода владельца —
@@ -319,7 +319,7 @@
                     const p = cellXY(u.col, u.row);
                     floatText(p.x, p.y - 60, "−1⚔ −1♥", 0xef9f8c);
                     punch(u.node);
-                    sfx("dam");
+                    sfx("chpoc");
                     // убыль — способность Элементаля: «Сонм духов» (wisSpirits)
                     // за первое её срабатывание в бою даёт владельцу карту
                     // (даже если Дух погибает от этой же убыли)
@@ -446,7 +446,7 @@
                     const p = cellXY(b.col, b.row);
                     floatText(p.x, p.y - 60, `+${k}♥`, 0x9fd489);
                     punch(b.node);
-                    sfx("up");
+                    sfx("chpoc");
                 }
             };
 
@@ -471,7 +471,7 @@
                         const vp = cellXY(v.col, v.row);
                         floatText(vp.x, vp.y - 60, "−1♥", 0xef9f8c);
                         punch(v.node);
-                        sfx("acid");
+                        sfx("chpoc");
                         if (v.hp <= 0) killUnit(v, null);
                     }
                 }
@@ -535,7 +535,7 @@
                         damageBase(op, pw,
                             { x: 960, y: op === "p" ? 840 : 240, fill: 0xffa45e });
                         refreshHud();
-                        sfx("rocket");
+                        sfx("chpoc");
                         if (checkEnd()) return;
                         continue;
                     }

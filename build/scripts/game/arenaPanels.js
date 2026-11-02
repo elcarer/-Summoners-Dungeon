@@ -79,7 +79,7 @@
                 if (cardId === undefined || CARDS[cardId].type !== want) return;
                 B.deck.splice(deckIdx, 1);
                 B.hand.push(cardId);
-                sfx("chpoc");
+                sfx("acid");
                 closeRunesPanel();
                 layoutHand();
                 refreshHud();
@@ -116,7 +116,7 @@
                 if (!B) return;
                 for (const id of taken) B.hand.push(id);
                 if (rest.length) B.deck.push(...rest);
-                sfx("chpoc");
+                sfx("acid");
                 layoutHand();
                 refreshHud();
             };
@@ -188,7 +188,7 @@
                 seekTop.splice(idx, 1);
                 seekTaken.push(cardId);
                 seekPicks -= 1;
-                sfx("chpoc");
+                sfx("acid");
                 if (seekPicks <= 0 || !seekTop.length) { finishSeek(); return; }
                 drawSeekPanel(); // карт осталось меньше — перерисовать
             };
@@ -230,7 +230,7 @@
                 if (taken.length) B.hand.push(...taken);
                 if (rest.length) B.discard.push(...rest);
                 noteDiscard(rest.length, "p", rest); // «Болотная слизь»: пачка в сброс
-                sfx("chpoc");
+                sfx("acid");
                 grimStage = "show";
                 layoutHand();
                 refreshHud();
@@ -303,7 +303,7 @@
             A.monolithTake = function monolithTake(m) { // из колоды — в руку
                 B.deck.splice(m.idx, 1);
                 B.hand.push(m.id);
-                sfx("chpoc");
+                sfx("acid");
                 layoutHand();
                 refreshHud();
                 floatText(960, 840, "+1 " + GAME_LOC.t("card.grw20.draw"), 0x9fd489);
@@ -513,7 +513,7 @@
                 const p = cellXY(2, 0);
                 floatText(p.x, p.y - 120,
                     "⤒ " + GAME_LOC.t(`card.${id}.name`), 0xc9a0ef);
-                sfx("chpoc");
+                sfx("acid");
                 return true;
             };
             // Не разыгранная карта Мастера порталов — на верх колоды владельца
@@ -792,7 +792,7 @@
                 disc.splice(disc.indexOf(cardId), 1);
                 B.hand.push(cardId);
                 B.scorch.p.add(cardId); // «Сожжение»: после розыгрыша — из боя
-                sfx("chpoc");
+                sfx("acid");
                 closeBrewPanel();
                 layoutHand();
                 refreshHud();
@@ -931,7 +931,7 @@
                 if (!cardId) return;
                 B.discard.splice(B.discard.indexOf(cardId), 1);
                 B.hand.push(cardId);
-                sfx("chpoc");
+                sfx("acid");
                 const p = cellXY(2, 4);
                 floatText(p.x, p.y + 84, "↩ " + GAME_LOC.t(`card.${cardId}.name`), 0x9fd489);
                 closeRaisePanel();
@@ -1000,7 +1000,7 @@
                 const cardId = B.eHand[idx];
                 if (!cardId || !CARDS[cardId] || CARDS[cardId].type !== "unit") return;
                 B.eHand.splice(idx, 1); // удаление до конца боя: не в сброс, не в колоду
-                sfx("rocket");
+                sfx("chpoc");
                 const p = cellXY(2, 0);
                 floatText(p.x, p.y - 60, "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                 closeCaptivatePanel();

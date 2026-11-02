@@ -154,7 +154,7 @@
                 if (hn) hn.text = String(u.hp);
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 75, `${u.curAtk}⚔/${u.hp}♥`, 0x8cd0ef);
-                sfx("up");
+                sfx("chpoc");
                 return true;
             };
 
@@ -182,7 +182,7 @@
                     punch(v.node);
                 }
                 recalcAuras();
-                sfx("acid");
+                sfx("chpoc");
                 heroElementalDraw(u); // способность элементаля
                 for (const v of near.slice()) {
                     if (!B.units.includes(v)) continue; // каскад смерти соседа
@@ -256,7 +256,7 @@
                 if (ok) {
                     floatText(p.x, p.y - 84,
                         GAME_LOC.t(`card.${cardIdOf(src.def)}.name`), 0x8cd0ef);
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 return ok;
             };
@@ -326,7 +326,7 @@
                 }
                 floatText(p.x, p.y - 84,
                     "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0xc9b98c);
-                sfx("use");
+                sfx("aqua");
                 // «Смерть из-под земли» (firstDigReward, просил юзер):
                 // первое за бой срабатывание «Выкапливания» стороны —
                 // 1 карта и 1 энергия
@@ -337,7 +337,7 @@
                     if (side === "p") { drawCards(1); B.energy += 1; }
                     else { drawEnemy(1); B.eEnergy += 1; }
                     floatText(p.x, p.y - 118, "+1⚡ +1", 0xffd98c);
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 const u2 = addUnit(side, id, cell[0], cell[1], { rebirth: true });
                 if (u2 && left > 0 && B.units.includes(u2)) addExhuming(u2, left);

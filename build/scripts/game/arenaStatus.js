@@ -25,7 +25,7 @@
                         stacks += extra;
                         floatText(960, side === "p" ? 640 : 300,
                             `❄ +${extra}`, 0x8cd0ef);
-                        sfx("aqua");
+                        sfx("chpoc");
                     }
                 }
                 u.frozen = (u.frozen || 0) + stacks;
@@ -50,7 +50,7 @@
                 floatText(p.x, p.y - 88, `❄ ${u.frozen}`, 0x8cd0ef);
                 fxEvent("ice", { x: p.x, y: p.y - 10, scale: 1.05 });
                 punch(u.node);
-                sfx("aqua");
+                sfx("chpoc");
             };
             A.updateFrozenMark = function updateFrozenMark(u) {
                 const mark = u.node && u.node.getChildByName("frozenMark");
@@ -159,7 +159,7 @@
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, "☣", 0xb7d178);
                 fxEvent("poison", { x: p.x, y: p.y - 10, scale: 0.75 });
-                sfx("acid");
+                sfx("chpoc");
             };
             // Отклик спор на урон: база стороны проклятого существа получает
             // столько же, сколько оно нанесло (checkEnd зовут вызывающие)
@@ -171,7 +171,7 @@
                     u.side === "p"
                         ? { x: 960, y: 840, fill: 0xff5f4e }
                         : { x: 960, y: 60, fill: 0xff8f6e });
-                sfx("acid");
+                sfx("chpoc");
             };
 
             // «Защитный кокон» (grw19): цель получает «Защита 1» — любой урон
@@ -219,7 +219,7 @@
                 floatText(p.x, p.y - 60, GAME_LOC.t("card.grw19.name"), 0x8cd0ef);
                 fxEvent("ward", { x: p.x, y: p.y - 14, scale: 0.7 });
                 punch(u.node);
-                sfx("up");
+                sfx("chpoc");
             };
 
             // «Ядовитость N» (grw29): метка на существе — его атаки вешают на
@@ -252,7 +252,7 @@
                 floatText(p.x, p.y - 66, `☠ ${u.venom}`, 0x9fd489);
                 fxEvent("poison", { x: p.x, y: p.y - 10, scale: 0.64 });
                 punch(u.node);
-                sfx("acid");
+                sfx("chpoc");
             };
             A.addPoison = function addPoison(u, m) {
                 if (!B.units.includes(u)) return; // цель умерла от самой атаки
@@ -277,7 +277,7 @@
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, "☠", 0xb7d178);
                 fxEvent("poison", { x: p.x, y: p.y - 10, scale: 0.72 });
-                sfx("acid");
+                sfx("chpoc");
             };
             // Начало хода стороны, ДО марша: каждое отравленное её существо
             // теряет жизни по мощности яда (штатный урон — яд может убить).
@@ -328,7 +328,7 @@
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, "≡", 0xc9a06a);
                 fxEvent("seal", { x: p.x, y: p.y + 8, color: 0xc9a06a, scale: 0.8 });
-                sfx("acid");
+                sfx("chpoc");
             };
             A.removeEntangleMark = function removeEntangleMark(u) {
                 const mark = u.node && u.node.getChildByName("entangleMark");

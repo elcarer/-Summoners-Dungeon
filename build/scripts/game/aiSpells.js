@@ -37,7 +37,7 @@
                     let best = aiNovaPick();
                     if (focus && own.includes(focus)) best = focus; // руна
                     aimOff(best);
-                    if (best) { novaSplash(best); punch(best.node); sfx("up"); }
+                    if (best) { novaSplash(best); punch(best.node); sfx("chpoc"); }
                 }
                 if (s.wolfVolley) { // «Атака духами волков»: стрелок без своих на линии
                     const best = aiWolfPick();
@@ -86,7 +86,7 @@
                         damageUnit(best, spellDmg(def, "e", true, true), null, "rocket");
                         if (B.units.includes(best)) pushTowardBase(best);
                         punch(best.node);
-                        sfx("aqua");
+                        sfx("chpoc");
                         return;
                     }
                     // «Смыв» (wis85): существо игрока — в его руку; цель —
@@ -104,7 +104,7 @@
                         aimOff(best);
                         punch(best.node);
                         bounceUnit(best);
-                        sfx("aqua");
+                        sfx("chpoc");
                         return;
                     }
                     // «Слабость» (wis86): −2 урона сильнейшему существу игрока
@@ -121,7 +121,7 @@
                         floatText(p.x, p.y - 39, `−${s.debuffAtk}⚔`, 0xef9f8c);
                         fxEvent("debuff", { x: p.x, y: p.y - 12, scale: 0.72 });
                         punch(best.node);
-                        sfx("acid");
+                        sfx("chpoc");
                         return;
                     }
                     // «Трупный яд» (dec144): «Яд N» на существо игрока —
@@ -170,7 +170,7 @@
                         iceStrikeAttack(target, victim);
                         if (B.units.includes(victim)) addFrozen(victim, s.freeze || 1, "e");
                         punch(target.node);
-                        sfx("aqua");
+                        sfx("chpoc");
                         return;
                     }
                     // «Аура света» (hon199): световая метка на своё существо —
@@ -202,7 +202,7 @@
                         const ap = cellXY(best.col, best.row);
                         floatText(ap.x, ap.y - 60, "☀", 0xffe9b0);
                         punch(best.node);
-                        sfx("up");
+                        sfx("chpoc");
                         return;
                     }
                     const own = spellTargets(B.units.filter((v) => v.side === "e"
@@ -270,7 +270,7 @@
                         fxEvent("buff", { x: bp.x, y: bp.y - 12,
                             color: s.enchantFire ? 0xff8a5e : 0xffd98c, scale: 0.82 });
                     }
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 if (s.target === "anyUnitDmg") {
                     const targets = aiDmgTargets(def);
@@ -287,7 +287,7 @@
                             best = reflectAim("p", best); // «Отражение» (wis120) игрока
                             const n = purgeUnit(best);
                             healBase("e", n);
-                            sfx("up");
+                            sfx("chpoc");
                         }
                     } else if (s.cocoon) { // «Защитный кокон» — своему под удар
                         const own = spellTargets(B.units.filter((v) => v.side === "e"));
@@ -324,7 +324,7 @@
                             damageUnit(v, dmg + fs
                                 + heroSpellBonus(def, "e", true), null, "rocket");
                         }
-                        sfx("rocket");
+                        sfx("chpoc");
                         return;
                     }
                     const row = aiFirewallRow();
@@ -332,7 +332,7 @@
                     B.firewalls.push({ col: 2, row, side: "e",
                         left: s.turns, dmg: s.firewall });
                     redrawFirewalls();
-                    sfx("rocket");
+                    sfx("chpoc");
                 }
                 if (s.target === "emptyCell") {
                     if (s.skeletonCrowd) { // толпа — клетка с пустыми соседями, ближе к базе игрока
@@ -345,7 +345,7 @@
                             sc = sc * 10 + r; // плотнее и впереди — лучше
                             if (sc > bs) { bs = sc; bc = c; br = r; }
                         }
-                        if (bc >= 0 && skeletonCrowdSpawn("e", bc, br)) sfx("use");
+                        if (bc >= 0 && skeletonCrowdSpawn("e", bc, br)) sfx("aqua");
                     } else { // культ — ряд, где больше пустых (ничья — где больше игроков)
                         const empt = [0, 0, 0, 0, 0], pu = [0, 0, 0, 0, 0];
                         for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++)
@@ -365,7 +365,7 @@
                     if (!targets.length || B.playerBase <= baseDmg) {
                         damageBase("p", baseDmg,
                             { x: 960, y: 840, fill: 0xff5f4e });
-                        sfx("rocket");
+                        sfx("chpoc");
                     } else {
                         const best = focus && targets.includes(focus)
                             ? focus // руна: именно атакующий
@@ -377,7 +377,7 @@
                 if (s.target === "none" && s.baseDmg) { // землетрясение
                     damageBase("p", s.baseDmg + heroSpellBonus(def, "e", false, true),
                         { x: 960, y: 840, fill: 0xff5f4e });
-                    sfx("rocket");
+                    sfx("chpoc");
                 }
                 if (s.raiseDead) { // «Поднятие мёртвых»: лучшее существо сброса — в руку
                     const units = unitsInDiscard("e");
@@ -402,7 +402,7 @@
                         B.hand.splice(pick.i, 1);
                         floatText(960, 640,
                             "✕ " + GAME_LOC.t(`card.${pick.id}.name`), 0x8cd0ef);
-                        sfx("rocket");
+                        sfx("chpoc");
                         refreshHud();
                     }
                 }
@@ -443,7 +443,7 @@
                     const baseDmg = s.dmg + heroSpellBonus(def, "e", false, true);
                     if (!targets.length || B.playerBase <= baseDmg) {
                         damageBase("p", baseDmg, { x: 960, y: 840, fill: 0xff5f4e });
-                        sfx("rocket");
+                        sfx("chpoc");
                     } else {
                         const best = focus && targets.includes(focus)
                             ? focus // руна: именно атакованный
@@ -459,21 +459,21 @@
                     floatText(960, 840, `−${got}⚡`, 0xff5f4e);
                     floatText(960, 60, `+${got}⚡`, 0xffd98c);
                     punch(root.hud);
-                    sfx("aqua");
+                    sfx("chpoc");
                 }
                 if (s.energyPerHand) { // «Цветение кристаллов»: +1⚡ за карту руки (сама не считается)
                     const got = Math.max(0, B.eHand.length - 1);
                     B.eEnergy += got;
                     floatText(960, 60, `+${got}⚡`, 0xffd98c);
                     punch(root.hud);
-                    sfx("aqua");
+                    sfx("chpoc");
                 }
                 if (s.energyPerTrap) { // «Поток маны»: +1⚡ за свою ловушку
                     const got = B.traps.e.length;
                     B.eEnergy += got;
                     floatText(960, 60, `+${got}⚡`, 0xffd98c);
                     if (got) punch(root.hud);
-                    sfx("aqua");
+                    sfx("chpoc");
                 }
                 if (s.debuffEnemyAtkAll) { // «Нехватка воздуха»: −N урона всем существам игрока
                     const n = s.debuffEnemyAtkAll;
@@ -484,14 +484,14 @@
                         floatText(p.x, p.y - 39, `−${n}⚔`, 0xef9f8c);
                     }
                     recalcAuras();
-                    sfx("acid");
+                    sfx("chpoc");
                 }
                 if (s.iceSwarm) { // «Рой ледо-пикси»: Элементали 1/1 на случайные пустые клетки
                     iceSwarmSpawn("e", s.iceSwarm);
-                    sfx("use");
+                    sfx("aqua");
                 }
                 if (s.laySummon) { // «Молебен» (hon166): Человек 2/2 на случайную пустую клетку
-                    if (laySummonSpawn("e")) sfx("use");
+                    if (laySummonSpawn("e")) sfx("aqua");
                 }
                 if (s.rebalance) { // «Снабжение» (hon170): у всех своих существ
                     // меньшая из характеристик ⚔/♥ становится равной большей
@@ -511,7 +511,7 @@
                         floatText(vp.x, vp.y - 60, "⇔", 0xffd98c);
                         punch(v.node);
                     }
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 if (s.aoeDmg) { // «Раскалённые обломки»: всем существам и постройкам игрока
                     const dmg = s.aoeDmg + altarBonus("e");
@@ -520,7 +520,7 @@
                         damageUnit(v, dmg + fs
                             + (v.def.type === "unit" ? heroSpellBonus(def, "e", true) : 0),
                             null, "rocket");
-                    sfx("rocket");
+                    sfx("chpoc");
                 }
                 if (s.buffAllAtk) { // «Поднять стяги!»: +1 урона всем своим существам
                     for (const v of B.units) if (v.side === "e" && v.def.type === "unit") {
@@ -530,7 +530,7 @@
                         floatText(p.x, p.y - 39, `+${s.buffAllAtk}⚔`, 0x9fd489);
                     }
                     recalcAuras();
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 if (s.forge) { // «Ковка оружия» (tim208): появившиеся в этот ход — +2⚔
                     B.forge.e = { turn: B.turnNo, amt: s.forge };
@@ -542,7 +542,7 @@
                         floatText(p.x, p.y - 39, `+${s.forge}⚔`, 0x9fd489);
                     }
                     recalcAuras();
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 if (s.sacrifice) { // «Жертвоприношение»: взрыв по соседям жертвы
                     const u = aiSacrificePick();
@@ -583,7 +583,7 @@
                         B.eEnergy += n;
                         floatText(960, 60, `+${n}⚡`, 0xffd98c);
                         punch(root.hud);
-                        sfx("aqua");
+                        sfx("chpoc");
                     }
                 }
                 if (s.terrainScout) { // «Выбор местности» (dec156): лучшая постройка топ-6 — в руку
@@ -605,7 +605,7 @@
                         B.eEnergy += n;
                         floatText(960, 240, `−${n}♥ +${n}⚡`, 0xef9f8c);
                         punch(root.hud);
-                        sfx("aqua");
+                        sfx("chpoc");
                     }
                 }
                 if (s.mindControl) { // «Тёмный контроль» (dec134): забираем
@@ -654,7 +654,7 @@
                         const ap = cellXY(best.col, best.row);
                         floatText(ap.x, ap.y - 60, "☀", 0xffe9b0);
                         punch(best.node);
-                        sfx("up");
+                        sfx("chpoc");
                     }
                 }
                 if (s.baseHit) { // «Бросок валуна»: своё сильнейшее бьёт базу героя — это его атака
@@ -673,7 +673,7 @@
                     if (n > 0) {
                         B.eEnergy += n;
                         floatText(960, 190, `+${n}⚡`, 0xffd98c);
-                        sfx("aqua");
+                        sfx("chpoc");
                     }
                 }
                 // «Временная петля» (tim229): после этого хода враг играет

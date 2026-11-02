@@ -12,8 +12,8 @@
                     const total = spheresTotal();
                     const cards = Math.max(0, Math.min(B.split, total));
                     const energy = total - cards;
-                    if (cards > 0) { drawCards(cards); sfx("chpoc"); }
-                    if (energy > 0) { B.energy += energy; sfx("aqua"); } // на следующий ход
+                    if (cards > 0) drawCards(cards); // звук взятия — в drawCards (W34)
+                    if (energy > 0) { B.energy += energy; sfx("chpoc"); } // на следующий ход
                     layoutHand();
                     refreshHud();
                     if (B.hand.length > HAND_MAX) {

@@ -161,6 +161,11 @@
             uiTextures["npc/glom.png"] =
                 await assets.loadTexture("./images/npc/glom.png");
         } catch (e) { /* арта ещё нет — окно с силуэтом */ }
+        // здания городов (арт юзера, W34): магазин/кузница/дом Глома 384×256
+        // (6×4 клетки 64px, 1:1) и ратуша 384×384 (6×6)
+        for (const f of ["shop", "armory", "town_hall", "glom_house"])
+            uiTextures[`buildings/${f}.png`] =
+                await assets.loadTexture(`./images/buildings/${f}.png`);
         const uiTex = (name) => {
             const t = uiTextures[name];
             if (!t) throw new Error(`нет текстуры ui/${name}`);
@@ -213,6 +218,8 @@
             // лист Времени юзера (просил юзер): существа стихии — гномы
             // (tim201–203/209); Тордин в мире ходит тем же листом
             gnome: heroSheets.time,
+            // фигурка Глома в городе (арт юзера, W34): спрайтшит 4×6 кадров
+            glom: await assets.loadCharacter("./images/sprites/glom_256"),
         };
 
         // ── UI-корень: базовое разрешение 1920×1080, вписывается в окно ────
@@ -288,29 +295,30 @@
         // Файлы из build/sound: sfx-эффекты боя/UI + музыка сцен.
         // Музыка грузится лениво при первом вызове music() (треки тяжёлые);
         // короткие sfx предзагружаются сразу, фоном.
+        // Привязка звуков к событиям (W34, юзер перезаписал файлы и задал
+        // список «событие → файл»); старые menu/use/dam/up/openRoom вышли
+        // из оборота, файлы остаются в build/sound
         const SFX_FILES = {
-            menu: "menu.mp3",      // клики UI
-            chpoc: "chpoc.mp3",    // добор карты / сброс
-            use: "use.mp3",        // призыв существа/строения
-            mine: "mine.mp3",      // установка ловушки
-            sword: "sword.mp3",    // атака существом
-            dam: "dam.mp3",        // урон (прочие источники)
-            acid: "acid.mp3",      // сработала ловушка
-            rocket: "rocket.mp3",  // заклинание-снаряд
-            up: "up.mp3",          // усиление (+ к урону)
-            die: "die.mp3",        // гибель существа / поражение
-            crash: "crash.mp3",    // удар по базе
-            step: "step.mp3",      // шаг существа (марш/рывок)
-            aqua: "aqua.mp3",      // шкала: +энергия в конце хода
-            coins: "coins.mp3",    // выбор трофея
-            lvlUp: "lvlUp.mp3",    // победа
-            openRoom: "openRoom.mp3", // начало боя
+            step: "step.mp3",      // нажатие кнопки интерфейса
+            acid: "acid.mp3",      // взятие карты (добор, панели, драфт)
+            aqua: "aqua.mp3",      // призыв существа
+            chpoc: "chpoc.mp3",    // каст заклинания (срабатывания карт)
+            mine: "mine.mp3",      // розыгрыш/срабатывание ловушки
+            crash: "crash.mp3",    // атака существом и удар по базе
+            die: "die.mp3",        // смерть существа
+            sword: "sword.mp3",    // возведение постройки (механика впереди)
+            coins: "coins.mp3",    // вход в подземелье (и золото/награды)
+            rocket: "rocket.mp3",  // начало боя
+            enter: "enter.mp3",    // вход в город
+            footstep: "footstep.mp3", // шаги героя (петля)
+            alert: "alert.mp3",    // бродячий монстр заметил героя
+            lvlUp: "lvlUp.mp3",    // победа (драфт)
         };
         // Тихие/частые звуки — множитель поверх ползунка «звук»
         const SFX_VOL = {
-            menu: 0.7, step: 0.45, chpoc: 0.9, dam: 0.8, use: 1.0, sword: 0.9,
-            die: 0.9, crash: 1.0, up: 0.85, mine: 0.9, acid: 0.9, rocket: 0.85,
-            aqua: 0.8, coins: 0.9, lvlUp: 1.0, openRoom: 0.8,
+            step: 0.45, chpoc: 0.9, sword: 0.9,
+            die: 0.9, crash: 1.0, mine: 0.9, acid: 0.9, rocket: 0.85,
+            aqua: 0.8, coins: 0.9, lvlUp: 1.0, enter: 0.9, alert: 0.9,
         };
         const MUSIC_FILES = {
             menu: "CoinCreek.mp3",
@@ -330,11 +338,40 @@
         window.addEventListener("keydown", unlockAudio);
         const sfxCounts = {};
         const gameSfx = (name) => {
-            const key = name || "menu";
+            const key = name || "step"; // клик UI — step.mp3 (W34, юзер)
             sfxCounts[key] = (sfxCounts[key] || 0) + 1;
+            globalThis.__SFX_LOG = sfxCounts; // пробы: что и сколько звучало
             audio.playFile(key, SFX_VOL[key] !== undefined ? SFX_VOL[key] : 1);
         };
         const gameMusic = (name) => { audio.music(name); };
+
+        // ── Шаги героя (W34, юзер): footstep.mp3 петлёй, ПОКА герой идёт ──
+        // У разовых sfx движка петли нет — HTMLAudio с loop. Сцены тикают
+        // ctx.footstep(x, y) каждый кадр: дельта позиции решает «идёт/стоит»;
+        // смена сцены тики прекращает — страховочный интервал глушит звук.
+        const stepAudio = new Audio("./sound/footstep.mp3");
+        stepAudio.loop = true;
+        let stepLast = null, stepT = 0, stepWanted = false;
+        const footstepTick = (x, y) => {
+            stepT = performance.now();
+            const moving = !!stepLast
+                && Math.abs(x - stepLast.x) + Math.abs(y - stepLast.y) > 0.3;
+            stepLast = { x, y };
+            stepWanted = moving;
+            const vol = Math.max(0, Math.min(1, settings.sound / 10)) * 0.5;
+            if (moving) {
+                stepAudio.volume = vol;
+                if (stepAudio.paused) stepAudio.play().catch(() => { /* нет жеста */ });
+            } else if (!stepAudio.paused) stepAudio.pause();
+        };
+        setInterval(() => {
+            if (!stepAudio.paused && performance.now() - stepT > 350)
+                stepAudio.pause();
+        }, 250);
+        // пробы: headless-хром блокирует ЛЮБОЕ аудио (autoplay-политика) —
+        // проверяем решение «идёт/стоит», реальный звук — в живом браузере
+        globalThis.__STEP_INFO = () => ({ wanted: stepWanted,
+            playing: !stepAudio.paused });
 
         // ── Общий контекст для сцен ────────────────────────────────────────
         const scheduler = createScheduler();
@@ -350,7 +387,7 @@
             const rows = collide.rows;
             if (gy < 0 || gy >= rows.length || gx < 0 || gx >= rows[0].length) return true;
             const ch = rows[gy][gx];
-            return ch === "#" || ch === "~"; // стены и вода непроходимы
+            return ch === "#" || ch === "~" || ch === "%"; // стены, вода и пятна застройки (W34)
         }
         // Инстанс ввода героя наружу: подземелье читает оси (клик-перемещение
         // отдаёт герою виртуальные оси, а без пути просто повторяет эти)
@@ -665,8 +702,9 @@
             roadsTex,    // тайлы дорог images/tiles/roads.png (11 видов)
             mountainTex, // спрайты гор images/tiles/montain (слой объектов)
             caveTex,     // спрайт пещеры подземелий images/tiles/cave.png
-            sfx: gameSfx,   // ctx.sfx() — клик UI; ctx.sfx("sword") — событие боя
+            sfx: gameSfx,   // ctx.sfx() — клик UI (step); ctx.sfx("chpoc") — событие
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
+            footstep: footstepTick, // шаги героя: сцены тикают позицией героя
             heroHover,        // ctx.heroHover(держатель, спрайт, bigX, bigY)
             questModal: 0,    // открыт модальный квест-диалог (мир/подземелье стоят)
         };

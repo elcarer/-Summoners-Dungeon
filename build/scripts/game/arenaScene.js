@@ -168,7 +168,7 @@
                 captivatePanel = null;
                 resurrectPanel = null;
                 unitCard = null;
-                sfx("openRoom"); // начало боя
+                sfx("rocket"); // начало боя
 
                 root = new PIXI.Container();
                 root.eventMode = "static";

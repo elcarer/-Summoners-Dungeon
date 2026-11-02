@@ -77,7 +77,7 @@
                 if (burn) { // «Сожжение»: карта удаляется из боя
                     B.scorch.p.delete(cardId);
                     floatText(960, 640, `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
-                    sfx("rocket");
+                    sfx("chpoc");
                 } else {
                     B.discard.push(cardId);
                     noteDiscard(1, "p", [cardId]);
@@ -252,7 +252,7 @@
                     floatText(p.x, p.y - 84, `${target.dir < 0 ? "−" : "+"}2 ${GAME_LOC.t("status.return.name")}`,
                         0xc9a0ef);
                     punch(u.node);
-                    sfx("aqua");
+                    sfx("chpoc");
                     return true;
                 }
                 for (const s of ["p", "e"]) {
@@ -264,7 +264,7 @@
                     const p = cellXY(e.col, e.row);
                     floatText(p.x, p.y - 84, `${target.dir < 0 ? "−" : "+"}2 ${GAME_LOC.t("status.delay.name")}`,
                         0xc9a0ef);
-                    sfx("aqua");
+                    sfx("chpoc");
                     return true;
                 }
                 return false;
@@ -653,7 +653,7 @@
                     "◈ " + GAME_LOC.t("spell.dome.name"), 0x8cd0ef);
                 fxEvent("ward", { x: p.x, y: p.y - 12, scale: 0.85 });
                 punch(u.node);
-                sfx("up");
+                sfx("chpoc");
             };
 
             // «Ремонт» (tim239, просил юзер): метка «при смерти — в руку
@@ -675,7 +675,7 @@
                     "🔧 " + GAME_LOC.t("spell.repair.name"), 0x9fd489);
                 fxEvent("heal", { x: p.x, y: p.y - 12, scale: 0.85 });
                 punch(u.node);
-                sfx("up");
+                sfx("chpoc");
             };
 
             // Эффекты заклинаний игрока, валидация цели внутри (false — цель не
@@ -752,7 +752,7 @@
                         iceStrikeAttack(u, victim);
                         if (B.units.includes(victim)) addFrozen(victim, def.spell.freeze || 1, "p");
                         punch(u.node);
-                        sfx("aqua");
+                        sfx("chpoc");
                         return true;
                     }
                     if (def.spell.hydroPunch) { // «Гидроудар»: 1 урон + сдвиг к своей базе
@@ -760,13 +760,13 @@
                         damageUnit(u, dmg, null, "rocket");
                         if (B.units.includes(u)) pushTowardBase(u);
                         punch(u.node);
-                        sfx("aqua");
+                        sfx("chpoc");
                         return true;
                     }
                     if (def.spell.bounce) { // «Смыв»: существо — в руку владельца
                         punch(u.node);
                         bounceUnit(u);
-                        sfx("aqua");
+                        sfx("chpoc");
                         return true;
                     }
                     if (def.spell.debuffAtk) { // «Слабость»: −N к урону (не ниже нуля)
@@ -775,7 +775,7 @@
                         floatText(p.x, p.y - 39, `−${def.spell.debuffAtk}⚔`, 0xef9f8c);
                         fxEvent("debuff", { x: p.x, y: p.y - 12, scale: 0.72 });
                         punch(u.node);
-                        sfx("acid");
+                        sfx("chpoc");
                         return true;
                     }
                     // «Разложение» (dec145): уничтожьте существо, затем
@@ -842,7 +842,7 @@
                         }
                     }
                     punch(u.node);
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 if (def.spell.target === "anyUnitDmg") { // дротик: существо или строение; варево — только существо
                     if (!target || target.col === undefined) return false;
@@ -853,7 +853,7 @@
                     if (def.spell.purge) { // «Извлечение духа»: снять все свойства, база лечится за каждое
                         const n = purgeUnit(u);
                         healBase("p", n);
-                        sfx("up");
+                        sfx("chpoc");
                     } else if (def.spell.cocoon) { // «Защитный кокон»: «Защита 1» цели
                         addProtect(u);
                     } else if (def.spell.drainAll) { // «Огнешар»: вся энергия сверх цены — в урон
@@ -874,7 +874,7 @@
                     if (!target || target.col === undefined) return false;
                     if (unitAt(target.col, target.row)) return false;
                     if (def.spell.skeletonCrowd) { // «Толпа скелетов»: клетка + слева/справа
-                        if (skeletonCrowdSpawn("p", target.col, target.row)) sfx("use");
+                        if (skeletonCrowdSpawn("p", target.col, target.row)) sfx("aqua");
                     } else cultRowSpawn("p", target.row);
                 }
                 if (def.spell.target === "anyCell") { // стена костров: ряд горит N ходов владельца;
@@ -891,13 +891,13 @@
                             damageUnit(v, dmg + fs
                                 + heroSpellBonus(def, "p", true), null, "rocket");
                         }
-                        sfx("rocket");
+                        sfx("chpoc");
                         return true;
                     }
                     B.firewalls.push({ col: target.col, row: target.row, side: "p",
                         left: def.spell.turns, dmg: def.spell.firewall });
                     redrawFirewalls();
-                    sfx("rocket");
+                    sfx("chpoc");
                 }
                 if (def.spell.target === "ownUnit" && def.spell.baseHit) { // «Бросок валуна»: своё существо бьёт базу врага — это его атака
                     if (!target || target.col === undefined) return false;
@@ -974,7 +974,7 @@
                     B.energy += n;
                     floatText(960, 840, `+${n}⚡`, 0xffd98c);
                     punch(root.hud);
-                    sfx("aqua");
+                    sfx("chpoc");
                 }
                 if (def.spell.terrainScout) { // «Выбор местности» (dec156): верхние N карт колоды — взять 1 постройку
                     openRunesPanel(def.spell.terrainScout, "building");
@@ -1000,7 +1000,7 @@
                 if (def.spell.target === "none" && def.spell.baseDmg) { // землетрясение
                     damageBase("e", def.spell.baseDmg + heroSpellBonus(def, "p", false, true),
                         { x: 960, y: 60, fill: 0xff8f6e });
-                    sfx("rocket");
+                    sfx("chpoc");
                 }
                 if (def.spell.target === "none" && def.spell.stealEnergy) { // «Похищение энергии»: 2⚡
                     const got = Math.min(def.spell.stealEnergy, B.eEnergy);
@@ -1009,7 +1009,7 @@
                     floatText(960, 60, `−${got}⚡`, 0xff8f6e);
                     floatText(960, 840, `+${got}⚡`, 0xffd98c);
                     punch(root.hud);
-                    sfx("aqua");
+                    sfx("chpoc");
                 }
                 if (def.spell.target === "none" && def.spell.energyPerHand) { // «Цветение кристаллов»: +1⚡ за карту в руке
                     // сама карта в момент эффекта ещё числится в руке — не считаем
@@ -1017,14 +1017,14 @@
                     B.energy += got;
                     floatText(960, 840, `+${got}⚡`, 0xffd98c);
                     punch(root.hud);
-                    sfx("aqua");
+                    sfx("chpoc");
                 }
                 if (def.spell.target === "none" && def.spell.energyPerTrap) { // «Поток маны»: +1⚡ за свою ловушку
                     const got = B.traps.p.length;
                     B.energy += got;
                     floatText(960, 840, `+${got}⚡`, 0xffd98c);
                     if (got) punch(root.hud);
-                    sfx("aqua");
+                    sfx("chpoc");
                 }
                 if (def.spell.debuffEnemyAtkAll) { // «Нехватка воздуха»: −N урона всем существам врага
                     const n = def.spell.debuffEnemyAtkAll;
@@ -1036,14 +1036,14 @@
                         fxEvent("debuff", { x: p.x, y: p.y - 12, scale: 0.62 });
                     }
                     recalcAuras();
-                    sfx("acid");
+                    sfx("chpoc");
                 }
                 if (def.spell.iceSwarm) { // «Рой ледо-пикси»: Элементали 1/1 на случайные пустые клетки
                     const n = iceSwarmSpawn("p", def.spell.iceSwarm);
-                    if (n) sfx("use");
+                    if (n) sfx("aqua");
                 }
                 if (def.spell.laySummon) { // «Молебен»: Человек 2/2 на случайную пустую клетку
-                    if (laySummonSpawn("p")) sfx("use");
+                    if (laySummonSpawn("p")) sfx("aqua");
                 }
                 if (def.spell.rebalance) { // «Снабжение» (hon170): у всех своих
                     // существ меньшая из характеристик ⚔/♥ становится равной
@@ -1064,7 +1064,7 @@
                         floatText(vp.x, vp.y - 60, "⇔", 0xffd98c);
                         punch(v.node);
                     }
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 if (def.spell.aoeDmg) { // «Раскалённые обломки»: всем вражеским существам и постройкам
                     const dmg = def.spell.aoeDmg + altarBonus("p");
@@ -1075,7 +1075,7 @@
                         damageUnit(v, dmg + fs
                             + (v.def.type === "unit" ? heroSpellBonus(def, "p", true) : 0),
                             null, "rocket");
-                    sfx("rocket");
+                    sfx("chpoc");
                 }
                 if (def.spell.buffAllAtk) { // «Поднять стяги!»: +1 урона всем своим существам
                     for (const v of B.units) if (v.side === "p" && v.def.type === "unit") {
@@ -1086,7 +1086,7 @@
                         fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.6 });
                     }
                     recalcAuras();
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 // «Ковка оружия» (tim208): все свои существа, появившиеся
                 // в ЭТОТ ход (включая пришедших через «Сдвиг»), получают
@@ -1103,14 +1103,14 @@
                         fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.6 });
                     }
                     recalcAuras();
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 if (def.spell.target === "enemyAny") {
                     if (!target) return false;
                     if (target.base === true) {
                         damageBase("e", def.spell.dmg + heroSpellBonus(def, "p", false, true),
                             { x: 960, y: 60, fill: 0xff8f6e });
-                        sfx("rocket");
+                        sfx("chpoc");
                     } else if (target.col !== undefined) {
                         const u = unitAt(target.col, target.row);
                         // защиту отсеял единый вход; тут — только сторона
@@ -1126,7 +1126,7 @@
                     if (target.base === true) {
                         damageBase("e", def.spell.dmg + heroSpellBonus(def, "p", false, true),
                             { x: 960, y: 60, fill: 0xff8f6e });
-                        sfx("rocket");
+                        sfx("chpoc");
                     } else if (target.col !== undefined) {
                         const u = unitAt(target.col, target.row);
                         if (!u || u.def.type !== "unit") return false;
@@ -1168,7 +1168,7 @@
                     if (n > 0) {
                         B.energy += n;
                         floatText(960, 790, `+${n}⚡`, 0xffd98c);
-                        sfx("aqua");
+                        sfx("chpoc");
                     }
                 }
                 // «Мозговой штурм» (tim206): сбросить ВСЮ руку и взять столько

@@ -427,7 +427,7 @@
                             if (B.scorch.e.has(cardId) || def.burn) { // «Сожжение»: карта удалена из боя
                                 B.scorch.e.delete(cardId);
                                 floatText(960, 640, `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
-                                sfx("rocket");
+                                sfx("chpoc");
                             } else { B.eDiscard.push(cardId); noteDiscard(1, "e", [cardId]); }
                             cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                             heroStrReplay("e", cardId, def); // «Мастера огня»

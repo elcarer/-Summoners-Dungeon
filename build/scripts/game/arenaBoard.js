@@ -103,7 +103,7 @@
                 const p = cellXY(col, row);
                 floatText(p.x, p.y - 66,
                     "⏳ " + GAME_LOC.t("status.delay.name"), 0xc9a0ef);
-                sfx("mine");
+                sfx("chpoc");
                 return entry;
             };
             // Тик начала хода владельца: счётчики тают, созревшие существа
@@ -703,7 +703,7 @@
                     x: sp.x, y: sp.y + 24, color: fxColorOf(def.elem),
                     scale: opts.token ? 0.72 : 1,
                 });
-                sfx("use"); // призыв (обе стороны)
+                sfx("aqua"); // призыв (обе стороны)
                 B.units.push(u);
                 recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда
                 // «Возврат N» ПОСТРОЙКИ («Стык эпох» tim228, просил юзер):
@@ -751,7 +751,7 @@
                             const p = cellXY(col, row);
                             floatText(p.x, p.y - 75, `+${pool}⚔ +${pool}♥`, 0x9fd489);
                             floatText(960, side === "p" ? 840 : 240, `−${pool}⚡`, 0xffd98c);
-                            sfx("up");
+                            sfx("chpoc");
                         }
                     }
                     // «Хранитель леса» (grw22): при призыве урон и жизни = числу
@@ -771,7 +771,7 @@
                         if (hn) hn.text = String(u.hp);
                         const p = cellXY(col, row);
                         floatText(p.x, p.y - 75, `${n}⚔/${n}♥`, 0x9fd489);
-                        sfx("up");
+                        sfx("chpoc");
                     }
                     // военный лагерь: существо, призванное рядом (верт/гориз),
                     // получает +1 к урону за каждый лагерь — перманентно
@@ -812,7 +812,7 @@
                         const bp = cellXY(col, row);
                         floatText(bp.x, bp.y - 96,
                             "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0xc9b98c);
-                        sfx("up");
+                        sfx("chpoc");
                     }
                     // Врождённое «Выкапливание N» (dec146 «Восставший
                     // нетопырь»): счётчик общий с меткой/Мортисом/костями.
@@ -848,7 +848,7 @@
                             if (an) an.text = String(u.curAtk);
                             const p = cellXY(u.col, u.row);
                             floatText(p.x, p.y - 60, `+${k}⚔`, 0x9fd489);
-                            sfx("up");
+                            sfx("chpoc");
                         }
                         const op = cellXY(o.col, o.row);
                         floatText(op.x, op.y - 90, GAME_LOC.t(`card.${cardIdOf(o.def)}.name`), 0xb7d0ef);
@@ -885,7 +885,7 @@
                         const up = cellXY(u.col, u.row);
                         floatText(up.x, up.y - 66, "+2⚔ +2♥", 0x9fd489);
                         punch(u.node);
-                        sfx("up");
+                        sfx("chpoc");
                         const sp = cellXY(o.col, o.row);
                         floatText(sp.x, sp.y - 60, "−2♥", 0xef9f8c);
                         punch(o.node);
@@ -901,7 +901,7 @@
                         const p = cellXY(o.col, o.row);
                         floatText(p.x, p.y - 66, "+1⚡", 0xffd98c);
                         punch(o.node);
-                        sfx("aqua");
+                        sfx("chpoc");
                     }
                     // «Конница» (firstSpeedAtk, просил юзер): первое за бой
                     // призванное стороной существо СО СВОЕЙ «Скоростью»
@@ -920,7 +920,7 @@
                             const spS = cellXY(col, row);
                             floatText(spS.x, spS.y - 96,
                                 `+${hdS.abilityVal || 1}⚔`, 0x9fd489);
-                            sfx("up");
+                            sfx("chpoc");
                         }
                     }
                     // «Возврат N» (tim215/218/219/220, просил юзер): спустя N
@@ -950,7 +950,7 @@
                             healUnit(near[(Math.random() * near.length) | 0], def.healArrive);
                             const hpA = cellXY(col, row);
                             floatText(hpA.x, hpA.y - 75, `+${def.healArrive}♥`, 0x9fd489);
-                            sfx("up");
+                            sfx("chpoc");
                         }
                     }
                     // «Герой прошлого» (tim232, просил юзер): появляется по
@@ -1011,14 +1011,14 @@
                             const an = u.node.getChildByName("atk");
                             if (an) an.text = String(u.curAtk);
                             floatText(hp2.x, hp2.y - 75, `+${hd.abilityVal}⚔`, 0x9fd489);
-                            sfx("up");
+                            sfx("chpoc");
                         } else if (hd.ability === "firstSummonHp") {
                             u.hp += hd.abilityVal;
                             recalcAuras();
                             const hn = u.node.getChildByName("hp");
                             if (hn) hn.text = String(u.hp);
                             floatText(hp2.x, hp2.y - 75, `+${hd.abilityVal}♥`, 0x9fd489);
-                            sfx("up");
+                            sfx("chpoc");
                         } else if (hd.ability === "firstSummonWard") {
                             // Мира: первое призванное существо получает
                             // «Защиту от заклинаний» (u.spellWard)
@@ -1026,7 +1026,7 @@
                             addWardMark(u);
                             floatText(hp2.x, hp2.y - 75,
                                 "✦ " + GAME_LOC.t("spell.ward.name"), 0x8cd0ef);
-                            sfx("up");
+                            sfx("chpoc");
                         }
                     }
                     // «Мортис» (firstSkeletonDig, просил юзер): первый
@@ -1043,7 +1043,7 @@
                             const sp = cellXY(col, row);
                             floatText(sp.x, sp.y - 96,
                                 "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0xc9b98c);
-                            sfx("up");
+                            sfx("chpoc");
                         }
                     }
                     // «Леон фон Орэ» (firstHonorGuard, просил юзер): первое
@@ -1062,7 +1062,7 @@
                             floatText(sp.x, sp.y - 96,
                                 "✦ " + GAME_LOC.t("status.protect.name"), 0x8cd0ef);
                             fxEvent("ward", { x: sp.x, y: sp.y - 16, scale: 0.66 });
-                            sfx("up");
+                            sfx("chpoc");
                         }
                     }
                     // «Мятежники» (firstHonorDash, просил юзер): первое за
@@ -1100,7 +1100,7 @@
                                 damageBase(side === "p" ? "e" : "p", u.curAtk);
                                 const sp = cellXY(col, row);
                                 floatText(sp.x, sp.y - 108, `⚔${u.curAtk}`, 0xef9f8c);
-                                sfx("rocket");
+                                sfx("chpoc");
                             }
                         }
                     }
@@ -1117,7 +1117,7 @@
                             if (an) an.text = String(u.curAtk);
                             const cp = cellXY(col, row);
                             floatText(cp.x, cp.y - 75, `+${hd.abilityVal || 1}⚔`, 0x9fd489);
-                            sfx("up");
+                            sfx("chpoc");
                         }
                     }
                 }

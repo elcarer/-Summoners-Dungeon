@@ -89,7 +89,7 @@
                 B.heroFlags.epicDiscount[side] = true;
                 const n = hd.abilityVal || 2;
                 floatText(960, side === "p" ? 640 : 300, `−${n}⚡`, 0xc9a0ef);
-                sfx("up");
+                sfx("chpoc");
             };
             // «Пастух росянок» (grw40): пока он на поле стороны, способности
             // Растений (метка plant) этой стороны срабатывают на 1 раз больше
@@ -168,7 +168,7 @@
                 B.heroFlags.strReplay[side] = true;
                 floatText(960, side === "p" ? 640 : 300,
                     `↩ ${GAME_LOC.t(`card.${cardId}.name`)}`, 0x9fd489);
-                sfx("up");
+                sfx("chpoc");
             };
             // «Дуновение опасности» (firstSpellEnergy): первое заклинание
             // стороны в бою даёт её владельцу +1⚡. Зовётся после оплаты
@@ -181,7 +181,7 @@
                 const n = hd.abilityVal || 1;
                 if (side === "p") B.energy += n; else B.eEnergy += n;
                 floatText(960, side === "p" ? 640 : 300, `+${n}⚡`, 0x8cd0ef);
-                sfx("aqua");
+                sfx("chpoc");
             };
             // «Путь воды» (firstTrapEnergy): первое срабатывание ЛЮБОЙ своей
             // ловушки в бою (клеточная, отмена, приманка, руна, «при гибели»)
@@ -195,7 +195,7 @@
                 const n = hd.abilityVal || 1;
                 if (side === "p") B.energy += n; else B.eEnergy += n;
                 floatText(960, side === "p" ? 640 : 300, `+${n}⚡`, 0x8cd0ef);
-                sfx("aqua");
+                sfx("chpoc");
                 refreshHud();
             };
             // «Сонм духов» (firstElementalDraw): ПЕРВОЕ срабатывание
@@ -235,7 +235,7 @@
                 B.heroFlags.mageDouble[u.side] = true;
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 96, "×2", 0xffd98c);
-                sfx("up");
+                sfx("chpoc");
                 fn();
                 return true;
             };
@@ -259,7 +259,7 @@
                 const p = opts.dead ? { x: 960, y: 0 } : cellXY(u.col, u.row);
                 floatText(p.x, (opts.dead ? (u.side === "p" ? 640 : 300)
                     : p.y - 96), "×2", 0xffd98c);
-                sfx("up");
+                sfx("chpoc");
                 fn();
                 return first;
             };
@@ -317,7 +317,7 @@
                     const p = cellXY(u.col, u.row);
                     floatText(p.x, p.y - 66, "+1⚔", 0x9fd489);
                     punch(u.node);
-                    sfx("up");
+                    sfx("chpoc");
                 }
                 // «Паладин света» (hon182, просил юзер): когда ВЛАДЕЛЕЦ
                 // разыгрывает заклинание, существо получает +N к урону и +N к
@@ -340,7 +340,7 @@
                         floatText(p.x, p.y - 75,
                             `+${u.def.spellGrow}⚔ +${u.def.spellGrow}♥`, 0x9fd489);
                         punch(u.node);
-                        sfx("up");
+                        sfx("chpoc");
                         return true;
                     });
                 }

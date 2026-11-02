@@ -32,6 +32,7 @@
                     B.hand.push(id);
                     drawn.push(id);
                 }
+                if (drawn.length) sfx("acid"); // взятие карты (W34, юзер)
                 // прилёт карт из колоды в слоты руки (просил юзер) — если
                 // есть что показывать: в начале боя root ещё не собран, добор
                 // мгновенный, как раньше
@@ -62,6 +63,7 @@
                     B.eHand.push(id);
                     drawn.push(id);
                 }
+                if (drawn.length) sfx("acid"); // взятие карты (W34, юзер)
                 // жест добора врага (просил юзер): рубашка летит от его колоды
                 // к верхнему краю и растворяется — рука врага не видна
                 if (drawn.length && root && root.cardFxLayer && !B.stopped) {
@@ -144,7 +146,7 @@
                 if (burned) {
                     floatText(960, side === "p" ? 640 : 300,
                         `🔥 ${GAME_LOC.t("burn.gone")} ×${burned}`, 0xff8f6e);
-                    sfx("rocket");
+                    sfx("chpoc");
                 }
                 floatText(960, side === "p" ? 640 : 300, `✧ ${n}`, 0x8cd0ef);
                 sfx("chpoc");
@@ -293,7 +295,7 @@
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 66, "✧", 0xb07ad5);
                 fxEvent("debuff", { x: p.x, y: p.y - 12, scale: 0.78 });
-                sfx("aqua");
+                sfx("chpoc");
             };
             A.removeConfuseMark = function removeConfuseMark(u) {
                 const mark = u.node && u.node.getChildByName("confuseMark");
@@ -379,7 +381,7 @@
                 setWalk(u, true);
                 floatText(p.x, p.y - 72, "+1⚔ +1♥", 0x9fd489);
                 punch(u.node);
-                sfx("up");
+                sfx("chpoc");
                 await delay(0.52 / animK()); // глиссада: полный шаг
                 if (B.stopped) return true;
                 afterMoved(u); // перемещение — ловушки врага

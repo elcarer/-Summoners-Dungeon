@@ -55,7 +55,7 @@
             const rest = options.map((_, k) => k).filter((k) => k !== i);
             lastEnemy = rest[(Math.random() * rest.length) | 0];
             G.draft.ePicks.push(options[lastEnemy]);
-            if (ctx.sfx) ctx.sfx("chpoc");
+            if (ctx.sfx) ctx.sfx("acid");
             rebuild();
             scheduler.after(0.9, () => {
                 if (!root) return; // сцена закрыта («Уйти») — доигрывать некому
