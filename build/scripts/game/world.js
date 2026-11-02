@@ -77,6 +77,7 @@
         const GEN = globalThis.GAME_WORLDGEN;
         const T = GEN.T;
         let layer = null, heroId = null, heroShadow = null, heroSprite = null;
+        let questArrow = null; // стрелка к цели задания (W31)
         let worldTerr = null; // коды местности клетки (слой worldTiles)
         let terrStats = null; // статистика слоя (тесты: fallback/odd)
         let woodStats = null; // статистика лесного оверлея wood.png (тесты)
@@ -900,14 +901,33 @@
             if (G.cityStates) G.cityStates[elem] = st;
             return st;
         }
-        function enterCity() {
+        // «свой» стартовый город стихии: городов-стартов шесть (по одному
+        // на стихию, spawnTown ставит worldGen) — ищем ближайший к спавну
+        // СВОЕЙ стихии. find() по флагу всегда отдавал первый в pois —
+        // город Силы (баг юзера W31: Тлен заходил в Силовой город)
+        function ownStartTown(map) {
+            const sp = map.spawn[G.elem] || map.spawn.strength;
+            let best = null, bd = Infinity;
+            for (const p of map.pois) {
+                if (!p.spawnTown) continue;
+                const d = Math.hypot(p.gx - sp.gx, p.gy - sp.gy);
+                if (d < bd) { bd = d; best = p; }
+            }
+            return best;
+        }
+        function enterCity(tw) {
             const m = G.world.map;
-            const tw = m && m.pois && m.pois.find((p) => p.spawnTown);
+            if (!m || !m.pois) return false;
+            // какой город: тот, что тронули (касание арки); без аргумента
+            // (тесты/программный вход) — «свой» стартовый
+            if (!tw) tw = ownStartTown(m);
             if (!tw) return false;
             if (heroId !== null)
                 G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
-            G.cityOut = tw.elem || G.elem; // выход — к дверям этого города
+            // выход — к дверям ЭТОГО города (не первого spawnTown в pois!)
+            G.cityOut = { elem: tw.elem || G.elem, gx: tw.gx, gy: tw.gy };
             const st = cityStateFor(tw.elem || G.elem);
+            st.exitTown = { gx: tw.gx, gy: tw.gy };
             // прибытие к лестнице-выходу; 2с «остывание» лестницы — герой
             // встаёт рядом с ней, и первый же кадр не выкидывает в мир
             // (тот же приём, что у входа в данж)
@@ -931,10 +951,14 @@
                 // ГОРОДА (не столицы, просил юзер), общая для всех стихий
                 const spawnPx = px(map.spawn[G.elem] || map.spawn.strength);
                 let hp = G.world.heroPos ? { ...G.world.heroPos } : null;
-                if (G.cityOut) { // вышли из города — к его дверям (W30)
-                    const tw = map.pois.find((p) => p.spawnTown);
-                    hp = tw ? freeCellNear(px(tw).x, px(tw).y) : spawnPx;
+                if (G.cityOut) { // вышли из города — к дверям ЭТОГО города (W31)
+                    // старые сейвы хранят строку-стихию — таких дверей нет,
+                    // герой пойдёт по обычным правилам ниже
+                    const co = typeof G.cityOut === "object" ? G.cityOut : null;
                     G.cityOut = null;
+                    const tw = co && map.pois.find((p) => p.kind === "town"
+                        && p.gx === co.gx && p.gy === co.gy);
+                    hp = tw ? freeCellNear(px(tw).x, px(tw).y) : spawnPx;
                 } else if (G.world.out) {
                     const at = cavePoi(G.world.outCave) || cavePoi("gob");
                     hp = freeCellNear(px(at).x, px(at).y);
@@ -951,6 +975,15 @@
                             return Math.hypot(hp.x - c.x, hp.y - c.y) < TS * 1.2;
                         });
                     if (near) hp = freeCellNear(hp.x, hp.y);
+                }
+                // активный герой сменился с момента выбора точки появления
+                // (вкладка «Герои» меняет стихию забега на ходу; сейвы без
+                // якоря): герой отправляется в зону СВОЕЙ стихии — к спавну
+                // (баг юзера W31: герой Тлена начинал в зоне Силы)
+                if (G.world.startElem !== G.elem) {
+                    G.world.startElem = G.elem;
+                    G.world.heroPos = { ...spawnPx };
+                    hp = { ...spawnPx };
                 }
                 // реванш: живой отряд у точки появления отодвигает героя —
                 // касание с первого кадра не перезапускает только что
@@ -1118,6 +1151,19 @@
                 heroShadow.zIndex = hp.y - 0.5;
                 objLayer.addChild(heroShadow);
                 objLayer.addChild(sprite);
+                // стрелка к цели активного задания (W31): позицию/направление
+                // обновляет update(); включение — чекбокс в окне задания
+                // (G.settings.questArrow, по умолчанию включена)
+                questArrow = new PIXI.Graphics();
+                questArrow.moveTo(20, 0); questArrow.lineTo(-12, -13);
+                questArrow.lineTo(-6, 0); questArrow.lineTo(-12, 13);
+                questArrow.lineTo(20, 0);
+                questArrow.fill({ color: 0xf0c96a });
+                questArrow.stroke({ width: 2, color: 0x241505 });
+                questArrow.scale.set(1.3); // заметнее у тайлов 32px
+                questArrow.visible = false;
+                questArrow.zIndex = hp.y + 2;
+                objLayer.addChild(questArrow);
                 worldContainer.visible = true;
                 camera.follow({
                     get x() { return heroId !== null ? COMPONENTS.positionX[heroId] : hp.x; },
@@ -1166,6 +1212,7 @@
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
                 heroShadow = null;
                 heroSprite = null;
+                questArrow = null; // уходит вместе со слоем сцены
                 worldTerr = null;
                 terrStats = null;
                 woodStats = null;
@@ -1199,6 +1246,24 @@
                 heroShadow.position.set(hx, hy - 0.7 * 7 * 2);
                 heroShadow.zIndex = hy - 0.5;
                 if (heroSprite) heroSprite.zIndex = hy;
+                // стрелка задания (W31): у героя, в сторону цели; у самой
+                // цели и при открытом диалоге приглушена/скрыта
+                if (questArrow) {
+                    const qa = (G.settings && G.settings.questArrow !== false)
+                        && !(ctx.questModal || 0)
+                        ? globalThis.GAME_QUESTS.arrowTarget(G, { x: hx, y: hy })
+                        : null;
+                    if (qa) {
+                        const dx = qa.x - hx, dy = qa.y - hy;
+                        const d = Math.hypot(dx, dy) || 1;
+                        const r = 48 + 4 * Math.sin(performance.now() / 280);
+                        questArrow.visible = true;
+                        questArrow.position.set(hx + dx / d * r, hy + dy / d * r - 30);
+                        questArrow.rotation = Math.atan2(dy, dx);
+                        questArrow.alpha = d > TS * 2.5 ? 0.95 : 0.45;
+                        questArrow.zIndex = hy + 2;
+                    } else questArrow.visible = false;
+                }
                 // скорость по дорогам (просил юзер): дорога и мост дают
                 // ×1.2 к обычному шагу — переключается клеткой под ногами
                 {
@@ -1406,10 +1471,22 @@
                 if (!ctx.questModal && layer)
                 for (const p of G.world.map.pois) {
                     const c = px(p);
-                    // СТАРТОВЫЙ город (W30): касание — вход как в данж;
-                    // прочие города пока «Скоро…» (тот же кулдаун)
-                    if (Math.hypot(c.x - hx, c.y - hy) < TS * 0.85 && p.spawnTown) {
-                        enterCity();
+                    // города (W30/W31): касание СТАРТОВОГО — вход в НЕГО
+                    // (раньше всегда открывался первый spawnTown в pois —
+                    // город Силы, баг юзера); прочие — «Скоро…»
+                    if (p.kind === "town"
+                        && Math.hypot(c.x - hx, c.y - hy) < TS * 0.85) {
+                        if (p.spawnTown) {
+                            enterCity(p);
+                        } else {
+                            const deniedAt = p.denyAt || p.soonAt;
+                            if (!deniedAt || performance.now() - deniedAt > 2500) {
+                                p.denyAt = p.soonAt = performance.now();
+                                soonCount++;
+                                if (ctx.sfx) ctx.sfx();
+                                floatText(GAME_LOC.t("world.soon"), c.x, c.y, 0xd8c79d);
+                            }
+                        }
                         return;
                     }
                     if (p.kind !== "dungeon") continue;
@@ -1476,6 +1553,10 @@
                         seed: G.world.seed,
                         pois: map ? map.pois.length : 0,
                         speed: heroId !== null ? COMPONENTS.ctrlSpeed[heroId] : null,
+                        questArrow: questArrow
+                            ? { visible: questArrow.visible, x: questArrow.x,
+                                y: questArrow.y, rot: questArrow.rotation }
+                            : null,
                         onRoad: !!(map && heroId !== null
                             && [T.ROAD, T.BRIDGE].includes(map.ter[
                                 Math.floor(hero.y / TS) * map.w + Math.floor(hero.x / TS)])),

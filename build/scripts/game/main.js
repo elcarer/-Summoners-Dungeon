@@ -154,6 +154,13 @@
             uiTextures[`heroes/${h.img}.png`] =
                 await assets.loadTexture(`./images/heroes/${h.img}.png`);
         }
+        // портрет Глома (арт юзера, W31): файла может ещё не быть —
+        // диалоги квестов работают без портрета (силуэт); как только арт
+        // появится в images/npc/, подхватится здесь без правок кода
+        try {
+            uiTextures["npc/glom.png"] =
+                await assets.loadTexture("./images/npc/glom.png");
+        } catch (e) { /* арта ещё нет — окно с силуэтом */ }
         const uiTex = (name) => {
             const t = uiTextures[name];
             if (!t) throw new Error(`нет текстуры ui/${name}`);
@@ -456,6 +463,9 @@
                     v: globalThis.GAME_WORLDGEN.V,
                     seed: (Math.random() * 0x7fffffff) | 0,
                     heroPos: null, out: false, wander: null, wildLevel: {},
+                    // стихия, под которую выбрана точка появления: смена
+                    // героя («Герои») переносит его в зону новой стихии
+                    startElem: h.elems[0],
                 };
                 this.worldFrom = false;
                 this.dungeonStates = {};
@@ -501,6 +511,9 @@
                     // усиливают всех — W29); составы колод — в worldWander
                     worldWild: this.world.wildLevel
                         ? JSON.parse(JSON.stringify(this.world.wildLevel)) : null,
+                    // стихия точки появления (W31): смена героя —
+                    // перенос в зону новой стихии (world.enter)
+                    worldStartElem: this.world.startElem || null,
                     // глобальная карта: сейв хранит только сид — карта
                     // регенерируется детерминированно (worldGen.js)
                     worldV: globalThis.GAME_WORLDGEN.V,
@@ -510,6 +523,9 @@
                         done: { ...(this.quests.done || {}) },
                         announced: !!this.quests.announced,
                         pending: this.quests.pending || null,
+                        // прогресс (счётчик диких побед, чек-лист «Дно») —
+                        // W31: прежде не писался и терялся при перезапуске
+                        progress: { ...(this.quests.progress || {}) },
                     } : null,
                 });
             },
@@ -730,6 +746,10 @@
                 // отряды той же версии генератора: жив/мёртв и позиции
                 wander: r.worldV === globalThis.GAME_WORLDGEN.V
                     && r.worldWander ? r.worldWander : null,
+                // стихия точки появления (W31): сейвы без неё получат
+                // перенос героя в зону его стихии при первом входе в мир
+                startElem: r.worldV === globalThis.GAME_WORLDGEN.V
+                    && r.worldStartElem ? r.worldStartElem : null,
                 // дикие враги: уровень видов (старые сейвы — пусто,
                 // ensureWander создаст с нуля)
                 wildLevel: r.worldV === globalThis.GAME_WORLDGEN.V
@@ -1125,6 +1145,7 @@
                 state: () => globalThis.GAME_QUESTS.stateOf(G),
                 dialog: () => globalThis.GAME_QUESTS.dialogInfo(),
                 tap: () => globalThis.GAME_QUESTS.tap(),
+                tapDecline: () => globalThis.GAME_QUESTS.tapDecline(),
                 modal: () => (ctx.questModal || 0) > 0,
                 close: () => globalThis.GAME_QUESTS.forcedClose(ctx),
                 review: () => globalThis.GAME_QUESTS.showReview(ctx),

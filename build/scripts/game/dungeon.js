@@ -1513,10 +1513,14 @@
                     st.heroPos = { x: hx, y: hy };
                     if (st.city) {
                         // выход из города (W30): состояние — в G.cityStates
-                        // (НЕ в архив «данж:этаж»), герой — к дверям города
+                        // (НЕ в архив «данж:этаж»), герой — к дверям ТОГО
+                        // города, в который вошли (W31: объект с координатами)
                         G.cityStates[st.elem] = st;
                         G.dungeon = null;
-                        G.cityOut = st.elem;
+                        if (!G.cityOut || typeof G.cityOut !== "object")
+                            G.cityOut = st.exitTown
+                                ? { elem: st.elem, gx: st.exitTown.gx, gy: st.exitTown.gy }
+                                : st.elem; // старое состояние без exitTown — как раньше
                         if (G.saveRun) G.saveRun();
                         scenes.go("world");
                         return;
