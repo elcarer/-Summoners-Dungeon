@@ -346,7 +346,18 @@
     // южном, в городе — юго-восточном), вплотную к городской стене:
     // сквозные маршруты (арка по низу квартала, вертикальный коридор)
     // проходят в 2 клетках — мимо ворот не выезжает из города.
-    const CITY_V = 5; // версия планировки города: старые cityStates пересобираются
+    // W38 (юзер): ОСОБЕННОСТИ ГОРОДОВ ПО СТИХИИ — города чуть разреженнее,
+    // но архитектура интереснее: Сила — отдельные деревья (10.png) внутри
+    // и между кварталами (декор, проходимы — как леса мира); Рост — лесные
+    // зоны-рощи («F» НЕпроходимы: полог чащи wood + деревья, как массивы
+    // мира); Мудрость — река «~» с мостами «=» и набережными (река режет
+    // стеновую полосу между колонками кварталов, мосты встают на
+    // пересечениях коридоров); Тлен — болотные зоны (проходимый оверлей
+    // swamp.png поверх пустоши); Честь — горные массивы («M» непроходимы,
+    // спрайты montain); Время — запутанные проходы: пальцы стен внутри
+    // кварталов. Связность (двери/ворота/все клетки пола) проверяет
+    // check_city по всем стихиям.
+    const CITY_V = 6; // версия планировки города: старые cityStates пересобираются
     function newCityState(elem, capital) {
         const D = globalThis.GAME_DATA;
         const caveId = Object.keys(D.CAVES).find(
@@ -418,6 +429,77 @@
             corridor(lows[1], lows[2]);
             corridor(lows[3], lows[4]);
         }
+        // ── W38: особенности по стихии (юзер). Рощи/горы пишутся СИМВОЛАМИ
+        // в карту («F»/«M» — непроходимы, как пятна застройки), река Мудрости
+        // — «~» вода / «=» мост, болота Тлена и деревья — только оверлеи
+        // рендера (пол не меняют). Прямоугольники фич — с периметром-обходом:
+        // коридорные строки (низы комнат) и вертикали коридоров не перерезаются
+        const feat = { trees: 0, forest: [], swamp: [], mounts: [],
+            maze: [], water: [], bridges: [] };
+        const fillRect = (rects, ch) => {
+            for (const [x0, y0, x1, y1] of rects)
+                for (let y = y0; y <= y1; y++)
+                    for (let x = x0; x <= x1; x++)
+                        if (g[y][x] === ".") g[y][x] = ch;
+        };
+        if (elem === "strength") feat.trees = 1; // деревья ниже — рендером
+        else if (elem === "growth") {
+            feat.forest = capital
+                ? [[17, 2, 21, 4], [17, 15, 18, 16]] // северо-восток + юго-восток
+                : [[2, 12, 4, 13]];                 // юго-запад
+            fillRect(feat.forest, "F");
+        } else if (elem === "wisdom") {
+            // река по стеновой полосе между колонками кварталов (столица —
+            // между центральной/южной и восточными, город — между западом
+            // и центром): коридорная клетка → мост, стена → вода; вдоль —
+            // набережные (пол вместо толщи, берега реки из комнат).
+            // У воротного квартала набережные НЕ прорезаются (чебышёв ≤ 3
+            // до ворот): иначе появлялся транзит через прямых соседей
+            // лестницы-выхода — W37-инвариант (проверяет check_city)
+            const rx = capital ? 15 : 6;
+            const gate = capital ? [13, 15] : [18, 12];
+            for (let y = 1; y < CH - 1; y++) {
+                if (g[y][rx] === ".") { g[y][rx] = "="; feat.bridges.push([rx, y]); }
+                else { g[y][rx] = "~"; feat.water.push([rx, y]); }
+                for (const bx of [rx - 1, rx + 1]) {
+                    if (g[y][bx] !== "#") continue;
+                    if (Math.max(Math.abs(bx - gate[0]), Math.abs(y - gate[1])) <= 3)
+                        continue;
+                    g[y][bx] = ".";
+                }
+            }
+        } else if (elem === "decay") {
+            // болота проходимы: оверлей swamp.png поверх пола (рендер)
+            feat.swamp = capital
+                ? [[17, 2, 21, 4], [2, 15, 6, 16], [17, 15, 21, 16]]
+                : [[2, 13, 4, 14], [10, 9, 12, 10]];
+        } else if (elem === "honor") {
+            // массивы НЕ перерезают вертикали коридоров (в столице это
+            // x=4 и x=19) и не оставляют отрезанных карманов у зданий
+            feat.mounts = capital
+                ? [[17, 2, 21, 3], [2, 15, 3, 16], [5, 15, 6, 16],
+                   [17, 15, 18, 16], [20, 15, 21, 16]]
+                : [[2, 13, 4, 13], [15, 1, 17, 1], [12, 9, 12, 9]];
+            fillRect(feat.mounts, "M");
+        } else if (elem === "time") {
+            // пальцы стен внутри кварталов (воротный квартал чист — W37):
+            // прижаты к стенам, чебышёв ≥ 2 от зданий (не «прилипают»),
+            // коридорные строки/вертикали не перерезают, карманов не
+            // оставляют (полная связность — check_city)
+            feat.maze = capital ? [
+                [14, 7], [14, 8], [14, 9], [14, 10],        // центральная
+                [7, 2], [7, 3],                             // северо-западная
+                [16, 2], [16, 3], [22, 2], [22, 3], [19, 2], // северо-восточная
+                [7, 8], [7, 9], [6, 10], [7, 10],           // западная
+                [16, 8], [16, 9],                           // восточная
+                [1, 15], [1, 16], [7, 15], [7, 16],         // юго-западная
+                [16, 15], [16, 16], [22, 15], [22, 16],     // юго-восточная
+            ] : [
+                [12, 7], [12, 8], [12, 9],                  // центральная
+                [5, 12], [5, 13], [1, 13],                  // юго-западная
+            ];
+            for (const [x, y] of feat.maze) g[y][x] = "#";
+        }
         const objects = blds.map((b) => {
             const o = { ...b, taken: false };
             if (o.type === "shop") { // торговец картами живёт в магазине
@@ -442,6 +524,7 @@
             lootCenters: [], objects,
             districts: rooms.length, // районов-комнат: 5 / 8
             roomRects: rooms, // [x0,y0,x1,y1] кварталов — для проб (W37)
+            feat, // особенности стихии (W38): trees/forest/swamp/mounts/maze/water/bridges
             glom: house ? {
                 state: "hidden", // hidden → walking → talking → idle
                 x: glomHome.x, y: glomHome.y,
@@ -468,7 +551,8 @@
     // возвращаем на место (бой перезапустится касанием, не падаем).
     function retreatCell(enemy) {
         const cx = Math.round(enemy.x / TS - 0.5), cy = Math.round(enemy.y / TS - 0.5);
-        const open = (gx, gy) => gx >= 0 && gy >= 0 && gx < DW && gy < DH && MAPROWS[gy][gx] !== "#";
+        const open = (gx, gy) => gx >= 0 && gy >= 0 && gx < DW && gy < DH
+            && !"#%~FM".includes(MAPROWS[gy][gx]);
         const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
         for (let i = dirs.length - 1; i > 0; i--) {
             const j = (Math.random() * (i + 1)) | 0;
@@ -505,7 +589,9 @@
             const gx = Math.floor(px / TS), gy = Math.floor(py / TS);
             if (gx < 0 || gy < 0 || gx >= W || gy >= H) return true;
             const ch = MAPROWS[gy][gx];
-            return ch === "#" || ch === "%"; // стены и пятна застройки (W34)
+            // стены, пятна застройки (W34), вода рек и чащи/горы стихийных
+            // фич (W38); мосты «=» — проходимы
+            return ch === "#" || ch === "%" || ch === "~" || ch === "F" || ch === "M";
         }
 
         // ── Клик-перемещение: BFS по клеткам + ведение героя по пути ────────
@@ -515,7 +601,9 @@
         function walkable(gx, gy) {
             if (gx < 0 || gy < 0 || gx >= W || gy >= H) return false;
             const ch = MAPROWS[gy][gx];
-            return ch !== "#" && ch !== "%"; // улицы/площадь/земля — ходибельно
+            // улицы/площадь/земля/мосты/болота — ходибельно; стены, пятна
+            // застройки, вода, чащи и горы (W38) — нет
+            return ch !== "#" && ch !== "%" && ch !== "~" && ch !== "F" && ch !== "M";
         }
         function bfsPath(sx, sy, tx, ty) {
             if (sx === tx && sy === ty) return null;
@@ -622,10 +710,15 @@
             const vsheet = city
                 ? ctx.worldSheets[CITY_VARIANTS[caveOf(myState.cave).elem] || "dirt"]
                 : null;
+            // W38: вода реки Мудрости — те же квадраты, но листом воды;
+            // под мостами «=» тоже вода, доски моста рисуются поверх
+            const wsheet = city ? (ctx.worldSheets.water || null) : null;
             for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
-                if (MAPROWS[j][i] === "#" && !wallDrawn(i, j)) continue;
-                if (vsheet && vsheet.textures.length) {
-                    const texs = vsheet.textures;
+                const ch = MAPROWS[j][i];
+                if (ch === "#" && !wallDrawn(i, j)) continue;
+                const sheet = (ch === "~" || ch === "=") ? wsheet : vsheet;
+                if (sheet && sheet.textures.length) {
+                    const texs = sheet.textures;
                     for (let sy = 0; sy < 2; sy++) for (let sx = 0; sx < 2; sx++) {
                         const sp = new PIXI.Sprite(
                             texs[hsh(i * 2 + sx, j * 2 + sy) % texs.length]);
@@ -637,6 +730,46 @@
                 const sp = new PIXI.Sprite(uiTex(`dungeon_tiles/${lair}/floor/${hsh(i, j) % FLOORS}.png`));
                 sp.position.set(i * TS, j * TS);
                 c.addChild(sp);
+            }
+            // W38: оверлеи стихийных фич города — болота Тлена (swamp.png)
+            // и полог чащи Роста (wood.png): те же dual-grid рендеры, что у
+            // массивов открытого мира (синтетический ter-слой по state.feat;
+            // город ≤ 24×19 — один чанк). Болото проходимо, чаща «F» — нет,
+            // но пол/полог под ней рисуются
+            if (city && myState.feat) {
+                const WT = globalThis.GAME_WORLDTILES, GEN = globalThis.GAME_WORLDGEN;
+                const mkTer = (val, chNeed, rects) => {
+                    const ter = new Uint8Array(W * H);
+                    for (const [x0, y0, x1, y1] of rects)
+                        for (let y = y0; y <= y1; y++)
+                            for (let x = x0; x <= x1; x++)
+                                if (MAPROWS[y][x] === chNeed) ter[y * W + x] = val;
+                    return { w: W, h: H, ter };
+                };
+                if (myState.feat.swamp.length && WT && GEN && ctx.worldSheets.swamp)
+                    c.addChild(WT.renderSwampChunk(
+                        mkTer(GEN.T.SWAMP, ".", myState.feat.swamp),
+                        ctx.worldSheets, TS, 0, 0).container);
+                if (myState.feat.forest.length && WT && GEN && ctx.worldSheets.wood)
+                    c.addChild(WT.renderForestChunk(
+                        mkTer(GEN.T.FOREST, "F", myState.feat.forest),
+                        ctx.worldSheets, TS, 0, 0).container);
+                // мосты «=»: настил-доски поверх воды (как мосты мира)
+                const g2 = new PIXI.Graphics();
+                let planks = 0;
+                const edge = 4, plank = 2, gap = (TS - 2 * edge - plank) / 3;
+                for (let j = 0; j < H; j++) for (let i = 0; i < W; i++)
+                    if (MAPROWS[j][i] === "=") {
+                        const x = i * TS, y = j * TS;
+                        g2.rect(x, y, TS, edge); g2.fill(0x6e5233);
+                        g2.rect(x, y + TS - edge, TS, edge); g2.fill(0x6e5233);
+                        for (let b = 0; b < 4; b++) {
+                            g2.rect(x + 3, y + edge + b * gap, TS - 6, plank);
+                            g2.fill(0x7c5c36);
+                        }
+                        planks++;
+                    }
+                if (planks) c.addChild(g2);
             }
             return c;
         }
@@ -660,6 +793,72 @@
                 sp.position.set(i * TS, (j + 1) * TS);
                 sp.zIndex = (j + 1) * TS - 1;
                 layer.addChild(sp);
+            }
+        }
+
+        // W38: декорации стихийных фич города на слой y-sort (как стены и
+        // здания): деревья Силы — ОТДЕЛЬНЫЕ, спрайт 10.png (юзер), внутри и
+        // между кварталами, ПРОХОДИМЫ (клетка остаётся полом — как леса
+        // открытого мира, герой ходит за кронами); Рост — деревья рощ «F»
+        // (набор стихии из worldGen) + редкий разброс; Честь — горные
+        // спрайты на клетках массивов «M». Позиция/зеркало — хэш клетки,
+        // как у деревьев мира (worldTiles)
+        function addCityDeco(layer) {
+            if (!myState || !myState.city || !myState.feat) return;
+            const f = myState.feat;
+            const GEN = globalThis.GAME_WORLDGEN;
+            const trees = ctx.treeTex || [];
+            if (!trees.length) return;
+            // зона отчуждения РАЗБРОСА (рощи «F» руками расставлены вне её):
+            // ворота/спавн/двери зданий — чебышёв ≤ 1: деревья не заслоняют
+            // лестницу-выход и входы в дома
+            const keep = new Set();
+            const keep1 = (x, y) => {
+                for (let dy = -1; dy <= 1; dy++)
+                    for (let dx = -1; dx <= 1; dx++) keep.add((y + dy) * 1000 + x + dx);
+            };
+            keep1(Math.floor(myState.ladder.x / TS), Math.floor(myState.ladder.y / TS));
+            keep1(Math.floor(myState.spawn.x / TS), Math.floor(myState.spawn.y / TS));
+            for (const o of myState.objects) keep1(o.col, o.row);
+            const strengthSet = [10]; // юзер: деревья города Силы — 10.png
+            const groveSet = (GEN && GEN.TREE_SETS && GEN.TREE_SETS.growth) || [10];
+            for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+                const ch = MAPROWS[j][i];
+                if (ch !== "." && ch !== "F") continue;
+                const grove = ch === "F";
+                const scatter = (f.trees && hsh(i, j, 11) < 130) // ~13% пола
+                    || (myState.elem === "growth" && hsh(i, j, 11) < 70); // ~7%
+                if (!grove && !scatter) continue;
+                if (!grove && keep.has(j * 1000 + i)) continue;
+                const pool = myState.elem === "strength" ? strengthSet : groveSet;
+                const tex = trees[pool[hsh(i, j, 12) % pool.length] - 1];
+                if (!tex) continue;
+                const sp = new PIXI.Sprite(tex);
+                sp.anchor.set(0.5, 1); // низ ствола на кромке клетки
+                sp.scale.x = hsh(i, j, 13) < 500 ? -1 : 1;
+                sp.position.set(
+                    (i + 0.5) * TS + (hsh(i, j, 14) / 1000 - 0.5) * TS * 0.6,
+                    (j + 1) * TS + 3);
+                sp.zIndex = sp.position.y; // y-sort с героем/стенами
+                sp.eventMode = "none"; // декорация — клики уходят в пол
+                sp.__cityTree = 1; // тест-хук: подсчёт деревьев (как __tree мира)
+                layer.addChild(sp);
+            }
+            const mtns = ctx.mountainTex || [];
+            if (myState.elem === "honor" && mtns.length) {
+                for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+                    if (MAPROWS[j][i] !== "M") continue;
+                    const sp = new PIXI.Sprite(mtns[hsh(i, j, 15) % mtns.length]);
+                    sp.anchor.set(0.5, 1);
+                    sp.scale.x = hsh(i, j, 16) < 500 ? -1 : 1;
+                    sp.position.set(
+                        (i + 0.5) * TS + (hsh(i, j, 17) / 1000 - 0.5) * TS * 0.5,
+                        (j + 1) * TS + 2);
+                    sp.zIndex = sp.position.y;
+                    sp.eventMode = "none";
+                    sp.__cityMount = 1; // тест-хук: подсчёт скал
+                    layer.addChild(sp);
+                }
             }
         }
 
@@ -1493,6 +1692,7 @@
                 layer.addChild(zone);
                 layer.addChild(buildMapGfx()); // подложка + пол (zIndex 0)
                 addWalls(layer); // стены поверх пола, zIndex по нижней кромке
+                addCityDeco(layer); // деревья/горы стихийных фич города (W38)
                 if (st.exit) layer.addChild(makeExit()); // на дне данжа спуска нет
                 if (st.ladder) layer.addChild(makeLadder(st));
                 tokens = [];
