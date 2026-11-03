@@ -319,6 +319,14 @@
                 effectTipState: () => (A.effectTip
                     ? { key: A.effectTip.key, x: Math.round(A.effectTip.node.x),
                         y: Math.round(A.effectTip.node.y) } : null),
+                // точка метки эффекта существа (тесты W46): точное наведение
+                markPoint(col, row, name) {
+                    const u = unitAt(col, row);
+                    if (!u || !u.node) return null;
+                    const m = u.node.getChildByName(name);
+                    if (!m) return null;
+                    return { x: u.node.x + m.x, y: u.node.y + m.y };
+                },
                 // общий z-order поля (тесты): сортировка включена, zIndex — ряды
                 zOrder: () => (root && root.unitsLayer
                     ? { sortable: !!root.unitsLayer.sortableChildren,

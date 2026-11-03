@@ -723,19 +723,18 @@
                 rx += 64;
             }
             // активный квест сюжетной линии (просил юзер): иконка правее
-            // ресурсного ряда открывает текст задания; без квестов иконки нет
-            if (G.quests && G.quests.active) {
-                goldPlate.addChild(hudIcon("icon_rune.png", rx + 16, 17, () => {
-                    globalThis.GAME_QUESTS.showReview(ctx);
-                }, 0.75));
-                // (W45, юзер) рядом — кнопка АКТИВНОГО ПОРУЧЕНИЯ ратуши:
-                // окно с текстом и чек-боксом стрелки (GAME_SIDEQ.showReview)
-                if (globalThis.GAME_SIDEQ
-                    && globalThis.GAME_SIDEQ.activeModel(G)) {
-                    goldPlate.addChild(hudIcon("icon_map.png", rx + 52, 17,
-                        () => { globalThis.GAME_SIDEQ.showReview(ctx); }, 0.75));
-                }
-            }
+            // ресурсного ряда открывает текст задания. (W46, юзер) иконки
+            // строятся всегда, видимость СИНХРОНИЗИРУЕТСЯ ПО КАДРАМ (update):
+            // руна — только с ВЗЯТЫМ квестом (announced: «Принять» у Глома),
+            // кнопка поручения (W45) — в постоянном слоте правее. W46:
+            // поручение отодвинуто с rx+52 — налезало на руну 72px боком
+            const qRune = hudIcon("icon_rune.png", rx + 16, 17, () => {
+                globalThis.GAME_QUESTS.showReview(ctx);
+            }, 0.75);
+            const qSide = hudIcon("icon_map.png", rx + 80, 17,
+                () => { globalThis.GAME_SIDEQ.showReview(ctx); }, 0.75);
+            qRune.visible = qSide.visible = false; // до первой синхронизации
+            goldPlate.addChild(qRune, qSide);
             c.addChild(goldPlate);
             // настройки доступны и из мира; «Назад» вернёт сюда. Колода —
             // только по карте героя (просил юзер): карта под иконкой золота
@@ -776,7 +775,8 @@
             // к краям ОКНА по горизонтали (просил юзер: при переходе
             // из полноэкранного в оконный letterbox-полосы канваса
             // отодвигали золото/карточку героя и настройки от краёв)
-            c.userData = { goldT, resT, mini, goldPlate, heroHolder, settingsBtn };
+            c.userData = { goldT, resT, mini, goldPlate, heroHolder,
+                settingsBtn, qRune, qSide };
             return c;
         }
 
@@ -1027,6 +1027,17 @@
                     }
                 }
                 G.world.heroPos = { ...hp };
+
+                // (W46, юзер) поражение/побег в открытом мире: 2с ненападения
+                // С МОМЕНТА ВОЗВРАТА в мир. finish() (arenaFlow) ставит 3с,
+                // но путь через редактор колоды (потеря карты, добор из
+                // коллекции) съедает их — герой возвращался прямо под бой
+                // с тем же отрядом
+                if (G.world.afterDefeat) {
+                    G.world.afterDefeat = false;
+                    G.world.battleCool = Math.max(G.world.battleCool || 0,
+                        performance.now() + 2000);
+                }
 
                 layer = new PIXI.Container();
                 layer.sortableChildren = true;
@@ -1524,6 +1535,22 @@
                 for (const e of globalThis.GAME_SIDEQ.RES_ELEMS)
                     uiHud.userData.resT[e].text = String(G.resources[e] || 0);
 
+                // (W46, юзер) иконки квестов в HUD — синхронизация по кадрам:
+                // руна видна только с ВЗЯТЫМ квестом (announced ставит
+                // «Принять» в диалоге Глома), кнопка поручения — в своём
+                // постоянном слоте правее (не двигаем: позиция иконок
+                // не зависит от состояния квестов)
+                {
+                    const qud = uiHud.userData;
+                    const qOn = !!(G.quests && G.quests.active
+                        && G.quests.announced);
+                    const sq = globalThis.GAME_SIDEQ
+                        && globalThis.GAME_SIDEQ.stateOf(G);
+                    qud.qRune.visible = qOn;
+                    qud.qSide.visible = !!(sq && sq.active
+                        && sq.active.length);
+                }
+
                 // ── бродячие отряды: патруль, погоня, касание — бой ────────
                 // (просил юзер). Ходят по сетке 4 направлениями: BFS-путь
                 // ведём виртуальными осями ctrlVI/VJ — контроллер characters
@@ -1891,6 +1918,17 @@
                         storyFill: questArrow ? 0x76c93e : null,
                         review: globalThis.GAME_SIDEQ.reviewOpen(),
                     }),
+                    // (W46) иконки квестов в HUD: видимость руны (только
+                    // с взятым квестом) и кнопки поручения + её X
+                    questIcons: () => {
+                        const ud = uiHud && uiHud.userData;
+                        return ud && ud.qRune
+                            ? { rune: ud.qRune.visible,
+                                side: ud.qSide.visible,
+                                sideX: Math.round(ud.qSide.position.x),
+                                runeX: Math.round(ud.qRune.position.x) }
+                            : null;
+                    },
                     note: G.world.sideNote || null,
                 }),
                 res: () => ({ resources: { ...G.resources },

@@ -716,8 +716,9 @@
                         }
                     }
                     // «Зомби-разбойник» (decRaider): нанеся урон вражескому
-                    // существу, даёт «Возврат 1» случайному СВОЕМУ существу
-                    // (счётчик добавляется к уже висящему; метка пересоздаётся)
+                    // существу, даёт «Выкапливание 1» случайному СВОЕМУ
+                    // существу (W46, юзер — было «Возврат 1»; счётчик
+                    // добавляется к уже висящему, метка пересоздаётся)
                     if (!B.heroFlags.dmgReturn[raiderSide]) {
                         const hd = heroDefOf(raiderSide);
                         if (hd && hd.ability === "firstDmgReturn") {
@@ -726,11 +727,10 @@
                                 v.side === raiderSide && v.def.type === "unit");
                             if (own.length) {
                                 const v = own[(Math.random() * own.length) | 0];
-                                v.ret = (v.ret || 0) + (hd.abilityVal || 1);
-                                returnMarkDraw(v);
+                                addExhuming(v, (v.exhuming || 0) + (hd.abilityVal || 1));
                                 floatText(cellXY(v.col, v.row).x,
                                     cellXY(v.col, v.row).y - 96,
-                                    "↩ " + (hd.abilityVal || 1), 0xc9a0ef);
+                                    "⛏ " + (hd.abilityVal || 1), 0xc9b98c);
                                 sfx("chpoc");
                             }
                         }

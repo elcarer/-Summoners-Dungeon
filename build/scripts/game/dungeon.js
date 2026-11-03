@@ -1088,18 +1088,18 @@
                 rx += 64;
             }
             // активный квест сюжетной линии (просил юзер): иконка правее
-            // ресурсного ряда открывает текст задания; без квестов иконки нет
-            if (G.quests && G.quests.active) {
-                goldPlate.addChild(hudIcon("icon_rune.png", rx + 16, 17, () => {
-                    globalThis.GAME_QUESTS.showReview(ctx);
-                }, 0.75));
-                // (W45, юзер) рядом — кнопка АКТИВНОГО ПОРУЧЕНИЯ ратуши
-                if (globalThis.GAME_SIDEQ
-                    && globalThis.GAME_SIDEQ.activeModel(G)) {
-                    goldPlate.addChild(hudIcon("icon_map.png", rx + 52, 17,
-                        () => { globalThis.GAME_SIDEQ.showReview(ctx); }, 0.75));
-                }
-            }
+            // ресурсного ряда открывает текст задания. (W46, юзер) иконки
+            // строятся всегда, видимость СИНХРОНИЗИРУЕТСЯ ПО КАДРАМ (update):
+            // руна — только с ВЗЯТЫМ квестом (announced), кнопка поручения
+            // (W45) — в постоянном слоте правее (отодвинута с rx+52:
+            // налезала на руну боком)
+            const qRune = hudIcon("icon_rune.png", rx + 16, 17, () => {
+                globalThis.GAME_QUESTS.showReview(ctx);
+            }, 0.75);
+            const qSide = hudIcon("icon_map.png", rx + 80, 17,
+                () => { globalThis.GAME_SIDEQ.showReview(ctx); }, 0.75);
+            qRune.visible = qSide.visible = false; // до первой синхронизации
+            goldPlate.addChild(qRune, qSide);
             c.addChild(goldPlate);
             // настройки доступны и из подземелья; «Назад» вернёт сюда.
             // Колода — только по карте героя (просил юзер): карта под золотом
@@ -1141,7 +1141,7 @@
             toast.position.set(960, 495);
             toast.alpha = 0;
             c.addChild(toast);
-            c.userData = { floorT, goldT, resT, toast };
+            c.userData = { floorT, goldT, resT, toast, qRune, qSide };
             return c;
         }
 
@@ -2428,6 +2428,20 @@
                 // ресурсы стихий в HUD (W40) — числа каждый кадр
                 for (const e of globalThis.GAME_SIDEQ.RES_ELEMS)
                     uiHud.userData.resT[e].text = String(G.resources[e] || 0);
+
+                // (W46, юзер) иконки квестов в HUD — синхронизация по кадрам:
+                // руна видна только с ВЗЯТЫМ квестом, кнопка поручения — в
+                // своём постоянном слоте правее (как в мире)
+                {
+                    const qud = uiHud.userData;
+                    const qOn = !!(G.quests && G.quests.active
+                        && G.quests.announced);
+                    const sq = globalThis.GAME_SIDEQ
+                        && globalThis.GAME_SIDEQ.stateOf(G);
+                    qud.qRune.visible = qOn;
+                    qud.qSide.visible = !!(sq && sq.active
+                        && sq.active.length);
+                }
 
                 // ── триггеры: окно объекта, враги, выход ───────────────────
                 if (st.win || ctx.questModal) { // квест-диалог — как окно объекта

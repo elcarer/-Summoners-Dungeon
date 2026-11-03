@@ -925,8 +925,9 @@
                   color: 0x504048, img: "decay/148" },
         // «Толстопуз» (dec149): когда умирает существо его владельца
         // (любое, кроме него самого), каждая живая копия прибавляет себе
-        // БАЗОВЫЕ ⚔/♥ умершего (fatBelly — хук в killUnit)
-        dec149: { type: "unit", cost: 2, atk: 0, hp: 2, speed: 1,
+        // БАЗОВЫЕ ⚔/♥ умершего (fatBelly — хук в killUnit).
+        // Статы 4/5 (W46, юзер) — было 0/2
+        dec149: { type: "unit", cost: 2, atk: 4, hp: 5, speed: 1,
                   creature: "zombie", sheet: "zomb", // Зомби, лист зомби юзера
                   subtype: "zombie", // подтип — по спеке юзера (чат)
                   fatBelly: 1,

@@ -43,6 +43,12 @@
                 // «Возврат N» (Время, W17): счётчик u.ret тикает в начале
                 // хода владельца; на нуле существо возвращается в руку
                 returnMark: { name: "status.return.name", desc: "status.return.desc", val: (u) => u.ret },
+                // (W46, юзер) дотушёваны метки без подсказок: «Выкапливание»
+                // (Метка некроманта/Мортис/Костная куча), «Силовой купол» и
+                // «Ремонт» — у всех persistent-меток поля есть тултип
+                exhumingMark: { name: "spell.exhuming.name", desc: "spell.exhuming.desc", val: (u) => u.exhuming },
+                domeMark: { name: "spell.dome.name", desc: "spell.dome.desc", val: () => 0 },
+                repairMark: { name: "spell.repair.name", desc: "spell.repair.desc", val: () => 0 },
             };
             A.effectTip = null; // { key, node }
             A.effectTipHide = function effectTipHide() {
