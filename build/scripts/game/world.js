@@ -448,12 +448,14 @@
         function makeTown(poi) {
             const c = new PIXI.Container();
             // спрайт юзера images/sities/<стихия>/1.png (192×128),
-            // анкер — низ footprint (якорь-клетка нижняя средняя,
-            // перед входом), как у пещеры данжа (W39, юзер)
+            // масштаб 1.5 → 288×192 = 9×6 клетки (W41, юзер: города
+            // крупнее); анкер — низ footprint (якорь-клетка нижняя
+            // средняя, перед входом), как у пещеры данжа (W39, юзер)
             const sp = new PIXI.Sprite(ctx.cityTex[poi.elem].town);
             sp.anchor.set(0.5, 1);
+            sp.scale.set(1.5);
             c.addChild(sp);
-            c.addChild(label(poi.name, 16, 0xf3e6c2, -130));
+            c.addChild(label(poi.name, 16, 0xf3e6c2, -195));
             c.position.set((poi.gx + 0.5) * TS, (poi.gy + 1) * TS);
             c.zIndex = (poi.gy + 1) * TS; // низ footprint — y-sort общий
             return c;
@@ -461,11 +463,13 @@
         function makeCapital(poi) {
             const c = new PIXI.Container();
             // спрайт юзера images/sities/<стихия>/0.png (192×160),
-            // анкер — низ footprint, как у пещеры данжа (W39, юзер)
+            // масштаб 1.5 → 288×240 = 9×7.5 клетки (W41, юзер: города
+            // крупнее); анкер — низ footprint, как у пещеры данжа (W39)
             const sp = new PIXI.Sprite(ctx.cityTex[poi.elem].cap);
             sp.anchor.set(0.5, 1);
+            sp.scale.set(1.5);
             c.addChild(sp);
-            c.addChild(label(poi.name, 20, 0xf0c96a, -162));
+            c.addChild(label(poi.name, 20, 0xf0c96a, -243));
             c.position.set((poi.gx + 0.5) * TS, (poi.gy + 1) * TS);
             c.zIndex = (poi.gy + 1) * TS; // низ footprint — y-sort общий
             return c;
@@ -1162,7 +1166,8 @@
                     .filter((p) => p.kind === "town" || p.kind === "capital")
                     .map((p) => {
                         const g = new PIXI.Graphics();
-                        g.ellipse(0, 0, 96, 26);
+                        // под размер города (W41: спрайты ×1.5, было 96×26)
+                        g.ellipse(0, 0, 144, 39);
                         g.fill({ color: 0xd8b62a, alpha: 0.3 });
                         g.visible = false;
                         g.zIndex = (p.gy + 1) * TS - 1; // под узлом города
