@@ -397,14 +397,17 @@
 
         // Коллизии героя (character-система) — по карте АКТИВНОЙ сцены:
         // подземелье и открытый мир подменяют collide.rows при входе,
-        // а также шаг клетки (мир — 40px, подземелье — 56px тайлы)
-        const collide = { rows: GAME_DUNGEON.ROWS, ts: 40 };
+        // а также шаг клетки (мир — 40px, подземелье — 56px тайлы).
+        // extra — дополнительный предикат сцены (мир ставит блок тел
+        // городов W42, данж сбрасывает)
+        const collide = { rows: GAME_DUNGEON.ROWS, ts: 40, extra: null };
         function blocked(px, py) {
             const gx = Math.floor(px / collide.ts), gy = Math.floor(py / collide.ts);
             const rows = collide.rows;
             if (gy < 0 || gy >= rows.length || gx < 0 || gx >= rows[0].length) return true;
             const ch = rows[gy][gx];
-            return ch === "#" || ch === "~" || ch === "%"; // стены, вода и пятна застройки (W34)
+            if (ch === "#" || ch === "~" || ch === "%") return true; // стены, вода и пятна застройки (W34)
+            return !!(collide.extra && collide.extra(gx, gy));
         }
         // Инстанс ввода героя наружу: подземелье читает оси (клик-перемещение
         // отдаёт герою виртуальные оси, а без пути просто повторяет эти)

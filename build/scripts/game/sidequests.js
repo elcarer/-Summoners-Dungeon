@@ -50,11 +50,31 @@
         return citiesOf(G).find((p) => keyOf(p) === key) || null;
     }
 
-    // Проходимость мира: стены «#» и вода «~» — как world.walkable
+    // Тело города в открытом мире — препятствие (W42, юзер): спрайт
+    // 9 клеток шириной (колонки gx-4..gx+4), высота 6 рядов у города
+    // (gy-5..gy) и 7.5 у столицы (gy-7..gy, верхний ряд — половинный);
+    // непроходимы все ряды, КРОМЕ верхнего (герой обходит город и
+    // может зайти за него, но не ходит по «телу»). Единственная точка
+    // правила: её используют world.walkable (через кэш), collide.extra
+    // (ходьба в main.js) и walkableAt ниже (флуд/маршруты квестов)
+    function cityBlockAt(map, gx, gy) {
+        const pois = map && map.pois;
+        if (!pois) return false;
+        for (let i = 0; i < pois.length; i++) {
+            const p = pois[i];
+            if (p.kind !== "town" && p.kind !== "capital") continue;
+            if (gx < p.gx - 4 || gx > p.gx + 4) continue;
+            const top = p.kind === "capital" ? p.gy - 7 : p.gy - 5;
+            if (gy > top && gy <= p.gy) return true;
+        }
+        return false;
+    }
+    // Проходимость мира: стены «#» и вода «~» + тело города (W42)
     function walkableAt(map, x, y) {
         if (!map || x < 0 || y < 0 || x >= map.w || y >= map.h) return false;
         const ch = map.rows[y][x];
-        return ch !== "#" && ch !== "~";
+        if (ch === "#" || ch === "~") return false;
+        return !cityBlockAt(map, x, y);
     }
     // BFS 4 направления (порядок соседей E,W,S,N — как bfsPath в world.js);
     // возвращает список клеток пути или null
@@ -100,11 +120,17 @@
     }
 
     // Кольцо маршрута вокруг города: 8 румбов, радиус 7–12 (случайно на
-    // точку), каждая — ближайшая проходимая и достижимая от якоря города;
+    // точку), каждая — ближайшая проходимая и достижимая от города;
     // дубли — мимо. Патруль мира (world.js) ведёт отряд по s.d.route —
-    // недостижимую точку патруль просто пропустит
+    // недостижимую точку патруль просто пропустит. Старт BFS — не якорь
+    // (с W42 тело города непроходимо), а ближайшая проходимая клетка
+    // у ворот — «снаружи» города
+    function gateCell(map, poi) {
+        return nearWalkable(map, poi.gx, poi.gy) || [poi.gx, poi.gy + 1];
+    }
     function routeAround(G, poi) {
         const map = G.world.map;
+        const gate = gateCell(map, poi);
         const pts = [];
         for (let i = 0; i < 8; i++) {
             const a = (i / 8) * Math.PI * 2;
@@ -112,7 +138,7 @@
             const w = nearWalkable(map,
                 Math.round(poi.gx + Math.cos(a) * r),
                 Math.round(poi.gy + Math.sin(a) * r));
-            if (w && bfs(map, poi.gx, poi.gy, w[0], w[1])
+            if (w && bfs(map, gate[0], gate[1], w[0], w[1])
                 && !pts.some((p) => p[0] === w[0] && p[1] === w[1])) pts.push(w);
         }
         return pts.length >= 2 ? pts : null;
@@ -150,7 +176,8 @@
         const enc = PREFIX[q.elem] + "Raider";
         const poi = poiByKey(G, q.city);
         if (!poi || !globalThis.GAME_DATA.ENCOUNTERS[enc]) return null;
-        const dist = flood(map, poi.gx, poi.gy);
+        const gate = gateCell(map, poi); // якорь непроходим с W42 — от ворот
+        const dist = flood(map, gate[0], gate[1]);
         const ring = [];
         for (let dy = -HUNT_R; dy <= HUNT_R; dy++)
             for (let dx = -HUNT_R; dx <= HUNT_R; dx++) {
@@ -356,6 +383,6 @@
         // Честь, Время) — для world.js/dungeon.js
         RES_ELEMS: ["strength", "growth", "wisdom", "decay", "honor", "time"],
         // утилиты для проб/мир-кода
-        cityKey, keyOf, remainingTypes, walkableAt,
+        cityKey, keyOf, remainingTypes, walkableAt, cityBlockAt,
     };
 })();

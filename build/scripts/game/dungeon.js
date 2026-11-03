@@ -1953,6 +1953,7 @@
                 W = MAPROWS[0].length; H = MAPROWS.length; // город шире/выше данжа
                 ctx.collide.rows = MAPROWS; // коллизии героя — по карте этажа
                 ctx.collide.ts = TS; // клетка этажа — 64px (тайлы данжа)
+                ctx.collide.extra = null; // блок тел городов мира (W42) — только в мире
                 // сейв стоя на лестнице не должен мгновенно поднимать героя
                 if (st.ladder && st.heroPos
                     && Math.hypot(st.ladder.x - st.heroPos.x, st.ladder.y - st.heroPos.y) < TS * 0.9) {
@@ -2224,7 +2225,22 @@
                     const idle = !path && !charInput.ix && !charInput.iy;
                     if (idle) for (const o of st.objects) {
                         if (o.taken) continue;
-                        const d = Math.hypot(o.col * TS + TS / 2 - hx, o.row * TS + TS / 2 - hy);
+                        // W43 (юзер): у зданий с меню (ратуша/кузница/магазин)
+                        // окно открывается у ЛЮБОЙ стены — дистанция до пятна
+                        // здания, а не только до клетки-двери (у двери герой
+                        // стоял, меню не было). Дом Глома — мимо (своя сценка),
+                        // одиночные объекты (сундуки и пр.) — как раньше
+                        let d;
+                        if (o.build && o.type !== "glomHouse") {
+                            const dx = Math.max(o.gx * TS - hx, 0,
+                                hx - (o.gx + o.w) * TS);
+                            const dy = Math.max(o.gy * TS - hy, 0,
+                                hy - (o.gy + o.h) * TS);
+                            d = Math.hypot(dx, dy);
+                        } else {
+                            d = Math.hypot(o.col * TS + TS / 2 - hx,
+                                o.row * TS + TS / 2 - hy);
+                        }
                         if (o.cool) { if (d > TS * 1.25) o.cool = false; continue; }
                         if (d < TS * 0.85) { openObject(o); break; }
                     }

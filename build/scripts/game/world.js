@@ -210,11 +210,28 @@
                 time: "timGuard" }[elem] || null;
         }
 
+        // тело городов мира — препятствие (W42, юзер): правило в
+        // GAME_SIDEQ.cityBlockAt (единственная точка), здесь мемо-кэш
+        // по клеткам — walkable зовётся BFS-ами десятки тысяч раз
+        let blkCache = { map: null, m: new Map() };
+        function cellBlocked(map, gx, gy) {
+            const sq = globalThis.GAME_SIDEQ;
+            if (!sq || !sq.cityBlockAt) return false;
+            if (blkCache.map !== map) blkCache = { map, m: new Map() };
+            const k = gy * map.w + gx;
+            let v = blkCache.m.get(k);
+            if (v === undefined) {
+                v = sq.cityBlockAt(map, gx, gy);
+                blkCache.m.set(k, v);
+            }
+            return v;
+        }
         function walkable(gx, gy) {
             const map = G.world.map;
             if (!map || gx < 0 || gy < 0 || gx >= map.w || gy >= map.h) return false;
             const ch = map.rows[gy][gx];
-            return ch !== "#" && ch !== "~";
+            if (ch === "#" || ch === "~") return false;
+            return !cellBlocked(map, gx, gy);
         }
         function bfsPath(sx, sy, tx, ty) {
             const map = G.world.map, W = map.w, H = map.h;
@@ -447,13 +464,15 @@
         }
         function makeTown(poi) {
             const c = new PIXI.Container();
-            // спрайт юзера images/sities/<стихия>/1.png (192×128),
-            // масштаб 1.5 → 288×192 = 9×6 клетки (W41, юзер: города
-            // крупнее); анкер — низ footprint (якорь-клетка нижняя
-            // средняя, перед входом), как у пещеры данжа (W39, юзер)
+            // спрайт юзера images/sities/<стихия>/1.png: 288×192 = 9×6
+            // клетки (W41, юзер: города крупнее); арты в двух разрешениях
+            // (288px у decay/honor/time/wisdom, 192px у strength/growth) —
+            // масштаб нормируется по ширине, итог 9×6 у всех (W42);
+            // анкер — низ footprint (якорь-клетка нижняя средняя, перед
+            // входом), как у пещеры данжа (W39, юзер)
             const sp = new PIXI.Sprite(ctx.cityTex[poi.elem].town);
             sp.anchor.set(0.5, 1);
-            sp.scale.set(1.5);
+            sp.scale.set(288 / sp.texture.width);
             c.addChild(sp);
             c.addChild(label(poi.name, 16, 0xf3e6c2, -195));
             c.position.set((poi.gx + 0.5) * TS, (poi.gy + 1) * TS);
@@ -462,12 +481,13 @@
         }
         function makeCapital(poi) {
             const c = new PIXI.Container();
-            // спрайт юзера images/sities/<стихия>/0.png (192×160),
-            // масштаб 1.5 → 288×240 = 9×7.5 клетки (W41, юзер: города
-            // крупнее); анкер — низ footprint, как у пещеры данжа (W39)
+            // спрайт юзера images/sities/<стихия>/0.png: 288×240 = 9×7.5
+            // клетки (W41, юзер: города крупнее); нормировка по ширине —
+            // 288px арты scale 1, старые 192px — 1.5 (W42); анкер — низ
+            // footprint, как у пещеры данжа (W39)
             const sp = new PIXI.Sprite(ctx.cityTex[poi.elem].cap);
             sp.anchor.set(0.5, 1);
-            sp.scale.set(1.5);
+            sp.scale.set(288 / sp.texture.width);
             c.addChild(sp);
             c.addChild(label(poi.name, 20, 0xf0c96a, -243));
             c.position.set((poi.gx + 0.5) * TS, (poi.gy + 1) * TS);
@@ -936,9 +956,17 @@
                 ensureWander(); // жив/мёртв и позиции отрядов (создать/дописать)
                 ctx.collide.rows = map.rows; // коллизии героя — по карте мира
                 ctx.collide.ts = TS; // после подземелья (клетка 64) — шаг мира
+                // ходьба (в т.ч. клавиатурой) тоже respectит тело городов
+                // (W42) — данж при входе сбрасывает extra
+                ctx.collide.extra = (gx, gy) => cellBlocked(map, gx, gy);
                 // точка появления: вышедший из подземелья герой стоит
                 // у входа ТОГО данжа; новая игра — клетка у случайного
-                // ГОРОДА (не столицы, просил юзер), общая для всех стихий
+                // ГОРОДА (не столицы, просил юзер), общая для всех стихий.
+                // W42: спавн-точка могла попасть в тело города (теперь
+                // непроходимо) — сдвиг к ближайшей свободной клетке
+                const spawnOk = (q) =>
+                    walkable(Math.floor(q.x / TS), Math.floor(q.y / TS))
+                        ? q : freeCellNear(q.x, q.y);
                 const spawnPx = px(map.spawn[G.elem] || map.spawn.strength);
                 let hp = G.world.heroPos ? { ...G.world.heroPos } : null;
                 if (G.cityOut) { // вышли из города — к дверям ЭТОГО города (W31)
@@ -950,14 +978,14 @@
                     const tw = co && map.pois.find((p) =>
                         (p.kind === "town" || p.kind === "capital")
                         && p.gx === co.gx && p.gy === co.gy);
-                    hp = tw ? freeCellNear(px(tw).x, px(tw).y) : spawnPx;
+                    hp = tw ? freeCellNear(px(tw).x, px(tw).y) : spawnOk(spawnPx);
                 } else if (G.world.out) {
                     const at = cavePoi(G.world.outCave) || cavePoi("gob");
                     hp = freeCellNear(px(at).x, px(at).y);
                     G.world.out = false;
-                } else if (!hp) hp = spawnPx;
+                } else if (!hp) hp = spawnOk(spawnPx);
                 else if (!walkable(Math.floor(hp.x / TS), Math.floor(hp.y / TS)))
-                    hp = spawnPx; // позиция с чужой/старой карты — к спавну
+                    hp = spawnOk(spawnPx); // чужая/старая карта — к спавну
                 else {
                     // сохранённая позиция у самой арки не должна мгновенно
                     // сработать триггер — отодвигаем на свободную клетку
@@ -1604,9 +1632,12 @@
                     // города (W30/W31): касание СТАРТОВОГО — вход в НЕГО
                     // (раньше всегда открывался первый spawnTown в pois —
                     // город Силы, баг юзера). W40 (юзер): входят ВСЕ города
-                    // — письмо ратуши доставляется в любой из них
+                    // — письмо ратуши доставляется в любой из них.
+                    // W42: нижний ряд спрайта непроходим (тело города —
+                    // препятствие), радиус 1.3 клетки — вход с клетки
+                    // перед воротами (диагональ 45px ещё молчит)
                     if ((p.kind === "town" || p.kind === "capital")
-                        && Math.hypot(c.x - hx, c.y - hy) < TS * 0.85) {
+                        && Math.hypot(c.x - hx, c.y - hy) < TS * 1.3) {
                         enterCity(p);
                         return;
                     }
