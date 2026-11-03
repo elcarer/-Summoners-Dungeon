@@ -31,7 +31,10 @@
     // v16 — враги открытого мира не спавнятся у старта героя (W44, юзер):
     // стражи данжей/мостов/Тлена у стартовых точек удаляются, дикие —
     // не ближе 16 клеток; старые миры (v15) перегенерируются
-    const V = 16;
+    // v17 — дороги в обход городов (W45, юзер): A* не режет спрайт города
+    // (footprint 9×6/9×7.5 клеток — с W42 тело непроходимо, дорога к
+    // «воротам» подходила сквозь него); старые миры (v16) перегенерируются
+    const V = 17;
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // деревья лесных массивов по зонам стихий (просил юзер): вместо
@@ -704,12 +707,30 @@
         // ── 6. дороги: A* между площадями/арками. Внутри зоны — остов
         // (Прим) + одно «кольцевое» ребро; между смежными зонами —
         // ближайшая пара. Дорога прокладывается и сквозь горы/чащи
-        // (перевал), и через воду (мост); стены городов для дорог
-        // непроходимы — путь приходит к площади снаружи, и связность
-        // всего мира гарантирована ────────────────────────────────────────
-        const costOf = (x, y) => {
+        // (перевал), и через воду (мост); стены городов и СПРАЙТЫ ГОРОДОВ
+        // для дорог непроходимы (W45, юзер: дорога вела сквозь непроходимое
+        // тело города — теперь в обход, к «воротам» с юга) — путь приходит
+        // к площади снаружи, и связность всего мира гарантирована ──────────
+        // Маска спрайтов городов: footprint 9×6 (город) / 9×7.5 (столица)
+        // клеток якоря, КРОМЕ самой площади — к ней дорога приходит с юга
+        // (клетка под якорем вне тела). Обход дорог через тело — на generation;
+        // клин между городами (путь не нашёлся) — фолбэк по-старому, сквозь
+        // (связность дороже косметики; рисуется под спрайтом)
+        const cityBody = new Uint8Array(W * H);
+        for (const p of pois) {
+            if (p.kind !== "town" && p.kind !== "capital") continue;
+            const top = p.kind === "capital" ? p.gy - 7 : p.gy - 5;
+            for (let y = Math.max(0, top); y <= Math.min(H - 1, p.gy); y++)
+                for (let x = Math.max(0, p.gx - 4)
+                    ; x <= Math.min(W - 1, p.gx + 4); x++) {
+                    if (x === p.gx && y === p.gy) continue; // площадь — цель пути
+                    cityBody[y * W + x] = 1;
+                }
+        }
+        const costOf = (x, y, strict) => {
             const i = y * W + x;
             if (blocked[i]) return Infinity; // стены зданий не пересекаем
+            if (strict && cityBody[i]) return Infinity; // спрайт города — в обход
             const t = ter[i];
             if (t === T_ROAD) return 0.75; // дороги охотно сливаются
             if (t === T_BRIDGE) return 0.9;
@@ -719,9 +740,10 @@
             if (t === T_MOUNTAIN) return 9;
             return 13; // вода — мост
         };
-        function astar(sx, sy, tx, ty) {
+        function astar(sx, sy, tx, ty, strict) {
             const start = sy * W + sx, target = ty * W + tx;
-            if (!isFinite(costOf(sx, sy)) || !isFinite(costOf(tx, ty)))
+            if (!isFinite(costOf(sx, sy, strict))
+                || !isFinite(costOf(tx, ty, strict)))
                 return null;
             const g = new Map([[start, 0]]);
             const prev = new Map([[start, null]]);
@@ -736,7 +758,7 @@
                 for (const [dx, dy] of DIRS) {
                     const nx = cx + dx, ny = cy + dy;
                     if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-                    const step = costOf(nx, ny);
+                    const step = costOf(nx, ny, strict);
                     if (!isFinite(step)) continue;
                     const ni = ny * W + nx;
                     const ng = gc + step;
@@ -795,7 +817,11 @@
             if (bp) edges.push(bp);
         }
         for (const [p, q] of edges) {
-            const path = astar(p.gx, p.gy, q.gx, q.gy);
+            // сперва в ОБХОД спрайтов городов; пути нет (город зажат) —
+            // по-старому, сквозь (дорога рисуется под спрайтом, связность
+            // важнее косметики)
+            const path = astar(p.gx, p.gy, q.gx, q.gy, true)
+                || astar(p.gx, p.gy, q.gx, q.gy, false);
             if (!path) continue;
             for (const i of path) {
                 if (blocked[i]) continue; // стены не красятся, площадь — да

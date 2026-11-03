@@ -144,8 +144,12 @@
         return list.length ? list : [{ who: "glom", text: questText(G, q) }];
     }
     function speakerName(G, who) {
+        // имя героя — через foeTitle (W45, юзер): активным героем может
+        // стать ЗАВОЁВАННЫЙ герой-враг («Герои» — captured), у него нет
+        // ключа hero.<id>.name — показывался сырой ключ «ссылкой в коде»;
+        // foeTitle умеет и тех (enc-заголовок), и стартовых (hero.<id>.name)
         return who === "hero"
-            ? GAME_LOC.t(`hero.${G.heroId}.name`)
+            ? globalThis.GAME_UI.foeTitle(G.heroId)
             : GAME_LOC.t("city.npcName");
     }
 
@@ -230,8 +234,12 @@
     function rollCommonCards(G, n) {
         const CD = globalThis.GAME_CARD_DATA;
         const D = globalThis.GAME_DATA;
+        // (W45, юзер) только карты С ЛИЦОМ: служебные токены без лица
+        // (icePixie «Ледо-пикси», gobA, skel…) — не награда; тот же
+        // фильтр, что у collectibleOf в dataCards
         const commons = Object.keys(CD.CARDS).filter((c) =>
-            CD.CARDS[c].elem === G.elem && CD.CARDS[c].rarity === "common");
+            CD.CARDS[c].elem === G.elem && CD.CARDS[c].rarity === "common"
+            && CD.CARDS[c].img);
         const shuffle = (arr) => {
             for (let i = arr.length - 1; i > 0; i--) {
                 const j = (Math.random() * (i + 1)) | 0;
@@ -294,16 +302,11 @@
         const q = QUESTS.find((x) => x.id === G.quests.active);
         if (!q || !G.quests.announced) return null;
         if (q.kind === "wild") {
-            const o = from || G.world.heroPos || { x: 0, y: 0 };
-            let best = null, bd = Infinity;
-            for (const k in (G.world.wander || {})) {
-                if (k.indexOf("wild:") !== 0) continue;
-                const w = G.world.wander[k];
-                if (!w || !w.alive) continue;
-                const d = Math.hypot(w.x - o.x, w.y - o.y);
-                if (d < bd) { bd = d; best = w; }
-            }
-            return best ? { x: best.x, y: best.y } : null;
+            // (W45, юзер) стрелка — только к КОНКРЕТНОЙ цели квеста, а не
+            // «к любому дикому»: q1 не имеет монстра-цели (победи любых 3),
+            // и после побочного квеста-охоты стрелка «перецеплялась» на
+            // следующего бродягу. q1 — без стрелки; q2–q4 ведут к арке
+            return null;
         }
         const cave = caveOfElem(G.elem);
         const poi = map.pois.find((p) => p.kind === "dungeon" && p.cave === cave);

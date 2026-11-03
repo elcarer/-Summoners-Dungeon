@@ -1093,6 +1093,12 @@
                 goldPlate.addChild(hudIcon("icon_rune.png", rx + 16, 17, () => {
                     globalThis.GAME_QUESTS.showReview(ctx);
                 }, 0.75));
+                // (W45, юзер) рядом — кнопка АКТИВНОГО ПОРУЧЕНИЯ ратуши
+                if (globalThis.GAME_SIDEQ
+                    && globalThis.GAME_SIDEQ.activeModel(G)) {
+                    goldPlate.addChild(hudIcon("icon_map.png", rx + 52, 17,
+                        () => { globalThis.GAME_SIDEQ.showReview(ctx); }, 0.75));
+                }
             }
             c.addChild(goldPlate);
             // настройки доступны и из подземелья; «Назад» вернёт сюда.
@@ -1402,23 +1408,115 @@
                 boostT.text = t("forge.boosters",
                     { n: G.boosters[elem] || 0 });
             }
+            // (W45, юзер) анимации кузницы: ковка — бустер собирается из
+            // кусочков, вскрытие — бустер рвётся, карты вылетают. Состояние
+            // для проб: phase "idle"/"craft"/"open"; на время анимации
+            // кнопки кузницы не работают (animBusy)
+            let animBusy = false, animPhase = "idle";
             function craft() {
                 if ((G.resources[elem] || 0) < 3) {
+                    // «не хватает» — мгновенный фидбек даже во время анимации
                     needT.text = t("forge.need", { name: resName });
                     needT.alpha = 1;
                     if (ctx.sfx) ctx.sfx();
                     return;
                 }
+                if (animBusy) return; // ковка уже идёт — двойной траты нет
                 G.resources[elem] -= 3;
                 G.boosters[elem] = (G.boosters[elem] || 0) + 1;
                 needT.alpha = 0;
                 refresh();
                 if (ctx.sfx) ctx.sfx("up");
                 if (G.saveRun) G.saveRun();
+                playCraftAnim();
+            }
+            // ковка: арт бустера (500×300) режется сеткой 4×3; куски
+            // слетаются в свой слот по одному (стагger 45мс, ease-out),
+            // в конце — вспышка и «прикат» готового бустера
+            function playCraftAnim() {
+                animBusy = true;
+                animPhase = "craft";
+                art.visible = false;
+                const tex = art.texture;
+                const COLS = 4, ROWS = 3, PW = 500 / COLS, PH = 300 / ROWS;
+                const fx = new PIXI.Container();
+                fx.eventMode = "none";
+                c.addChild(fx);
+                const flash = new PIXI.Graphics();
+                flash.ellipse(0, 0, 195, 115);
+                flash.fill({ color: 0xffe2a8, alpha: 0.5 });
+                flash.position.set(960, top + 84 + 84);
+                flash.alpha = 0;
+                flash.eventMode = "none";
+                c.addChild(flash);
+                const pieces = [];
+                for (let r = 0; r < ROWS; r++)
+                    for (let col = 0; col < COLS; col++) {
+                        const px = col * PW, py = r * PH;
+                        const sp = new PIXI.Sprite(new PIXI.Texture({
+                            source: tex.source,
+                            frame: new PIXI.Rectangle(px, py, PW, PH) }));
+                        sp.anchor.set(0.5);
+                        sp.scale.set(0.56);
+                        sp.eventMode = "none";
+                        const ex = 960 - 140 + (px + PW / 2) * 0.56;
+                        const ey = top + 84 + (py + PH / 2) * 0.56;
+                        const a = Math.random() * Math.PI * 2;
+                        const d = 170 + Math.random() * 130;
+                        sp.position.set(ex + Math.cos(a) * d,
+                            ey + Math.sin(a) * d);
+                        sp.rotation = (Math.random() - 0.5) * 1.3;
+                        sp.alpha = 0;
+                        fx.addChild(sp);
+                        pieces.push({ sp, ex, ey, sx: sp.x, sy: sp.y,
+                            srot: sp.rotation, t0: 120 + pieces.length * 45 });
+                    }
+                const t0 = performance.now();
+                const FLY = 480, TOTAL = 120 + pieces.length * 45 + FLY + 40;
+                const tick = () => {
+                    if (fx.destroyed) { PIXI.Ticker.shared.remove(tick); return; }
+                    const el = performance.now() - t0;
+                    for (const p of pieces) {
+                        const k = Math.min(1, Math.max(0, (el - p.t0) / FLY));
+                        const e = 1 - Math.pow(1 - k, 3);
+                        p.sp.alpha = e;
+                        p.sp.x = p.sx + (p.ex - p.sx) * e;
+                        p.sp.y = p.sy + (p.ey - p.sy) * e;
+                        p.sp.rotation = p.srot * (1 - e);
+                    }
+                    if (el < TOTAL) return;
+                    PIXI.Ticker.shared.remove(tick);
+                    fx.destroy({ children: true });
+                    art.visible = true;
+                    // вспышка + прикат готового бустера
+                    const t1 = performance.now();
+                    const pop = () => {
+                        if (flash.destroyed) {
+                            PIXI.Ticker.shared.remove(pop);
+                            return;
+                        }
+                        const k = Math.min(1,
+                            (performance.now() - t1) / 260);
+                        art.scale.set(0.56 + Math.sin(k * Math.PI) * 0.07);
+                        flash.alpha = k < 0.6 ? 0.5 * (1 - k / 0.6) : 0;
+                        if (k >= 1) {
+                            PIXI.Ticker.shared.remove(pop);
+                            flash.destroy();
+                            animBusy = false;
+                            animPhase = "idle";
+                        }
+                    };
+                    PIXI.Ticker.shared.add(pop);
+                };
+                PIXI.Ticker.shared.add(tick);
             }
             // вскрытие: карты сразу в коллекцию (как награда W32), лица —
-            // рядом с ховер-зумом; окно меняется на просмотр добычи
+            // рядом с ховер-зумом; окно меняется на просмотр добычи.
+            // (W45, юзер) перед окном добычи — анимация: бустер дрожит,
+            // РВЁТСЯ пополам (половинки разлетаются), карты вылетают из
+            // центра и встают в свой ряд — потом обычное окно (forgeReward)
             function openBooster() {
+                if (animBusy) return;
                 if (!(G.boosters[elem] > 0)) {
                     needT.text = t("forge.none");
                     needT.alpha = 1;
@@ -1432,9 +1530,119 @@
                 G.persistMeta();
                 if (G.saveRun) G.saveRun();
                 if (ctx.sfx) ctx.sfx("coins");
+                animBusy = true;
+                animPhase = "open";
                 winNode.destroy({ children: true });
-                winNode = forgeReward(cards);
+                winNode = buildOpenAnim(cards);
                 ctx.ui.addChild(winNode);
+                winRefs = { leaveBtn: null, forge: {
+                    tap: () => {},
+                    state: () => ({ elem, phase: animPhase,
+                        res: G.resources[elem] || 0,
+                        boosters: G.boosters[elem] || 0,
+                        cards: [...cards], need: false, needText: "" }),
+                } };
+            }
+            // анимация вскрытия: панель как у forgeReward (800×460), в
+            // центре — арт бустера; геометрия ряда карт ТА ЖЕ, что в
+            // forgeReward (spread/cy) — вылетевшие карты «приземляются»
+            // точно в слоты статичного окна добычи
+            function buildOpenAnim(cards) {
+                const rc = new PIXI.Container();
+                rc.eventMode = "static";
+                const dm = new PIXI.Graphics();
+                dm.rect(-3000, -2000, 7920, 5080);
+                dm.fill({ color: 0x000000, alpha: 0.55 });
+                rc.addChild(dm);
+                const pn = new PIXI.Graphics();
+                pn.roundRect(960 - 400, top, 800, 460, 18);
+                pn.fill({ color: 0x171310, alpha: 0.96 });
+                pn.stroke({ width: 4, color: 0x6b5c40 });
+                rc.addChild(pn);
+                const head = T(t("forge.opened"), 34, 0xf0c96a);
+                head.anchor.set(0.5, 0);
+                head.position.set(960, top + 30);
+                head.eventMode = "none";
+                rc.addChild(head);
+                const tex = uiTex(`resources/buster_${elem}.png`);
+                const CX = 960, CY = top + 84 + 84, S = 0.56;
+                const whole = new PIXI.Sprite(tex);
+                whole.anchor.set(0.5);
+                whole.scale.set(S);
+                whole.position.set(CX, CY);
+                whole.eventMode = "none";
+                rc.addChild(whole);
+                const half = (fx0) => {
+                    const s = new PIXI.Sprite(new PIXI.Texture({
+                        source: tex.source,
+                        frame: new PIXI.Rectangle(fx0, 0, 250, 300) }));
+                    s.anchor.set(0.5);
+                    s.scale.set(S);
+                    s.eventMode = "none";
+                    s.position.set(CX + (fx0 === 0 ? -70 : 70), CY);
+                    s.visible = false;
+                    rc.addChild(s);
+                    return s;
+                };
+                const hl = half(0), hr = half(250);
+                const sc = 0.28;
+                const spread = Math.min(150, 760 / Math.max(1, cards.length));
+                const cy = top + 250, sy = top + 230;
+                const cardsSp = cards.map((id, i) => {
+                    const card = cardFace(ctx, id, { scale: 0.02 });
+                    card.position.set(CX, sy);
+                    card.alpha = 0;
+                    card.eventMode = "none";
+                    rc.addChild(card);
+                    return { sp: card,
+                        ex: 960 + (i - (cards.length - 1) / 2) * spread, ey: cy };
+                });
+                const t0 = performance.now();
+                const SHAKE = 420, TEAR = 560, STAG = 90, FLY = 460;
+                const TOTAL = Math.max(SHAKE + 140
+                    + (cards.length - 1) * STAG + FLY + 80, SHAKE + TEAR);
+                const tick = () => {
+                    if (rc.destroyed) { PIXI.Ticker.shared.remove(tick); return; }
+                    const el = performance.now() - t0;
+                    if (el < SHAKE) { // дрожит нарастающе
+                        const k = el / SHAKE;
+                        whole.x = CX + Math.sin(el / 22) * 5 * k;
+                        whole.rotation = Math.sin(el / 17) * 0.06 * k;
+                    } else { // рвётся: половинки разлетаются и гаснут
+                        whole.visible = false;
+                        hl.visible = hr.visible = true;
+                        const k = Math.min(1, (el - SHAKE) / TEAR);
+                        const e = 1 - Math.pow(1 - k, 2);
+                        hl.x = CX - 70 - 175 * e;
+                        hl.y = CY + 14 * e;
+                        hl.rotation = -0.55 * e;
+                        hl.alpha = 1 - e;
+                        hr.x = CX + 70 + 175 * e;
+                        hr.y = CY + 14 * e;
+                        hr.rotation = 0.55 * e;
+                        hr.alpha = 1 - e;
+                    }
+                    for (let i = 0; i < cardsSp.length; i++) {
+                        const cs = cardsSp[i];
+                        const k = Math.min(1, Math.max(0,
+                            (el - SHAKE - 120 - i * STAG) / FLY));
+                        const e = 1 - Math.pow(1 - k, 3);
+                        cs.sp.alpha = e;
+                        cs.sp.scale.set(0.02 + (sc - 0.02) * e);
+                        cs.sp.x = CX + (cs.ex - CX) * e;
+                        cs.sp.y = sy + (cs.ey - sy) * e;
+                    }
+                    if (el < TOTAL) return;
+                    PIXI.Ticker.shared.remove(tick);
+                    if (rc.destroyed) return;
+                    animBusy = false;
+                    animPhase = "idle";
+                    winNode.destroy({ children: true });
+                    winNode = forgeReward(cards);
+                    ctx.ui.addChild(winNode);
+                };
+                PIXI.Ticker.shared.add(tick);
+                return rc;
             }
             function forgeReward(cards) {
                 const rc = new PIXI.Container();
@@ -1479,7 +1687,8 @@
             refresh();
             winRefs = { leaveBtn, forge: {
                 tap: (w) => (w === "craft" ? craft() : openBooster()),
-                state: () => ({ elem, res: G.resources[elem] || 0,
+                state: () => ({ elem, phase: animPhase,
+                    res: G.resources[elem] || 0,
                     boosters: G.boosters[elem] || 0,
                     resT: resT.text, boostT: boostT.text,
                     need: needT.alpha > 0.5, needText: needT.text }),
@@ -2142,7 +2351,13 @@
                 // — «Уйти» (магазин/карта сокровищ) или «Взять» (сундук/
                 // золото — оно там единственное)
                 if (ctx.input.wasPressed("Escape")) {
-                    if ((ctx.questModal || 0) > 0) globalThis.GAME_QUESTS.tap();
+                    if ((ctx.questModal || 0) > 0) {
+                        // квест-диалог — своей кнопкой; окно поручения
+                        // (W45) — тоже своей («Уйти»)
+                        if (!globalThis.GAME_QUESTS.tap()
+                            && globalThis.GAME_SIDEQ)
+                            globalThis.GAME_SIDEQ.closeReview();
+                    }
                     else if (winObj) {
                         if (winRefs && winRefs.leaveBtn) winRefs.leaveBtn.emit("pointertap");
                         else if (winRefs && winRefs.takeBtn) winRefs.takeBtn.emit("pointertap");

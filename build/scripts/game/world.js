@@ -728,6 +728,13 @@
                 goldPlate.addChild(hudIcon("icon_rune.png", rx + 16, 17, () => {
                     globalThis.GAME_QUESTS.showReview(ctx);
                 }, 0.75));
+                // (W45, юзер) рядом — кнопка АКТИВНОГО ПОРУЧЕНИЯ ратуши:
+                // окно с текстом и чек-боксом стрелки (GAME_SIDEQ.showReview)
+                if (globalThis.GAME_SIDEQ
+                    && globalThis.GAME_SIDEQ.activeModel(G)) {
+                    goldPlate.addChild(hudIcon("icon_map.png", rx + 52, 17,
+                        () => { globalThis.GAME_SIDEQ.showReview(ctx); }, 0.75));
+                }
             }
             c.addChild(goldPlate);
             // настройки доступны и из мира; «Назад» вернёт сюда. Колода —
@@ -1228,13 +1235,15 @@
                 objLayer.addChild(sprite);
                 // стрелка к цели активного задания (W31): позицию/направление
                 // обновляет update(); включение — чекбокс в окне задания
-                // (G.settings.questArrow, по умолчанию включена)
+                // (G.settings.questArrow, по умолчанию включена).
+                // (W45, юзер) зелёная — раньше была жёлтой и сливалась со
+                // стрелкой письма побочного квеста
                 questArrow = new PIXI.Graphics();
                 questArrow.moveTo(20, 0); questArrow.lineTo(-12, -13);
                 questArrow.lineTo(-6, 0); questArrow.lineTo(-12, 13);
                 questArrow.lineTo(20, 0);
-                questArrow.fill({ color: 0xf0c96a });
-                questArrow.stroke({ width: 2, color: 0x241505 });
+                questArrow.fill({ color: 0x76c93e });
+                questArrow.stroke({ width: 2, color: 0x1c3207 });
                 questArrow.scale.set(1.3); // заметнее у тайлов 32px
                 questArrow.visible = false;
                 questArrow.zIndex = hp.y + 2;
@@ -1370,9 +1379,11 @@
                 }
                 // стрелки побочных квестов ратуши (W40): красная — ближайший
                 // живой охотничий монстр, жёлтая — город-адресат письма;
-                // скрыты при модальном диалоге, чекбокс тот же (questArrow)
+                // скрыты при модальном диалоге; свой чекбокс — в окне
+                // поручения (G.settings.sideqArrow, W45: отдельно от
+                // сюжетной стрелки)
                 if (sideArrows) {
-                    const on = (G.settings && G.settings.questArrow !== false)
+                    const on = (G.settings && G.settings.sideqArrow !== false)
                         && !(ctx.questModal || 0);
                     const tgts = on && globalThis.GAME_SIDEQ
                         ? globalThis.GAME_SIDEQ.arrowTargets(G) : [];
@@ -1464,9 +1475,12 @@
                     * Math.max(0.25, ((G.settings && G.settings.animSpeed) ?? 5) / 5);
 
                 // Эскейп закрывает квест-диалог его кнопкой (просил юзер —
-                // дублирование кнопок «выход» меню на клавишу)
-                if (ctx.input.wasPressed("Escape") && (ctx.questModal || 0) > 0)
-                    globalThis.GAME_QUESTS.tap();
+                // дублирование кнопок «выход» меню на клавишу); окно
+                // поручения (W45) — своей кнопкой «Уйти»
+                if (ctx.input.wasPressed("Escape") && (ctx.questModal || 0) > 0) {
+                    if (!globalThis.GAME_QUESTS.tap()
+                        && globalThis.GAME_SIDEQ) globalThis.GAME_SIDEQ.closeReview();
+                }
 
                 // M — размер мини-карты: обычная ↔ крупная вдвое
                 // (просил юзер волна 15)
@@ -1867,6 +1881,16 @@
                     arrows: sideArrows ? {
                         red: sideArrows.red.visible,
                         yellow: sideArrows.yellow.visible } : null,
+                    // (W45) цвета/видимость обеих стрелок + чек-боксы
+                    arrowState: () => ({
+                        sideqOn: (G.settings && G.settings.sideqArrow) !== false,
+                        storyOn: (G.settings && G.settings.questArrow) !== false,
+                        red: sideArrows ? sideArrows.red.visible : null,
+                        yellow: sideArrows ? sideArrows.yellow.visible : null,
+                        story: questArrow ? questArrow.visible : null,
+                        storyFill: questArrow ? 0x76c93e : null,
+                        review: globalThis.GAME_SIDEQ.reviewOpen(),
+                    }),
                     note: G.world.sideNote || null,
                 }),
                 res: () => ({ resources: { ...G.resources },

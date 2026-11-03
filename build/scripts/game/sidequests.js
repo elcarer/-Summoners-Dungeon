@@ -280,13 +280,165 @@
         return p ? p.name : globalThis.GAME_LOC.t("world.title");
     }
 
+    // Модель АКТИВНОГО поручения для окна-просмотра (W45, юзер): после
+    // поправки «одно одновременно» активное всегда одно
+    function activeModel(G) {
+        const sq = stateOf(G);
+        if (!sq || !sq.active.length) return null;
+        const a = sq.active[0];
+        const t = globalThis.GAME_LOC.t;
+        return {
+            type: a.type, elem: a.elem, city: a.city,
+            name: a.type === "hunt" ? t("sideq.hunt.name")
+                : t("sideq.letter.name", { city: poiName(G, a.target) }),
+            text: a.type === "hunt"
+                ? t("sideq.hunt.active", { mob: mobName(a.elem) })
+                : t("sideq.letter.active", { city: poiName(G, a.target) }),
+            reward: t("sideq.reward", { res: resName(a.elem) }),
+        };
+    }
+
+    // ── Окно активного поручения (W45, юзер): кнопка рядом с кнопкой
+    // сюжетного задания открывает просмотр с чек-боксом стрелки (своё
+    // состояние G.settings.sideqArrow — отдельно от сюжетной). Паттерн —
+    // окно просмотра сюжетного квеста (quests.js review): dim+панель,
+    // модальность ctx.questModal, Escape закрывает (closeReview)
+    let rev = null, revGeo = null;
+    function reviewOpen() { return !!rev; }
+    function closeReview() {
+        if (!rev) return false;
+        const d = rev;
+        rev = null;
+        d.ctx.questModal = Math.max(0, (d.ctx.questModal || 1) - 1);
+        if (d.node && !d.node.destroyed) d.node.destroy({ children: true });
+        return true;
+    }
+    function showReview(ctx) {
+        const G = ctx && ctx.G;
+        if (!G || rev) return false;
+        const m = activeModel(G);
+        if (!m) return false;
+        const t = globalThis.GAME_LOC.t;
+        const { T, button } = globalThis.GAME_UI;
+        const node = new globalThis.PIXI.Container();
+        node.eventMode = "static";
+        const dim = new globalThis.PIXI.Graphics();
+        dim.rect(-3000, -2000, 7920, 5080);
+        dim.fill({ color: 0x000000, alpha: 0.55 });
+        node.addChild(dim);
+        const w = 780, h = 540, top = 540 - h / 2;
+        const panel = new globalThis.PIXI.Graphics();
+        panel.roundRect(960 - w / 2, top, w, h, 18);
+        panel.fill({ color: 0x171310, alpha: 0.96 });
+        panel.stroke({ width: 4, color: 0x6b5c40 });
+        node.addChild(panel);
+        const title = T(t("sideq.title"), 44, 0xf0c96a,
+            { stroke: { color: 0x241505, width: 8 } });
+        title.anchor.set(0.5, 0);
+        title.position.set(960, top + 20);
+        title.eventMode = "none";
+        node.addChild(title);
+        const head = T(t("sideq.taken"), 26, 0xbfae87);
+        head.anchor.set(0.5, 0);
+        head.position.set(960, top + 96);
+        head.eventMode = "none";
+        node.addChild(head);
+        const name = T(m.name, 32, 0xf0c96a);
+        name.anchor.set(0.5, 0);
+        name.position.set(960, top + 136);
+        name.eventMode = "none";
+        node.addChild(name);
+        const body = T(m.text, 24, 0xd8c79d,
+            { wordWrap: true, wordWrapWidth: w - 130, align: "center" });
+        body.anchor.set(0.5, 0);
+        body.position.set(960, top + 200);
+        body.eventMode = "none";
+        node.addChild(body);
+        const rewIcon = new globalThis.PIXI.Sprite(
+            ctx.uiTex(`resources/res_${m.elem}.png`));
+        rewIcon.anchor.set(0.5);
+        rewIcon.scale.set(0.34);
+        rewIcon.eventMode = "none";
+        node.addChild(rewIcon);
+        const rew = T(m.reward, 26, 0xffe2a8);
+        rew.anchor.set(0.5, 0);
+        rew.position.set(960, top + 320);
+        rew.eventMode = "none";
+        node.addChild(rew);
+        rew.position.y = top + 320;
+        rewIcon.position.set(960 - rew.width / 2 - 24, top + 338);
+        // чек-бокс стрелки к цели ПОРУЧЕНИЯ (как у сюжетного — quests.js):
+        // своё состояние sideqArrow, стрелки побочных квестов читают его
+        // в world.js
+        const on = () => !!(G.settings && G.settings.sideqArrow !== false);
+        const box = new globalThis.PIXI.Graphics();
+        const mark = new globalThis.PIXI.Graphics();
+        const drawBox = () => {
+            box.clear();
+            box.roundRect(0, 0, 28, 28, 6);
+            box.fill({ color: 0x241505 });
+            box.stroke({ width: 2, color: 0x6b5c40 });
+            mark.clear();
+            if (on()) {
+                mark.moveTo(6, 15); mark.lineTo(12, 21); mark.lineTo(22, 7);
+                mark.stroke({ width: 4, color: 0xbfd489 });
+            }
+        };
+        drawBox();
+        const lab = T(t("quest.arrow"), 22, 0xd8c79d);
+        lab.anchor.set(0, 0.5);
+        const rowW = 28 + 14 + lab.width;
+        const rx = 960 - rowW / 2;
+        box.position.set(rx, top + 386);
+        mark.position.set(rx, top + 386);
+        lab.position.set(rx + 42, top + 400);
+        box.eventMode = "static";
+        mark.eventMode = "none";
+        lab.eventMode = "none";
+        box.on("pointertap", () => {
+            G.settings = G.settings || {};
+            G.settings.sideqArrow = !on();
+            if (revGeo) revGeo.on = on(); // пробы видят свежее состояние
+            if (globalThis.GAME_META && globalThis.GAME_META.saveSettings)
+                globalThis.GAME_META.saveSettings(G.settings);
+            drawBox();
+            if (ctx.sfx) ctx.sfx();
+        });
+        node.addChild(box);
+        node.addChild(mark);
+        node.addChild(lab);
+        const leaveBtn = button(ctx, {
+            tex: "button_menu.png", label: t("sideq.leave"),
+            x: 960, y: top + h - 70, scale: 1,
+            onTap: () => closeReview(),
+        });
+        node.addChild(leaveBtn);
+        ctx.ui.addChild(node);
+        ctx.questModal = (ctx.questModal || 0) + 1;
+        rev = { ctx, node };
+        revGeo = { box: [Math.round(box.x) + 14, Math.round(box.y) + 14],
+            on: on() };
+        return true;
+    }
+    // для проб: открыто ли окно поручения и где центр чек-бокса (клик мышью)
+    function reviewState() {
+        return rev ? { open: true, box: revGeo.box, on: revGeo.on }
+            : { open: false };
+    }
+
     // Принять: письмо берёт адресат из окна (targetKey — тот же, что
     // показан, иначе случайный); охота спавнит монстра. Возвращает квест
-    // или null
+    // или null. (W45, юзер) ОДНОВРЕМЕННО висит только одно поручение:
+    // взятие нового ОТМЕНЯЕТ текущее (монстр отменённой охоты уходит
+    // из мира; в done не пишем — можно вернуться и взять заново)
     function accept(G, poi, type, targetKey = null) {
         const sq = stateOf(G);
         if (!sq) return null;
         const city = keyOf(poi);
+        for (const a of sq.active)
+            if (a.type === "hunt" && a.mobKey && G.world
+                && G.world.wander) delete G.world.wander[a.mobKey];
+        sq.active.length = 0;
         if (!remainingTypes(G, city).includes(type)) return null;
         const q = { city, type, elem: poi.elem };
         if (type === "hunt") {
@@ -376,6 +528,8 @@
     globalThis.GAME_SIDEQ = {
         fresh, stateOf, model, accept, onHuntWin, onEnterCity,
         arrowTargets, glowCities, huntMobs,
+        // окно активного поручения (W45): кнопка в HUD мира/города
+        showReview, closeReview, reviewOpen, activeModel, reviewState,
         // имя монстра стихии и имя города по ключу (тосты после принятия)
         mobTitle: (elem) => globalThis.GAME_LOC.t("enc." + encOf(elem) + ".title"),
         cityName: (G, key) => poiName(G, key),
