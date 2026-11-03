@@ -86,6 +86,26 @@
                 }
             };
 
+            // «Гном-разбойник» (timRaider, W40): ПЕРВЫЙ раз за бой, оставшись
+            // без карт в руке, берёт 2 карты. Добор в свой ход ничем не
+            // ограничен (лимит 7 — только в конце хода). Зовётся после розыгрыша
+            // карты игроком (spendCard) и после розыгрышей ИИ (enemyTurn).
+            // Сбросы панелями переполнения/очереди руку в ноль не приводят —
+            // не считаются («остался без карт, ИГРАЯ»)
+            A.heroEmptyHandDraw = function heroEmptyHandDraw(side) {
+                if (!B || B.heroFlags.emptyHand[side]) return;
+                const hand = side === "p" ? B.hand : B.eHand;
+                if (hand.length) return;
+                const hd = heroDefOf(side);
+                if (!hd || hd.ability !== "emptyHandDraw") return;
+                B.heroFlags.emptyHand[side] = true;
+                const n = hd.abilityVal || 2;
+                if (side === "p") drawCards(n); else drawEnemy(n);
+                floatText(960, side === "p" ? 640 : 300, `+${n} ⤴`, 0xc9a0ef);
+                sfx("chpoc");
+                refreshHud();
+            };
+
             // «Запутать руны» (wis101): сторона сбрасывает ВСЮ руку и берёт N
             // карт. keepId — карта, которая прямо сейчас разыгрывается из руки
             // и уйдёт в сброс отдельно (само заклинание себя не сбрасывает).
@@ -784,6 +804,13 @@
                                         if (rc) st.deck.push(rc);
                                     }
                                 }
+                            }
+                            // охотничий монстр ратуши (побочный квест, W40):
+                            // победа закрывает квест — +1 ресурс городу
+                            if (G.activeEnemy.wander
+                                && String(G.activeEnemy.wander).indexOf("wild:q") === 0
+                                && globalThis.GAME_SIDEQ) {
+                                globalThis.GAME_SIDEQ.onHuntWin(G, G.activeEnemy.wander);
                             }
                             if (G.activeEnemy.boss) {
                                 G.dungeon.bossDead = true;

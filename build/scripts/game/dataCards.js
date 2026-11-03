@@ -760,6 +760,30 @@
                      wild: "common", core: [] },
         timSimple: { scene: 6, baseHp: 8, elem: "time", hero: "timSimple",
                      wild: "common", core: [] },
+        // ── «Разбойники» — РЕДКИЕ бродячие враги открытого мира (просил
+        // юзер W40): тот же спавн-пул точек wildSpawns, что у «Простых»,
+        // но реже (wild: "rare" — вес 2 против 6). База 12♥ (карта героя),
+        // колода НЕ фиксирована: при спавне генерится 8 Обычных + 3 Редких
+        // + 1 Эпическая карта стихии (raiderDeck ниже; genDeck: "raider" —
+        // в world.js). Способности героев — «первый раз за бой»
+        strRaider: { scene: 1, baseHp: 12, elem: "strength",
+                     hero: "strRaider", wild: "rare", genDeck: "raider",
+                     core: [] },
+        grwRaider: { scene: 1, baseHp: 12, elem: "growth",
+                     hero: "grwRaider", wild: "rare", genDeck: "raider",
+                     core: [] },
+        wisRaider: { scene: 3, baseHp: 12, elem: "wisdom",
+                     hero: "wisRaider", wild: "rare", genDeck: "raider",
+                     core: [] },
+        decRaider: { scene: 1, baseHp: 12, elem: "decay",
+                     hero: "decRaider", wild: "rare", genDeck: "raider",
+                     core: [] },
+        honRaider: { scene: 5, baseHp: 12, elem: "honor",
+                     hero: "honRaider", wild: "rare", genDeck: "raider",
+                     core: [] },
+        timRaider: { scene: 6, baseHp: 12, elem: "time",
+                     hero: "timRaider", wild: "rare", genDeck: "raider",
+                     core: [] },
     };
     // Подземелья открытого мира: стихия (пул наград/драфта) и кап глубины.
     // У «Подземных ключей» шесть этажей; главарь «Безумный маг» стоит на
@@ -1039,6 +1063,47 @@
         if (!rares.length) rares = collectibleOf(elem, "common");
         return rares.length ? rares[(Math.random() * rares.length) | 0] : null;
     }
+    // Ядро колоды РЕДКОГО бродячего монстра («разбойники», просил юзер
+    // W40): 8 Обычных + 3 Редких + 1 Эпическая карта стихии, без повторов
+    // (пока карт хватает — мешок добирается по кругу, как в wildDeck).
+    // Усиление вида за победы (level) сверху добирает Редкие — как у
+    // «Простых». Детерминировано сидом точки
+    function raiderDeck(elem, level, seed) {
+        const rng = wildRng((seed | 0) ^ 0x5eed1234);
+        const plan = [["common", 8], ["rare", 3], ["epic", 1]];
+        const deck = [];
+        for (const [rar, n] of plan) {
+            let pool = collectibleOf(elem, rar);
+            if (!pool.length) pool = collectibleOf(elem, "common");
+            const bag = pool.slice();
+            for (let k = 0; k < n && pool.length; k++) {
+                if (!bag.length) bag.push(...pool); // карт меньше плана — по кругу
+                deck.push(bag.splice((rng() * bag.length) | 0, 1)[0]);
+            }
+        }
+        if (level > 0) {
+            let rares = collectibleOf(elem, "rare");
+            if (!rares.length) rares = collectibleOf(elem, "common");
+            for (let k = 0; k < level; k++)
+                deck.push(rares[(rng() * rares.length) | 0]);
+        }
+        return deck;
+    }
+    // Состав бустера (кузница города, просил юзер W40): 3 Обычных +
+    // 2 Редких + 1 Эпическая карта стихии — без повторов, где хватает
+    function boosterCards(elem) {
+        const plan = [["common", 3], ["rare", 2], ["epic", 1]];
+        const out = [];
+        for (const [rar, n] of plan) {
+            const pool = collectibleOf(elem, rar);
+            const bag = pool.slice();
+            for (let k = 0; k < n && pool.length; k++) {
+                if (!bag.length) bag.push(...pool);
+                out.push(bag.splice((Math.random() * bag.length) | 0, 1)[0]);
+            }
+        }
+        return out;
+    }
 
     // Обычный враг для этажа подземелья: архетип из таблицы этажа СВОЕГО
     // данжа (пещеры / Роща Роста / Подземные ключи / Земли мёртвых /
@@ -1074,5 +1139,6 @@
         caveDeckFor,
         enemyDeck, mobForFloor, ELEM_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,
         wildPool, wildPick, wildDeck, wildRareCard, WILD_WEIGHT,
+        raiderDeck, boosterCards,
     };
 })();

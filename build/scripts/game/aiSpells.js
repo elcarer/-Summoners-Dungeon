@@ -10,6 +10,11 @@
             // (u.spellWard, просил юзер)
             A.enemyCastSpellEffect = function enemyCastSpellEffect(def, free = false, focus = null, fromHand = false) {
                 A.spellCasting = true;
+                // чей каст (вложенные повторы сохраняют внешний) — «Зомби-
+                // разбойник» (decRaider): урон заклинанием вражескому существу
+                // считается «нанесённым уроном» (W40)
+                const prevCast = A.castSide;
+                A.castSide = "e";
                 // заклинание ИЗ РУКИ рождает эффект в центре показанной
                 // карты врага (просил юзер), не в центре экрана; руны и
                 // повторы без показанной карты — как раньше
@@ -18,7 +23,7 @@
                 fxSpellCast(def, focus, "e", origin);
                 try {
                     enemyCastSpellEffectInner(def, free, focus, fromHand);
-                } finally { A.spellCasting = false; }
+                } finally { A.spellCasting = false; A.castSide = prevCast; }
             };
             A.enemyCastSpellEffectInner = function enemyCastSpellEffectInner(def, free = false, focus = null, fromHand = false) {
                 const s = def.spell;

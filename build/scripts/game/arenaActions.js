@@ -86,6 +86,8 @@
                 B.selected = null;
                 B.spellTarget = false;
                 cryptSettle("p", cardId); // «Склеп» (dec157): сыгранная из него карта — в колоду
+                // «Гном-разбойник» (timRaider, W40): рука опустела — 2 карты
+                heroEmptyHandDraw("p");
                 return cardId;
             };
 
@@ -686,9 +688,14 @@
             // наносит урон существам с «Защитой от заклинаний» (u.spellWard).
             A.applySpellP = function applySpellP(cardId, target, free = false, opts = null) {
                 A.spellCasting = true;
+                // чей каст (вложенные повторы сохраняют внешний) — «Зомби-
+                // разбойник» (decRaider): урон заклинанием вражескому существу
+                // считается «нанесённым уроном» (W40)
+                const prevCast = A.castSide;
+                A.castSide = "p";
                 try {
                     return applySpellPInner(cardId, target, free, opts);
-                } finally { A.spellCasting = false; }
+                } finally { A.spellCasting = false; A.castSide = prevCast; }
             };
             A.applySpellPInner = function applySpellPInner(cardId, target, free = false, opts = null) {
                 const def = CARDS[cardId];

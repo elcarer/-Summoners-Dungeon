@@ -175,6 +175,14 @@
         for (const f of ["shop", "armory", "town_hall", "glom_house"])
             uiTextures[`buildings/${f}.png`] =
                 await assets.loadTexture(`./images/buildings/${f}.png`);
+        // ресурсы и бустеры стихий (арт юзера, W40): иконки в HUD сверху
+        // (72×72) и бустер в окне кузницы (500×300)
+        for (const e of Object.keys(GAME_DATA.ELEM_LOGO)) {
+            uiTextures[`resources/res_${e}.png`] =
+                await assets.loadTexture(`./images/resources/res_${e}.png`);
+            uiTextures[`resources/buster_${e}.png`] =
+                await assets.loadTexture(`./images/resources/buster_${e}.png`);
+        }
         const uiTex = (name) => {
             const t = uiTextures[name];
             if (!t) throw new Error(`нет текстуры ui/${name}`);
@@ -409,6 +417,13 @@
 
         const G = {
             hero: { hp: 10, maxHp: 10 }, gold: 0,
+            // ресурсы стихий и бустеры кузницы (W40, просил юзер): на начало
+            // игры нули; ресурсы дают побочные квесты ратуши, тратятся в
+            // кузнице города (3 → бустер стихии города)
+            resources: { strength: 0, growth: 0, wisdom: 0,
+                decay: 0, honor: 0, time: 0 },
+            boosters: { strength: 0, growth: 0, wisdom: 0,
+                decay: 0, honor: 0, time: 0 },
             run: { floor: 1, cave: "gob", floors: { gob: 1, grw: 1, wis: 1 } },
             heroId: metaState.heroId, // активный герой забега (можно сменить в «Героях»)
             starterId: metaState.starterId, // выбранный при «Новой игре» — не меняется
@@ -501,6 +516,9 @@
                 this.live = true; // забег поднят в G — «Сохранить» берёт его
                 this.hero.hp = this.hero.maxHp;
                 this.gold = 0;
+                // ресурсы стихий и бустеры — с нуля (W40)
+                for (const e of Object.keys(this.resources)) this.resources[e] = 0;
+                for (const e of Object.keys(this.boosters)) this.boosters[e] = 0;
                 this.run = { floor: 1, cave: "gob", floors: { gob: 1, grw: 1, wis: 1 } };
                 this.dungeon = null;
                 // глобальная карта — каждый забег своя: сид крутится здесь,
@@ -544,6 +562,11 @@
                     elem: this.elem,
                     hero: { hp: this.hero.hp, maxHp: this.hero.maxHp },
                     gold: this.gold,
+                    // ресурсы стихий/бустеры (W40) и побочные квесты ратуши
+                    resources: { ...this.resources },
+                    boosters: { ...this.boosters },
+                    worldSideQ: this.world.sideQuests
+                        ? JSON.parse(JSON.stringify(this.world.sideQuests)) : null,
                     dungeon: this.dungeon ? JSON.parse(JSON.stringify(this.dungeon)) : null,
                     dungeonStates: JSON.parse(JSON.stringify(this.dungeonStates || {})),
                     cityStates: JSON.parse(JSON.stringify(this.cityStates || {})),
@@ -739,6 +762,11 @@
             G.live = true;
             G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp || 10 };
             G.gold = r.gold || 0;
+            // ресурсы стихий/бустеры (W40): старые сейвы — нули
+            for (const e of Object.keys(G.resources))
+                G.resources[e] = (r.resources && r.resources[e]) || 0;
+            for (const e of Object.keys(G.boosters))
+                G.boosters[e] = (r.boosters && r.boosters[e]) || 0;
             G.elem = r.elem || "strength";
             // герой из сейва; у старых сейвов heroId ещё нет —
             // герой восстанавливается по стихии забега
@@ -807,6 +835,9 @@
                 // ensureWander создаст с нуля)
                 wildLevel: r.worldV === globalThis.GAME_WORLDGEN.V
                     && r.worldWild ? r.worldWild : null,
+                // побочные квесты ратуши (W40; старые сейвы — с нуля)
+                sideQuests: r.worldSideQ
+                    && r.worldSideQ.v === 1 ? r.worldSideQ : null,
                 map: null,
             };
             // сюжетная линия забега (старые сейвы — без неё: первый
@@ -1223,6 +1254,10 @@
                 scene: scenes.current,
                 hero: { ...G.hero }, floor: G.run.floor, gold: G.gold,
                 heroId: G.heroId, elem: G.elem, cave: G.run.cave,
+                resources: { ...G.resources },
+                boosters: { ...G.boosters },
+                sideQuests: globalThis.GAME_SIDEQ
+                    ? globalThis.GAME_SIDEQ.stateOf(G) : null,
                 quests: globalThis.GAME_QUESTS.stateOf(G),
                 // герои: активный, завоёванные карты, колоды по героям
                 heroes: {

@@ -125,6 +125,30 @@
                     if (v.illusionOf === u && v.def.illusion && B.units.includes(v))
                         killUnit(v, null);
                 }
+                // «Гоблин-разбойник» (strRaider, W40): ПЕРВЫЙ раз за бой,
+                // убивая существо противника, наносит 2 урона по случайному
+                // существу противника. Убийство — ударом существа (killer):
+                // заклинания и ловушки бьют без killer-существа, их гибели
+                // способность не считает (как «Ответ»/«Снизошедший» ниже).
+                // Рекурсия штатная: добив может убить — killUnit честно
+                // обрабатывает каскады (здесь уже после removeUnit жертвы)
+                if (u.def.type === "unit" && killer && killer.def
+                    && killer.def.type === "unit" && killer.side !== u.side
+                    && B.units.includes(killer)
+                    && !B.heroFlags.killSnipe[killer.side]) {
+                    const hd = heroDefOf(killer.side);
+                    if (hd && hd.ability === "firstKillSnipe") {
+                        B.heroFlags.killSnipe[killer.side] = true;
+                        const foes = B.units.filter((v) =>
+                            v.side === u.side && v.def.type === "unit");
+                        if (foes.length) {
+                            const v = foes[(Math.random() * foes.length) | 0];
+                            const p2 = cellXY(v.col, v.row);
+                            floatText(p2.x, p2.y - 66, `${hd.abilityVal || 2}`, 0xff8f6e);
+                            damageUnit(v, hd.abilityVal || 2, null, "dam");
+                        }
+                    }
+                }
                 // ауры строений умирают вместе с ними; «Король скелетов»
                 // (dec147) — юнит-аура, его смерть тоже снимает бонус;
                 // «Смоляная статуя» (dec155): смерть носителя метки tarMark
@@ -668,6 +692,50 @@
                         return true;
                     });
                 }
+                // ── «Разбойники» (W40, просил юзер): «первый раз за бой» по
+                // урону существам. Атака — урон существом (марш, «Скорость»,
+                // спецудары; заклинания и ловушки бьют без killer-существа —
+                // как у «Ответа»), заклинания — по A.castSide (ставят в
+                // точках каста сторон; тики стен/статусов castSide не ставят)
+                let raiderSide = null;
+                if (target.def.type === "unit" && amt > 0) {
+                    if (killer && killer.def && killer.def.type === "unit"
+                        && killer.side !== target.side) raiderSide = killer.side;
+                    else if (!killer && A.spellCasting && A.castSide
+                        && A.castSide !== target.side) raiderSide = A.castSide;
+                }
+                if (raiderSide) {
+                    // «Рыцарь-разбойник» (honRaider): после атаки существа
+                    // противника лечит 2♥ своей базе (атака состоялась —
+                    // даже если цель от удара погибла)
+                    if (!B.heroFlags.attackHeal[raiderSide]) {
+                        const hd = heroDefOf(raiderSide);
+                        if (hd && hd.ability === "firstAttackHeal") {
+                            B.heroFlags.attackHeal[raiderSide] = true;
+                            healBase(raiderSide, hd.abilityVal || 2);
+                        }
+                    }
+                    // «Зомби-разбойник» (decRaider): нанеся урон вражескому
+                    // существу, даёт «Возврат 1» случайному СВОЕМУ существу
+                    // (счётчик добавляется к уже висящему; метка пересоздаётся)
+                    if (!B.heroFlags.dmgReturn[raiderSide]) {
+                        const hd = heroDefOf(raiderSide);
+                        if (hd && hd.ability === "firstDmgReturn") {
+                            B.heroFlags.dmgReturn[raiderSide] = true;
+                            const own = B.units.filter((v) =>
+                                v.side === raiderSide && v.def.type === "unit");
+                            if (own.length) {
+                                const v = own[(Math.random() * own.length) | 0];
+                                v.ret = (v.ret || 0) + (hd.abilityVal || 1);
+                                returnMarkDraw(v);
+                                floatText(cellXY(v.col, v.row).x,
+                                    cellXY(v.col, v.row).y - 96,
+                                    "↩ " + (hd.abilityVal || 1), 0xc9a0ef);
+                                sfx("chpoc");
+                            }
+                        }
+                    }
+                }
                 // «Опорник» (hon198): когда ЭТУ ПОСТРОЙКУ атакуют, владелец
                 // получает 1 энергию — даже если атака постройку убила
                 // (атака состоялась); заклинания и ловушки бьют без
@@ -770,6 +838,25 @@
                     color: side === "p" ? 0xff7a5e : 0xffb26e,
                 });
                 punch(root.hud);
+                // «Эльф-разбойник» (grwRaider, W40): ПЕРВЫЙ раз за бой,
+                // нанеся урон вражеской базе, наносит 4 урона по случайной
+                // постройке противника. Разбирающий — сторона, ПРОТИВОПОЛОЖНАЯ
+                // получившей урон базе (само-урон своей базе способность
+                // «чужим» не считает)
+                if (!B.heroFlags.baseHitBuild[side === "p" ? "e" : "p"]) {
+                    const hd = heroDefOf(side === "p" ? "e" : "p");
+                    if (hd && hd.ability === "firstBaseHitBuild") {
+                        B.heroFlags.baseHitBuild[side === "p" ? "e" : "p"] = true;
+                        const blds = B.units.filter((v) =>
+                            v.side === side && v.def.type === "building");
+                        if (blds.length) {
+                            const v = blds[(Math.random() * blds.length) | 0];
+                            const bp = cellXY(v.col, v.row);
+                            floatText(bp.x, bp.y - 66, `${hd.abilityVal || 4}`, 0xff8f6e);
+                            damageUnit(v, hd.abilityVal || 4, null, "dam");
+                        }
+                    }
+                }
                 // «Тёмный владыка» (darklord, босс данжа Времени, просил
                 // юзер): ПЕРВЫЙ за бой урон его базе отражается — базе
                 // противника наносится столько же. Флаг ставится ДО

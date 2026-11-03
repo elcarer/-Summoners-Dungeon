@@ -1069,10 +1069,28 @@
             const goldT = new PIXI.Text({ text: "0", style: hudStyle });
             goldT.position.set(38, 3);
             goldPlate.addChild(goldT);
+            // ресурсы стихий (W40, просил юзер): как в мире — иконки+числа
+            // правее золота; кузница города тратит их (3 → бустер)
+            const resStyle = { fontFamily: "Kereru", fontSize: 22,
+                fill: 0xf3e6c2, stroke: { color: 0x1c1207, width: 4 } };
+            const resT = {};
+            let rx = 150;
+            for (const e of globalThis.GAME_SIDEQ.RES_ELEMS) {
+                const icon = new PIXI.Sprite(uiTex(`resources/res_${e}.png`));
+                icon.anchor.set(0.5);
+                icon.scale.set(0.4);
+                icon.position.set(rx + 14, 18);
+                goldPlate.addChild(icon);
+                const num = new PIXI.Text({ text: "0", style: resStyle });
+                num.position.set(rx + 32, 6);
+                goldPlate.addChild(num);
+                resT[e] = num;
+                rx += 64;
+            }
             // активный квест сюжетной линии (просил юзер): иконка правее
-            // числа золота открывает текст задания; без квестов иконки нет
+            // ресурсного ряда открывает текст задания; без квестов иконки нет
             if (G.quests && G.quests.active) {
-                goldPlate.addChild(hudIcon("icon_rune.png", 126, 17, () => {
+                goldPlate.addChild(hudIcon("icon_rune.png", rx + 16, 17, () => {
                     globalThis.GAME_QUESTS.showReview(ctx);
                 }, 0.75));
             }
@@ -1117,7 +1135,7 @@
             toast.position.set(960, 495);
             toast.alpha = 0;
             c.addChild(toast);
-            c.userData = { floorT, goldT, toast };
+            c.userData = { floorT, goldT, resT, toast };
             return c;
         }
 
@@ -1217,14 +1235,22 @@
                 globalThis.GAME_QUESTS.talkTo(ctx);
                 return;
             }
-            if (o.type === "armory" || o.type === "townHall"
-                || o.type === "glomHouse") {
-                // кузница/ратуша/дом Глома (W34): здание стоит, функционал
-                // добавляется позже; дом Глома — просто декорация, Глом
-                // сам подходит к герою (квестовая сценка)
+            if (o.type === "glomHouse") {
+                // дом Глома (W34): декорация — Глом сам подходит к герою
+                // (квестовая сценка)
                 o.cool = true;
                 showToast(GAME_LOC.t("world.soon"));
                 winObj = null;
+                return;
+            }
+            if (o.type === "armory" || o.type === "townHall") {
+                // кузница и ратуша (W40, просил юзер): крафт бустеров из
+                // ресурсов стихии города; побочные квесты города
+                o.cool = true;
+                G.dungeon.win = { idx: G.dungeon.objects.indexOf(o) };
+                winNode = o.type === "armory"
+                    ? buildForgeWin(o) : buildQuestWin(o);
+                ctx.ui.addChild(winNode);
                 return;
             }
             G.dungeon.win = { idx: G.dungeon.objects.indexOf(o) };
@@ -1283,6 +1309,321 @@
             });
             c.addChild(leaveBtn);
             winRefs = { takeBtn: null, startBtn, leaveBtn };
+            return c;
+        }
+
+        // ── Кузница города (W40, просил юзер): бустер из 3 ресурсов стихии
+        // города; вскрытие — 3 обычные + 2 редкие + 1 эпическая карта стихии
+        // в коллекцию (dataCards.boosterCards). Арт бустера юзера
+        // images/resources/buster_<стихия>.png. Ресурсы/бустеры — в сейве
+        function buildForgeWin(o) {
+            const t = GAME_LOC.t;
+            const D = globalThis.GAME_DATA;
+            const { T, button, cardFace, cardZoomer } = globalThis.GAME_UI;
+            const elem = G.dungeon.elem || "strength";
+            const resName = t("res." + elem);
+            const c = new PIXI.Container();
+            const zoomer = cardZoomer(ctx, { host: c });
+            c.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(-3000, -2000, 7920, 5080);
+            dim.fill({ color: 0x000000, alpha: 0.55 });
+            c.addChild(dim);
+            const w = 780, h = 640, top = 540 - h / 2;
+            const panel = new PIXI.Graphics();
+            panel.roundRect(960 - w / 2, top, w, h, 18);
+            panel.fill({ color: 0x171310, alpha: 0.96 });
+            panel.stroke({ width: 4, color: 0x6b5c40 });
+            c.addChild(panel);
+            const title = T(t("forge.title"), 44, 0xf0c96a,
+                { stroke: { color: 0x241505, width: 8 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(960, top + 20);
+            title.eventMode = "none";
+            c.addChild(title);
+            // арт бустера стихии (юзер, 500×300)
+            const art = new PIXI.Sprite(uiTex(`resources/buster_${elem}.png`));
+            art.anchor.set(0.5, 0);
+            art.scale.set(0.56); // → 280×168
+            art.position.set(960, top + 84);
+            art.eventMode = "none";
+            c.addChild(art);
+            const desc = T(t("forge.desc", { elem: t("elem." + elem) }),
+                21, 0xbfae87, { wordWrap: true, wordWrapWidth: w - 120,
+                    align: "center" });
+            desc.anchor.set(0.5, 0);
+            desc.position.set(960, top + 268);
+            desc.eventMode = "none";
+            c.addChild(desc);
+            // ресурс (иконка+число) и бустеры — живые строки
+            const rIcon = new PIXI.Sprite(uiTex(`resources/res_${elem}.png`));
+            rIcon.anchor.set(0.5);
+            rIcon.scale.set(0.42);
+            rIcon.position.set(960 - 168, top + 352);
+            rIcon.eventMode = "none";
+            c.addChild(rIcon);
+            const resT = T("", 26, 0xf3e6c2);
+            resT.anchor.set(0, 0.5);
+            resT.position.set(960 - 140, top + 352);
+            resT.eventMode = "none";
+            c.addChild(resT);
+            const boostT = T("", 26, 0xffe2a8);
+            boostT.anchor.set(0, 0.5);
+            boostT.position.set(960 + 40, top + 352);
+            boostT.eventMode = "none";
+            c.addChild(boostT);
+            const needT = T("", 22, 0xff8f6e);
+            needT.anchor.set(0.5, 0.5);
+            needT.position.set(960, top + 408);
+            needT.alpha = 0;
+            needT.eventMode = "none";
+            c.addChild(needT);
+            const craftBtn = button(ctx, {
+                tex: "button_menu.png", label: t("forge.craft"),
+                x: 960 - 180, y: top + h - 74, scale: 1,
+                onTap: () => craft(),
+            });
+            c.addChild(craftBtn);
+            const openBtn = button(ctx, {
+                tex: "button_menu.png", label: t("forge.open"),
+                x: 960 + 180, y: top + h - 74, scale: 1,
+                onTap: () => openBooster(),
+            });
+            c.addChild(openBtn);
+            const leaveBtn = button(ctx, {
+                tex: "button_menu.png", label: t("shop.leave"),
+                x: 165, y: 78, scale: 1,
+                onTap: () => { o.cool = true; closeModal(); },
+            });
+            c.addChild(leaveBtn);
+            function refresh() {
+                resT.text = t("forge.res",
+                    { name: resName, n: G.resources[elem] || 0 });
+                boostT.text = t("forge.boosters",
+                    { n: G.boosters[elem] || 0 });
+            }
+            function craft() {
+                if ((G.resources[elem] || 0) < 3) {
+                    needT.text = t("forge.need", { name: resName });
+                    needT.alpha = 1;
+                    if (ctx.sfx) ctx.sfx();
+                    return;
+                }
+                G.resources[elem] -= 3;
+                G.boosters[elem] = (G.boosters[elem] || 0) + 1;
+                needT.alpha = 0;
+                refresh();
+                if (ctx.sfx) ctx.sfx("up");
+                if (G.saveRun) G.saveRun();
+            }
+            // вскрытие: карты сразу в коллекцию (как награда W32), лица —
+            // рядом с ховер-зумом; окно меняется на просмотр добычи
+            function openBooster() {
+                if (!(G.boosters[elem] > 0)) {
+                    needT.text = t("forge.none");
+                    needT.alpha = 1;
+                    if (ctx.sfx) ctx.sfx();
+                    return;
+                }
+                G.boosters[elem] -= 1;
+                const cards = D.boosterCards(elem);
+                for (const id of cards)
+                    G.collection[id] = (G.collection[id] || 0) + 1;
+                G.persistMeta();
+                if (G.saveRun) G.saveRun();
+                if (ctx.sfx) ctx.sfx("coins");
+                winNode.destroy({ children: true });
+                winNode = forgeReward(cards);
+                ctx.ui.addChild(winNode);
+            }
+            function forgeReward(cards) {
+                const rc = new PIXI.Container();
+                const zr = cardZoomer(ctx, { host: rc });
+                rc.eventMode = "static";
+                const dm = new PIXI.Graphics();
+                dm.rect(-3000, -2000, 7920, 5080);
+                dm.fill({ color: 0x000000, alpha: 0.55 });
+                rc.addChild(dm);
+                const pn = new PIXI.Graphics();
+                pn.roundRect(960 - 400, top, 800, 460, 18);
+                pn.fill({ color: 0x171310, alpha: 0.96 });
+                pn.stroke({ width: 4, color: 0x6b5c40 });
+                rc.addChild(pn);
+                const head = T(t("forge.opened"), 34, 0xf0c96a);
+                head.anchor.set(0.5, 0);
+                head.position.set(960, top + 30);
+                head.eventMode = "none";
+                rc.addChild(head);
+                // ряд лиц (как награда W32): ховер — зум до полного размера
+                const sc = 0.28, hh = 495 * sc / 2;
+                const spread = Math.min(150, 760 / Math.max(1, cards.length));
+                const cy = top + 250;
+                cards.forEach((id, i) => {
+                    const card = cardFace(ctx, id, { scale: sc });
+                    const cx = 960 + (i - (cards.length - 1) / 2) * spread;
+                    card.position.set(cx, cy);
+                    card.eventMode = "static";
+                    card.on("pointerover", () => zr.show(id, cx, cy, card, sc));
+                    card.on("pointerout", () => zr.hide(false));
+                    rc.addChild(card);
+                });
+                const lv = button(ctx, {
+                    tex: "button_menu.png", label: t("shop.leave"),
+                    x: 960, y: top + 400, scale: 1,
+                    onTap: () => { o.cool = true; closeModal(); },
+                });
+                rc.addChild(lv);
+                winRefs = { leaveBtn: lv, forge: null }; // окно сменилось
+                return rc;
+            }
+            refresh();
+            winRefs = { leaveBtn, forge: {
+                tap: (w) => (w === "craft" ? craft() : openBooster()),
+                state: () => ({ elem, res: G.resources[elem] || 0,
+                    boosters: G.boosters[elem] || 0,
+                    resT: resT.text, boostT: boostT.text,
+                    need: needT.alpha > 0.5, needText: needT.text }),
+            } };
+            return c;
+        }
+
+        // ── Ратуша города (W40, просил юзер): побочные квесты. Подход к
+        // ратуше — окно с описанием, наградой и кнопками «Принять»/
+        // «Отказаться». Выполненные квесты не возобновляются (model/accept —
+        // sidequests.js); «охота» спавнит монстра у города, «письмо»
+        // выбирает город-адресат
+        function buildQuestWin(o) {
+            const t = GAME_LOC.t;
+            const { T, button } = globalThis.GAME_UI;
+            const SQ = globalThis.GAME_SIDEQ;
+            const c = new PIXI.Container();
+            c.eventMode = "static";
+            const dim = new PIXI.Graphics();
+            dim.rect(-3000, -2000, 7920, 5080);
+            dim.fill({ color: 0x000000, alpha: 0.55 });
+            c.addChild(dim);
+            const w = 780, h = 540, top = 540 - h / 2;
+            const panel = new PIXI.Graphics();
+            panel.roundRect(960 - w / 2, top, w, h, 18);
+            panel.fill({ color: 0x171310, alpha: 0.96 });
+            panel.stroke({ width: 4, color: 0x6b5c40 });
+            c.addChild(panel);
+            const title = T(t("sideq.title"), 44, 0xf0c96a,
+                { stroke: { color: 0x241505, width: 8 } });
+            title.anchor.set(0.5, 0);
+            title.position.set(960, top + 20);
+            title.eventMode = "none";
+            c.addChild(title);
+            const leaveBtn = button(ctx, {
+                tex: "button_menu.png", label: t("sideq.leave"),
+                x: 960, y: top + h - 70, scale: 1,
+                onTap: () => { o.cool = true; closeModal(); },
+            });
+            c.addChild(leaveBtn);
+            // город, в котором герой: вход запомнил якорь (exitTown)
+            const map = G.world && G.world.map;
+            const et = G.dungeon.exitTown || null;
+            const poi = map && et ? map.pois.find((p) =>
+                (p.kind === "town" || p.kind === "capital")
+                && p.gx === et.gx && p.gy === et.gy) : null;
+            const head = T("", 26, 0xbfae87);
+            head.anchor.set(0.5, 0);
+            head.position.set(960, top + 96);
+            head.eventMode = "none";
+            c.addChild(head);
+            const name = T("", 32, 0xf0c96a);
+            name.anchor.set(0.5, 0);
+            name.position.set(960, top + 136);
+            name.eventMode = "none";
+            c.addChild(name);
+            const body = T("", 24, 0xd8c79d,
+                { wordWrap: true, wordWrapWidth: w - 130, align: "center" });
+            body.anchor.set(0.5, 0);
+            body.position.set(960, top + 200);
+            body.eventMode = "none";
+            c.addChild(body);
+            const rewIcon = new PIXI.Sprite(uiTex("icon_gold.png"));
+            rewIcon.anchor.set(0.5);
+            rewIcon.eventMode = "none";
+            const rew = T("", 26, 0xffe2a8);
+            rew.anchor.set(0.5, 0);
+            rew.position.set(960, top + 320);
+            rew.eventMode = "none";
+            c.addChild(rew);
+            if (!poi || !SQ) {
+                head.text = t("sideq.done");
+                name.text = "";
+                body.text = "";
+                rew.text = "";
+                rewIcon.visible = false;
+                winRefs = { leaveBtn, quest: null };
+                return c;
+            }
+            const m = SQ.model(G, poi);
+            if (m.mode === "done") {
+                head.text = "";
+                name.text = "";
+                body.text = m.text || t("sideq.done");
+                rew.text = "";
+                rewIcon.visible = false;
+            } else if (m.mode === "taken") {
+                head.text = m.head;
+                name.text = m.name;
+                body.text = m.text;
+                rew.text = m.reward;
+                // иконка ресурса награды слева от строки награды
+                const resTex = uiTex(`resources/res_${poi.elem}.png`);
+                rewIcon.texture = resTex;
+                rewIcon.scale.set(0.34);
+                rewIcon.position.set(960 - rew.width / 2 - 24, top + 338);
+                rewIcon.visible = true;
+            } else { // offer
+                head.text = t("sideq.offerHead");
+                name.text = m.name;
+                body.text = m.text;
+                rew.text = m.reward;
+                const resTex = uiTex(`resources/res_${poi.elem}.png`);
+                rewIcon.texture = resTex;
+                rewIcon.scale.set(0.34);
+                rewIcon.position.set(960 - rew.width / 2 - 24, top + 338);
+                rewIcon.visible = true;
+                // кнопки «Принять»/«Отказаться» вместо «Уйти»
+                c.removeChild(leaveBtn);
+                const acceptTap = () => {
+                    const q = SQ.accept(G, poi, m.type, m.target);
+                    if (!q) return;
+                    if (ctx.sfx) ctx.sfx("up");
+                    closeModal();
+                    showToast(q.type === "hunt"
+                        ? t("sideq.hunt.active", { mob: SQ.mobTitle(q.elem) })
+                        : t("sideq.letter.active",
+                            { city: SQ.cityName(G, q.target) }));
+                };
+                const acceptBtn = button(ctx, {
+                    tex: "button_menu.png", label: t("sideq.accept"),
+                    x: 960 - 170, y: top + h - 70, scale: 1,
+                    onTap: acceptTap,
+                });
+                c.addChild(acceptBtn);
+                const declineBtn = button(ctx, {
+                    tex: "button_menu.png", label: t("sideq.decline"),
+                    x: 960 + 170, y: top + h - 70, scale: 1,
+                    onTap: () => { o.cool = true; closeModal(); },
+                });
+                c.addChild(declineBtn);
+                winRefs = { leaveBtn: declineBtn, quest: {
+                    state: () => ({ mode: m.mode, type: m.type,
+                        name: name.text, text: body.text, reward: rew.text }),
+                    accept: acceptTap,
+                } };
+            }
+            // taken/done: «Уйти» остаётся, принять нечего (offer выше
+            // уже назначил winRefs с accept)
+            if (!winRefs || !winRefs.quest) winRefs = { leaveBtn, quest: {
+                state: () => ({ mode: m.mode, type: m.type || null,
+                    name: name.text, text: body.text, reward: rew.text }),
+                accept: () => {},
+            } };
             return c;
         }
 
@@ -1868,6 +2209,9 @@
                     ? GAME_LOC.t("city.name")
                     : GAME_LOC.t("dungeon.floor", { n: st.floor });
                 uiHud.userData.goldT.text = String(G.gold);
+                // ресурсы стихий в HUD (W40) — числа каждый кадр
+                for (const e of globalThis.GAME_SIDEQ.RES_ELEMS)
+                    uiHud.userData.resT[e].text = String(G.resources[e] || 0);
 
                 // ── триггеры: окно объекта, враги, выход ───────────────────
                 if (st.win || ctx.questModal) { // квест-диалог — как окно объекта
@@ -2170,6 +2514,15 @@
                     glom: st.glom ? { ...st.glom } : null,
                 };
             },
+            // кузница/ратуша (тесты W40): окно открыто?, тапы кнопок
+            cityObjWin: () => ({ open: !!winNode, type: winObj && winObj.type }),
+            forgeTap: (w) => { if (winRefs && winRefs.forge) winRefs.forge.tap(w); },
+            forgeState: () => (winRefs && winRefs.forge
+                ? winRefs.forge.state() : null),
+            questWinState: () => (winRefs && winRefs.quest
+                ? winRefs.quest.state() : null),
+            questAccept: () => { if (winRefs && winRefs.quest) winRefs.quest.accept(); },
+            winDismiss: () => { if (winObj) { winObj.cool = true; closeModal(); } },
         };
     }
 

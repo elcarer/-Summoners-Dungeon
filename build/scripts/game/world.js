@@ -107,6 +107,8 @@
         //       id, sprite, shadow, wp, path, aggro, repath }
         let squads = [];
         let tip = null; // { squad, node, hero } — подсказка на отряде (курсор)
+        let poiGlows = []; // жёлтые свечения городов-адресатов писем (W40)
+        let sideArrows = null; // стрелки побочных квестов: red/yellow (W40)
 
         // карта мира живёт в забеге: генерится по сиду один раз и
         // переживает переходы сцены (сейв хранит только сид)
@@ -164,12 +166,20 @@
                         const enc = D.wildPick(d.elem, G.world.seed, i);
                         if (!enc) continue;
                         const lvl = G.world.wildLevel[enc] || 0;
+                        // «разбойники» (редкие дикие, W40): ядро 8 Обычных +
+                        // 3 Редких + 1 Эпическая (raiderDeck); «Простые» —
+                        // 9 Обычных + Редкие за уровень (wildDeck)
+                        const rd = D.ENCOUNTERS[enc]
+                            && D.ENCOUNTERS[enc].genDeck === "raider";
                         G.world.wander[k] = {
                             alive: true,
                             x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS,
                             enc, hpBonus: lvl,
-                            deck: D.wildDeck(d.elem, lvl,
-                                (G.world.seed ^ ((i + 1) * 2654435761)) | 0),
+                            deck: rd
+                                ? D.raiderDeck(d.elem, lvl,
+                                    (G.world.seed ^ ((i + 1) * 2654435761)) | 0)
+                                : D.wildDeck(d.elem, lvl,
+                                    (G.world.seed ^ ((i + 1) * 2654435761)) | 0),
                         };
                     }
             }
@@ -670,10 +680,28 @@
             const goldT = new PIXI.Text({ text: "0", style: hudStyle });
             goldT.position.set(38, 3);
             goldPlate.addChild(goldT);
+            // ресурсы стихий (W40, просил юзер): иконки+числа правее золота —
+            // по аналогии с ним; на начало игры нули, обновляются в update
+            const resStyle = { fontFamily: "Kereru", fontSize: 22,
+                fill: 0xf3e6c2, stroke: { color: 0x1c1207, width: 4 } };
+            const resT = {};
+            let rx = 150; // золото занимает ~до 110
+            for (const e of globalThis.GAME_SIDEQ.RES_ELEMS) {
+                const icon = new PIXI.Sprite(uiTex(`resources/res_${e}.png`));
+                icon.anchor.set(0.5);
+                icon.scale.set(0.4); // 72 → ~29px
+                icon.position.set(rx + 14, 18);
+                goldPlate.addChild(icon);
+                const num = new PIXI.Text({ text: "0", style: resStyle });
+                num.position.set(rx + 32, 6);
+                goldPlate.addChild(num);
+                resT[e] = num;
+                rx += 64;
+            }
             // активный квест сюжетной линии (просил юзер): иконка правее
-            // числа золота открывает текст задания; без квестов иконки нет
+            // ресурсного ряда открывает текст задания; без квестов иконки нет
             if (G.quests && G.quests.active) {
-                goldPlate.addChild(hudIcon("icon_rune.png", 126, 17, () => {
+                goldPlate.addChild(hudIcon("icon_rune.png", rx + 16, 17, () => {
                     globalThis.GAME_QUESTS.showReview(ctx);
                 }, 0.75));
             }
@@ -717,7 +745,7 @@
             // к краям ОКНА по горизонтали (просил юзер: при переходе
             // из полноэкранного в оконный letterbox-полосы канваса
             // отодвигали золото/карточку героя и настройки от краёв)
-            c.userData = { goldT, mini, goldPlate, heroHolder, settingsBtn };
+            c.userData = { goldT, resT, mini, goldPlate, heroHolder, settingsBtn };
             return c;
         }
 
@@ -888,6 +916,9 @@
             // (тот же приём, что у входа в данж)
             if (st.spawn) st.heroPos = { ...st.spawn };
             st.ladderCoolMs = 2000;
+            // письмо доставлено? (побочный квест ратуши, W40): вход в
+            // город-адресат закрывает квест — +1 ресурс городу, выдавшему
+            if (globalThis.GAME_SIDEQ) globalThis.GAME_SIDEQ.onEnterCity(G, tw);
             G.dungeon = st;
             if (ctx.sfx) ctx.sfx("enter"); // вход в город (W34, юзер)
             scenes.go("dungeon");
@@ -908,10 +939,12 @@
                 let hp = G.world.heroPos ? { ...G.world.heroPos } : null;
                 if (G.cityOut) { // вышли из города — к дверям ЭТОГО города (W31)
                     // старые сейвы хранят строку-стихию — таких дверей нет,
-                    // герой пойдёт по обычным правилам ниже
+                    // герой пойдёт по обычным правилам ниже.
+                    // W40: города-столицы тоже входят — выход к их дверям
                     const co = typeof G.cityOut === "object" ? G.cityOut : null;
                     G.cityOut = null;
-                    const tw = co && map.pois.find((p) => p.kind === "town"
+                    const tw = co && map.pois.find((p) =>
+                        (p.kind === "town" || p.kind === "capital")
                         && p.gx === co.gx && p.gy === co.gy);
                     hp = tw ? freeCellNear(px(tw).x, px(tw).y) : spawnPx;
                 } else if (G.world.out) {
@@ -1083,6 +1116,60 @@
                 if (map.bridgeGuards) spawnSquads(map.bridgeGuards, "bridge");
                 if (map.decayGuards) spawnSquads(map.decayGuards, "decay");
                 if (map.wildSpawns) spawnSquads(map.wildSpawns, "wild");
+                // охотничьи монстры ратуши (побочные квесты, W40): живут
+                // в G.world.wander с ключами "wild:q<город>" (миграция сейва
+                // не трогает — префикс wild:), маршрут вокруг города — в
+                // состоянии (st.route). Спрайт с красным свечением (пульс)
+                for (const a of ((globalThis.GAME_SIDEQ
+                    && globalThis.GAME_SIDEQ.stateOf(G).active) || [])) {
+                    if (a.type !== "hunt" || !a.mobKey) continue;
+                    const key = a.mobKey;
+                    const st = G.world.wander[key];
+                    if (!st || !st.alive) continue;
+                    const s = { kind: "wild", key,
+                        d: { route: st.route || [] }, st,
+                        wp: 0, path: null, aggro: false, repath: 0, id: null,
+                        enc: st.enc };
+                    s.elem = globalThis.GAME_DATA.ENCOUNTERS[s.enc].elem;
+                    const made = makeSquadNode(s);
+                    s.sprite = made.sprite;
+                    s.shadow = made.shadow;
+                    s.sprite.position.set(st.x, st.y);
+                    s.sprite.zIndex = st.y;
+                    s.shadow.position.set(st.x, st.y - 9.8);
+                    s.shadow.zIndex = st.y - 0.5;
+                    s.glow = new PIXI.Graphics();
+                    s.glow.ellipse(0, 0, 26, 12);
+                    s.glow.fill({ color: 0xd03028, alpha: 0.42 });
+                    s.glow.position.set(st.x, st.y - 2);
+                    s.glow.zIndex = st.y - 0.4;
+                    objLayer.addChild(s.glow);
+                    objLayer.addChild(s.shadow);
+                    objLayer.addChild(s.sprite);
+                    s.id = characters.spawn({
+                        x: st.x, y: st.y, sprite: s.sprite,
+                        anims: made.sheet.animations,
+                        speed: WAND_SPEED, fps: made.sheet.fps,
+                        halfW: 7, halfH: 5,
+                    });
+                    ECS.addComponent(world, s.id, "ctrlVI", 0);
+                    ECS.addComponent(world, s.id, "ctrlVJ", 0);
+                    squads.push(s);
+                }
+                // жёлтые свечения городов-адресатов писем (пул по городам,
+                // видимость/пульс — в update по GAME_SIDEQ.glowCities)
+                poiGlows = map.pois
+                    .filter((p) => p.kind === "town" || p.kind === "capital")
+                    .map((p) => {
+                        const g = new PIXI.Graphics();
+                        g.ellipse(0, 0, 96, 26);
+                        g.fill({ color: 0xd8b62a, alpha: 0.3 });
+                        g.visible = false;
+                        g.zIndex = (p.gy + 1) * TS - 1; // под узлом города
+                        objLayer.addChild(g);
+                        return { key: p.gx + ":" + p.gy, x: (p.gx + 0.5) * TS,
+                            y: (p.gy + 1) * TS - 6, node: g };
+                    });
                 worldContainer.addChild(layer);
 
                 // герой — лист по стихии забега (Рост — эльф, Сила — гоблин)
@@ -1119,6 +1206,24 @@
                 questArrow.visible = false;
                 questArrow.zIndex = hp.y + 2;
                 objLayer.addChild(questArrow);
+                // стрелки побочных квестов ратуши (W40): красная — к
+                // охотничьему монстру, жёлтая — к городу-адресату письма.
+                // Позиции/направления — в update (по GAME_SIDEQ.arrowTargets)
+                sideArrows = {};
+                for (const [name, fill, line] of [
+                    ["red", 0xd03028, 0x3a0c08], ["yellow", 0xf3d34a, 0x3a2c05]]) {
+                    const a = new PIXI.Graphics();
+                    a.moveTo(20, 0); a.lineTo(-12, -13);
+                    a.lineTo(-6, 0); a.lineTo(-12, 13);
+                    a.lineTo(20, 0);
+                    a.fill({ color: fill });
+                    a.stroke({ width: 2, color: line });
+                    a.scale.set(1.3);
+                    a.visible = false;
+                    a.zIndex = hp.y + 2;
+                    objLayer.addChild(a);
+                    sideArrows[name] = a;
+                }
                 worldContainer.visible = true;
                 camera.follow({
                     get x() { return heroId !== null ? COMPONENTS.positionX[heroId] : hp.x; },
@@ -1139,6 +1244,16 @@
                 // квест-диалоги: анонс нового задания / окно незабранной
                 // награды (открываются поверх мира, герой стоит)
                 globalThis.GAME_QUESTS.onSceneEnter(ctx);
+                // награда побочного квеста ратуши (W40): «+1 ресурс»
+                // всплывает у героя при входе в мир
+                if (G.world.sideNote) {
+                    const n = G.world.sideNote;
+                    G.world.sideNote = null;
+                    floatText(GAME_LOC.t(n.key,
+                        { res: GAME_LOC.t("res." + n.elem) }),
+                        COMPONENTS.positionX[heroId], COMPONENTS.positionY[heroId],
+                        0xf3d34a);
+                }
             },
             exit() {
                 if (heroId !== null) {
@@ -1219,6 +1334,42 @@
                         questArrow.alpha = d > TS * 2.5 ? 0.95 : 0.45;
                         questArrow.zIndex = hy + 2;
                     } else questArrow.visible = false;
+                }
+                // стрелки побочных квестов ратуши (W40): красная — ближайший
+                // живой охотничий монстр, жёлтая — город-адресат письма;
+                // скрыты при модальном диалоге, чекбокс тот же (questArrow)
+                if (sideArrows) {
+                    const on = (G.settings && G.settings.questArrow !== false)
+                        && !(ctx.questModal || 0);
+                    const tgts = on && globalThis.GAME_SIDEQ
+                        ? globalThis.GAME_SIDEQ.arrowTargets(G) : [];
+                    for (const name of ["red", "yellow"]) {
+                        const a = sideArrows[name];
+                        const near = tgts.filter((t) => t.color === name)
+                            .sort((p, q) => Math.hypot(p.x - hx, p.y - hy)
+                                - Math.hypot(q.x - hx, q.y - hy))[0];
+                        if (near) {
+                            const dx = near.x - hx, dy = near.y - hy;
+                            const d = Math.hypot(dx, dy) || 1;
+                            const r = 48 + 4 * Math.sin(performance.now() / 280);
+                            a.visible = true;
+                            a.position.set(hx + dx / d * r, hy + dy / d * r - 30);
+                            a.rotation = Math.atan2(dy, dx);
+                            a.alpha = d > TS * 2.5 ? 0.95 : 0.45;
+                            a.zIndex = hy + 2;
+                        } else a.visible = false;
+                    }
+                }
+                // жёлтые свечения городов-адресатов писем (W40): пульс
+                if (poiGlows.length) {
+                    const lit = globalThis.GAME_SIDEQ
+                        ? globalThis.GAME_SIDEQ.glowCities(G) : [];
+                    for (const g of poiGlows) {
+                        const on = lit.includes(g.key);
+                        g.node.visible = on;
+                        if (on) g.node.alpha = 0.62 + 0.3
+                            * Math.sin(performance.now() / 300);
+                    }
                 }
                 // скорость по дорогам (просил юзер): дорога и мост дают
                 // ×1.2 к обычному шагу — переключается клеткой под ногами
@@ -1322,6 +1473,9 @@
                 }
 
                 uiHud.userData.goldT.text = String(G.gold);
+                // ресурсы стихий в HUD (W40) — числа каждый кадр
+                for (const e of globalThis.GAME_SIDEQ.RES_ELEMS)
+                    uiHud.userData.resT[e].text = String(G.resources[e] || 0);
 
                 // ── бродячие отряды: патруль, погоня, касание — бой ────────
                 // (просил юзер). Ходят по сетке 4 направлениями: BFS-путь
@@ -1337,6 +1491,13 @@
                         s.st.x = sx; s.st.y = sy; // сейв-состояние живёт с ним
                         s.shadow.position.set(sx, sy - 9.8);
                         s.shadow.zIndex = sy - 0.5;
+                        // красное свечение охотничьего монстра (W40): пульс
+                        if (s.glow) {
+                            s.glow.position.set(sx, sy - 2);
+                            s.glow.zIndex = sy - 0.4;
+                            s.glow.alpha = 0.6 + 0.3
+                                * Math.sin(performance.now() / 260);
+                        }
                         const dHero = Math.hypot(hx - sx, hy - sy);
                         // касание отряда — бой (как соприкосновение
                         // с противником в самом подземелье). После
@@ -1437,20 +1598,11 @@
                     const c = px(p);
                     // города (W30/W31): касание СТАРТОВОГО — вход в НЕГО
                     // (раньше всегда открывался первый spawnTown в pois —
-                    // город Силы, баг юзера); прочие — «Скоро…»
-                    if (p.kind === "town"
+                    // город Силы, баг юзера). W40 (юзер): входят ВСЕ города
+                    // — письмо ратуши доставляется в любой из них
+                    if ((p.kind === "town" || p.kind === "capital")
                         && Math.hypot(c.x - hx, c.y - hy) < TS * 0.85) {
-                        if (p.spawnTown) {
-                            enterCity(p);
-                        } else {
-                            const deniedAt = p.denyAt || p.soonAt;
-                            if (!deniedAt || performance.now() - deniedAt > 2500) {
-                                p.denyAt = p.soonAt = performance.now();
-                                soonCount++;
-                                if (ctx.sfx) ctx.sfx();
-                                floatText(GAME_LOC.t("world.soon"), c.x, c.y, 0xd8c79d);
-                            }
-                        }
+                        enterCity(p);
                         return;
                     }
                     if (p.kind !== "dungeon") continue;
@@ -1570,7 +1722,9 @@
                     return true;
                 },
                 enterCave: (cave) => enterCave(cave),
-                enterCity: () => enterCity(), // тесты W30: вход в стартовый город
+                // вход в город: без аргумента — «свой» стартовый (тесты W30),
+                // с poi — в указанный (письмо W40 / вход в любой город)
+                enterCity: (tw) => enterCity(tw),
                 soonCount: () => soonCount,
                 // ── бродячие отряды (тесты): список с живыми позициями и
                 // заморозка ИИ — пробы с прогулками по миру не ловят бои.
@@ -1656,6 +1810,31 @@
                         }
                     return { list: out, level: G.world.wildLevel || {} };
                 },
+                // ── побочные квесты ратуши и ресурсы (тесты, W40) ────────
+                sideq: () => ({
+                    state: globalThis.GAME_SIDEQ
+                        ? globalThis.GAME_SIDEQ.stateOf(G) : null,
+                    mobs: globalThis.GAME_SIDEQ
+                        ? globalThis.GAME_SIDEQ.huntMobs(G).map((m) => {
+                            const s = squads.find((x) => x.key === m.key);
+                            return { ...m,
+                                x: s && s.id !== null
+                                    ? COMPONENTS.positionX[s.id] : m.x,
+                                y: s && s.id !== null
+                                    ? COMPONENTS.positionY[s.id] : m.y,
+                                walking: !!(s && s.id !== null
+                                    && COMPONENTS.ctrlMove[s.id]),
+                                glow: !!(s && s.glow && s.glow.visible) };
+                        }) : [],
+                    glows: globalThis.GAME_SIDEQ
+                        ? globalThis.GAME_SIDEQ.glowCities(G) : [],
+                    arrows: sideArrows ? {
+                        red: sideArrows.red.visible,
+                        yellow: sideArrows.yellow.visible } : null,
+                    note: G.world.sideNote || null,
+                }),
+                res: () => ({ resources: { ...G.resources },
+                    boosters: { ...G.boosters } }),
                 // подсказка на отряде: состояние панели (как в подземелье)
                 hoverAt(x, y) {
                     hoverSquads({ x, y });

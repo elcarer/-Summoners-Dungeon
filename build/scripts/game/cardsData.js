@@ -2185,6 +2185,36 @@
                      elems: ["decay"], starter: "decay", img: "58" },
         timSimple: { id: "timSimple", rarity: "common", baseHp: 8,
                      elems: ["time"], starter: "time", img: "59" },
+        // ── «Разбойники» — РЕДКИЕ бродячие враги открытого мира (просил
+        // юзер W40, арты heroes/60–65.png): база 12♥, ядро колоды НЕ
+        // фиксировано — 8 Обычных + 3 Редких + 1 Эпическая карта стихии
+        // при спавне (dataCards.raiderDeck). Способности — «первый раз
+        // за бой»: Сила — убив существо, бьёт 2 по случайному существу
+        // (firstKillSnipe); Рост — ударив базу, бьёт 4 по случайной
+        // постройке (firstBaseHitBuild); Мудрость — сыграв заклинание,
+        // получает 2⚡ (firstSpellEnergy); Честь — атаковав существо,
+        // лечит базе 2♥ (firstAttackHeal); Тлен — нанеся урон существу,
+        // даёт «Возврат 1» случайному своему (firstDmgReturn); Время —
+        // оставшись без карт в руке, берёт 2 (emptyHandDraw).
+        // Способности работают у обеих сторон
+        strRaider: { id: "strRaider", rarity: "rare", baseHp: 12,
+                     elems: ["strength"], starter: "strength",
+                     img: "60", ability: "firstKillSnipe", abilityVal: 2 },
+        grwRaider: { id: "grwRaider", rarity: "rare", baseHp: 12,
+                     elems: ["growth"], starter: "growth",
+                     img: "61", ability: "firstBaseHitBuild", abilityVal: 4 },
+        wisRaider: { id: "wisRaider", rarity: "rare", baseHp: 12,
+                     elems: ["wisdom"], starter: "wisdom",
+                     img: "62", ability: "firstSpellEnergy", abilityVal: 2 },
+        decRaider: { id: "decRaider", rarity: "rare", baseHp: 12,
+                     elems: ["decay"], starter: "decay",
+                     img: "64", ability: "firstDmgReturn", abilityVal: 1 },
+        honRaider: { id: "honRaider", rarity: "rare", baseHp: 12,
+                     elems: ["honor"], starter: "honor",
+                     img: "63", ability: "firstAttackHeal", abilityVal: 2 },
+        timRaider: { id: "timRaider", rarity: "rare", baseHp: 12,
+                     elems: ["time"], starter: "time",
+                     img: "65", ability: "emptyHandDraw", abilityVal: 2 },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon", "tordin"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -2211,7 +2241,10 @@
         "timGuard", // «Охранник Времени» — зона Времени (просил юзер)
         // «Простые» враги открытого мира (просил юзер W29)
         "strSimple", "grwSimple", "wisSimple", "honSimple",
-        "decSimple", "timSimple"];
+        "decSimple", "timSimple",
+        // «Разбойники» — редкие бродячие враги открытого мира (просил юзер W40)
+        "strRaider", "grwRaider", "wisRaider", "honRaider",
+        "decRaider", "timRaider"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.
