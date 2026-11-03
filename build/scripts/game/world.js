@@ -437,59 +437,27 @@
         }
         function makeTown(poi) {
             const c = new PIXI.Container();
-            // footprint 5×3 = 160×96px (просил юзер), центр — середина
-            // footprint (у якоря-площади нижняя средняя клетка)
-            const s = GEN.KIND_SIZE.town;
-            const p = { x: (poi.gx + 0.5) * TS,
-                y: (poi.gy - (s.h - 1) + s.h / 2) * TS };
-            const sh = new PIXI.Graphics();
-            sh.ellipse(0, 44, 78, 14); sh.fill({ color: 0x0d130a, alpha: 0.5 });
-            c.addChild(sh);
-            const b = new PIXI.Graphics(); // большой дом + пристройка
-            b.rect(-76, -10, 104, 54); b.fill(0x8f846d);
-            b.poly([-82, -10, -24, -46, 34, -10]); b.fill(ROOF[poi.elem]);
-            b.rect(36, 6, 40, 38); b.fill(0x9a8f75); // пристройка
-            b.poly([30, 6, 56, -16, 82, 6]); b.fill(ROOF[poi.elem]);
-            b.rect(-52, 22, 14, 22); b.fill(0x3a2f22); // двери
-            b.rect(48, 24, 12, 20); b.fill(0x3a2f22);
-            b.rect(-66, 2, 8, 8); b.rect(-30, 2, 8, 8); b.rect(4, 2, 8, 8);
-            b.fill(0x3a2f22); // окна
-            c.addChild(b);
-            c.addChild(label(poi.name, 16, 0xf3e6c2, -56));
-            c.position.set(p.x, p.y);
-            c.zIndex = (poi.gy + 1) * TS; // низ footprint
+            // спрайт юзера images/sities/<стихия>/1.png (192×128),
+            // анкер — низ footprint (якорь-клетка нижняя средняя,
+            // перед входом), как у пещеры данжа (W39, юзер)
+            const sp = new PIXI.Sprite(ctx.cityTex[poi.elem].town);
+            sp.anchor.set(0.5, 1);
+            c.addChild(sp);
+            c.addChild(label(poi.name, 16, 0xf3e6c2, -130));
+            c.position.set((poi.gx + 0.5) * TS, (poi.gy + 1) * TS);
+            c.zIndex = (poi.gy + 1) * TS; // низ footprint — y-sort общий
             return c;
         }
         function makeCapital(poi) {
             const c = new PIXI.Container();
-            // footprint 5×4 = 160×128px (просил юзер), центр — середина
-            // footprint (у якоря-площади центральная клетка)
-            const s = GEN.KIND_SIZE.capital;
-            const p = { x: (poi.gx + 0.5) * TS,
-                y: (poi.gy - (s.h - 1) + s.h / 2) * TS };
-            const sh = new PIXI.Graphics();
-            sh.ellipse(0, 56, 84, 15); sh.fill({ color: 0x0d130a, alpha: 0.55 });
-            c.addChild(sh);
-            const b = new PIXI.Graphics(); // цитадель: стены, зубцы, башня
-            b.rect(-80, -10, 160, 66); b.fill(0x9a8f75);
-            for (let t = 0; t < 8; t++) b.rect(-80 + t * 21, -20, 15, 11);
-            b.fill(0x8a8066);
-            b.rect(-14, -64, 28, 90); b.fill(0x9a8f75); // башня
-            b.poly([-22, -64, 0, -98, 22, -64]); b.fill(ROOF[poi.elem]);
-            b.rect(-13, 30, 26, 26); b.fill(0x3a2f22); // ворота
-            b.rect(-52, 4, 9, 9); b.rect(43, 4, 9, 9); b.fill(0x3a2f22);
-            c.addChild(b);
-            // флаг стихии над башней — логотип из интерфейса
-            const logo = new PIXI.Sprite(
-                uiTex(globalThis.GAME_DATA.ELEM_LOGO[poi.elem]));
-            logo.anchor.set(0.5, 1);
-            logo.scale.set(0.55);
-            logo.position.set(0, -102);
-            logo.eventMode = "none";
-            c.addChild(logo);
-            c.addChild(label(poi.name, 20, 0xf0c96a, -104));
-            c.position.set(p.x, p.y);
-            c.zIndex = (poi.gy + 1) * TS; // низ footprint
+            // спрайт юзера images/sities/<стихия>/0.png (192×160),
+            // анкер — низ footprint, как у пещеры данжа (W39, юзер)
+            const sp = new PIXI.Sprite(ctx.cityTex[poi.elem].cap);
+            sp.anchor.set(0.5, 1);
+            c.addChild(sp);
+            c.addChild(label(poi.name, 20, 0xf0c96a, -162));
+            c.position.set((poi.gx + 0.5) * TS, (poi.gy + 1) * TS);
+            c.zIndex = (poi.gy + 1) * TS; // низ footprint — y-sort общий
             return c;
         }
         // пещера-подземелье: спрайт юзера cave.png (192×136 ≈ 6×4 клетки,

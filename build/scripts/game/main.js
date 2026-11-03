@@ -129,6 +129,15 @@
                 `./images/tiles/montain/${n}.png`));
         // пещера подземелий: images/tiles/cave.png — 192×136 ≈ 6×4 клетки
         const caveTex = await assets.loadTexture("./images/tiles/cave.png");
+        // города мира: images/sities/<стихия>/{0,1}.png — спрайты юзера
+        // (0.png — столица 192×160, 1.png — обычный город 192×128);
+        // стихии — ключи ELEM_LOGO (тот же канонический список)
+        const cityTex = {};
+        for (const e of Object.keys(GAME_DATA.ELEM_LOGO))
+            cityTex[e] = {
+                cap: await assets.loadTexture(`./images/sities/${e}/0.png`),
+                town: await assets.loadTexture(`./images/sities/${e}/1.png`),
+            };
         // деревья лесных массивов: images/tiles/trees/<n>.png — спрайты
         // юзера 96px (слой объектов над тайлами чащи, просил юзер)
         const treeTex = [];
@@ -702,6 +711,7 @@
             roadsTex,    // тайлы дорог images/tiles/roads.png (11 видов)
             mountainTex, // спрайты гор images/tiles/montain (слой объектов)
             caveTex,     // спрайт пещеры подземелий images/tiles/cave.png
+            cityTex,     // спрайты городов мира images/sities/<стихия>/{0,1}
             sfx: gameSfx,   // ctx.sfx() — клик UI (step); ctx.sfx("chpoc") — событие
             music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
             footstep: footstepTick, // шаги героя: сцены тикают позицией героя
