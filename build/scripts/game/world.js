@@ -905,12 +905,12 @@
         function cityStateFor(elem) {
             const saved = G.cityStates && G.cityStates[elem];
             // планировка города своей версии (cityV, W34) — иначе пересбор:
-            // новый генератор живёт в GAME_DUNGEON.newCityState
+            // новый генератор живёт в city.js (GAME_CITY, W47)
             if (saved && saved.v === globalThis.GAME_DUNGEON.MAP_V
-                && saved.cityV === globalThis.GAME_DUNGEON.CITY_V) return saved;
+                && saved.cityV === globalThis.GAME_CITY.CITY_V) return saved;
             // столица — стартовый город СВОЕЙ стихии (8 районов, дом Глома);
             // прочие города — обычные (5 районов)
-            const st = globalThis.GAME_DUNGEON.newCityState(
+            const st = globalThis.GAME_CITY.newCityState(
                 elem, elem === G.elem);
             if (G.cityStates) G.cityStates[elem] = st;
             return st;

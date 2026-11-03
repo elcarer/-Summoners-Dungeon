@@ -53,7 +53,9 @@
   забег), `cardsData` (ЧИСТЫЕ ДАННЫЕ карт/героев → `GAME_CARD_DATA`; его же
   читает cards.html), `dataCards` (логика: архетипы врагов, enemyDeck, пулы
   наград/добора, магазин → `GAME_DATA`), `uiKit`, `world` (открытый мир),
-  `dungeon` (этажи, генератор, объекты), `arenaCore` + модули `arena*`
+  `city` (построение города: планировка/декор/окна кузницы-ратуши →
+  `GAME_CITY`, W47), `dungeon` (этажи и общий движок их сцены, генератор,
+  объекты), `arenaCore` + модули `arena*`
   (бой: Cards/Board/Combat/Hand/Panels/Hud/Flow/AI/Actions/Scene/Api;
   `arena.js` — только сборка), `deckScene`/`rewardScene`/`draftScene`/
   `settingsScene`, `main` (бут, меню, выбор героя, сцены).
@@ -94,5 +96,5 @@
   бэклог; читать по задаче нужную доку, не весь объём): `combat.md` — правила
   боя и геометрия арены; `traps.md` — свод ловушек; `architecture.md` —
   устройство, листы существ, пайплайн карт; `journal.md` — журнал волн
-  (детали W26–W46). Перед правкой боя/карт читать `docs/combat.md`, при
+  (детали W26–W47). Перед правкой боя/карт читать `docs/combat.md`, при
   отладке и пробах — `docs/traps.md`.
