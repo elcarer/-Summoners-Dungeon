@@ -161,6 +161,11 @@
         if (!G.quests || G.quests.pending || draft) return null;
         const q = QUESTS.find((x) => x.id === G.quests.active);
         if (!q) return null;
+        // (W49, юзер) квест, ещё НЕ ВЗЯТЫЙ у Глома (announced=false),
+        // не выполняется и прогресс не копит: победы до разговора
+        // засчитывать нельзя — окно «задание выполнено» выскочило у
+        // юзера без взятого «Карты с улицы»
+        if (!G.quests.announced) return null;
         const P = G.quests.progress;
         if (q.kind === "wild") {
             if (!wander) return null;
@@ -207,7 +212,9 @@
     function markDraft(G) {
         if (!G.quests || G.quests.pending) return;
         const q = QUESTS.find((x) => x.id === G.quests.active);
-        if (!q || q.kind !== "final") return;
+        // (W49, юзер) тот же гейт, что у onBattleWin: невзятый квест
+        // галочки не копит
+        if (!q || q.kind !== "final" || !G.quests.announced) return;
         G.quests.progress.draft = true;
         if (finalDone(G.quests.progress)) G.quests.pending = q.id;
         if (G.saveRun) G.saveRun();
@@ -218,7 +225,9 @@
     function noteFloor(G, floor) {
         if (!G.quests || G.quests.pending || !G.dungeon || G.dungeon.city) return;
         const q = QUESTS.find((x) => x.id === G.quests.active);
-        if (!q || q.kind !== "final") return;
+        // (W49, юзер) тот же гейт, что у onBattleWin: невзятый квест
+        // галочки не копит
+        if (!q || q.kind !== "final" || !G.quests.announced) return;
         const info = globalThis.GAME_DATA.CAVES[G.dungeon.cave];
         if (info && floor >= (info.maxFloor || 1)) {
             G.quests.progress.bottom = true;

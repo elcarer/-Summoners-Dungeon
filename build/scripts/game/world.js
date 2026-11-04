@@ -982,6 +982,13 @@
                     // W40: города-столицы тоже входят — выход к их дверям
                     const co = typeof G.cityOut === "object" ? G.cityOut : null;
                     G.cityOut = null;
+                    // (W49, юзер) 3с нельзя зайти в ЭТОТ же город обратно:
+                    // герой выходит у ворот (свободная клетка в 1.4 клетки
+                    // от якоря, триггер входа — 1.3), и без кулдауна первый
+                    // же шаг к воротам возвращал его в город — пройти мимо
+                    // входа было невозможно
+                    G.world.cityCoolMs = 3000;
+                    G.world.cityCoolTw = co ? co.gx + ":" + co.gy : null;
                     const tw = co && map.pois.find((p) =>
                         (p.kind === "town" || p.kind === "capital")
                         && p.gx === co.gx && p.gy === co.gy);
@@ -1232,7 +1239,13 @@
                 heroSprite = sprite;
                 heroId = characters.spawn({
                     x: hp.x, y: hp.y, sprite, anims: ctx.heroSheet.animations,
-                    speed: HERO_SPEED, fps: ctx.heroSheet.fps, halfW: 7, halfH: 5,
+                    speed: HERO_SPEED, fps: ctx.heroSheet.fps,
+                    // (W49, юзер) коллайдер «ног» УЖЕ (8×6px, было 14×10):
+                    // щели между валунами скал визуально есть, а широкий
+                    // короб цеплял углы клеток и не пускал героя в
+                    // 1-клеточные проходы (у отрядов мира свой короб —
+                    // они ходят по BFS-клеткам и не застревают)
+                    halfW: 4, halfH: 3,
                 });
                 ECS.addComponent(world, heroId, "ctrlVI", 0);
                 ECS.addComponent(world, heroId, "ctrlVJ", 0);
@@ -1362,6 +1375,12 @@
                 if (heroId === null || !uiHud) return;
                 const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
                 if (ctx.footstep) ctx.footstep(hx, hy); // шаги героя (W34)
+                // (W49) остывание входа в город после выхода — убывающий
+                // счётчик МС (тиком здесь), НЕ метка performance.now():
+                // та в сейве после перезапуска блокировала бы до конца
+                // сессии (ловушка W22 у ladderCoolMs)
+                if (G.world.cityCoolMs > 0)
+                    G.world.cityCoolMs -= ticker.deltaMS;
                 // чанки экрана + запас (пересобираются только при выходе
                 // камеры за набор) и видимость POI (просил юзер: рисуется
                 // только экран плюс запас, остальное — когда доедет)
@@ -1679,8 +1698,14 @@
                     // перед воротами (диагональ 45px ещё молчит)
                     if ((p.kind === "town" || p.kind === "capital")
                         && Math.hypot(c.x - hx, c.y - hy) < TS * 1.3) {
-                        enterCity(p);
-                        return;
+                        // (W49, юзер) 3с после выхода вход в ЭТОТ же город
+                        // закрыт — ворота можно спокойно пройти мимо; в
+                        // другие города и после остывания вход как был
+                        if (!(G.world.cityCoolMs > 0
+                            && G.world.cityCoolTw === p.gx + ":" + p.gy)) {
+                            enterCity(p);
+                            return;
+                        }
                     }
                     if (p.kind !== "dungeon") continue;
                     if (Math.hypot(c.x - hx, c.y - hy) < TS * 0.85) {
@@ -1802,6 +1827,10 @@
                 // вход в город: без аргумента — «свой» стартовый (тесты W30),
                 // с poi — в указанный (письмо W40 / вход в любой город)
                 enterCity: (tw) => enterCity(tw),
+                // (W49) остывание повторного входа в город после выхода
+                // (пробы): мс до конца кулдауна и ключ города (gx:gy)
+                cityCool: () => ({ ms: Math.max(0, G.world.cityCoolMs || 0),
+                    tw: G.world.cityCoolTw || null }),
                 soonCount: () => soonCount,
                 // ── бродячие отряды (тесты): список с живыми позициями и
                 // заморозка ИИ — пробы с прогулками по миру не ловят бои.
