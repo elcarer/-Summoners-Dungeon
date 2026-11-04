@@ -470,15 +470,58 @@
             if (G.saveRun) G.saveRun();
             playCraftAnim();
         }
-        // ковка: арт бустера (500×300) режется сеткой 4×3; куски
-        // слетаются в свой слот по одному (стагger 45мс, ease-out),
-        // в конце — вспышка и «прикат» готового бустера
+        // (W48, юзер) кусочки мельче и неровные: арт рисуется в canvas,
+        // каждый кусок вырезается ломаным полигоном (случайная сетка
+        // резов + дрожь края); соседи нахлёстываются (пиксели общие) —
+        // в собранном виде швов нет, а во время полёта края рваные
+        function boosterBase() {
+            const cv = document.createElement("canvas");
+            cv.width = 500; cv.height = 300;
+            cv.getContext("2d").drawImage(
+                art.texture.source.resource, 0, 0, 500, 300);
+            return cv;
+        }
+        // текстура куска: полигон (в координатах арта 500×300) → canvas
+        function jagTex(base, poly, bx0, by0, bw, bh) {
+            const cv = document.createElement("canvas");
+            cv.width = bw; cv.height = bh;
+            const g = cv.getContext("2d");
+            g.beginPath();
+            poly.forEach((p, i) =>
+                (i ? g.lineTo : g.moveTo).call(g, p[0] - bx0, p[1] - by0));
+            g.closePath();
+            g.clip();
+            g.drawImage(base, -bx0, -by0);
+            return PIXI.Texture.from(cv);
+        }
+        // ковка: арт бустера (500×300) режется на ~25-35 неровных
+        // кусков; слетаются в свой слот по одному (стаггер 24мс,
+        // ease-out), в конце — вспышка и «прикат» готового бустера
         function playCraftAnim() {
             animBusy = true;
             animPhase = "craft";
             art.visible = false;
-            const tex = art.texture;
-            const COLS = 4, ROWS = 3, PW = 500 / COLS, PH = 300 / ROWS;
+            const base = boosterBase();
+            const OV = 9, AMP = 5 + Math.random() * 2; // нахлёст, дрожь края
+            const xs = [0]; // неровная сетка резов (px арта)
+            for (let gx = 55 + Math.random() * 40; gx < 438;
+                gx += 52 + Math.random() * 46) xs.push(Math.round(gx));
+            xs.push(500);
+            const ys = [0];
+            for (let gy = 48 + Math.random() * 30; gy < 252;
+                gy += 44 + Math.random() * 34) ys.push(Math.round(gy));
+            ys.push(300);
+            // ломаная сторона: линия вокруг v0 вдоль [a..b] с дрожью ±AMP
+            const zig = (v0, a, b, vert) => {
+                const pts = [];
+                const n = Math.max(2, Math.round(Math.abs(b - a) / 12));
+                for (let k = 0; k <= n; k++) {
+                    const j = (Math.random() - 0.5) * 2 * AMP;
+                    const t = a + (b - a) * (k / n);
+                    pts.push(vert ? [v0 + j, t] : [t, v0 + j]);
+                }
+                return pts;
+            };
             const fx = new PIXI.Container();
             fx.eventMode = "none";
             c.addChild(fx);
@@ -489,32 +532,53 @@
             flash.alpha = 0;
             flash.eventMode = "none";
             c.addChild(flash);
-            const pieces = [];
-            for (let r = 0; r < ROWS; r++)
-                for (let col = 0; col < COLS; col++) {
-                    const px = col * PW, py = r * PH;
-                    const sp = new PIXI.Sprite(new PIXI.Texture({
-                        source: tex.source,
-                        frame: new PIXI.Rectangle(px, py, PW, PH) }));
+            const pieces = [], texs = [];
+            for (let j = 0; j < ys.length - 1; j++)
+                for (let i = 0; i < xs.length - 1; i++) {
+                    const L = i ? xs[i] - OV : 0;
+                    const R = i < xs.length - 2 ? xs[i + 1] + OV : 500;
+                    const T = j ? ys[j] - OV : 0;
+                    const B = j < ys.length - 2 ? ys[j + 1] + OV : 300;
+                    const poly = [
+                        ...(j ? zig(T, L, R, false) : [[L, 0], [R, 0]]),
+                        ...(i < xs.length - 2 ? zig(R, T, B, true)
+                            : [[R, T], [R, B]]),
+                        ...(j < ys.length - 2 ? zig(B, R, L, false)
+                            : [[R, 300], [L, 300]]),
+                        ...(i ? zig(L, B, T, true) : [[0, B], [0, T]]),
+                    ];
+                    const pxs = poly.map(p => p[0]);
+                    const pys = poly.map(p => p[1]);
+                    const bx0 = Math.floor(Math.min(...pxs)) - 1;
+                    const by0 = Math.floor(Math.min(...pys)) - 1;
+                    const bw = Math.ceil(Math.max(...pxs)) - bx0 + 1;
+                    const bh = Math.ceil(Math.max(...pys)) - by0 + 1;
+                    const tx = jagTex(base, poly, bx0, by0, bw, bh);
+                    texs.push(tx);
+                    const sp = new PIXI.Sprite(tx);
                     sp.anchor.set(0.5);
                     sp.scale.set(0.56);
                     sp.eventMode = "none";
-                    const ex = 960 - 140 + (px + PW / 2) * 0.56;
-                    const ey = top + 84 + (py + PH / 2) * 0.56;
+                    const ex = 960 + (bx0 + bw / 2 - 250) * 0.56;
+                    const ey = top + 84 + 84 + (by0 + bh / 2 - 150) * 0.56;
                     const a = Math.random() * Math.PI * 2;
-                    const d = 170 + Math.random() * 130;
+                    const d = 150 + Math.random() * 150;
                     sp.position.set(ex + Math.cos(a) * d,
                         ey + Math.sin(a) * d);
                     sp.rotation = (Math.random() - 0.5) * 1.3;
                     sp.alpha = 0;
                     fx.addChild(sp);
                     pieces.push({ sp, ex, ey, sx: sp.x, sy: sp.y,
-                        srot: sp.rotation, t0: 120 + pieces.length * 45 });
+                        srot: sp.rotation, t0: 120 + pieces.length * 24 });
                 }
             const t0 = performance.now();
-            const FLY = 480, TOTAL = 120 + pieces.length * 45 + FLY + 40;
+            const FLY = 460, TOTAL = 120 + pieces.length * 24 + FLY + 40;
             const tick = () => {
-                if (fx.destroyed) { PIXI.Ticker.shared.remove(tick); return; }
+                if (fx.destroyed) {
+                    PIXI.Ticker.shared.remove(tick);
+                    texs.forEach(t => t.destroy(true));
+                    return;
+                }
                 const el = performance.now() - t0;
                 for (const p of pieces) {
                     const k = Math.min(1, Math.max(0, (el - p.t0) / FLY));
@@ -527,6 +591,7 @@
                 if (el < TOTAL) return;
                 PIXI.Ticker.shared.remove(tick);
                 fx.destroy({ children: true });
+                texs.forEach(t => t.destroy(true));
                 art.visible = true;
                 // вспышка + прикат готового бустера
                 const t1 = performance.now();
@@ -609,19 +674,32 @@
             whole.position.set(CX, CY);
             whole.eventMode = "none";
             rc.addChild(whole);
-            const half = (fx0) => {
-                const s = new PIXI.Sprite(new PIXI.Texture({
-                    source: tex.source,
-                    frame: new PIXI.Rectangle(fx0, 0, 250, 300) }));
+            // (W48, юзер) разрез — рваный, зигзагом-«ёлочкой»: обе
+            // половинки режутся ОДНОЙ ломаной, края комплементарны
+            const base = boosterBase();
+            const AM = 15; // амплитуда ёлочки (px арта)
+            const zpts = [];
+            for (let y = 0, k = 0; y <= 300; y += 22, k++)
+                zpts.push([
+                    250 + (k % 2 ? -AM : AM) * (0.8 + Math.random() * 0.4),
+                    Math.min(300, y + (k ? (Math.random() - 0.5) * 6 : 0))]);
+            const polyL = [[0, 0], [zpts[0][0], 0], ...zpts, [0, 300]];
+            const polyR = [[500, 0], [zpts[0][0], 0], ...zpts, [500, 300]];
+            const txL = jagTex(base, polyL, 0, 0, 251 + AM, 301);
+            const txR = jagTex(base, polyR, 250 - AM - 1, 0, 250 + AM + 2, 301);
+            const xL0 = 960 + ((251 + AM) / 2 - 250) * S;
+            const xR0 = 960 + (250 - AM - 1 + (250 + AM + 2) / 2 - 250) * S;
+            const mkHalf = (tx, x0) => {
+                const s = new PIXI.Sprite(tx);
                 s.anchor.set(0.5);
                 s.scale.set(S);
                 s.eventMode = "none";
-                s.position.set(CX + (fx0 === 0 ? -70 : 70), CY);
+                s.position.set(x0, CY);
                 s.visible = false;
                 rc.addChild(s);
                 return s;
             };
-            const hl = half(0), hr = half(250);
+            const hl = mkHalf(txL, xL0), hr = mkHalf(txR, xR0);
             const sc = 0.28;
             const spread = Math.min(150, 760 / Math.max(1, cards.length));
             const cy = top + 250, sy = top + 230;
@@ -645,16 +723,16 @@
                     const k = el / SHAKE;
                     whole.x = CX + Math.sin(el / 22) * 5 * k;
                     whole.rotation = Math.sin(el / 17) * 0.06 * k;
-                } else { // рвётся: половинки разлетаются и гаснут
+                } else { // рвётся: половинки (край ёлочкой) разлетаются
                     whole.visible = false;
                     hl.visible = hr.visible = true;
                     const k = Math.min(1, (el - SHAKE) / TEAR);
                     const e = 1 - Math.pow(1 - k, 2);
-                    hl.x = CX - 70 - 175 * e;
+                    hl.x = xL0 - 175 * e;
                     hl.y = CY + 14 * e;
                     hl.rotation = -0.55 * e;
                     hl.alpha = 1 - e;
-                    hr.x = CX + 70 + 175 * e;
+                    hr.x = xR0 + 175 * e;
                     hr.y = CY + 14 * e;
                     hr.rotation = 0.55 * e;
                     hr.alpha = 1 - e;
@@ -671,11 +749,15 @@
                 }
                 if (el < TOTAL) return;
                 PIXI.Ticker.shared.remove(tick);
-                if (rc.destroyed) return;
+                if (rc.destroyed) { // окно закрыли mid-anim — чистим
+                    txL.destroy(true); txR.destroy(true);
+                    return;
+                }
                 animBusy = false;
                 animPhase = "idle";
                 const fr = forgeReward(cards);
                 env.replaceWin(fr.node, fr.refs);
+                txL.destroy(true); txR.destroy(true);
             };
             PIXI.Ticker.shared.add(tick);
             return rc;
