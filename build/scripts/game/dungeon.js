@@ -1359,6 +1359,15 @@
                     && Math.hypot(st.ladder.x - st.heroPos.x, st.ladder.y - st.heroPos.y) < TS * 0.9) {
                     st.heroPos = { ...st.spawn };
                 }
+                // сейв в клетках прохода города (W52): груз не должен
+                // сразу выкидывать в мир — герой возвращается к спавну
+                if (st.city && st.exitPassage && st.heroPos) {
+                    const pg = st.exitPassage;
+                    const pcx = Math.floor(st.heroPos.x / TS),
+                          pcy = Math.floor(st.heroPos.y / TS);
+                    if (pcy === pg.y && pcx >= pg.x0 && pcx <= pg.x1)
+                        st.heroPos = { ...st.spawn };
+                }
                 // сейвы старых волн без объектов — генерируются при заходе
                 if (!st.objects) { st.objects = genObjects(st.floor, st.cave, st.lootCenters || st.roomCenters); st.win = null; }
                 for (const o of st.objects)
@@ -1382,7 +1391,10 @@
                         if (i >= 0) st.spawn = { x: i * TS + TS / 2, y: j * TS + TS / 2 };
                     }
                 }
-                if (!st.ladder && st.spawn) st.ladder = { x: st.spawn.x, y: st.spawn.y - TS };
+                // лестница — только у этажей данжа: у города выход —
+                // проход в стене (W52), st.ladder у города нет
+                if (!st.ladder && !st.city && st.spawn)
+                    st.ladder = { x: st.spawn.x, y: st.spawn.y - TS };
                 if (st.city) {
                     // город (W30): страховки сейвов — торговец без sold,
                     // врагов в городе нет и не будет
@@ -1436,7 +1448,7 @@
                 addWalls(layer); // стены поверх пола, zIndex по нижней кромке
                 CITY.addCityDeco({ ctx, st, MAPROWS, W, H, hsh }, layer); // деревья/горы фич города (W38)
                 if (st.exit) layer.addChild(makeExit()); // на дне данжа спуска нет
-                if (st.ladder) layer.addChild(makeLadder(st));
+                if (st.ladder && !st.city) layer.addChild(makeLadder(st));
                 tokens = [];
                 for (const e of st.enemies) if (e.alive) {
                     const tok = makeToken(e);
@@ -1778,20 +1790,29 @@
                         return;
                     }
                 }
-                // ── лестница у старта: наверх; на 1-м этаже — в открытый мир ──
-                // первые 2с после входа в подземелье лестница «остывает» —
-                // герой прибывает к ней вплотную, без паузы выход срабатывал
-                // от первого же клика (просил юзер). Порог шире полклетки
+                // ── выход: город — проход в стене; данж — лестница у старта ──
+                // Город (W52, юзер): выход из города — ЗАХОД в клетки
+                // прохода в нижней стене; радиуса нет — сквозные маршруты
+                // мимо прохода город не покидают. Данж: лестница наверх
+                // (на 1-м этаже — в открытый мир), порог шире полклетки
                 // (просил юзер W22): герой, вставший кликом в СОСЕДНЮЮ с
-                // иконкой клетку (например, попал в подпись «Выход»),
-                // тоже выходит. Остывание — убывающий счётчик МС (тик
-                // ниже), а НЕ performance.now(): метка, сохранённая в сейв,
-                // после «Продолжить» в новой сессии блокировала выход до
-                // конца сессии (баг W22)
+                // иконкой клетку, тоже выходит. Первые 2с после входа
+                // выход «остывает» — герой прибывает к нему вплотную, без
+                // паузы выход срабатывал от первого же клика (просил юзер).
+                // Остывание — убывающий счётчик МС (тик ниже), а НЕ
+                // performance.now(): метка, сохранённая в сейв, после
+                // «Продолжить» в новой сессии блокировала выход до конца
+                // сессии (баг W22)
                 if (st.ladderCoolMs > 0) st.ladderCoolMs -= dt * 1000;
-                if (!st.win && !ctx.questModal && st.ladder
-                    && !(st.ladderCoolMs > 0)
-                    && Math.hypot(st.ladder.x - hx, st.ladder.y - hy) < TS * 1.02) {
+                const psg = st.city ? st.exitPassage : null;
+                const hitExit = psg
+                    ? Math.floor(hy / TS) === psg.y
+                        && Math.floor(hx / TS) >= psg.x0
+                        && Math.floor(hx / TS) <= psg.x1
+                    : !!st.ladder
+                        && Math.hypot(st.ladder.x - hx, st.ladder.y - hy) < TS * 1.02;
+                if (!st.win && !ctx.questModal && hitExit
+                    && !(st.ladderCoolMs > 0)) {
                     const from = st.floor;
                     st.heroPos = { x: hx, y: hy };
                     if (st.city) {
