@@ -517,9 +517,13 @@
                 c.addChild(sp);
             }
             // W38: оверлеи фич города (болота/чаща/мосты) — city.js (W47)
-            if (city && myState.feat)
+            if (city && myState.feat) {
+                // W50 (юзер): берега реки Мудрости — переходы magic_water
+                // (смешанные квадранты поверх базовой заливки), city.js
+                CITY.addCityWaterBanks({ ctx, st: myState, MAPROWS, W, H }, c);
                 CITY.addCityGroundOverlays(
                     { ctx, st: myState, MAPROWS, W, H }, c);
+            }
             return c;
         }
         function addWalls(layer) {

@@ -352,6 +352,44 @@
         if (planks) c.addChild(g2);
     }
 
+    // Берега реки Мудрости (W50, юзер): переходы листом magic_water
+    // (dual-grid 4×4×32px, фича — вода: тайл показывает воду в углах-
+    // фичах). Река — колонка «~» с мостами «=» (мост тоже вода под
+    // досками), берега до сих пор были жёсткими — клетка целиком вода,
+    // клетка целиком магия. Рисуются КВАДРАНТЫ 32px (четверть клетки
+    // 64px): тайл квадранта (qx,qy) стоит в пикселе (qx·32, qy·32) и
+    // определяется 4 клетками города вокруг его верхнего левого угла —
+    // та же конвенция dual-grid, что у мира. Квадрант со СМЕШАННЫМИ
+    // углами (вода + суша) перерисовывается тайлом magic_water по ключу
+    // LOOKUP; чистые (вся вода / вся суша) не трогаются — под ними
+    // базовая заливка пола/воды dungeon.js как была. Зовёт dungeon.js
+    // ПЕРЕД addCityGroundOverlays (доски мостов поверх берегов);
+    // env: { ctx, st, MAPROWS, W, H }
+    function addCityWaterBanks(env, c) {
+        const { ctx, MAPROWS, W, H } = env;
+        const WT = globalThis.GAME_WORLDTILES;
+        const sheet = ctx.worldSheets && ctx.worldSheets.magic_water;
+        if (!WT || !sheet || !sheet.textures || !sheet.textures.length)
+            return;
+        const isW = (x, y) => x >= 0 && y >= 0 && x < W && y < H
+            && (MAPROWS[y][x] === "~" || MAPROWS[y][x] === "=");
+        for (let qy = 0; qy < H * 2; qy++)
+            for (let qx = 0; qx < W * 2; qx++) {
+                // клетки вокруг вершины (qx·32, qy·32): лево/право, верх/низ
+                const lx = (qx * 32 - 1) >> 6, rx2 = qx >> 1;
+                const ty = (qy * 32 - 1) >> 6, by = qy >> 1;
+                const tl = isW(lx, ty), tr = isW(rx2, ty);
+                const bl = isW(lx, by), br = isW(rx2, by);
+                const n = tl + tr + bl + br;
+                if (!n || n === 4) continue; // чистые квадранты — база
+                const spr = new PIXI.Sprite(
+                    sheet.textures[WT.LOOKUP[tl * 8 + tr * 4 + bl * 2 + br]]);
+                spr.position.set(qx * 32, qy * 32);
+                spr.scale.set(32 / sheet.ts);
+                c.addChild(spr);
+            }
+    }
+
     // ── Кузница города (W40, просил юзер): бустер из 3 ресурсов стихии
     // города; вскрытие — 3 обычные + 2 редкие + 1 эпическая карта стихии
     // в коллекцию (dataCards.boosterCards). Арт бустера юзера
@@ -957,6 +995,7 @@
 
     globalThis.GAME_CITY = {
         CITY_VARIANTS, CITY_V, newCityState, addCityDeco,
-        addCityGroundOverlays, buildForgeWin, buildQuestWin,
+        addCityGroundOverlays, addCityWaterBanks, buildForgeWin,
+        buildQuestWin,
     };
 })();

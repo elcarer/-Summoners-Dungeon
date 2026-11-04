@@ -96,11 +96,12 @@
         // Листы местности глобальной карты (просил юзер, волна тайлов
         // мира): images/tiles/*.png — dual-grid 4×4 по 32px, нарезка и
         // конвенция углов — из движкового dualgrid.js (TILE_CORNERS).
-        // Пары: grass_dirt, grass_water и снег/песок/тлен/магия поверх
-        // земли; wood — прозрачный оверлей лесных массивов (renderForest);
-        // dirt/grass/snow/sand/waste/magic/water — НЕ dual-grid: тайлсеты
-        // ВАРИАНТОВ сплошной заливки 4×4 (16 вариантов по 32px, просил
-        // юзер волны 13–14) — нарезка та же
+        // Пары: grass_dirt, grass_water, снег/песок/тлен/магия поверх
+        // земли и (W50, юзер) совмещения местности с водой — берега рек
+        // без травяных колец; wood — прозрачный оверлей лесных массивов
+        // (renderForest); dirt/grass/snow/sand/waste/magic/water — НЕ
+        // dual-grid: тайлсеты ВАРИАНТОВ сплошной заливки 4×4 (16
+        // вариантов по 32px, просил юзер волны 13–14) — нарезка та же
         say("тайлы мира…");
         await frame();
         const dual = globalThis.createDualGrid();
@@ -108,7 +109,8 @@
         for (const name of ["grass_dirt", "grass_water", "sand_dirt",
                             "snow_dirt", "waste_dirt", "magic_dirt", "wood",
                             "swamp", "dirt", "grass", "snow", "sand",
-                            "waste", "magic", "water"]) {
+                            "waste", "magic", "water", "dirt_water",
+                            "snow_water", "sand_water", "magic_water"]) {
             worldSheets[name] = dual.sliceTileset(
                 await assets.loadTexture(`./images/tiles/${name}.png`));
         }
