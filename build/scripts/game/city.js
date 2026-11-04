@@ -311,8 +311,9 @@
     // (swamp.png) и полог чащи Роста (wood.png) — те же dual-grid
     // рендеры, что у массивов открытого мира (синтетический ter-слой по
     // state.feat; город ≤ 24×19 — один чанк). Болото проходимо, чаща
-    // «F» — нет, но пол/полог под ней рисуются. Мосты «=» — настил-доски
-    // поверх воды (как мосты мира). Зовёт dungeon.js из своей отрисовки
+    // «F» — нет, но пол/полог под ней рисуются. Мосты «=» — тайлсет
+    // moats.png (W51, юзер) поверх воды, как мосты мира. Зовёт
+    // dungeon.js из своей отрисовки
     // пола; env: { ctx, st, MAPROWS, W, H }
     function addCityGroundOverlays(env, c) {
         const { ctx, st, MAPROWS, W, H } = env;
@@ -334,22 +335,44 @@
             c.addChild(WT.renderForestChunk(
                 mkTer(GEN.T.FOREST, "F", st.feat.forest),
                 ctx.worldSheets, TS, 0, 0).container);
-        // мосты «=»: настил-доски поверх воды (как мосты мира)
-        const g2 = new PIXI.Graphics();
-        let planks = 0;
-        const edge = 4, plank = 2, gap = (TS - 2 * edge - plank) / 3;
-        for (let j = 0; j < H; j++) for (let i = 0; i < W; i++)
-            if (MAPROWS[j][i] === "=") {
-                const x = i * TS, y = j * TS;
-                g2.rect(x, y, TS, edge); g2.fill(0x6e5233);
-                g2.rect(x, y + TS - edge, TS, edge); g2.fill(0x6e5233);
-                for (let b = 0; b < 4; b++) {
-                    g2.rect(x + 3, y + edge + b * gap, TS - 6, plank);
-                    g2.fill(0x7c5c36);
-                }
-                planks++;
+        // мосты «=»: тайлсет moats.png (W51, юзер) вместо заглушки-
+        // настила — вид по маске 4-соседей (таблица ROAD_TILE), через
+        // мост продолжаются мосты и пол берега (уступ упирается в
+        // набережную). Для города — 64px лист moats_64.png (клетка
+        // города 64px, рисование 1:1; 32px лист растягивался вдвое
+        // и мылился), фолбэки — 32px лист, затем старый настил-доски
+        const moatTex = (ctx.moatsCityTex && ctx.moatsCityTex.length)
+            ? ctx.moatsCityTex : ctx.moatsTex;
+        if (WT && moatTex && moatTex.length) {
+            const cn = (x, y) => (x >= 0 && y >= 0 && x < W && y < H
+                && (MAPROWS[y][x] === "=" || MAPROWS[y][x] === ".")) ? 1 : 0;
+            const s32 = moatTex[0].width;
+            for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+                if (MAPROWS[j][i] !== "=") continue;
+                const mask = cn(i, j - 1) | cn(i + 1, j) << 1
+                    | cn(i, j + 1) << 2 | cn(i - 1, j) << 3;
+                const spr = new PIXI.Sprite(moatTex[WT.ROAD_TILE[mask]]);
+                spr.position.set(i * TS, j * TS);
+                spr.scale.set(TS / s32);
+                c.addChild(spr);
             }
-        if (planks) c.addChild(g2);
+        } else {
+            const g2 = new PIXI.Graphics();
+            let planks = 0;
+            const edge = 4, plank = 2, gap = (TS - 2 * edge - plank) / 3;
+            for (let j = 0; j < H; j++) for (let i = 0; i < W; i++)
+                if (MAPROWS[j][i] === "=") {
+                    const x = i * TS, y = j * TS;
+                    g2.rect(x, y, TS, edge); g2.fill(0x6e5233);
+                    g2.rect(x, y + TS - edge, TS, edge); g2.fill(0x6e5233);
+                    for (let b = 0; b < 4; b++) {
+                        g2.rect(x + 3, y + edge + b * gap, TS - 6, plank);
+                        g2.fill(0x7c5c36);
+                    }
+                    planks++;
+                }
+            if (planks) c.addChild(g2);
+        }
     }
 
     // Берега реки Мудрости (W50, юзер): переходы листом magic_water
@@ -362,9 +385,11 @@
     // та же конвенция dual-grid, что у мира. Квадрант со СМЕШАННЫМИ
     // углами (вода + суша) перерисовывается тайлом magic_water по ключу
     // LOOKUP; чистые (вся вода / вся суша) не трогаются — под ними
-    // базовая заливка пола/воды dungeon.js как была. Зовёт dungeon.js
-    // ПЕРЕД addCityGroundOverlays (доски мостов поверх берегов);
-    // env: { ctx, st, MAPROWS, W, H }
+    // базовая заливка пола/воды dungeon.js как была. Исключение (W51,
+    // баг юзера): квадранты с углом-мостом «=» не рисуются вовсе —
+    // настил моста сам накрывает стык, берег в ряду моста — база.
+    // Зовёт dungeon.js ПЕРЕД addCityGroundOverlays (мосты поверх
+    // берегов); env: { ctx, st, MAPROWS, W, H }
     function addCityWaterBanks(env, c) {
         const { ctx, MAPROWS, W, H } = env;
         const WT = globalThis.GAME_WORLDTILES;
@@ -373,6 +398,8 @@
             return;
         const isW = (x, y) => x >= 0 && y >= 0 && x < W && y < H
             && (MAPROWS[y][x] === "~" || MAPROWS[y][x] === "=");
+        const isB = (x, y) => x >= 0 && y >= 0 && x < W && y < H
+            && MAPROWS[y][x] === "=";
         for (let qy = 0; qy < H * 2; qy++)
             for (let qx = 0; qx < W * 2; qx++) {
                 // клетки вокруг вершины (qx·32, qy·32): лево/право, верх/низ
@@ -382,6 +409,14 @@
                 const bl = isW(lx, by), br = isW(rx2, by);
                 const n = tl + tr + bl + br;
                 if (!n || n === 4) continue; // чистые квадранты — база
+                // W51 (баг юзера): у квадрантов с углом-МОСТОМ «=» берега
+                // не рисуются — настил моста сам накрывает этот стык, а
+                // водная часть листа magic_water иначе торчала бы полосой
+                // между концом моста и берегом («дырка»). База под мостом —
+                // вода, у берега в ряду моста — пол: настил стыкуется с
+                // берегом встык
+                if ((tl && isB(lx, ty)) || (tr && isB(rx2, ty))
+                    || (bl && isB(lx, by)) || (br && isB(rx2, by))) continue;
                 const spr = new PIXI.Sprite(
                     sheet.textures[WT.LOOKUP[tl * 8 + tr * 4 + bl * 2 + br]]);
                 spr.position.set(qx * 32, qy * 32);

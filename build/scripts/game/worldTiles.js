@@ -421,6 +421,40 @@
         return { container: c, stats: st };
     }
 
+    // ── мосты (W51, юзер): moats.png — 11 видов сеткой 4×3 по 32px,
+    // раскладка и ориентация КАК У ДОРОГ roads.png (крест, прямые,
+    // повороты, T-стыки, 12-й слот пуст — свержено замером альфы и
+    // кропом клеток). Замена заглушки-настила (доски Graphics без
+    // ориентации). Вид по маске 4-соседей = таблица ROAD_TILE, через
+    // мост продолжаются мосты И дороги — уступ моста упирается в
+    // дорогу берега и должен показать открытие в её сторону (та же
+    // семантика соседей, что у renderRoadsChunk). Изолированная
+    // клетка — вертикаль, как у дорог
+    function renderMoatsChunk(map, moatTex, TS, x0, y0, stats) {
+        const GEN = globalThis.GAME_WORLDGEN, T = GEN.T;
+        const W = map.w, H = map.h;
+        const st = stats || { tiles: 0, skipped: 0 };
+        const c = new PIXI.Container();
+        const cn = (x, y) => {
+            if (x < 0 || y < 0 || x >= W || y >= H) return 0;
+            const t = map.ter[y * W + x];
+            return t === T.ROAD || t === T.BRIDGE ? 1 : 0;
+        };
+        const s32 = moatTex[0].width;
+        const xe = Math.min(W, x0 + CHUNK), ye = Math.min(H, y0 + CHUNK);
+        for (let j = y0; j < ye; j++) for (let i = x0; i < xe; i++) {
+            if (map.ter[j * W + i] !== T.BRIDGE) { st.skipped++; continue; }
+            const mask = cn(i, j - 1) | cn(i + 1, j) << 1
+                | cn(i, j + 1) << 2 | cn(i - 1, j) << 3;
+            const spr = new PIXI.Sprite(moatTex[ROAD_TILE[mask]]);
+            spr.position.set(i * TS, j * TS);
+            spr.scale.set(TS / s32);
+            c.addChild(spr);
+            st.tiles++;
+        }
+        return { container: c, stats: st };
+    }
+
     // ── горы (просил юзер): спрайты montain/1..6.png вместо заглушки,
     // ТОТ ЖЕ СЛОЙ ОБЪЕКТОВ, что деревья (общий y-sort сцены). ГУСТО
     // (просил юзер: спрайтов больше, близко друг к другу — в хребте
@@ -457,6 +491,8 @@
     }
 
     globalThis.GAME_WORLDTILES = {
+        // V11: мосты moats.png (W51, юзер) вместо заглушки-настила —
+        // renderMoatsChunk, вид по маске 4-соседей (таблица ROAD_TILE);
         // V10: берега без травяных колец — пары земля/снег/песок/магия с
         // водой (листы <t>_water юзера, W50); стык двух суш у воды рендер
         // сводит земляным листом (чужой угол — землёй);
@@ -465,11 +501,11 @@
         // вариантов (sand.png, пустыня); V7 — болота оверлеем поверх
         // тлена (без кромок terrainOf, подложка waste в renderChunk),
         // пара трава|болото из PAIRS убрана
-        V: 10, CHUNK, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER, SWAMP,
+        V: 11, CHUNK, DIRT, GRASS, SNOW, SAND, WASTE, MAGIC, WATER, SWAMP,
         NAME, ZONE_TERRAIN, PAIRS, SOLID, VARIANTS, MINI, terrainOf,
         LOOKUP, ROAD_TILE,
         render, renderChunk, renderForest, renderForestChunk,
-        renderSwamp, renderSwampChunk, renderRoadsChunk,
+        renderSwamp, renderSwampChunk, renderRoadsChunk, renderMoatsChunk,
         renderTreesChunk, renderMountainsChunk, pairOK,
     };
 })();

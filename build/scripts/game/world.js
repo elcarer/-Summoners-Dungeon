@@ -83,6 +83,7 @@
         let woodStats = null; // статистика лесного оверлея wood.png (тесты)
         let swampStats = null; // статистика болот swamp.png (тесты)
         let roadStats = null; // статистика дорог roads.png (тесты)
+        let moatStats = null; // статистика мостов moats.png (тесты)
         let objLayer = null; // общий y-sort слой: деревья/горы/POI/герой
         let fxLayer = null; // всплывающие надписи — ВСЕГДА на переднем плане
         let chunkHolder = null; // контейнер активных чанков рендера
@@ -329,7 +330,9 @@
             if (ctx.roadsTex && ctx.roadsTex.length)
                 c.addChild(globalThis.GAME_WORLDTILES.renderRoadsChunk(
                     map, ctx.roadsTex, TS, x0, y0, roadStats).container);
-            c.addChild(buildMapGfxChunk(map, x0, y0)); // мосты-настил
+            if (ctx.moatsTex && ctx.moatsTex.length)
+                c.addChild(globalThis.GAME_WORLDTILES.renderMoatsChunk(
+                    map, ctx.moatsTex, TS, x0, y0, moatStats).container);
             const objs = [];
             if (ctx.treeTex && ctx.treeTex.length) {
                 const tr = globalThis.GAME_WORLDTILES.renderTreesChunk(
@@ -419,30 +422,6 @@
                     && pn.y > ry0 - 256 && pn.y < ry1 + 320;
         }
 
-        // ── мосты чанка: настил-заглушка поверх воды (доски и кант).
-        // Дороги рисует тайлсет roads.png (renderRoadsChunk, ПОД этим
-        // слоем объектов), горы — спрайты montain (renderMountainsChunk,
-        // общий y-sort слой) — см. worldTiles.js. Строится ЧАНКАМИ
-        // 32×32 клетки — culling собирает сцену из видимых чанков
-        function buildMapGfxChunk(map, x0, y0) {
-            const g = new PIXI.Graphics();
-            const W = map.w, H = map.h, CH = globalThis.GAME_WORLDTILES.CHUNK;
-            const plank = 2; // доска моста (заглушка)
-            const edge = 4; // кант моста, ~TS/8 (заглушка)
-            const plankGap = (TS - 2 * edge - plank) / 3;
-            const xe = Math.min(W, x0 + CH), ye = Math.min(H, y0 + CH);
-            for (let j = y0; j < ye; j++) for (let i = x0; i < xe; i++) {
-                if (map.ter[j * W + i] !== T.BRIDGE) continue;
-                const x = i * TS, y = j * TS;
-                g.rect(x, y, TS, edge); g.fill(0x6e5233);
-                g.rect(x, y + TS - edge, TS, edge); g.fill(0x6e5233);
-                for (let b = 0; b < 4; b++) {
-                    g.rect(x + 3, y + edge + b * plankGap, TS - 6, plank);
-                    g.fill(0x7c5c36);
-                }
-            }
-            return g;
-        }
         // рамка всей карты — один Graphics на всё (не чанкируется)
         function buildMapFrame(map) {
             const g = new PIXI.Graphics();
@@ -1095,6 +1074,7 @@
                 swampStats = { tiles: 0, skipped: 0,
                     scale: TS / (ctx.worldSheets.swamp || ctx.worldSheets.wood).ts };
                 roadStats = { tiles: 0, skipped: 0 };
+                moatStats = { tiles: 0, skipped: 0 };
                 treeCount = 0;
                 mtnCount = 0;
                 chunkCache = new Map();
@@ -1806,8 +1786,8 @@
                 },
                 // слой местности (тайлы images/tiles): коды клеток 0..7
                 // (земля/трава/снег/песок/тлен/вода/болото), статистика
-                // рендера, лесной оверлей wood.png, болота swamp.png и
-                // дороги roads.png (тайлы по маскам)
+                // рендера, лесной оверлей wood.png, болота swamp.png,
+                // дороги roads.png и мосты moats.png (тайлы по маскам)
                 terrain: () => ({
                     v: globalThis.GAME_WORLDTILES.V,
                     terr: worldTerr ? Array.from(worldTerr) : null,
@@ -1815,6 +1795,7 @@
                     forest: woodStats ? { ...woodStats } : null,
                     swamp: swampStats ? { ...swampStats } : null,
                     roads: roadStats ? { ...roadStats } : null,
+                    moats: moatStats ? { ...moatStats } : null,
                 }),
                 setHeroPos(x, y) {
                     if (heroId === null) return false;

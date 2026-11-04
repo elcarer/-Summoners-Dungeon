@@ -123,6 +123,26 @@
                 source: roadsSrc.source,
                 frame: new PIXI.Rectangle(c * 32, r * 32, 32, 32),
             }));
+        // мосты: moats.png юзера (W51) — 11 видов сеткой 4×3 по 32px
+        // (12-й слот пуст), раскладка и ориентация как у дорог roads.png
+        const moatsSrc = await assets.loadTexture("./images/tiles/moats.png");
+        const moatsTex = [];
+        for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++)
+            moatsTex.push(new PIXI.Texture({
+                source: moatsSrc.source,
+                frame: new PIXI.Rectangle(c * 32, r * 32, 32, 32),
+            }));
+        // мосты городов: moats_64.png юзера — те же 11 видов, но по 64px
+        // (клетка города 64px → рисование 1:1; 32px лист в городе
+        // растягивался вдвое и мылился)
+        const moatsCitySrc = await assets.loadTexture(
+            "./images/tiles/moats_64.png");
+        const moatsCityTex = [];
+        for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++)
+            moatsCityTex.push(new PIXI.Texture({
+                source: moatsCitySrc.source,
+                frame: new PIXI.Rectangle(c * 64, r * 64, 64, 64),
+            }));
         // горы: images/tiles/montain/<n>.png — спрайты юзера на слой
         // объектов (общий y-sort с деревьями, просил юзер)
         const mountainTex = [];
@@ -737,6 +757,8 @@
             worldSheets, // нарезки листов местности images/tiles (карта мира)
             treeTex,     // спрайты деревьев images/tiles/trees (лесные массивы)
             roadsTex,    // тайлы дорог images/tiles/roads.png (11 видов)
+            moatsTex,    // тайлы мостов images/tiles/moats.png (11 видов)
+            moatsCityTex, // мосты городов moats_64.png (64px, 1:1)
             mountainTex, // спрайты гор images/tiles/montain (слой объектов)
             caveTex,     // спрайт пещеры подземелий images/tiles/cave.png
             cityTex,     // спрайты городов мира images/sities/<стихия>/{0,1}
