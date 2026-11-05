@@ -252,12 +252,12 @@
                             || e === "tarStatue" || e === "tarKettles"
                             || e === "timeTrap" // «Ловушка времени» — только существа
                             || e === "selfDmg" // «Удар двойника»: существо бьёт себя
-                            || e === "massRet") // «В гуще боя»: существам «Возврат 1»
+                            || e === "massRet" // «В гуще боя»: существам «Возврат 1»
+                            || e === "magmaPool") // «Лужи магмы» — только существа
                             return u.def.type === "unit";
                         return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
                             || e === "confuse" || e === "cellDebuff"
-                            || e === "ancestor" || e === "entangle"
-                            || e === "magmaPool"; // «Лужи магмы» — нейтральная
+                            || e === "ancestor" || e === "entangle";
                     };
                 let i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                     && cellEffect(t));
@@ -272,7 +272,6 @@
                         && (t.def.trap.effect === "cellDmgAll" || t.def.trap.effect === "cellDebuff"
                             || t.def.trap.effect === "entangle"
                             || t.def.trap.effect === "timeTrap"
-                            || t.def.trap.effect === "magmaPool"
                             || (t.def.trap.effect === "tarKettles"
                                 && u.def.type === "unit")));
                 }

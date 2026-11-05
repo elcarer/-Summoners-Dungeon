@@ -1871,10 +1871,10 @@
                  color: 0xb06a3e, img: "strength_growth/248" },
         // «Огнелис» (sg249): заклинание призыва — Животное (жетон sgrFox)
         // в случайную пустую клетку; после призыва игрок распределяет
-        // 8 очков характеристик между уроном и жизнями (панель
+        // 7 очков характеристик между уроном и жизнями (панель
         // openSplitPanel — arenaPanels; ИИ — авто поровну)
         sg249: { type: "spell", cost: 3,
-                 spell: { target: "none", summonPoints: 8, summonToken: "sgrFox" },
+                 spell: { target: "none", summonPoints: 7, summonToken: "sgrFox" },
                  kind: "summon", // тип эффекта — по спеке юзера
                  rarity: "epic", elem: "strGro",
                  multi: ["strength", "growth"],
@@ -1890,11 +1890,12 @@
         // Огнелис из «Огнелиса» (sg249) — служебная карта без лица, как
         // icePixie/skel: спавнится только заклинанием. statPoints — очки
         // характеристик: распределение происходит при РОЗЫГРЫШЕ карты
-        // (панель/ИИ-авто), базовые статы = авто-распределению поровну.
+        // (панель/ИИ-авто), базовые статы = авто-распределению ceil/floor
+        // (у sgrFox 4/3 из 7 очков, у sgrBear 5/4 из 9).
         // ЖЕТОН БЕЗ multi: «Ярость природы» бьёт при РОЗЫГРЫШЕ карт, а не
         // при призыве жетона — multiFury читает def.multi
-        sgrFox: { type: "unit", cost: 3, atk: 4, hp: 4, speed: 1,
-                  creature: "animal", sheet: "wolf", statPoints: 8,
+        sgrFox: { type: "unit", cost: 3, atk: 4, hp: 3, speed: 1,
+                  creature: "animal", sheet: "wolf", statPoints: 7,
                   subtype: "animal", // подтип — по спеке юзера (Животное)
                   rarity: "epic", elem: "strGro",
                   color: 0xd8824e },
