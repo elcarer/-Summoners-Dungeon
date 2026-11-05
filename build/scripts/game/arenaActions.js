@@ -642,6 +642,43 @@
                 return true;
             };
 
+            // «Рождение феникса» (sg244, W55): уничтожить ВСЕ постройки на
+            // поле (обе стороны — в спеке «все постройки»), посчитать
+            // погибших; в случайной пустой клетке поля появляется Элементаль
+            // (жетон sgrElem, «Полёт») с ⚔/♥ = числу уничтоженных построек.
+            // Построек не было или поле забито — жетона нет. Каскады смерти
+            // штатные (killUnit): «Горящие рунокамни» и способность героя
+            // срабатывают. Возвращает число уничтоженных построек
+            A.phoenixRise = function phoenixRise(side) {
+                let n = 0;
+                for (const v of B.units.slice()) {
+                    if (!v || v.def.type !== "building" || !B.units.includes(v)) continue;
+                    if (killUnit(v, null)) n++;
+                }
+                if (n <= 0) return 0;
+                const empty = [];
+                for (let row = 0; row < GRID; row++)
+                    for (let col = 0; col < GRID; col++)
+                        if (!unitAt(col, row)) empty.push([col, row]);
+                if (empty.length) {
+                    const [col, row] = empty[(Math.random() * empty.length) | 0];
+                    const u = addUnit(side, "sgrElem", col, row, { token: true });
+                    if (u) { // база 1/1 — масштаб до n поверх (как keeperScale)
+                        u.bonusAtk += n - 1;
+                        u.hp += n - 1;
+                        recalcAuras();
+                        const an = u.node.getChildByName("atk");
+                        if (an) an.text = String(u.curAtk);
+                        const hn = u.node.getChildByName("hp");
+                        if (hn) hn.text = String(u.hp);
+                        const p = cellXY(col, row);
+                        floatText(p.x, p.y - 75, `${n}⚔/${n}♥`, 0xffb26e);
+                        sfx("chpoc");
+                    }
+                }
+                return n;
+            };
+
             // «Силовой купол» (tim234, просил юзер): установка метки купола
             // на существо/постройку — любой урон по ней режется до 1
             // (гейт в damageUnit). Общая для игрока (applySpellPInner) и
@@ -759,6 +796,27 @@
                     // тип карты проверяем здесь; защиту уже отсеял вход
                     if (!u || u.def.type !== "unit") return false;
                     const p = cellXY(u.col, u.row);
+                    if (def.spell.crushEnergy) { // «Древомощь» (sg243): вся
+                        // оставшаяся энергия → «Сокрушение» и +N⚔/+N♥ цели.
+                        // Эффект идёт ДО списания цены карты (см. castSpell)
+                        // — как «Гроза»: пул = энергия минус цена (повтор
+                        // «Горящими рунами» бесплатен), нулит castSpell
+                        const pool = B.energy - (free ? 0 : effCost(cardId, "p"));
+                        u.crushGrant = true; // crushHit читает поверх def.crush
+                        u.bonusAtk = (u.bonusAtk || 0) + pool;
+                        u.hp += pool;
+                        recalcAuras();
+                        const an = u.node.getChildByName("atk");
+                        if (an) an.text = String(u.curAtk);
+                        const hn = u.node.getChildByName("hp");
+                        if (hn) hn.text = String(u.hp);
+                        floatText(p.x, p.y - 39, `+${pool}⚔ +${pool}♥`, 0x9fd489);
+                        floatText(960, 840, `−${pool}⚡`, 0xffd98c);
+                        fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
+                        punch(u.node);
+                        sfx("chpoc");
+                        return true;
+                    }
                     if (def.spell.iceStrike) { // «Ледяной удар»: цель бьёт соседа
                         const victim = iceStrikeVictim(u);
                         if (!victim) return false; // соседей-существ нет — не кастуем
@@ -1009,6 +1067,11 @@
                     floatText(p.x, p.y - 60, "⤓", 0xef9f8c);
                     sfx("chpoc");
                     openExcavatePanel(cell); // выбор постройки сброса в освободившуюся клетку
+                }
+                if (def.spell.phoenix) { // «Рождение феникса» (sg244): все
+                    // постройки — в топку, Элементаль = числу жертв
+                    phoenixRise("p");
+                    return true;
                 }
                 if (def.spell.target === "none" && def.spell.baseDmg) { // землетрясение
                     damageBase("e", def.spell.baseDmg + heroSpellBonus(def, "p", false, true),
@@ -1337,7 +1400,8 @@
                 const target = autoTargetFor(cardId);
                 applySpellP(cardId, target, true);
                 fxSpellCast(cardId, target, "p", origin);
-                if (def.spell.drainAll || def.spell.stormAll) B.energy = 0; // огнешар/гроза и в повторе сжигают энергию
+                if (def.spell.drainAll || def.spell.stormAll
+                    || def.spell.crushEnergy) B.energy = 0; // огнешар/гроза/«Древомощь» и в повторе сжигают энергию
                 const hi = B.hand.indexOf(cardId);
                 if (hi >= 0) B.hand.splice(hi, 1);
                 else {
@@ -1409,7 +1473,8 @@
                     return false;
                 }
                 fxSpellCast(cardId, target, "p", origin);
-                B.energy = (def.spell.drainAll || def.spell.stormAll)
+                B.energy = (def.spell.drainAll || def.spell.stormAll
+                    || def.spell.crushEnergy) // «Древомощь» (sg243) сливает всё
                     ? 0 : B.energy - effCost(cardId, "p", target);
                 consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                 spendCard(handIdx); // при пометке «Сброса разума» вернёт карту в руку

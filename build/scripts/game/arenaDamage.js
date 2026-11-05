@@ -287,6 +287,43 @@
                         refreshHud();
                     }
                 }
+                // «Горящие рунокамни» (sg245, W55): умирая, наносят всем
+                // СУЩЕСТВАМ противника и его базе урон = числу заклинаний
+                // в сбросе ВЛАДЕЛЬЦА (сама карта — постройка, на счёт не
+                // влияет). Каждая цель — полная сумма
+                if (u.def.type === "building" && u.def.runeBurn) {
+                    const side = u.side;
+                    const foe = side === "p" ? "e" : "p";
+                    const discard = side === "p" ? B.discard : B.eDiscard;
+                    const n = discard.filter((id) => CARDS[id]
+                        && CARDS[id].type === "spell").length;
+                    if (n > 0) {
+                        const bp = cellXY(u.col, u.row);
+                        for (const v of B.units.slice()) {
+                            if (v.side !== foe || v.def.type !== "unit"
+                                || !B.units.includes(v)) continue;
+                            damageUnit(v, n, null, "dam");
+                        }
+                        damageBase(foe, n, foe === "p"
+                            ? { x: 960, y: 830, fill: 0xc86a3e }
+                            : { x: 960, y: 250, fill: 0xc86a3e });
+                        floatText(bp.x, bp.y - 96, String(n), 0xff8f6e);
+                        sfx("crash");
+                    }
+                }
+                // «Горящая местность» (sgrBurn, W55): когда ПОСТРОЙКА героя
+                // умирает — 1 урон базе противника (каждый раз, без «первого
+                // за бой»; спека юзера)
+                if (u.def.type === "building") {
+                    const hd = heroDefOf(u.side);
+                    if (hd && hd.ability === "burnDeath") {
+                        const foe = u.side === "p" ? "e" : "p";
+                        damageBase(foe, hd.abilityVal || 1, foe === "p"
+                            ? { x: 960, y: 830, fill: 0xff5f4e }
+                            : { x: 960, y: 250, fill: 0xff5f4e });
+                        sfx("chpoc");
+                    }
+                }
                 heroDeathReplay(u); // «Гоблин-вождь»: первый погибший гоблин возвращается
                 heroBuildingReplay(u); // «Хранитель рощи»: первая погибшая постройка возвращается
                 lichRaiseGhost(killer, u); // «Лич»: призрак на клетку убитого

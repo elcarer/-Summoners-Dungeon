@@ -727,6 +727,44 @@
                     u.ret = rv;
                     returnMarkDraw(u);
                 }
+                // «Закат перворожденных» (sg246, W55): после розыгрыша — 6
+                // верхних карт колоды владельца в сброс (добор идёт с конца
+                // массива — верх колоды это pop()); за каждое сброшенное
+                // заклинание соседние (верт/гориз) с постройкой существа
+                // ОБЕИХ сторон получают −1 к урону (в спеке «соседние
+                // существа» без стороны). Существам позже summoned —
+                // дебаффа нет: эффект разовый, при розыгрыше
+                if (def.type === "building" && def.sunsetMill) {
+                    const deck = side === "p" ? B.deck : B.eDeck;
+                    const discard = side === "p" ? B.discard : B.eDiscard;
+                    const milled = [];
+                    for (let k = 0; k < def.sunsetMill && deck.length; k++) {
+                        const id = deck.pop();
+                        discard.push(id);
+                        milled.push(id);
+                        noteDiscard(1, side, [id]);
+                    }
+                    const millP = cellXY(col, row);
+                    if (milled.length)
+                        floatText(millP.x, millP.y - 90, "⤓ " + milled.length,
+                            0xc9b98c);
+                    const spells = milled.filter((id) => CARDS[id]
+                        && CARDS[id].type === "spell").length;
+                    if (spells > 0) {
+                        for (const v of B.units.slice()) {
+                            if (v === u || v.def.type !== "unit"
+                                || !B.units.includes(v)) continue;
+                            if (Math.abs(v.col - col)
+                                + Math.abs(v.row - row) !== 1) continue;
+                            v.bonusAtk = (v.bonusAtk || 0) - spells;
+                            const p2 = cellXY(v.col, v.row);
+                            floatText(p2.x, p2.y - 39, `−${spells}⚔`, 0xef9f8c);
+                            punch(v.node);
+                        }
+                        recalcAuras();
+                        sfx("chpoc");
+                    }
+                }
                 // «Ковка оружия» (tim208): розыгрыш в этом же ходу — существо,
                 // появившееся ПОСЛЕ заклинания, тоже получает бонус (спека:
                 // «все существа, появившиеся на поле боя в этот ваш ход»)

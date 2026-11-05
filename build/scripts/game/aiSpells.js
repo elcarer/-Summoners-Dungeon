@@ -78,6 +78,37 @@
                     return;
                 }
                 if (s.target === "anyUnit" && !s.nova) { // усиление/очарование — лучшему
+                    // «Древомощь» (sg243): вся оставшаяся энергия →
+                    // «Сокрушение» и +N⚔/+N♥ лучшему своему существу.
+                    // Эффект до списания цены — пул = энергия минус цена
+                    // (нулит aiPlay, как у stormAll)
+                    if (s.crushEnergy) {
+                        const own = spellTargets(B.units.filter((v) => v.side === "e"
+                            && v.def.type === "unit"));
+                        let best = own.slice()
+                            .sort((a, b) => aiThreat(b) - aiThreat(a)
+                                || a.row - b.row)[0];
+                        if (focus && own.includes(focus)) best = focus;
+                        if (!best) return;
+                        aimOff(best);
+                        const pool = Math.max(0,
+                            B.eEnergy - effCost(cardIdOf(def), "e"));
+                        best.crushGrant = true; // crushHit читает поверх def.crush
+                        best.bonusAtk = (best.bonusAtk || 0) + pool;
+                        best.hp += pool;
+                        recalcAuras();
+                        const an = best.node.getChildByName("atk");
+                        if (an) an.text = String(best.curAtk);
+                        const hn = best.node.getChildByName("hp");
+                        if (hn) hn.text = String(best.hp);
+                        const p = cellXY(best.col, best.row);
+                        floatText(p.x, p.y - 39, `+${pool}⚔ +${pool}♥`, 0x9fd489);
+                        floatText(960, 240, `−${pool}⚡`, 0xffd98c);
+                        fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
+                        punch(best.node);
+                        sfx("chpoc");
+                        return;
+                    }
                     // «Гидроудар» (wis99): 1 урон + сдвиг К ЕГО базе,
                     // цель — самая опасная (фокус руны, если годится)
                     if (s.hydroPunch) {
@@ -378,6 +409,11 @@
                         if (best) damageUnit(best, s.dmg + heroSpellBonus(def, "e",
                             best.def.type === "unit", true), null, "rocket");
                     }
+                }
+                if (s.phoenix) { // «Рождение феникса» (sg244): все постройки —
+                    // в топку, Элементаль = числу жертв
+                    phoenixRise("e");
+                    return;
                 }
                 if (s.target === "none" && s.baseDmg) { // землетрясение
                     damageBase("p", s.baseDmg + heroSpellBonus(def, "e", false, true),

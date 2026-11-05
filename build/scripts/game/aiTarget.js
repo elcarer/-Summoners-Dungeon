@@ -429,6 +429,12 @@
             A.aiSpellPlayable = function aiSpellPlayable(def, forReplay = false) {
                 const s = def.spell;
                 if (s.copyLast) return aiReplayOk();
+                // «Древомощь» (sg243): есть своё существо и запас ≥2⚡ —
+                // иначе карта зря (эффект = потраченная энергия)
+                if (s.crushEnergy
+                    && !(B.eEnergy >= 2
+                        && spellTargets(B.units.filter((v) => v.side === "e"
+                            && v.def.type === "unit")).length)) return false;
                 // «Царский совет» (tim230): снимать нечего — карту переводить зря
                 if (s.trapSweep && !B.traps.p.length) return false;
                 // «Силовой купол» (tim234): некому — есть своё существо или

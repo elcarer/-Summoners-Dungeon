@@ -414,7 +414,8 @@
                             // (повтор «Горящими рунами» бесплатен — скидка не копится)
                             const tOff = def.spell.copyLast ? 0 : castTargetOff;
                             castTargetOff = 0;
-                            B.eEnergy = (def.spell.drainAll || def.spell.stormAll)
+                            B.eEnergy = (def.spell.drainAll || def.spell.stormAll
+                                || def.spell.crushEnergy) // «Древомощь» сливает всё (sg243)
                                 ? 0 : B.eEnergy - Math.max(0, effCost(cardId, "e") - tOff);
                             notePlay("e"); // «Конвейер» (tim225)
                             consumeEpicDiscount(cardId, "e"); // «Архилич»

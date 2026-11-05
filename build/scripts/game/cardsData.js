@@ -1792,6 +1792,52 @@
                  rarity: "common", elem: "strGro",
                  multi: ["strength", "growth"],
                  color: 0x8a6a3e, img: "strength_growth/242" },
+        // ── W55 (спека юзера): карты 243–246, тоже только «Рыжий лес» ─────
+        // «Древомощь» (sg243): заклинание — потратить ВСЮ оставшуюся
+        // энергию, цель получает «Сокрушение» и +к урону/жизням по числу
+        // потраченной энергии (crushEnergy — обработка в arenaActions/
+        // aiSpells; флаг u.crushGrant читает crushHit в arenaCombat)
+        sg243: { type: "spell", cost: 1,
+                 spell: { target: "anyUnit", crushEnergy: true },
+                 kind: "buff", // тип эффекта — по спеке юзера
+                 rarity: "common", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xc8873e, img: "strength_growth/243" },
+        // «Рождение феникса» (sg244): уничтожить ВСЕ постройки, в
+        // случайной пустой клетке появляется Элементаль с «Полётом» и
+        // ⚔/♥ = числу уничтоженных построек (phoenix — phoenixRise в
+        // arenaActions, жетон sgrElem)
+        sg244: { type: "spell", cost: 5,
+                 spell: { target: "none", phoenix: true },
+                 kind: "summon", // тип эффекта — по спеке юзера
+                 rarity: "rare", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xd8824e, img: "strength_growth/244" },
+        // «Горящие рунокамни» (sg245): постройка 0/5 — умирая, наносит
+        // всем СУЩЕСТВАМ противника и его базе урон = числу заклинаний
+        // в сбросе владельца (runeBurn — killUnit в arenaDamage)
+        sg245: { type: "building", cost: 3, atk: 0, hp: 5, runeBurn: true,
+                 rarity: "epic", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xb8652e, img: "strength_growth/245" },
+        // «Закат перворожденных» (sg246): постройка 0/2 — после розыгрыша
+        // 6 верхних карт своей колоды в сброс; за каждое сброшенное
+        // заклинание соседние (верт/гориз) существа получают −1 к урону
+        // (sunsetMill — addUnit в arenaBoard)
+        sg246: { type: "building", cost: 1, atk: 0, hp: 2, sunsetMill: 6,
+                 rarity: "rare", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0x8f7a52, img: "strength_growth/246" },
+        // Элементаль из «Рождения феникса» (sg244) — служебная карта без
+        // лица, как icePixie/skel: спавнится только заклинанием. Статы
+        // (= числу уничтоженных построек) ставит phoenixRise поверх базы
+        // 1/1. ЖЕТОН БЕЗ multi: «Ярость природы» бьёт при РОЗЫГРЫШЕ карт,
+        // а не при призыве жетона — multiFury читает def.multi
+        sgrElem: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
+                   creature: "goblin", sheet: "air_el", ability: "flyOver",
+                   subtype: "elemental", // подтип — по спеке юзера (Элементаль)
+                   rarity: "common", elem: "strGro",
+                   color: 0xd8824e },
     };
     const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
 
@@ -1829,6 +1875,17 @@
             "grw7", "grw7", "grw31", "grw36", "grw36", "grw33",
             "grw37", "grw37", "grw16", "grw16",
             "sg241", "sg241", "sg242", "sg242",
+        ],
+        // W55 (спека юзера): ядро колоды врага «Горящая местность»
+        // (2-й этаж «Рыжего леса») — 32 карты; ключ для симметрии реестра
+        // (захват карты героя — колода его стартера)
+        strBurn: [
+            "sg244", "sg244", "sg245", "sg246", "sg246",
+            "sg241", "sg241", "str9", "str9", "str10",
+            "str12", "str12", "str18", "str17", "str17",
+            "str19", "str19", "str23", "str23", "str24", "str24",
+            "str31", "str31", "grw17", "grw17", "grw25", "grw25",
+            "grw27", "grw27", "grw38", "grw38", "grw39",
         ],
     };
 
@@ -1937,6 +1994,12 @@
         sgrBig: { id: "sgrBig", rarity: "rare", baseHp: 16,
                   elems: ["strength", "growth"], starter: "strGro",
                   img: "66", ability: "bigStomp", abilityVal: 1 },
+        // «Горящая местность» (W55, спека юзера, арт heroes/67.png): враг
+        // 2-го этажа «Рыжего леса». 18♥, редкая; способность burnDeath:
+        // когда ВАША постройка умирает, нанесите 1 урон базе противника
+        sgrBurn: { id: "sgrBurn", rarity: "rare", baseHp: 18,
+                   elems: ["strength", "growth"], starter: "strBurn",
+                   img: "67", ability: "burnDeath", abilityVal: 1 },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -2268,6 +2331,7 @@
         "grwBeasts", "grwGrove", "grwWild", "grwMagic", "grwCity",
         "grwControl", "grwBoss",
         "sgrBig", // «Рыжий лес»: двухцветный враг 1-го этажа (W54)
+        "sgrBurn", // «Горящая местность»: враг 2-го этажа (W55)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

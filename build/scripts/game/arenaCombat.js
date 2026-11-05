@@ -12,7 +12,8 @@
             // переходит в базу противника
             A.crushHit = function crushHit(attacker, dmg, hpBefore) {
                 if (!attacker || !attacker.def
-                    || (!attacker.def.crush && !epochCrush(attacker))
+                    || (!attacker.def.crush && !attacker.crushGrant // sg243 «Древомощь»
+                        && !epochCrush(attacker))
                     || !B.units.includes(attacker) || dmg <= 0) return;
                 const raw = dmg - hpBefore;
                 if (raw <= 0) return;
