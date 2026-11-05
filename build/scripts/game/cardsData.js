@@ -1838,6 +1838,27 @@
                    subtype: "elemental", // подтип — по спеке юзера (Элементаль)
                    rarity: "common", elem: "strGro",
                    color: 0xd8824e },
+        // ── W56 (спека юзера): карта 247, тоже только «Рыжий лес» ──────────
+        // «Эльф корней» (sg247): заклинание призыва — Эльф 1/1 (жетон
+        // sgrRootElf) на случайную пустую клетку поля. Способность жетона
+        // rootGrab: после приезда случайное вражеское существо получает
+        // «Опутывание 1» (summonRootElf — arenaSummons)
+        sg247: { type: "spell", cost: 1,
+                 spell: { target: "none", rootSummon: true },
+                 kind: "summon", // тип эффекта — по спеке юзера
+                 rarity: "common", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0x6f8a4e, img: "strength_growth/247" },
+        // Эльф корней из «Эльфа корней» (sg247) — служебная карта без
+        // лица, как icePixie/skel: спавнится только заклинанием. rootGrab —
+        // «Опутывание N» случайному вражескому существу после приезда.
+        // ЖЕТОН БЕЗ multi: «Ярость природы» бьёт при РОЗЫГРЫШЕ карт,
+        // а не при призыве жетона — multiFury читает def.multi
+        sgrRootElf: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
+                      creature: "elf", rootGrab: 1,
+                      subtype: "elf", // подтип — по спеке юзера (Эльф)
+                      rarity: "common", elem: "strGro",
+                      color: 0x6f8a4e },
     };
     const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
 
@@ -1886,6 +1907,20 @@
             "str19", "str19", "str23", "str23", "str24", "str24",
             "str31", "str31", "grw17", "grw17", "grw25", "grw25",
             "grw27", "grw27", "grw38", "grw38", "grw39",
+        ],
+        // W56 (спека юзера): ядро колоды врага «Безумие стаи» (3-й этаж
+        // «Рыжего леса») — 32 карты: Эльф огня ×3, Проросший огр ×3,
+        // Древомощь ×3, Быстрый гоблин ×3, Шаман гоблинов ×2, Трусливый
+        // гоблин ×3, Хищное растение ×3, Эльфийский друид ×2, Проросший
+        // кабан ×2, Мини-фея ×2, Друид глубокой чащи ×1, Отравленные
+        // лезвия ×2, Эльф корней ×3
+        strPack: [
+            "sg241", "sg241", "sg241", "sg242", "sg242", "sg242",
+            "sg243", "sg243", "sg243", "str1", "str1", "str1",
+            "str7", "str7", "str29", "str29", "str29",
+            "grw1", "grw1", "grw1", "grw9", "grw9",
+            "grw13", "grw13", "grw14", "grw14", "grw24",
+            "grw29", "grw29", "sg247", "sg247", "sg247",
         ],
     };
 
@@ -2000,6 +2035,15 @@
         sgrBurn: { id: "sgrBurn", rarity: "rare", baseHp: 18,
                    elems: ["strength", "growth"], starter: "strBurn",
                    img: "67", ability: "burnDeath", abilityVal: 1 },
+        // «Безумие стаи» (W56, спека юзера, арт heroes/68.png): враг
+        // 3-го этажа «Рыжего леса». 20♥, редкая; способность packFrenzy:
+        // когда срабатывает способность СУЩЕСТВА владельца — 1 урон базе
+        // противника (точки вызова packFrenzy: призывные хуки addUnit,
+        // ogrGrow/afterAttackPush, predator, summonDruidWolf, fleeCoward,
+        // druidEnergy)
+        sgrPack: { id: "sgrPack", rarity: "rare", baseHp: 20,
+                   elems: ["strength", "growth"], starter: "strPack",
+                   img: "68", ability: "packFrenzy", abilityVal: 1 },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -2332,6 +2376,7 @@
         "grwControl", "grwBoss",
         "sgrBig", // «Рыжий лес»: двухцветный враг 1-го этажа (W54)
         "sgrBurn", // «Горящая местность»: враг 2-го этажа (W55)
+        "sgrPack", // «Безумие стаи»: враг 3-го этажа (W56)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

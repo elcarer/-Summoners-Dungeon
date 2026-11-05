@@ -429,6 +429,9 @@
             A.aiSpellPlayable = function aiSpellPlayable(def, forReplay = false) {
                 const s = def.spell;
                 if (s.copyLast) return aiReplayOk();
+                // «Эльф корней» (sg247): на 5×5 поле нет пустой клетки —
+                // карту переводить зря (призыв некуда)
+                if (s.rootSummon && B.units.length >= 25) return false;
                 // «Древомощь» (sg243): есть своё существо и запас ≥2⚡ —
                 // иначе карта зря (эффект = потраченная энергия)
                 if (s.crushEnergy

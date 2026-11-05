@@ -642,6 +642,23 @@
                 return true;
             };
 
+            // «Эльф корней» (sg247, W56): призывает Эльфа 1/1 (жетон
+            // sgrRootElf) на СЛУЧАЙНУЮ пустую клетку поля боя (не только
+            // своей зоны призыва). Поле забито — существо не призывается.
+            // Способность жетона («Опутывание 1» случайному вражескому
+            // существу) срабатывает в addUnit через summonRootElf.
+            // Возвращает true, если призвал
+            A.rootElfSpawn = function rootElfSpawn(side) {
+                const empty = [];
+                for (let row = 0; row < GRID; row++)
+                    for (let col = 0; col < GRID; col++)
+                        if (!unitAt(col, row)) empty.push([col, row]);
+                if (!empty.length) return false;
+                const [col, row] = empty[(Math.random() * empty.length) | 0];
+                addUnit(side, "sgrRootElf", col, row, { token: true });
+                return true;
+            };
+
             // «Рождение феникса» (sg244, W55): уничтожить ВСЕ постройки на
             // поле (обе стороны — в спеке «все постройки»), посчитать
             // погибших; в случайной пустой клетке поля появляется Элементаль
@@ -1120,6 +1137,9 @@
                 }
                 if (def.spell.laySummon) { // «Молебен»: Человек 2/2 на случайную пустую клетку
                     if (laySummonSpawn("p")) sfx("aqua");
+                }
+                if (def.spell.rootSummon) { // «Эльф корней»: Эльф 1/1 на случайную пустую клетку
+                    if (rootElfSpawn("p")) sfx("aqua");
                 }
                 if (def.spell.rebalance) { // «Снабжение» (hon170): у всех своих
                     // существ меньшая из характеристик ⚔/♥ становится равной

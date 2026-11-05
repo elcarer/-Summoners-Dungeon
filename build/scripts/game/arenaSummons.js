@@ -217,6 +217,26 @@
                 return true;
             };
 
+            // «Эльф корней» (sg247, W56 спека юзера): после призыва этого
+            // существа случайное ВРАЖЕСКОЕ существо получает «Опутывание 1»
+            // (пропускает перемещение в начале хода, счётчик тает по 1 —
+            // addEntangle в arenaStatus). Врагов-существ нет — способность
+            // молчит. Хук героя «Безумие стаи» (packFrenzy) зовётся из
+            // addUnit по факту призыва юнита с призывной способностью
+            A.summonRootElf = function summonRootElf(u) {
+                if (!B.units.includes(u)) return false;
+                const foes = B.units.filter((v) => v.side !== u.side
+                    && v.def.type === "unit");
+                if (!foes.length) return false;
+                const v = foes[(Math.random() * foes.length) | 0];
+                addEntangle(v, u.def.rootGrab || 1);
+                const p = cellXY(v.col, v.row);
+                fxEvent("seal", { x: p.x, y: p.y + 8, color: 0x9fb06e,
+                    scale: 0.6 });
+                sfx("chpoc");
+                return true;
+            };
+
             // Способности, которые «Озёрная дева» (wis111) может скопировать
             // у соседнего существа. Статы/подтип/арт/лист не копируются —
             // «способность», а не превращение в другое существо.
@@ -228,6 +248,7 @@
                 "spellBuffAura", "sisterDraw", "plantEcho", "wolfSummon",
                 "trapCancel", "sulfurBurst", "slimeGain",
                 "fireSnipe", "growOnAttack", // W54: «Рыжий лес»
+                "rootGrab", // W56: «Эльф корней» — опутывание после призыва
             ];
             // Копирование способностей в per-unit копию def (как purgeUnit):
             // исходная карта каталога не меняется, cardIdOf узнаёт карту по
@@ -385,6 +406,7 @@
                 addUnit(u.side, "grw2", col, row, { token: true });
                 const p = cellXY(col, row);
                 floatText(p.x, p.y - 75, GAME_LOC.t("card.grw2.name"), 0x9fd489);
+                packFrenzy(u); // «Безумие стаи»: способность друида сработала
             };
 
             // Лечение (+n жизни; пределом служит сама карта — жёсткого максимума

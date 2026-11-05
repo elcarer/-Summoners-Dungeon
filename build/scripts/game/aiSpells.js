@@ -415,6 +415,11 @@
                     phoenixRise("e");
                     return;
                 }
+                if (s.rootSummon) { // «Эльф корней» (sg247): Эльф 1/1 +
+                    // опутывание случайного существа игрока (summonRootElf)
+                    rootElfSpawn("e");
+                    return;
+                }
                 if (s.target === "none" && s.baseDmg) { // землетрясение
                     damageBase("p", s.baseDmg + heroSpellBonus(def, "e", false, true),
                         { x: 960, y: 840, fill: 0xff5f4e });

@@ -26,6 +26,7 @@
         strGro: starterCollection(STARTER_DECKS.strGro),
         // W55: ядро врага «Горящая местность» (2-й этаж) — та же симметрия
         strBurn: starterCollection(STARTER_DECKS.strBurn),
+        strPack: starterCollection(STARTER_DECKS.strPack),
     };
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N
@@ -96,8 +97,10 @@
                  "grw31", "grw33",
                  "sg241", "sg241", "sg242", "sg242",
                  // W55: карты 243–246 — тоже только в «Рыжем лесу»
-                 // (веса по редкости: обычная ×3, редкие ×2, эпическая ×1)
+                 // (веса по редкости: обычная ×3, редкие ×2, эпическая ×1);
+                 // W56: обычная sg247 — тем же весом ×3
                  "sg243", "sg243", "sg243",
+                 "sg247", "sg247", "sg247",
                  "sg244", "sg244", "sg246", "sg246", "sg245"],
         growth: ["grw1", "grw1", "grw1", "grw2", "grw2", "grw2",
                  "grw3", "grw3", "grw3", "grw4", "grw4", "grw4",
@@ -707,6 +710,18 @@
                            "str24", "str31", "str31", "grw17", "grw17",
                            "grw25", "grw25", "grw27", "grw27", "grw38",
                            "grw38", "grw39"] },
+        // «Безумие стаи» (W56, спека юзера): враг 3-го этажа. 20♥, герой
+        // sgrPack (heroes/68): способность packFrenzy — когда срабатывает
+        // способность ЕГО существа, 1 урон базе противника. Ядро — ровно
+        // 32 карты из спеки (в т.ч. новый sg247)
+        sgrPack:  { scene: 1, baseHp: 20, elem: "strGro", hero: "sgrPack",
+                    core: ["sg241", "sg241", "sg241", "sg242", "sg242",
+                           "sg242", "sg243", "sg243", "sg243", "str1",
+                           "str1", "str1", "str7", "str7", "str29",
+                           "str29", "str29", "grw1", "grw1", "grw1",
+                           "grw9", "grw9", "grw13", "grw13", "grw14",
+                           "grw14", "grw24", "grw29", "grw29", "sg247",
+                           "sg247", "sg247"] },
         // Босс 3-го этажа — тот же «Большой размер», растёт с глубиной:
         // +2 карты/этаж из grow (мультицветные sg241/sg242) и добор из
         // ENEMY_FILLS.strGro (механика вождя гоблинов)
@@ -947,11 +962,12 @@
     // «Большой размер» (один новый противник задан спекой для 1-го этажа,
     // глубже он же — колода неизменна, сложность дают этаж и босс);
     // босс только на 3-м этаже (sgrBoss, CAVES.sgr.boss); W55 (спека
-    // юзера): на 2-м этаже — «Горящая местность» (sgrBurn)
+    // юзера): на 2-м этаже — «Горящая местность» (sgrBurn); W56 (спека
+    // юзера): на 3-м этаже — «Безумие стаи» (sgrPack)
     const FLOOR_MOBS_SGR = [
         ["sgrBig"],                             // 1
         ["sgrBurn"],                            // 2
-        ["sgrBig"],                             // 3
+        ["sgrPack"],                            // 3
     ];
     const MOB_TABLES = { gob: FLOOR_MOBS, grw: FLOOR_MOBS_GROWTH,
                          wis: FLOOR_MOBS_WISDOM, dec: FLOOR_MOBS_DECAY,
@@ -1050,7 +1066,7 @@
             common: ["str1", "str2", "str3", "str4", "str9", "str13",
                      "str16", "str23", "str26", "str30", "str32", "str33",
                      "grw1", "grw2", "grw3", "grw4", "grw5", "grw7",
-                     "grw8", "grw16", "sg241", "sg243"],
+                     "grw8", "grw16", "sg241", "sg243", "sg247"],
             rare:   ["str5", "str11", "str14", "str17", "str19", "str20",
                      "str24", "grw9", "grw12", "grw13", "grw14", "grw20",
                      "grw27", "grw36", "grw37", "sg242", "sg244", "sg246"],

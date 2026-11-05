@@ -164,6 +164,7 @@
                 floatText(p.x, p.y - 39, `+${n}⚔ +${n}♥`, 0x9fd489);
                 fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.8 });
                 sfx("chpoc");
+                packFrenzy(u); // «Безумие стаи»: способность огра сработала
             };
 
             // «Большой размер» (sgrBig — герой «Рыжего леса», W54 спека
@@ -181,6 +182,29 @@
                             y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff8f6e }
                         : { x: cellXY(u.col, 0).x,
                             y: cellXY(u.col, 0).y - 15, fill: 0xffb26e });
+                sfx("chpoc");
+            };
+
+            // «Безумие стаи» (sgrPack — враг 3-го этажа «Рыжего леса», W56
+            // спека юзера): когда срабатывает способность СУЩЕСТВА
+            // владельца — 1 урон базе противника. Работает у обеих сторон;
+            // точки вызова packFrenzy — места фактического срабатывания
+            // способностей существ: призывные хуки addUnit, ogrGrow/
+            // afterAttackPush (после атаки), predator (смерть другого
+            // существа), summonDruidWolf (выживание после урона),
+            // fleeCoward (сбегание в начале хода), druidEnergy (энергия
+            // за чужой призыв)
+            A.packFrenzy = function packFrenzy(u) {
+                if (!u || u.def.type !== "unit" || !B.units.includes(u)) return;
+                const hd = heroDefOf(u.side);
+                if (!hd || hd.ability !== "packFrenzy") return;
+                const op = u.side === "p" ? "e" : "p";
+                damageBase(op, hd.abilityVal || 1,
+                    op === "p"
+                        ? { x: cellXY(u.col, GRID - 1).x,
+                            y: cellXY(u.col, GRID - 1).y + 15, fill: 0x9fb06e }
+                        : { x: cellXY(u.col, 0).x,
+                            y: cellXY(u.col, 0).y - 15, fill: 0x9fb06e });
                 sfx("chpoc");
             };
 
@@ -208,6 +232,7 @@
                 glide(occ, p.x, p.y);
                 sfx("step");
                 triggerCellTraps(occ);
+                packFrenzy(u); // «Безумие стаи»: способность кабана сработала
             };
 
             // «Шаман гоблинов»: после призыва бесплатно разыгрывает случайного

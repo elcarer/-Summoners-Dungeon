@@ -1,6 +1,6 @@
 # Журнал волн — project3
 
-Журнал: строка на волну + детальные записи последних волн (W41–W53
+Журнал: строка на волну + детальные записи последних волн (W41–W56
 дословно). Сжат 2026-11-04 (волна W47): волны до W40 — однострочники,
 их подробности — git log, ловушки — docs/traps.md.
 
@@ -406,7 +406,7 @@ docs/traps.md.
   «Ярость природы». Детали ниже.
 
 
-## Детали последних волн (W41–W54 дословно)
+## Детали последних волн (W41–W56 дословно)
 
 ## Волна W41 (2026-11-03) — города открытого мира крупнее (9×6 / 9×7.5)
 
@@ -1247,3 +1247,61 @@ d0651eb) и новый противник 2-го этажа «Горящая м�
   (изолировать length=0). Регресс: mini_test 19/0 (каталог 254),
   check_city 394/0, probe_w54 35/0. Полный смоук не гонялся — не
   распоряжали. Прочее: MAP_V/CITY_V/WORLDGEN.V целы, каталог 254.
+
+## Волна W56 (2026-11-05) — карта 247 «Эльф корней» + враг 3-го этажа «Безумие стаи»
+
+Юзер: спека карты 247 (арт 247.png) и нового противника 3-го этажа
+«Безумие стаи» (heroes/68.png, 20♥) — «Рыжий лес» укомплектован врагами на
+все 3 этажа: 1 — sgrBig, 2 — sgrBurn, 3 — sgrPack, босс sgrBoss на 3-м
+(bossLast, этаж не тронут).
+
+- КАРТА sg247 «Эльф корней» (1⚡, заклинание призыва, kind "summon",
+  spell.rootSummon, target none, Обычная, elem strGro + multi) — призывает
+  Эльфа 1/1 (жетон sgrRootElf: creature "elf", ЛИСТ ПО creature — без
+  sheet; subtype "elf") на СЛУЧАЙНУЮ пустую клетку поля (rootElfSpawn в
+  arenaActions по образцу laySummonSpawn/«Молебна»). Способность жетона
+  rootGrab: 1 — после призыва случайное ВРАЖЕСКОЕ существо (unit, любая
+  клетка) получает «Опутывание 1» — summonRootElf (arenaSummons, рядом с
+  summonFireElf) → штатный addEntangle (arenaStatus: счётчик тает в ход
+  владельца, перемещение пропускается, атака остаётся). rootGrab добавлен
+  в COPY_UNIT_ABILITY_KEYS («Озёрная дева» копирует). Жетон БЕЗ multi и
+  без img (каталог его считает — 254 → 256 вместе с sg247).
+- ВРАГ 3-ГО ЭТАЖА: HEROES.sgrPack (rare, 20♥, elems×2, img 68, starter
+  strPack, ability packFrenzy abilityVal 1) + ENCOUNTERS.sgrPack (ядро —
+  ровно 32 карты спеки: sg241×3, sg242×3, sg243×3, str1×3, str7×2,
+  str29×3, grw1×3, grw9×2, grw13×2, grw14×2, grw24, grw29×2, sg247×3) +
+  FLOOR_MOBS_SGR[2] = ["sgrPack"] + STARTER_DECKS/STARTER_COLLECTIONS.
+  strPack + HERO_FOE_ORDER + лок (enc.sgrPack.title «Безумие стаи»/"Pack
+  Madness", hero.sgrPack.ability, card.sg247/sgrRootElf RU/EN).
+- СПОСОБНОСТЬ packFrenzy («когда срабатывает способность вашего существа,
+  1 урон базе противника») — A.packFrenzy (arenaCombat, рядом с bigStomp —
+  тот же рисунок damageBase от колонки юнита, guard type === "unit").
+  Точки вызова = места ФАКТИЧЕСКОГО срабатывания способностей СУЩЕСТВ:
+  (1) addUnit — флаг призывных способностей (dash1/dashN/shaman/
+  spiritSummoner/bombling/waterMage/illusion/lakeMaid/sulfurBurst/
+  fireSnipe/rootGrab/healArrive/nearSpeed/axeArrive) → packFrenzy после
+  блока хуков; семантика «срабатывание = факт призыва юнита со
+  способностью „после призыва“» (условия хуков — соседи и т.п. — в бою
+  почти всегда выполнены); (2) ogrGrow (sg242 после атаки) — вызов в конце
+  функции; (3) afterAttackPush (grw13) — при фактическом толкании;
+  (4) predator (grw1, killUnit) — в цикле растений, packFrenzy(v);
+  (5) summonDruidWolf (grw24, после выживания урона); (6) fleeCoward
+  (str29, ДО removeUnit — иначе guard includes(u) отвалит); (7) druidEnergy
+  (grw9, при призыве чужого существа, packFrenzy(o) владельцу). НЕ
+  считаются срабатываниями: свойства атаки/движения (flyOver, venom,
+  thicketSplash, frostAttack, crush), статусы (berserkSummon), ловушки.
+  Способность работает у обеих сторон (heroDefOf(u.side)).
+- ПУЛЫ: ENEMY_FILLS.strGro common += "sg247"; REWARD_POOLS.strGro += sg247
+  ×3 (вес обычной). Каталог 254 → 256 (sg247 + жетон sgrRootElf).
+- ИИ: aiSpellPlayable — sg247 неиграбельна при полном поле (units ≥ 25);
+  enemyCastSpellEffect — ветка rootSummon (rootElfSpawn("e")).
+- Проба probe_w56 (25/0 ×3): данные (каталог 256, поля карт, hero/enc/
+  mob3/fills/pool/starter/collection/foe/локи), fetch-арт 2 файла, правило
+  колод, E2E-бой против sgrPack (патч энкаунтера 1-го этажа клоном
+  sgrPack): негативы (str2 при призыве молчит; sg242 при призыве молчит),
+  packFrenzy через ogrGrow/dash1/predator (каждый −1 базе игрока), sg247
+  (жетон 1/1 token/elf, ровно один враг entangle 1, Ярость природы −1,
+  packFrenzy игрока-горбага молчит), ход врага на колоде sgrPack. Регресс:
+  mini_test 19/0 (каталог 256), probe_w55 26/0 (ассерт каталога поднят до
+  256 — устарел после волны), check_city 394/0. Полный смоук не гонялся —
+  не распоряжали. Прочее: MAP_V/CITY_V/WORLDGEN.V целы, каталог 256.

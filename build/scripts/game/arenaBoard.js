@@ -944,6 +944,7 @@
                         floatText(p.x, p.y - 66, "+1⚡", 0xffd98c);
                         punch(o.node);
                         sfx("chpoc");
+                        packFrenzy(o); // «Безумие стаи»: способность друида сработала
                     }
                     // «Конница» (firstSpeedAtk, просил юзер): первое за бой
                     // призванное стороной существо СО СВОЕЙ «Скоростью»
@@ -1036,6 +1037,20 @@
                     else if (def.lakeMaid) heroMageDouble(u, () => summonLakeMaid(u)); // озёрная дева
                     else if (def.sulfurBurst) summonSulfur(u); // элементаль серы: −2⚔ −1♥ соседям
                     else if (def.fireSnipe) summonFireElf(u); // «Эльф огня»: 2×1 урон соседям противника
+                    else if (def.rootGrab) summonRootElf(u); // «Эльф корней»: опутывание случайного врага
+                    // «Безумие стаи» (sgrPack, W56 спека юзера): когда
+                    // срабатывает способность СУЩЕСТВА владельца — 1 урон
+                    // базе противника. Точка призыва: юнит с любой
+                    // способностью «после призыва» из цепочки выше —
+                    // срабатывание = факт призыва (условия хуков — соседи
+                    // и т.п. — почти всегда выполнены в реальном бою)
+                    if (def.ability === "dash1" || def.ability === "dashN"
+                        || def.ability === "shaman" || def.ability === "spiritSummoner"
+                        || def.ability === "bombling" || def.waterMage
+                        || def.illusion || def.lakeMaid || def.sulfurBurst
+                        || def.fireSnipe || def.rootGrab
+                        || def.healArrive || def.nearSpeed || def.axeArrive)
+                        packFrenzy(u);
                     if (def.berserkSummon) addBerserk(u, def.berserkSummon); // «Берсерк» — уже при призыве
                     // Способность героя (просил юзер): ПЕРВОЕ призванное игроком
                     // существо получает бонус — Горбаг +2 к урону, Эльмир +3 к

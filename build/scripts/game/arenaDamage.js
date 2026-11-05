@@ -197,6 +197,7 @@
                     floatText(p.x, p.y - 66, `+${k}⚔ +${k}♥`, 0x9fd489);
                     punch(v.node);
                     sfx("chpoc");
+                    packFrenzy(v); // «Безумие стаи»: способность растения сработала
                 }
                 // ловушки стороны погибшего: триггер «при гибели своего существа»
                 if (killer && killer.def && killer.def.type === "unit" && killer.side !== u.side) {

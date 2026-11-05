@@ -61,7 +61,22 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 
 ## Текущее состояние
 
-- Последняя волна: **W55** — карты 243–246 «Рыжего леса» + враг 2-го
+- Последняя волна: **W56** — карта 247 «Эльф корней» + враг 3-го этажа
+  «Безумие стаи». sg247 (1⚡, summon-заклинание, multi) — призывает Эльфа
+  1/1 (жетон sgrRootElf, creature "elf" лист по creature) в случайную
+  пустую клетку; способность жетона rootGrab — «Опутывание 1» случайному
+  вражескому существу после призыва (summonRootElf → штатный addEntangle,
+  rootGrab в COPY_UNIT_ABILITY_KEYS). Враг 3-го этажа sgrPack «Безумие
+  стаи» (heroes/68, 20♥, packFrenzy: когда срабатывает способность
+  СУЩЕСТВА владельца — 1 урон базе противника; ядро 32 из спеки;
+  FLOOR_MOBS_SGR[2]; работает у обеих сторон, точки вызова —
+  призывные хуки addUnit + ogrGrow/afterAttackPush/predator/
+  summonDruidWolf/fleeCoward/druidEnergy). «Рыжий лес» теперь: 1 —
+  sgrBig, 2 — sgrBurn, 3 — sgrPack, босс sgrBoss на 3-м. Каталог
+  254→256 (sg247 + жетон). Пробы: probe_w56 25/0 (×3), mini_test 19/0
+  (каталог 256), probe_w55 26/0, check_city 394/0. Детали —
+  `docs/journal.md` (W56).
+- **W55** — карты 243–246 «Рыжего леса» + враг 2-го
   этажа. sg243 «Древомощь» (вся энергия → «Сокрушение» +N⚔/+N♥ цели —
   флаг u.crushGrant, pool = энергия минус цена карты: эффект заклинания
   идёт ДО списания цены, нулит castSpell/replaySpell/aiPlay — образец
@@ -73,9 +88,7 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
   pop(), соседям −1⚔ за заклинание, sunsetMill в addUnit). Враг 2-го
   этажа sgrBurn «Горящая местность» (heroes/67, 18♥, burnDeath — каждая
   смерть СВОЕЙ постройки бьёт базу противника; ядро 32 из спеки;
-  FLOOR_MOBS_SGR[1]; этаж 3 — по-прежнему sgrBig, босс sgrBoss).
-  Каталог 249→254 (карты + жетон). Пробы: probe_w55 26/0 (×3),
-  mini_test 19/0 (каталог 254), check_city 394/0, probe_w54 35/0.
+  FLOOR_MOBS_SGR[1]).
   Детали — `docs/journal.md` (W55).
 - **W54** — (1) три поправки юзера: инфоокно
   «Поручение выполнено» с наградой (sidequests showComplete, вместо
@@ -272,14 +285,16 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
   пока НЕ тронут — по спеке юзера; оффлайн-каталог всех 244:
   for_work/pixelfx_upstream (tools/render.mjs, docs/CATALOG.md),
   скилл — ~/.zcode/skills/pixelfx.
-- Мультицвет «Сила+Рост» (W54–W55, спека юзера): новый мульти-данж = cave в
+- Мультицвет «Сила+Рост» (W54–W56, спека юзера): новый мульти-данж = cave в
   CAVES (+elems для драфта, fury/bossLast по вкусу) + FLOOR_MOBS_<cave> +
   ENEMY_FILLS/REWARD_POOLS/STARTER_DECKS ключа + TILE_SETS + ПРЕДЗАГРУЗКА
   тайлов в main.js (цикл TILE_FILES) + POI в worldGen + ELEM_CAVE_LABEL.
   Мульти-карта = elem "<код>" + multi:[стихии] (правило колод —
   пересечение); жетоны мульти-стихии БЕЗ multi (fury считает только
-  розыгрыши). «Рыжий лес» укомплектован: карты 241–246, этаж 1 sgrBig,
-  этаж 2 sgrBurn, босс sgrBoss на 3-м.
+  розыгрыши). «Рыжий лес» укомплектован: карты 241–247, этаж 1 sgrBig,
+  этаж 2 sgrBurn, этаж 3 sgrPack, босс sgrBoss на 3-м. Способности вида
+  «когда срабатывает способность существа» (packFrenzy) — точки вызова
+  по списку в docs/journal.md (W56).
 - Выход из города (W52, юзер): проход вниз в стене (st.exitPassage,
   3 клетки в нижнем ряду), триггер — заход в клетки прохода; иконки-
   таблички у города больше нет (лестница — только этажам данжа).

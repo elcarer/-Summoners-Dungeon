@@ -654,6 +654,7 @@
                 const discard = side === "p" ? B.discard : B.eDiscard;
                 const deck = side === "p" ? B.deck : B.eDeck;
                 const p = cellXY(u.col, u.row);
+                packFrenzy(u); // «Безумие стаи»: способность труса сработала
                 removeUnit(u);
                 floatText(p.x, p.y - 60, GAME_LOC.t(`card.${id}.name`), 0xd8c79d);
                 let i = discard.indexOf(id);
