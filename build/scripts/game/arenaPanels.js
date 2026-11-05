@@ -798,6 +798,110 @@
                 refreshHud();
             };
 
+            // ── Панель распределения очков (sg249 «Огнелис» / sg250
+            // «Огнемедведь», W57): после розыгрыша карты призыва очки
+            // характеристик делятся между уроном и жизнями призванного
+            // Животного. Модель зеркальная: урон + жизни = очки ВСЕГДА;
+            // кнопки «−»/«+» у каждой характеристики перекладывают очко в
+            // соседнюю. «Готово» — призыв (splitSpawn). Закрыть без выбора
+            // нельзя: карта уже потрачена (Esc-цепочка arenaScene панель
+            // не перечисляет, guard'ы остальных панелей молчат)
+            A.splitPanel = null;
+            A.splitToken = null;
+            A.splitPoints = 0;
+            A.splitAtk = 0;
+            A.closeSplitPanel = function closeSplitPanel() {
+                if (!splitPanel) return;
+                splitPanel.destroy({ children: true });
+                splitPanel = null;
+                if (B) B.picking = false;
+            };
+            A.openSplitPanel = function openSplitPanel(tokenId, points) {
+                closeSplitPanel();
+                B.picking = true;
+                splitToken = tokenId;
+                splitPoints = points;
+                splitAtk = Math.ceil(points / 2); // старт — поровну
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                node.addChild(stumpFrame());
+                const title = T(t("split.title"), 39, 0xf0c96a,
+                    { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 292);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("split.hint"), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 352);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const face = globalThis.GAME_UI.cardFace(ctx, tokenId, { scale: 0.7 });
+                face.position.set(960, 556);
+                face.eventMode = "none";
+                node.addChild(face);
+                // числа характеристик по бокам портрета; ссылки на кнопки —
+                // для затемнения недоступных (0 и очков исчерпаны)
+                const atkText = T("", 52, 0xffb26e,
+                    { stroke: { color: 0x241505, width: 6 } });
+                const hpText = T("", 52, 0x9fe08c,
+                    { stroke: { color: 0x241505, width: 6 } });
+                for (const [txt, x] of [[atkText, 540], [hpText, 1380]]) {
+                    txt.anchor.set(0.5, 0.5);
+                    txt.position.set(x, 556);
+                    txt.eventMode = "none";
+                    node.addChild(txt);
+                }
+                let atkMinus, atkPlus, hpMinus, hpPlus;
+                const redraw = () => {
+                    atkText.text = `${splitAtk}⚔`;
+                    hpText.text = `${splitPoints - splitAtk}♥`;
+                    atkMinus.alpha = splitAtk > 0 ? 1 : 0.4;
+                    atkPlus.alpha = splitPoints - splitAtk > 0 ? 1 : 0.4;
+                    hpMinus.alpha = splitPoints - splitAtk > 0 ? 1 : 0.4;
+                    hpPlus.alpha = splitAtk > 0 ? 1 : 0.4;
+                };
+                const btn = (label, x, y, onTap) => globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label, x, y, scale: 0.78, fontSize: 42,
+                    onTap,
+                });
+                atkMinus = btn("−", 470, 462, () =>
+                    { if (splitAtk > 0) { splitAtk--; sfx("chpoc"); redraw(); } });
+                atkPlus = btn("+", 470, 650, () =>
+                    { if (splitPoints - splitAtk > 0) { splitAtk++; sfx("chpoc"); redraw(); } });
+                hpMinus = btn("−", 1450, 462, () =>
+                    { if (splitPoints - splitAtk > 0) { splitAtk++; sfx("chpoc"); redraw(); } });
+                hpPlus = btn("+", 1450, 650, () =>
+                    { if (splitAtk > 0) { splitAtk--; sfx("chpoc"); redraw(); } });
+                node.addChild(atkMinus);
+                node.addChild(atkPlus);
+                node.addChild(hpMinus);
+                node.addChild(hpPlus);
+                node.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("split.done"),
+                    x: 960, y: 836, scale: 1,
+                    onTap: confirmSplit,
+                }));
+                root.addChild(node);
+                splitPanel = node;
+                redraw();
+            };
+            A.confirmSplit = function confirmSplit() {
+                if (!splitPanel || !splitToken) return;
+                const tokenId = splitToken;
+                const atk = splitAtk, hp = splitPoints - splitAtk;
+                splitToken = null;
+                closeSplitPanel();
+                if (splitSpawn("p", tokenId, atk, hp)) sfx("aqua");
+                else floatText(960, 540, t("split.full"), 0xef9f8c);
+                refreshHud();
+            };
+
             // ── Панель «Раскопок» (grw39): выбранная своя постройка убрана в
             // сброс — теперь постройка ИЗ СВОЕГО сброса встаёт в её клетку.
             // «Оставить»/Esc — обмен не завершён: клетка пустует, постройки

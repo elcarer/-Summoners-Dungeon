@@ -286,6 +286,7 @@
                     if (s.baseHit || s.wolfVolley) return 4.5; // бьёт СВОИМ существом
                     if (s.iceSwarm || s.skeletonCrowd) return 3; // тела — как обычный призыв
                     if (s.laySummon) return 3; // «Молебен»: тело 2/2 — как призыв
+                    if (s.summonPoints) return 4; // sg249/250: крупное Животное с распределением
                     if (s.captivate) return 2; // hon197: вынос карты призыва — контроль
                     if (s.resurrect) return 3; // hon200: бесплатное тело — как призыв
                     if (s.lightAura) return 4; // hon199: метка — как усиление
@@ -836,6 +837,7 @@
                     if (s.iceSwarm) v += Math.min(5, s.iceSwarm) * 0.55; // 5 тел 1/1
                     if (s.skeletonCrowd) v += 3 * 0.65; // dec140: три Скелета 1/2
                     if (s.laySummon) v += 1.2; // hon166: тело 2/2 за 1⚡
+                    if (s.summonPoints) v += 1.5; // sg249/250: Животное 4/4–5/4
                     if (s.captivate) v += 1.6; // hon197: удаление карты призыва из руки
                     if (s.resurrect) v += 1.8; // hon200: бесплатный призыв из сброса
                     if (s.lightAura) v += 1.0; // hon199: −1♥ соседям каждый ход

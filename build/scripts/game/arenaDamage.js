@@ -861,6 +861,13 @@
             // не показывается: урон виден на самой постройке).
             A.damageBase = function damageBase(side, amount, where = null) {
                 if (!B || !(amount > 0)) return;
+                // «Эльф-отступник» (sgrApostate, W57, спека юзера): когда
+                // наносится урон базе противника — на 1 урон больше. side —
+                // ПОЛУЧАТЕЛЬ урона, усиливает герой НАНОСЯЩЕЙ стороны
+                // (как firstBaseHitBuild: «разбирающий — противоположная
+                // сторона»); до редиректов («Дома на деревьях») и отражений
+                const hr = heroDefOf(side === "p" ? "e" : "p");
+                if (hr && hr.ability === "baseRage") amount += hr.abilityVal || 1;
                 const house = B.units.find((v) => v.side === side
                     && v.def.type === "building" && v.def.treeHomes);
                 if (house) {

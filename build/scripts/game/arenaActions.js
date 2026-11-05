@@ -659,6 +659,43 @@
                 return true;
             };
 
+            // «Огнелис»/«Огнемедведь» (sg249/250, W57): призыв Животного
+            // (жетон sgrFox/sgrBear) в СЛУЧАЙНУЮ пустую клетку поля боя с
+            // распределёнными очками характеристик. База жетона в каталоге =
+            // авто-распределению поровну (4/4 и 5/4); выбранные статы
+            // накладываются поверх, как в phoenixRise. Возвращает true, если
+            // призвал
+            A.splitSpawn = function splitSpawn(side, tokenId, atk, hp) {
+                const empty = [];
+                for (let row = 0; row < GRID; row++)
+                    for (let col = 0; col < GRID; col++)
+                        if (!unitAt(col, row)) empty.push([col, row]);
+                if (!empty.length) return false;
+                const [col, row] = empty[(Math.random() * empty.length) | 0];
+                const u = addUnit(side, tokenId, col, row, { token: true });
+                if (u) {
+                    const dAtk = atk - u.curAtk, dHp = hp - u.hp;
+                    if (dAtk) u.bonusAtk += dAtk;
+                    if (dHp) u.hp += dHp;
+                    recalcAuras();
+                    const an = u.node.getChildByName("atk");
+                    if (an) an.text = String(u.curAtk);
+                    const hn = u.node.getChildByName("hp");
+                    if (hn) hn.text = String(u.hp);
+                    const p = cellXY(col, row);
+                    floatText(p.x, p.y - 75, `${u.curAtk}⚔/${u.hp}♥`, 0xffb26e);
+                }
+                return true;
+            };
+
+            // Есть ли где призывать splitSpawn (жетон «Огнелиса/Огнемедведя»)
+            A.splitSpawnable = function splitSpawnable() {
+                for (let row = 0; row < GRID; row++)
+                    for (let col = 0; col < GRID; col++)
+                        if (!unitAt(col, row)) return true;
+                return false;
+            };
+
             // «Рождение феникса» (sg244, W55): уничтожить ВСЕ постройки на
             // поле (обе стороны — в спеке «все постройки»), посчитать
             // погибших; в случайной пустой клетке поля появляется Элементаль
@@ -1140,6 +1177,12 @@
                 }
                 if (def.spell.rootSummon) { // «Эльф корней»: Эльф 1/1 на случайную пустую клетку
                     if (rootElfSpawn("p")) sfx("aqua");
+                }
+                if (def.spell.summonPoints) { // «Огнелис»/«Огнемедведь» (sg249/250):
+                    // Животное в случайную пустую клетку — очки характеристик
+                    // распределяет игрок (панель); поле забито — не призывается
+                    if (splitSpawnable())
+                        openSplitPanel(def.spell.summonToken, def.spell.summonPoints);
                 }
                 if (def.spell.rebalance) { // «Снабжение» (hon170): у всех своих
                     // существ меньшая из характеристик ⚔/♥ становится равной

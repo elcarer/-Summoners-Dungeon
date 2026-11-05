@@ -420,6 +420,15 @@
                     rootElfSpawn("e");
                     return;
                 }
+                if (s.summonPoints) { // «Огнелис»/«Огнемедведь» (sg249/250):
+                    // Животное в случайную пустую клетку, очки поровну
+                    // (лис 4/4, медведь 5/4) — распределение только у игрока
+                    splitSpawn("e", s.summonToken,
+                        Math.ceil(s.summonPoints / 2),
+                        Math.floor(s.summonPoints / 2));
+                    sfx("aqua");
+                    return;
+                }
                 if (s.target === "none" && s.baseDmg) { // землетрясение
                     damageBase("p", s.baseDmg + heroSpellBonus(def, "e", false, true),
                         { x: 960, y: 840, fill: 0xff5f4e });

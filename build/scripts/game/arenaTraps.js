@@ -244,20 +244,21 @@
                 // срабатывают только на СУЩЕСТВ, как и написано в спеке;
                 // мины/засады и нейтральные ловушки по-прежнему ловят и
                 // строения
-                const cellEffect = (t) => {
-                    const e = t.def.trap.effect;
-                    if (e === "freezeSplash" || e === "rowShift"
-                        || e === "bubble" || e === "alliesStrike"
-                        || e === "ghostGrave" || e === "darkOffering"
-                        || e === "tarStatue" || e === "tarKettles"
-                        || e === "timeTrap" // «Ловушка времени» — только существа
-                        || e === "selfDmg" // «Удар двойника»: существо бьёт себя
-                        || e === "massRet") // «В гуще боя»: существам «Возврат 1»
-                        return u.def.type === "unit";
-                    return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
-                        || e === "confuse" || e === "cellDebuff"
-                        || e === "ancestor" || e === "entangle";
-                };
+                    const cellEffect = (t) => {
+                        const e = t.def.trap.effect;
+                        if (e === "freezeSplash" || e === "rowShift"
+                            || e === "bubble" || e === "alliesStrike"
+                            || e === "ghostGrave" || e === "darkOffering"
+                            || e === "tarStatue" || e === "tarKettles"
+                            || e === "timeTrap" // «Ловушка времени» — только существа
+                            || e === "selfDmg" // «Удар двойника»: существо бьёт себя
+                            || e === "massRet") // «В гуще боя»: существам «Возврат 1»
+                            return u.def.type === "unit";
+                        return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
+                            || e === "confuse" || e === "cellDebuff"
+                            || e === "ancestor" || e === "entangle"
+                            || e === "magmaPool"; // «Лужи магмы» — нейтральная
+                    };
                 let i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                     && cellEffect(t));
                 if (i < 0) {
@@ -271,6 +272,7 @@
                         && (t.def.trap.effect === "cellDmgAll" || t.def.trap.effect === "cellDebuff"
                             || t.def.trap.effect === "entangle"
                             || t.def.trap.effect === "timeTrap"
+                            || t.def.trap.effect === "magmaPool"
                             || (t.def.trap.effect === "tarKettles"
                                 && u.def.type === "unit")));
                 }
@@ -655,6 +657,19 @@
                     checkEnd();
                     return;
                 }
+                if (trap.def.trap.effect === "magmaPool") {
+                    // «Лужи магмы» (sg248, W57): вошедшее существо получает
+                    // 1 урон (+ аура алтаря, как у клеточных уронных ловушек);
+                    // ВЫЖИЛО — ловушка не исчезает, а переезжает в случайную
+                    // пустую клетку поля боя (спека юзера); погибло — исчезает
+                    // (уже снята из B.traps в triggerCellTraps)
+                    damageUnit(u, (trap.def.trap.amount || 1) + altarBonus(side),
+                        null, "acid");
+                    if (B.units.includes(u)) relocateMagma(trap, side);
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
                 // «Яма-ловушка» (hon167): урон = МЕНЬШЕМУ из урона и жизней
                 // вошедшего существа (спека юзера) — сумму задаёт само
                 // существо, аура алтаря не добавляется
@@ -669,6 +684,30 @@
                 }
                 refreshHud();
                 checkEnd();
+            };
+
+            // «Лужи магмы» (sg248): переезд СРАБОТАВШЕЙ ловушки в случайную
+            // пустую клетку поля боя (жертва выжила — спека юзера). Пустая =
+            // нет существ и ни чьих ловушек; свободных клеток нет — ловушка
+            // исчезает (не возвращается в B.traps)
+            A.relocateMagma = function relocateMagma(trap, side) {
+                const free = [];
+                for (let r = 0; r < GRID; r++)
+                    for (let c = 0; c < GRID; c++)
+                        if (!unitAt(c, r)
+                            && !B.traps.p.some((t) => t.col === c && t.row === r)
+                            && !B.traps.e.some((t) => t.col === c && t.row === r))
+                            free.push([c, r]);
+                if (!free.length) return;
+                const [c2, r2] = free[(Math.random() * free.length) | 0];
+                B.traps[side].push({ def: trap.def, col: c2, row: r2,
+                    unit: null, ret: trap.ret || 0 });
+                redrawTraps();
+                const p = cellXY(c2, r2);
+                floatText(p.x, p.y - 66, "?!", 0xe08cd0);
+                fxEvent("seal", { x: p.x, y: p.y + 8,
+                    color: 0xe08cd0, scale: 0.85 });
+                sfx("mine");
             };
 
             // «Выстрел 1» (Гоблинский лучник): после перемещения — 1 урон

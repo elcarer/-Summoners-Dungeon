@@ -1859,6 +1859,51 @@
                       subtype: "elf", // подтип — по спеке юзера (Эльф)
                       rarity: "common", elem: "strGro",
                       color: 0x6f8a4e },
+        // ── W57 (спека юзера): карты 248–250, тоже только «Рыжий лес» ──────
+        // «Лужи магмы» (sg248): ловушка на пустую клетку — существо,
+        // оказавшееся на ней перемещением/призывом, получает 1 урон;
+        // выжило — ловушка НЕ исчезает, а переезжает в случайную пустую
+        // клетку поля (magmaPool/relocateMagma — arenaTraps)
+        sg248: { type: "trap", cost: 2,
+                 trap: { event: "onCell", effect: "magmaPool", amount: 1 },
+                 rarity: "rare", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xb06a3e, img: "strength_growth/248" },
+        // «Огнелис» (sg249): заклинание призыва — Животное (жетон sgrFox)
+        // в случайную пустую клетку; после призыва игрок распределяет
+        // 8 очков характеристик между уроном и жизнями (панель
+        // openSplitPanel — arenaPanels; ИИ — авто поровну)
+        sg249: { type: "spell", cost: 3,
+                 spell: { target: "none", summonPoints: 8, summonToken: "sgrFox" },
+                 kind: "summon", // тип эффекта — по спеке юзера
+                 rarity: "epic", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xd8824e, img: "strength_growth/249" },
+        // «Огнемедведь» (sg250): то же, что «Огнелис», но 9 очков и жетон
+        // sgrBear (лист медведя)
+        sg250: { type: "spell", cost: 4,
+                 spell: { target: "none", summonPoints: 9, summonToken: "sgrBear" },
+                 kind: "summon", // тип эффекта — по спеке юзера
+                 rarity: "epic", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xc4763e, img: "strength_growth/250" },
+        // Огнелис из «Огнелиса» (sg249) — служебная карта без лица, как
+        // icePixie/skel: спавнится только заклинанием. statPoints — очки
+        // характеристик: распределение происходит при РОЗЫГРЫШЕ карты
+        // (панель/ИИ-авто), базовые статы = авто-распределению поровну.
+        // ЖЕТОН БЕЗ multi: «Ярость природы» бьёт при РОЗЫГРЫШЕ карт, а не
+        // при призыве жетона — multiFury читает def.multi
+        sgrFox: { type: "unit", cost: 3, atk: 4, hp: 4, speed: 1,
+                  creature: "animal", sheet: "wolf", statPoints: 8,
+                  subtype: "animal", // подтип — по спеке юзера (Животное)
+                  rarity: "epic", elem: "strGro",
+                  color: 0xd8824e },
+        // Огнемедведь из «Огнемедведя» (sg250) — как sgrFox, 9 очков
+        sgrBear: { type: "unit", cost: 4, atk: 5, hp: 4, speed: 1,
+                   creature: "animal", sheet: "bear", statPoints: 9,
+                   subtype: "animal", // подтип — по спеке юзера (Животное)
+                   rarity: "epic", elem: "strGro",
+                   color: 0xc4763e },
     };
     const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
 
@@ -1921,6 +1966,20 @@
             "grw1", "grw1", "grw1", "grw9", "grw9",
             "grw13", "grw13", "grw14", "grw14", "grw24",
             "grw29", "grw29", "sg247", "sg247", "sg247",
+        ],
+        // W57 (спека юзера): ядро колоды босса «Рыжего леса» «Эльф-отступник»
+        // (3-й этаж, последняя комната) — 32 карты: Эльф огня ×3, Проросший
+        // огр ×3, Древомощь ×3, Эльф корней ×3, Горящие рунокамни ×3, Лужи
+        // магмы ×3, Огнелис ×3, Огнемедведь ×3, Старейший древоброд ×2,
+        // Хранитель леса ×2, Защитный кокон ×1, Гоблинский лучник ×2,
+        // Землетрясение ×1
+        strBoss: [
+            "sg241", "sg241", "sg241", "sg242", "sg242", "sg242",
+            "sg243", "sg243", "sg243", "sg247", "sg247", "sg247",
+            "sg245", "sg245", "sg245", "sg248", "sg248", "sg248",
+            "sg249", "sg249", "sg249", "sg250", "sg250", "sg250",
+            "grw28", "grw28", "grw22", "grw22", "grw19",
+            "str13", "str13", "str10",
         ],
     };
 
@@ -2044,6 +2103,14 @@
         sgrPack: { id: "sgrPack", rarity: "rare", baseHp: 20,
                    elems: ["strength", "growth"], starter: "strPack",
                    img: "68", ability: "packFrenzy", abilityVal: 1 },
+        // «Эльф-отступник» (W57, спека юзера, арт heroes/69.png): БОСС
+        // «Рыжего леса» — последняя комната 3-го этажа (CAVES.sgr.boss →
+        // ENCOUNTERS.sgrBoss). 22♥, эпическая; способность baseRage: когда
+        // наносится урон базе противника, наносится на 1 урон больше
+        // (damageBase — единая точка урона базе)
+        sgrApostate: { id: "sgrApostate", rarity: "epic", baseHp: 22,
+                       elems: ["strength", "growth"], starter: "strBoss",
+                       img: "69", ability: "baseRage", abilityVal: 1 },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -2377,6 +2444,7 @@
         "sgrBig", // «Рыжий лес»: двухцветный враг 1-го этажа (W54)
         "sgrBurn", // «Горящая местность»: враг 2-го этажа (W55)
         "sgrPack", // «Безумие стаи»: враг 3-го этажа (W56)
+        "sgrApostate", // «Эльф-отступник»: босс «Рыжего леса» (W57)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

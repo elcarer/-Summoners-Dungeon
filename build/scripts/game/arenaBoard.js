@@ -1049,7 +1049,9 @@
                         || def.ability === "bombling" || def.waterMage
                         || def.illusion || def.lakeMaid || def.sulfurBurst
                         || def.fireSnipe || def.rootGrab
-                        || def.healArrive || def.nearSpeed || def.axeArrive)
+                        || def.healArrive || def.nearSpeed || def.axeArrive
+                        || def.statPoints) // W57: «Огнелис/Огнемедведь» —
+                        // «после призыва даются очки» тоже срабатывание
                         packFrenzy(u);
                     if (def.berserkSummon) addBerserk(u, def.berserkSummon); // «Берсерк» — уже при призыве
                     // Способность героя (просил юзер): ПЕРВОЕ призванное игроком
