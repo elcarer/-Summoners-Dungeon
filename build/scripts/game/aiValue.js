@@ -537,6 +537,11 @@
                 const foesAhead = B.units.some((v) => v.side === "p"
                     && v.col === col && v.row > row);
                 if (!foesAhead) score += 0.5 + (row === frontRow ? 0.4 : 0);
+                // (W58, юзер) призыв ЗА собственной постройкой — существо
+                // застрянет за ней до её смерти: марш прямой. Вес заметный,
+                // но не абсолютный (в забитой зоне призываться надо)
+                if (B.units.some((v) => v.side === "e" && v.def.type === "building"
+                    && v.col === col && v.row > row)) score -= 2.2;
                 return score;
             };
             // Клетка призыва существа ИИ: раньше — передний ряд/колонка без своих,
@@ -639,6 +644,19 @@
                 const rows = deployRows("e");
                 const free = freeCells(rows);
                 if (!free.length) return null;
+                // (W58, юзер) постройка не должна ПЕРЕКРЫВАТЬ путь своим
+                // существам к базе противника: марш прямой, постройка на
+                // (c,r) запирает всё СВОЁ, что стоит в той же колонке ВЫШЕ
+                // (враг марширует вниз) — и ждущие «Сдвига»: и приезд на
+                // клетку постройки (значок ждёт), и марш после приезда.
+                // Спецветки ниже не фильтруем: «Сдвиг»-метки врага, Тракт,
+                // Крепость, Краевой камень — их механика на перекрытии
+                const marchBlocked = (c, r) =>
+                    B.units.some((v) => v.side === "e" && v.def.type === "unit"
+                        && v.col === c && v.row < r)
+                    || ((B.delayed && B.delayed.e) || [])
+                        .some((e) => e.col === c && e.row <= r);
+                const safe = free.filter(([c, r]) => !marchBlocked(c, r));
                 // «Сдвиг» (Время, просил юзер): на метки «Сдвига» ИГРОКА ИИ
                 // ставит ПОСТРОЙКИ в первую очередь — постройка не марширует,
                 // стоит на клетке и блокирует прибытие задержанного существа
@@ -652,8 +670,12 @@
                     return pmarks[(Math.random() * pmarks.length) | 0];
                 if (def.campAura || def.campfire || def.sprout || def.groveAura
                     || def.monolith || def.elementalCircle || def.altarSword) {
+                    // (W58, юзер) ауры тоже не поперёк марша своих; безопасных
+                    // клеток нет — карту держим (поставим позже, колонки
+                    // освободятся)
+                    if (!safe.length) return null;
                     let best = [], bestScore = -Infinity;
-                    for (const [c, r] of free) {
+                    for (const [c, r] of safe) {
                         const score = aiBuildingSpotScore(def, c, r, free);
                         if (score > bestScore + 1e-9) { bestScore = score; best = [[c, r]]; }
                         else if (Math.abs(score - bestScore) < 1e-9) best.push([c, r]);
@@ -684,8 +706,11 @@
                     const pool = fwd.length ? fwd : free;
                     return pool[(Math.random() * pool.length) | 0];
                 }
-                const back = free.filter(([, r]) => r === rows[0]);
-                const pool = back.length ? back : free;
+                // (W58, юзер) обычные постройки — в тыл у своей базы, и тоже
+                // только на клетки, не запирающие марш своих существ
+                if (!safe.length) return null;
+                const back = safe.filter(([, r]) => r === rows[0]);
+                const pool = back.length ? back : safe;
                 return pool[(Math.random() * pool.length) | 0];
             };
 

@@ -383,18 +383,24 @@
         // мыши (W54, юзер): жмёшь клавишу — стрелка исчезает, шевельнул
         // мышь — появилась. Движение = реальный mousemove, поэтому курсор
         // не мигает у стоящей мыши. У игры курсор-картинка стоит в CSS с
-        // !important (index.html) — inline без important её не перебьет
+        // !important (index.html) — inline без important её не перебьет.
+        // W58 (юзер): правило стоит на body И canvas — прятать надо на
+        // обоих, иначе над холстом (вся игра) стрелка остаётся видимой
         let cursorHidden = false;
+        const cursorEls = () => [document.body, document.querySelector("canvas")]
+            .filter((el) => el);
         window.addEventListener("keydown", () => {
             if (!cursorHidden) {
                 cursorHidden = true;
-                document.body.style.setProperty("cursor", "none", "important");
+                for (const el of cursorEls())
+                    el.style.setProperty("cursor", "none", "important");
             }
         });
         window.addEventListener("mousemove", () => {
             if (cursorHidden) {
                 cursorHidden = false;
-                document.body.style.removeProperty("cursor");
+                for (const el of cursorEls())
+                    el.style.removeProperty("cursor");
             }
         });
         const sfxCounts = {};

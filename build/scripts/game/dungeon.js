@@ -740,7 +740,7 @@
             c.position.set(x, y);
             c.addChild(sp);
             // жёлтое свечение при наведении — правило UI для кнопок (W22)
-            globalThis.GAME_UI.addGlow(ctx, c, sp.width * 1.15, sp.height * 1.15);
+            globalThis.GAME_UI.addGlow(ctx, c, sp);
             return c;
         }
 

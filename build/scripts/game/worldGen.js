@@ -34,7 +34,7 @@
     // v17 — дороги в обход городов (W45, юзер): A* не режет спрайт города
     // (footprint 9×6/9×7.5 клеток — с W42 тело непроходимо, дорога к
     // «воротам» подходила сквозь него); старые миры (v16) перегенерируются
-    const V = 18; // W54: «Рыжий лес» — новый POI у границы Сила/Рост (миры пересобираются)
+    const V = 19; // W58 (юзер): между POI и водой минимум 1 клетка (миры пересобираются)
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // деревья лесных массивов по зонам стихий (просил юзер): вместо
@@ -624,13 +624,45 @@
         // ── 5. точки интереса зоны: столица 5×4, данж 6×4, 9–11 городов
         // 5×3. Якорь POI — его площадь: здание становится вокруг якоря,
         // все клетки footprint обязаны лежать на земле своей зоны ────────────
+        // W58 (юзер): между POI (город и прочие) и водой — минимум 1
+        // свободная клетка: город, прижатый к реке, оставлял вход
+        // недостижимым. Проверяем кольцо вокруг футпринта (по ватерлинии
+        // POI ставится ДО дорог — мосты рекой уже не считаются)
         const pois = [];
+        // прудам Мудрости нельзя ни в футпринт, ни в кольцо вокруг него
+        // (иначе поздний добор воды нарушит гарантию «1 клетка до воды»)
+        const markPoiMask = (kind, gx, gy) => {
+            let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+            for (const [fx, fy] of footCells(kind, gx, gy)) {
+                poiMask[fy * W + fx] = 1;
+                if (fx < x0) x0 = fx;
+                if (fx > x1) x1 = fx;
+                if (fy < y0) y0 = fy;
+                if (fy > y1) y1 = fy;
+            }
+            for (let fy = y0 - 1; fy <= y1 + 1; fy++)
+                for (let fx = x0 - 1; fx <= x1 + 1; fx++) {
+                    if (fy < 0 || fx < 0 || fy >= H || fx >= W) continue;
+                    poiMask[fy * W + fx] = 1;
+                }
+        };
         const placePred = (kind, k) => (x, y) => {
             if (x < 3 || y < 2 || x >= W - 3 || y >= H - 3) return false;
+            let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
             for (const [fx, fy] of footCells(kind, x, y)) {
                 const i = fy * W + fx;
                 if (zone[i] !== k || ter[i] !== T_GROUND) return false;
+                if (fx < x0) x0 = fx;
+                if (fx > x1) x1 = fx;
+                if (fy < y0) y0 = fy;
+                if (fy > y1) y1 = fy;
             }
+            for (let fy = y0 - 1; fy <= y1 + 1; fy++)
+                for (let fx = x0 - 1; fx <= x1 + 1; fx++) {
+                    if (fx >= x0 && fx <= x1 && fy >= y0 && fy <= y1) continue;
+                    if (fy < 0 || fx < 0 || fy >= H || fx >= W) continue;
+                    if (ter[fy * W + fx] === T_WATER) return false;
+                }
             return true;
         };
         for (let k = 0; k < 6; k++) {
@@ -699,8 +731,8 @@
             for (const p of zonePois) {
                 for (const [fx, fy, isAnchor] of footCells(p.kind, p.gx, p.gy)) {
                     if (!isAnchor) blocked[fy * W + fx] = 1;
-                    poiMask[fy * W + fx] = 1; // прудам Мудрости нельзя
                 }
+                markPoiMask(p.kind, p.gx, p.gy); // прудам нельзя (и кольцо)
                 pois.push(p);
             }
         }
@@ -752,9 +784,9 @@
                 const [x, y] = site;
                 for (const [fx, fy] of footCells("dungeon", x, y)) {
                     ter[fy * W + fx] = T_GROUND; // площадка расчищена
-                    poiMask[fy * W + fx] = 1;
                     blocked[fy * W + fx] = 1; // стены спрайта данжа (юг — арка)
                 }
+                markPoiMask("dungeon", x, y);
                 // якорь-площадь свободен (у данжа якорь — низ футпринта)
                 blocked[y * W + x] = 0;
                 pois.push({ kind: "dungeon", elem: "strGro",

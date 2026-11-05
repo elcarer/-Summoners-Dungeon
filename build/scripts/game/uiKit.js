@@ -41,7 +41,7 @@
         }
         c.position.set(x, y);
         c.eventMode = "static";
-        addGlow(ctx, c, sp.texture.width * scale, sp.texture.height * scale);
+        addGlow(ctx, c, sp);
         c.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); onTap && onTap(); });
         c.userData.sprite = sp;
         return c;
@@ -103,36 +103,25 @@
         ctx.app.ticker.add(tick);
     }
 
-    // Жёлтое свечение вокруг кнопки при наведении курсора (просил юзер
-    // W22 — правило UI: ВСЕ кнопки игры). Мягкий ореол — растянутая
-    // радиальная текстура в add-режиме под картинкой кнопки, альфа
-    // доводится твином (0.25/кадр). Тикер снимается сам, узлы умерли —
-    // сразу. c.userData.glow — доступ тестов.
-    function glowTex() {
-        if (!globalThis.__uiGlowTex) {
-            const cv = document.createElement("canvas");
-            cv.width = cv.height = 128;
-            const g = cv.getContext("2d");
-            const grd = g.createRadialGradient(64, 64, 6, 64, 64, 64);
-            grd.addColorStop(0, "rgba(255,255,255,0.9)");
-            grd.addColorStop(0.4, "rgba(255,255,255,0.4)");
-            grd.addColorStop(1, "rgba(255,255,255,0)");
-            g.fillStyle = grd;
-            g.fillRect(0, 0, 128, 128);
-            globalThis.__uiGlowTex = PIXI.Texture.from(cv);
-        }
-        return globalThis.__uiGlowTex;
-    }
-    function addGlow(ctx, c, w, h) {
-        const glow = new PIXI.Sprite(glowTex());
+    // Жёлтая подсветка кнопки при наведении курсора (просил юзер W22 —
+    // правило UI: ВСЕ кнопки игры). W58 (юзер): свет должен идти ПО
+    // КОНТУРУ кнопки, а не овалом за ней — раньше это была растянутая
+    // радиальная текстура, форм кнопки не повторявшая. Теперь — копия
+    // спрайта кнопки чуть большего масштаба под самой кнопкой: золотая
+    // кромка повторяет силуэт (прозрачные поля текстуры не светятся).
+    // Альфа доводится твином (0.25/кадр). Тикер снимается сам, узлы
+    // умерли — сразу. c.userData.glow — доступ тестов.
+    function addGlow(ctx, c, sp, margin = 1.08) {
+        // Контурная подсветка: клон спрайта кнопки, чуть раздутый —
+        // видна только золотая кромка вокруг силуэта
+        const glow = new PIXI.Sprite(sp.texture);
         glow.anchor.set(0.5);
-        glow.width = w * 1.42; // ореол торчит за края кнопки
-        glow.height = h * 1.9; // плоские кнопки — запас по вертикали
+        glow.scale.set(sp.scale.x * margin, sp.scale.y * margin);
         glow.tint = 0xffd75e;
         glow.blendMode = "add";
         glow.alpha = 0;
         glow.eventMode = "none";
-        c.addChildAt(glow, 0); // под картинкой кнопки — свечение Вокруг
+        c.addChildAt(glow, 0); // под картинкой кнопки — кромка Вокруг
         let a = 0, tgt = 0, running = false;
         const tick = () => {
             if (c.destroyed || glow.destroyed) { // сцена умерла — снимаем
@@ -371,10 +360,20 @@
         zone.rect(0, 0, w, h);
         zone.fill({ color: 0xffffff, alpha: 0.001 });
         zone.eventMode = "static";
-        zone.on("wheel", (e) => {
+        root.addChildAt(zone, 0);
+
+        // колесо — на КОРНЕ панели (W58, юзер): раньше слушатель висел
+        // только на подложке-зоне, а событие над картой уходило карте и
+        // по соседней ветке (zone — sibling) не доходило; над увеличенной
+        // ховер-копией (базовая карта под ней остаётся интерактивной)
+        // скролл пропадал вовсе. События карт всплывают: card → контент
+        // → inner → root — слушаем здесь. ВАЖНО: notifyTarget в Pixi v8
+        // пропускает не-interactive узлы пути (isInteractive: static/
+        // dynamic) — без eventMode корень с слушателем молчал бы
+        root.eventMode = "static";
+        root.on("wheel", (e) => {
             scrollBy((e.deltaY || 0) * 0.6);
         });
-        root.addChildAt(zone, 0);
 
         let contentH = 0, t = 0, dragging = false, explicitH = null;
 

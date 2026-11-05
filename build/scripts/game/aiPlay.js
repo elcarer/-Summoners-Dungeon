@@ -54,6 +54,10 @@
                     await enemyTurn();
                     return;
                 }
+                // Дополнительная пауза между концом хода противника и
+                // началом хода игрока (W58, юзер) — успеть осмотреть поле
+                await delay(0.5 / animK());
+                if (B.stopped) return;
                 await playerTurnStart();
             };
 
