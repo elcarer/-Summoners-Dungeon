@@ -92,7 +92,10 @@
             // юзер): у Горбага и прочих героев Силы — гоблинская, у героев
             // Роста — природная
             A.playerBackTex = function playerBackTex() {
-                return globalThis.GAME_UI.backTexOf(G.elem);
+                // W54: герой с ДВУМЯ стихиями — обложка мультицвета
+                const hd = globalThis.GAME_DATA.HEROES[G.heroId];
+                return globalThis.GAME_UI.backTexOf(
+                    hd && hd.elems && hd.elems.length > 1 ? "strGro" : G.elem);
             };
             // Ловушка врага — РУБАШКОЙ (просил юзер): игрок видит, что противник
             // сыграл карту, но какая именно ловушка — неизвестно; на поле встанет

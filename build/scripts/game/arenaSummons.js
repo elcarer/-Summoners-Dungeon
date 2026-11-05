@@ -195,6 +195,28 @@
                 return true;
             };
 
+            // «Эльф огня» (sg241, W54 спека юзера): после призыва наносит
+            // 2 раза по 1 урону СЛУЧАЙНЫМ соседним (верт/гориз) существам
+            // ПРОТИВНИКА. Выборы независимы — оба попадания могут прийтись
+            // по одной цели; соседей противника нет — способность молчит
+            A.summonFireElf = function summonFireElf(u) {
+                if (!B.units.includes(u)) return false;
+                for (let n = 0; n < (u.def.fireSnipe || 2); n++) {
+                    if (!B.units.includes(u)) return false; // сам погиб при призыве
+                    const near = B.units.filter((v) => v.side !== u.side
+                        && v.def.type === "unit"
+                        && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
+                    if (!near.length) return false;
+                    const v = near[(Math.random() * near.length) | 0];
+                    const p = cellXY(v.col, v.row);
+                    fxEvent("impact", { x: p.x, y: p.y - 24, color: 0xff8a5e,
+                        power: 0.55 });
+                    damageUnit(v, 1, u, "dam");
+                    sfx("chpoc");
+                }
+                return true;
+            };
+
             // Способности, которые «Озёрная дева» (wis111) может скопировать
             // у соседнего существа. Статы/подтип/арт/лист не копируются —
             // «способность», а не превращение в другое существо.
@@ -205,6 +227,7 @@
                 "keeperScale", "energyToStats", "animalCost", "targetDiscount",
                 "spellBuffAura", "sisterDraw", "plantEcho", "wolfSummon",
                 "trapCancel", "sulfurBurst", "slimeGain",
+                "fireSnipe", "growOnAttack", // W54: «Рыжий лес»
             ];
             // Копирование способностей в per-unit копию def (как purgeUnit):
             // исходная карта каталога не меняется, cardIdOf узнаёт карту по

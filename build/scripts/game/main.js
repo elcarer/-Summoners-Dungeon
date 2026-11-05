@@ -71,6 +71,8 @@
         uiTextures["card_honor_back.png"] = await assets.loadTexture("./images/ui/card_honor_back.png");
         // рубашка стихии Время (Тордин, просил юзер)
         uiTextures["card_time_back.png"] = await assets.loadTexture("./images/ui/card_time_back.png");
+        // рубашка мультицветных колод и карт «Рыжего леса» (W54, юзер)
+        uiTextures["card_multi_back.png"] = await assets.loadTexture("./images/ui/card_multi_back.png");
         // тайлы подземелий юзера: images/dungeon_tiles/<данж>/<…>.png —
         // полы 64×64 (floor/0-9) и стены walls/* по маске соседей.
         // Свой набор на каждый данж: goblins_lair (Сила), growth_lair (Рост),
@@ -87,7 +89,8 @@
             "walls/wall_end1", "walls/wall_end2", "walls/wall_end3",
             "walls/wall_end4"];
         for (const lair of ["goblins_lair", "growth_lair", "water_lair",
-                            "necro_lair", "honor_lair", "time_lair"]) {
+                            "necro_lair", "honor_lair", "time_lair",
+                            "str_gro"]) { // W54: «Рыжий лес» (тайлы юзера)
             for (const f of TILE_FILES) {
                 uiTextures[`dungeon_tiles/${lair}/${f}.png`] =
                     await assets.loadTexture(`./images/dungeon_tiles/${lair}/${f}.png`);
@@ -375,6 +378,25 @@
         const unlockAudio = () => { try { audio.unlock(); } catch (e) { /* нет WebAudio */ } };
         window.addEventListener("pointerdown", unlockAudio);
         window.addEventListener("keydown", unlockAudio);
+
+        // Курсор прячется при игре с клавиатуры и возвращается при движении
+        // мыши (W54, юзер): жмёшь клавишу — стрелка исчезает, шевельнул
+        // мышь — появилась. Движение = реальный mousemove, поэтому курсор
+        // не мигает у стоящей мыши. У игры курсор-картинка стоит в CSS с
+        // !important (index.html) — inline без important её не перебьет
+        let cursorHidden = false;
+        window.addEventListener("keydown", () => {
+            if (!cursorHidden) {
+                cursorHidden = true;
+                document.body.style.setProperty("cursor", "none", "important");
+            }
+        });
+        window.addEventListener("mousemove", () => {
+            if (cursorHidden) {
+                cursorHidden = false;
+                document.body.style.removeProperty("cursor");
+            }
+        });
         const sfxCounts = {};
         const gameSfx = (name) => {
             const key = name || "step"; // клик UI — step.mp3 (W34, юзер)
@@ -676,7 +698,7 @@
                 // минимум контекста боя (просил юзер): открытый мир — 12
                 // (стартовые колоды), подземелье — 15+этаж (вход 16)
                 const min = this.worldFrom ? D.deckMinFor(1)
-                    : D.caveDeckFor(this.run && this.run.floor ? this.run.floor : 1);
+                    : D.caveDeckFor(this.run && this.run.cave, this.run && this.run.floor ? this.run.floor : 1);
                 if (this.deck.length >= min) return "dungeon";
                 const heroes = [this.starterId, ...(this.captured || [])];
                 const reach = heroes.some((h) => {

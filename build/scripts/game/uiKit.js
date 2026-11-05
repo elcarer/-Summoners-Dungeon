@@ -188,6 +188,7 @@
             : elem === "decay" ? "card_decay_back.png"
             : elem === "honor" ? "card_honor_back.png"
             : elem === "time" ? "card_time_back.png"
+            : elem === "strGro" ? "card_multi_back.png" // W54: мультицвет
             : "card_goblin_back.png";
     }
 

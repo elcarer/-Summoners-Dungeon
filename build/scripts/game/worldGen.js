@@ -34,7 +34,7 @@
     // v17 — дороги в обход городов (W45, юзер): A* не режет спрайт города
     // (footprint 9×6/9×7.5 клеток — с W42 тело непроходимо, дорога к
     // «воротам» подходила сквозь него); старые миры (v16) перегенерируются
-    const V = 17;
+    const V = 18; // W54: «Рыжий лес» — новый POI у границы Сила/Рост (миры пересобираются)
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // деревья лесных массивов по зонам стихий (просил юзер): вместо
@@ -60,6 +60,7 @@
         strength: "world.cave", growth: "world.caveGrowth",
         wisdom: "world.caveWisdom", decay: "world.caveDecay",
         honor: "world.caveHonor", time: "world.caveTime",
+        strGro: "world.caveStrGro", // W54: «Рыжий лес»
     };
     // габариты зданий в клетках (просил юзер): город 5×3, столица 5×4;
     // (gx,gy) POI — якорь-площадь: у города нижняя средняя клетка,
@@ -704,6 +705,63 @@
             }
         }
 
+        // ── 5b. «Рыжий лес» (W54, спека юзера): МУЛЬТИЦВЕТНЫЙ данж
+        // Сила+Рост (cave "sgr", elem "strGro") — генерится у ГРАНИЦЫ
+        // зон Силы и Роста. Кандидаты — клетки, где футпринт 6×4 лежит
+        // на суше этих ДВУХ зон (переходить чужие нельзя); якоря других
+        // POI держим на дистанции (ослабляем при тесной стране, как у
+        // городов). Дальше данж едет по общим конвейерам: дорога (в
+        // остов Силы), охрана у арки, имя (world.caveStrGro)
+        {
+            const ks = ELEMS.indexOf("strength"), kg = ELEMS.indexOf("growth");
+            const footOk = (x, y) => {
+                if (x < 3 || y < 2 || x >= W - 3 || y >= H - 3) return false;
+                for (const [fx, fy] of footCells("dungeon", x, y)) {
+                    const i = fy * W + fx, z = zone[i];
+                    if (z !== ks && z !== kg) return false;
+                    const t = ter[i];
+                    if (t !== T_GROUND && t !== T_FOREST && t !== T_SWAMP)
+                        return false;
+                }
+                return true;
+            };
+            const cands = [];
+            for (let y = 3; y < H - 3; y++)
+                for (let x = 3; x < W - 3; x++) {
+                    if (!footOk(x, y)) continue;
+                    let border = false;
+                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        const z = zone[(y + dy) * W + x + dx];
+                        if (z === ks || z === kg) border = true;
+                    }
+                    if (border) cands.push([x, y]);
+                }
+            // перемешать по сиду, взять первую клетку, удалённую от всех
+            // POI; ослабление дистанции — как у городов (22 → 12)
+            for (let i = cands.length - 1; i > 0; i--) {
+                const j = (rng() * (i + 1)) | 0;
+                const t = cands[i]; cands[i] = cands[j]; cands[j] = t;
+            }
+            let site = null;
+            for (const minD of [22, 16, 12]) {
+                site = cands.find(([x, y]) => !pois.some((p) =>
+                    Math.hypot(p.gx - x, p.gy - y) < minD)) || null;
+                if (site) break;
+            }
+            if (site) {
+                const [x, y] = site;
+                for (const [fx, fy] of footCells("dungeon", x, y)) {
+                    ter[fy * W + fx] = T_GROUND; // площадка расчищена
+                    poiMask[fy * W + fx] = 1;
+                    blocked[fy * W + fx] = 1; // стены спрайта данжа (юг — арка)
+                }
+                // якорь-площадь свободен (у данжа якорь — низ футпринта)
+                blocked[y * W + x] = 0;
+                pois.push({ kind: "dungeon", elem: "strGro",
+                    gx: x, gy: y, cave: "sgr" });
+            }
+        }
+
         // ── 6. дороги: A* между площадями/арками. Внутри зоны — остов
         // (Прим) + одно «кольцевое» ребро; между смежными зонами —
         // ближайшая пара. Дорога прокладывается и сквозь горы/чащи
@@ -776,7 +834,10 @@
         }
         const edges = [];
         for (let k = 0; k < 6; k++) {
-            const nodes = pois.filter((p) => p.elem === ELEMS[k]);
+            // W54: «Рыжий лес» (elem "strGro") едет дорогой остова СИЛЫ —
+            // юзер: «чтобы к нему вела дорога»
+            const nodes = pois.filter((p) => p.elem === ELEMS[k]
+                || (p.cave === "sgr" && ELEMS[k] === "strength"));
             const inTree = [0];
             const rest = nodes.map((_, i) => i).slice(1);
             while (rest.length) { // остов Прима по евклиду

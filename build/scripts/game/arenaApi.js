@@ -5,6 +5,10 @@
     globalThis.GAME_ARENA.installApi = function installApi(A) {
         with (A) {
             A.api = {
+                // тест-хук W54: сам контекст арены (пробы патчат A.shuffle
+                // для детерминированной колоды — A пересоздаётся при буте,
+                // глобаль GAME_ARENA его не хранит)
+                __A: () => A,
                 endTurn() {
                     if (!B || B.phase !== "player" || B.discarding || B.picking) return;
                     cancelJourneySummon(); // незавершённый призыв — карта в руку

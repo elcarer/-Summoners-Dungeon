@@ -34,7 +34,8 @@
                         wis: "water_lair",
                         dec: "necro_lair",
                         hon: "honor_lair",
-                        tim: "time_lair" };
+                        tim: "time_lair",
+                        sgr: "str_gro" }; // W54: «Рыжий лес» (тайлы юзера)
     const tileSetOf = (cave) => TILE_SETS[cave] || TILE_SETS.gob;
     // Версия раскладки этажа: тайлы 64px данжа (v9 — у 5-го этажа
     // «Подземных ключей» появился спуск на новый 6-й; старые сейвы без
@@ -151,9 +152,10 @@
     // (спуск на 2-й — 17, на 3-й — 18, …), рост +1 за этаж до капа 60
     // (просил юзер; вход на 1-й этаж — 16, dataCards.caveDeckFor).
     // Минимум колоды ДЛЯ БОЯ на этаже N — то же число минус 1
-    // (caveDeckFor(N) = 15+N)
-    function deckNeed(floor) {
-        return Math.min(globalThis.GAME_DATA.DECK_MAX, 16 + Math.max(0, floor));
+    // (caveDeckFor(N) = 15+N). W54: считаем через caveDeckFor СВОЕГО
+    // данжа этажом ниже — «Рыжий лес» требует свою лестницу (26/28)
+    function deckNeed(cave, floor) {
+        return globalThis.GAME_DATA.caveDeckFor(cave, (floor | 0) + 1);
     }
 
     // ── ГЕНЕРАТОР РАСКЛАДКИ ЭТАЖА (просил юзер: комнаты и граф проходов
@@ -239,8 +241,11 @@
         const [bx, by] = center(rooms[far]);
         g[sy][sx] = "H";
         // главарь есть у каждого данжа (у «Подземных ключей» — «Безумный
-        // маг» на каждом этаже, как у пещер и Рощи)
-        if (caveOf(cave).boss) g[by][bx] = "B";
+        // маг» на каждом этаже, как у пещер и Рощи). W54: «Рыжий лес»
+        // (bossLast) держит босса ТОЛЬКО на последнем этаже — на 1–2-м
+        // в дальней комнате только спуск, без охраны (спека юзера)
+        if (caveOf(cave).boss && (!caveOf(cave).bossLast
+            || floor >= caveOf(cave).maxFloor)) g[by][bx] = "B";
         // спуск ставится только если есть куда: на последнем этаже данжа
         // выхода вниз нет вовсе (просил юзер)
         if (floor < caveOf(cave).maxFloor) {
@@ -302,7 +307,11 @@
             v: MAP_V,
             cave: caveId,
             floor, heroPos: null, spawn: null, ladder: null, enemies: [],
-            exit: null, exitCool: false, bossDead: !caveOf(caveId).boss,
+            exit: null, exitCool: false,
+            // босс «мёртв» по умолчанию: спуск НЕ запечатан, если на этаже
+            // босса нет вовсе («Рыжий лес», этажи 1–2 — спека юзера W54);
+            // парсер ниже переведёт в false, положив босса на карту
+            bossDead: true,
             toast: null, toastT: 0, win: null,
             rows: map.rows, roomCenters: map.roomCenters,
             lootCenters: map.lootCenters,
@@ -320,7 +329,10 @@
                 const enc = mobForFloor(caveId, floor);
                 st.enemies.push({ x, y, enc, deck: enemyDeck(enc, floor), alive: true, boss: false });
             }
-            else if (ch === "B" && bossId) st.enemies.push({ x, y, enc: bossId, deck: enemyDeck(bossId, floor), alive: true, boss: true });
+            else if (ch === "B" && bossId) {
+                st.bossDead = false;
+                st.enemies.push({ x, y, enc: bossId, deck: enemyDeck(bossId, floor), alive: true, boss: true });
+            }
             else if (ch === "X") st.exit = { x, y };
         }
         // лестница наверх — в стартовой комнате, клеткой выше героя:
@@ -746,6 +758,16 @@
             floorT.anchor.set(0.5, 0);
             floorT.position.set(960, 12); // по середине экрана (просил юзер)
             c.addChild(floorT);
+            // особенность подземелья (W54, юзер): текст «Ярости природы»
+            // виден, пока герой внутри «Рыжего леса» (обновление ниже)
+            const featT = new PIXI.Text({ text: "",
+                style: { fontFamily: "Kereru", fontSize: 17,
+                    fill: 0xd8a468, stroke: { color: 0x1c1207, width: 3 },
+                    wordWrap: true, wordWrapWidth: 860, align: "center" } });
+            featT.anchor.set(0.5, 0);
+            featT.position.set(960, 44);
+            featT.eventMode = "none";
+            c.addChild(featT);
             // золото — мета-ресурс забега: около верхнего левого угла
             // (просил юзер), без плашки
             const goldPlate = new PIXI.Container();
@@ -830,7 +852,7 @@
             toast.position.set(960, 495);
             toast.alpha = 0;
             c.addChild(toast);
-            c.userData = { floorT, goldT, resT, toast, qRune, qSide };
+            c.userData = { floorT, featT, goldT, resT, toast, qRune, qSide };
             return c;
         }
 
@@ -1130,7 +1152,7 @@
             return n;
         }
         function sellLocked() {
-            return ownedTotal() - 1 < deckNeed(G.dungeon ? G.dungeon.floor : 1);
+            return ownedTotal() - 1 < deckNeed(G.dungeon ? G.dungeon.cave : "gob", G.dungeon ? G.dungeon.floor : 1);
         }
 
         function shopSell(id) {
@@ -1309,7 +1331,7 @@
                 // нижняя подсказка правой панели объясняет блокировку продажи
                 const locked = sellLocked();
                 sellHint.text = locked
-                    ? t("shop.sellNeed", { n: deckNeed(G.dungeon ? G.dungeon.floor : 1) })
+                    ? t("shop.sellNeed", { n: deckNeed(G.dungeon ? G.dungeon.cave : "gob", G.dungeon ? G.dungeon.floor : 1) })
                     : t("shop.sellHint");
                 sellHint.style.fill = locked ? 0xff8f6e : 0x8a7c5e;
                 winRefs.goodsNodes = buildGoods();
@@ -1629,6 +1651,13 @@
                 uiHud.userData.floorT.text = st.city
                     ? GAME_LOC.t("city.name")
                     : GAME_LOC.t("dungeon.floor", { n: st.floor });
+                // особенность подземелья в инфоокне сверху (W54, юзер):
+                // «Ярость природы» — только внутри «Рыжего леса»
+                {
+                    const cd = globalThis.GAME_DATA.CAVES[st.cave];
+                    uiHud.userData.featT.text = !st.city && cd && cd.fury
+                        ? GAME_LOC.t("dungeon.fury") : "";
+                }
                 uiHud.userData.goldT.text = String(G.gold);
                 // ресурсы стихий в HUD (W40) — числа каждый кадр
                 for (const e of globalThis.GAME_SIDEQ.RES_ELEMS)
@@ -1867,8 +1896,8 @@
                     }
                     // спуск требует растущую колоду: с этажа N — 16+N карт
                     // (спуск на 2-й — 17, …) до капа 60 (просил юзер)
-                    else if (G.deck.length < deckNeed(st.floor)) {
-                        showToast(GAME_LOC.t("dungeon.exitDeck", { n: deckNeed(st.floor) }));
+                    else if (G.deck.length < deckNeed(st.cave, st.floor)) {
+                        showToast(GAME_LOC.t("dungeon.exitDeck", { n: deckNeed(st.cave, st.floor) }));
                     } else {
                         st.heroPos = { x: hx, y: hy };
                         G.dungeonStates[stKey(st.cave, st.floor)] = st;
@@ -1955,7 +1984,7 @@
             },
             hudGold: () => (uiHud && uiHud.userData.goldT ? uiHud.userData.goldT.text : null),
             // формула минимума колоды для спуска (тесты + единый источник)
-            deckNeed: (f) => deckNeed(f),
+            deckNeed: (c, f) => deckNeed(c, f),
             // лестница наверх у старта этажа и предел глубины данжа (тесты)
             ladderAt: () => (G.dungeon && G.dungeon.ladder ? { ...G.dungeon.ladder } : null),
             maxFloor: (cave) => caveOf(cave || (G.dungeon && G.dungeon.cave) || "gob").maxFloor,

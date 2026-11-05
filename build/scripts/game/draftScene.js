@@ -26,9 +26,17 @@
         let lastPicked = -1, lastEnemy = -1;
 
         function draftPool() {
-            const elem = draftElemOf(G);
+            // W54 (спека юзера): «Карта сокровищ» «Рыжего леса» — карты
+            // ОБОИХ стихий (elems) и мультицветные с хотя бы одной из них;
+            // прочие данжи драфтят одну стихию (elem) как раньше
+            const cave = G.dungeon && G.dungeon.cave;
+            const info = cave && globalThis.GAME_DATA.CAVES[cave];
+            const elems = info && info.elems ? info.elems : [draftElemOf(G)];
+            const okElem = (c) => c.multi
+                ? c.multi.some((e) => elems.includes(e))
+                : elems.includes(c.elem);
             return Object.keys(CARDS).filter((id) =>
-                CARDS[id].elem === elem && CARDS[id].img);
+                okElem(CARDS[id]) && CARDS[id].img);
         }
 
         function pickThree() {

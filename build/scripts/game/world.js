@@ -834,17 +834,23 @@
         // Вход в подземелье: продолжить текущий этаж ЭТОГО данжа (состояния
         // этажей хранит G.dungeonStates) или начать его первый. Подземелья
         // требуют растущую колоду (просил юзер): вход — 16 карт, каждый
-        // следующий этаж +1 (dataCards.caveDeckFor); с меньшей колодой
-        // вход закрыт — всплывает предупреждение. Открытый мир живёт по
-        // минимуму 12 (стартовые колоды) — добор фармят отрядами
+        // следующий этаж +1 (dataCards.caveDeckFor); «Рыжий лес» (W54) —
+        // 24 и +2 за этаж. С меньшей колодой вход закрыт — всплывает
+        // предупреждение. Открытый мир живёт по минимуму 12 (стартовые
+        // колоды) — добор фармят отрядами. «Рыжему лесу» нужны ЕЩЁ и
+        // ресурсы: 1 Щиток мощи + 1 Росток жизни (спека юзера W54;
+        // НЕ списываются — требование к герою, как и колода)
         function enterCave(cave) {
             const D = globalThis.GAME_DATA;
             const caveId = D.CAVES[cave] ? cave : "gob";
             if (!D.CAVES[caveId]) return false; // на всякий
             const floor = G.run.cave === caveId
                 ? (G.run.floors || (G.run.floors = {}))[caveId] || 1 : 1;
-            const need = D.caveDeckFor(floor);
+            const need = D.caveDeckFor(caveId, floor);
             if (G.deck.length < need) return false; // мало карт — вход закрыт
+            if (D.CAVES[caveId].fury && D.CAVES[caveId].elems
+                && !D.CAVES[caveId].elems.every((e) =>
+                    (G.resources && (G.resources[e] || 0) >= 1))) return false;
             if (heroId !== null) {
                 G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
             }
@@ -1290,15 +1296,19 @@
                 // квест-диалоги: анонс нового задания / окно незабранной
                 // награды (открываются поверх мира, герой стоит)
                 globalThis.GAME_QUESTS.onSceneEnter(ctx);
-                // награда побочного квеста ратуши (W40): «+1 ресурс»
-                // всплывает у героя при входе в мир
+                // награда побочного квеста ратуши (W40 → W54, юзер):
+                // инфоокно «поручение выполнено» — что сделал герой
+                // (победил разбойника / доставил письмо) + строка награды
                 if (G.world.sideNote) {
                     const n = G.world.sideNote;
                     G.world.sideNote = null;
-                    floatText(GAME_LOC.t(n.key,
-                        { res: GAME_LOC.t("res." + n.elem) }),
-                        COMPONENTS.positionX[heroId], COMPONENTS.positionY[heroId],
-                        0xf3d34a);
+                    if (!globalThis.GAME_SIDEQ.showComplete(ctx, n)) {
+                        // окно не открылось (нет ctx и т.п.) — прежний тост
+                        floatText(GAME_LOC.t(n.key,
+                            { res: GAME_LOC.t("res." + n.elem) }),
+                            COMPONENTS.positionX[heroId],
+                            COMPONENTS.positionY[heroId], 0xf3d34a);
+                    }
                 }
             },
             exit() {
@@ -1486,10 +1496,16 @@
 
                 // Эскейп закрывает квест-диалог его кнопкой (просил юзер —
                 // дублирование кнопок «выход» меню на клавишу); окно
-                // поручения (W45) — своей кнопкой «Уйти»
+                // «поручение выполнено» (W54) — своей кнопкой, затем окно
+                // поручения (W45) — кнопкой «Уйти»
                 if (ctx.input.wasPressed("Escape") && (ctx.questModal || 0) > 0) {
-                    if (!globalThis.GAME_QUESTS.tap()
-                        && globalThis.GAME_SIDEQ) globalThis.GAME_SIDEQ.closeReview();
+                    if (globalThis.GAME_SIDEQ
+                        && globalThis.GAME_SIDEQ.closeComplete()) {
+                        // окно завершения закрыто — остальное не трогаем
+                    } else if (!globalThis.GAME_QUESTS.tap()
+                        && globalThis.GAME_SIDEQ) {
+                        globalThis.GAME_SIDEQ.closeReview();
+                    }
                 }
 
                 // M — размер мини-карты: обычная ↔ крупная вдвое
@@ -1697,13 +1713,24 @@
                                 p.denyAt = p.soonAt = performance.now();
                                 soonCount++;
                                 if (ctx.sfx) ctx.sfx();
+                                // отказ «Рыжего леса» (W54): без 2 ресурсов
+                                // стихий — свой текст, без них — про колоду
+                                const cd = globalThis.GAME_DATA
+                                    .CAVES[p.cave] || null;
+                                const noRes = cd && cd.fury && cd.elems
+                                    && !cd.elems.every((e) =>
+                                        (G.resources
+                                            && (G.resources[e] || 0)) >= 1);
+                                const floor = G.run.cave === p.cave
+                                    ? (G.run.floors
+                                        || (G.run.floors = {}))[p.cave] || 1
+                                    : 1;
                                 floatText(GAME_LOC.t(
-                                    globalThis.GAME_DATA.CAVES[p.cave]
-                                        ? "world.deckLow" : "world.soon",
-                                    { min: globalThis.GAME_DATA.caveDeckFor(
-                                        G.run.cave === p.cave
-                                            ? (G.run.floors || (G.run.floors = {}))[p.cave] || 1
-                                            : 1) }),
+                                    !cd ? "world.soon"
+                                        : noRes ? "world.resLow"
+                                        : "world.deckLow",
+                                    { min: globalThis.GAME_DATA
+                                        .caveDeckFor(p.cave, floor) }),
                                     c.x, c.y, 0xd8c79d);
                             }
                         }

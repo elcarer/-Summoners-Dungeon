@@ -14,7 +14,7 @@ Git-правило: `build/`, `PLAN.md`, `README.md`, этот файл и `docs
 | `docs/combat.md` | правила боя (актуальные), геометрия арены поверх арта | ЛЮБАЯ правка боя/карт/ИИ — до правки |
 | `docs/traps.md` | свод ловушек кодинга и харнесса | отладка, новые механики, пробы |
 | `docs/architecture.md` | устройство `build/scripts/game/`, листы существ, пайплайн карт стихий, ассеты | новая карта/сцена/лист, правки сцен/мира |
-| `docs/journal.md` | журнал волн (строка на волну) + детали W41–W53 | история «почему так», поиск регрессов |
+| `docs/journal.md` | журнал волн (строка на волну) + детали W41–W54 | история «почему так», поиск регрессов |
 
 ## Запуск и тесты
 
@@ -61,20 +61,38 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 
 ## Текущее состояние
 
-- Последняя волна: **W53** — пиксель-арт эффекты **pixelfx** (юзер дал
-  библиотеку github.com/patch-gg/pixelfx, MIT): бандл
-  `build/dll/pixelfx.min.js` (164 КБ, глобаль PIXELFX, 18 эффектов,
-  лицензия dll/pixelfx/LICENSE.md) + мост `scripts/game/pixelfx.js`
-  (GAME_FX: canvas→PIXI.Texture nearest, общий тик Ticker.shared,
-  ramp(цвет)→палитра, one-shot сам умирает, loop с контейнером; нет
-  бандла — сцены живут штатно). БОЙ: 15 событий fxEvent → pixelfx
-  (impact/heal/death/summon/cast/ice/poison/trap/seal/base/buff/debuff/
-  ward/victory/defeat), Graphics-пресеты арены — фолбэк. ГОРОД: живые
-  огни — горн кузницы (brazier) + факелы ратуши (torch). Ловушка:
-  fxClear зовётся из enter() арены при root=null — guard обязателен.
-  Пробы: probe_w53 25/0 (новая), check_city 394/0, mini_test 19/0,
-  quest_test 30/0 (обновлён под W52-проход), probe_w52 24/0. Детали —
-  `docs/journal.md` (W53).
+- Последняя волна: **W54** — (1) три поправки юзера: инфоокно
+  «Поручение выполнено» с наградой (sidequests showComplete, вместо
+  «плюсика», questModal+Escape); курсор прячется по клавише и
+  возвращается по движению мыши (main.js, inline `!important` против
+  CSS-курсора игры); эффекты боя ЗАКАНЧИВАЮТСЯ — loop-эффекты каталога
+  pixelfx заменены одноразовыми (ward→shield-block, seal→mana-burst,
+  buff→collect-burst, poison→spore-burst) + страховка stop() для loop,
+  ПОСТРОЙКЕ — свой эффект build (heavy-landing) вместо призывного
+  (бандл пересобран, 18 эффектов). (2) МУЛЬТИЦВЕТНЫЙ данж «Рыжий лес»
+  (Сила+Рост): карты sg241/242 (elem "strGro" + multi), рубашка
+  card_multi_back.png, правило колод мульти-пересечением (deckScene);
+  герой-враг sgrBig «Большой размер» (heroes/66, 16♥, bigStomp, колода
+  32 из спеки); POI у границы Сила/Рост с дорогой (WORLDGEN.V 17→18);
+  3 этажа, босс только на 3-м, bossDead по факту B на этаже; вход
+  24/26/28 карт (caveDeckFor(cave,floor)) + 1 Щиток мощи + 1 Росток
+  жизни (не списываются); особенность fury «Ярость природы» (текст в
+  HUD данжа, multiFury −1 базе врага при розыгрыше двухцветной —
+  обе стороны); драфт «Карты сокровищ» — Сила+Рост+мульти (draftPool
+  по CAVES.elems). Пробы: probe_w54 35/0 (новая, 3 прогона), check_city
+  394/0, mini_test 19/0 (каталог 249), quest_test 30/0, probe_w52 24/0,
+  probe_w53 26/0. Детали — `docs/journal.md` (W54).
+- **W53** — пиксель-арт эффекты **pixelfx** (юзер дал библиотеку
+  github.com/patch-gg/pixelfx, MIT): бандл `build/dll/pixelfx.min.js`
+  (глобаль PIXELFX, лицензия dll/pixelfx/LICENSE.md) + мост
+  `scripts/game/pixelfx.js` (GAME_FX: canvas→PIXI.Texture nearest,
+  общий тик Ticker.shared, ramp(цвет)→палитра, one-shot сам умирает,
+  loop с контейнером; нет бандла — сцены живут штатно). БОЙ: события
+  fxEvent → pixelfx, Graphics-пресеты арены — фолбэк. ГОРОД: живые
+  огни — горн кузницы (brazier) + факелы ратуши (torch). Ловушки:
+  fxClear зовётся из enter() арены при root=null — guard обязателен;
+  W54 заменил loop-эффекты (done() у loop не наступает). Пробы:
+  probe_w53 26/0, check_city 394/0. Детали — `docs/journal.md` (W53).
 - **W52** — (1) выход из города ПРОХОДОМ вниз в стене
   вместо таблички «ВЫХОД» (просил юзер): 3 клетки пола в нижнем ряду под
   воротным кварталом (столица 12–14/18, город 15–17/15), триггер — заход
@@ -231,11 +249,20 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
   мостов = файл 4×3 + нарезка в main.js (moatsTex/moatsCityTex) +
   renderMoatsChunk сам берёт ROAD_TILE; слот 11 пустой (шум альфы не
   рендерится).
-- Эффекты pixelfx (W53): расширение — заменить эффект события = ключ в
-  PFX-таблице arenaFx.js + строка в бандле (for_work/pixelfx_entry.js →
-  npx esbuild) + перезапуск; мир (погода/порталы данжей) пока НЕ тронут —
-  по спеке юзера; оффлайн-каталог всех 244: for_work/pixelfx_upstream
-  (tools/render.mjs, docs/CATALOG.md), скилл — ~/.zcode/skills/pixelfx.
+- Эффекты pixelfx (W53/W54): заменить эффект события = ключ в PFX-
+  таблице arenaFx.js + строка в бандле (for_work/pixelfx_entry.js →
+  npx esbuild) + перезапуск; loop-эффекты на одноразовых событиях
+  НЕ ставить без страховки stop() (W54); мир (погода/порталы данжей)
+  пока НЕ тронут — по спеке юзера; оффлайн-каталог всех 244:
+  for_work/pixelfx_upstream (tools/render.mjs, docs/CATALOG.md),
+  скилл — ~/.zcode/skills/pixelfx.
+- Мультицвет «Сила+Рост» (W54, спека юзера): новый мульти-данж = cave в
+  CAVES (+elems для драфта, fury/bossLast по вкусу) + FLOOR_MOBS_<cave> +
+  ENEMY_FILLS/REWARD_POOLS/STARTER_DECKS ключа + TILE_SETS + ПРЕДЗАГРУЗКА
+  тайлов в main.js (цикл TILE_FILES) + POI в worldGen + ELEM_CAVE_LABEL.
+  Мульти-карта = elem "<код>" + multi:[стихии] (правило колод —
+  пересечение). Новые двухцветные карты/враги/этажи «Рыжего леса» —
+  ждут спек юзера (этажи 2–3 играют тем же sgrBig).
 - Выход из города (W52, юзер): проход вниз в стене (st.exitPassage,
   3 клетки в нижнем ряду), триггер — заход в клетки прохода; иконки-
   таблички у города больше нет (лестница — только этажам данжа).

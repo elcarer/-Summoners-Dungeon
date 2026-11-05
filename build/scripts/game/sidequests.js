@@ -428,6 +428,88 @@
             : { open: false };
     }
 
+    // ── Инфоокно «Поручение выполнено» (W54, юзер): рассказ, ЧТО сделал
+    // герой (победил разбойника / принёс письмо в нужное место), и там же —
+    // полученная награда (иконка ресурса + строка). Паттерн — окно
+    // просмотра поручения выше: dim+панель, модальность ctx.questModal
+    // (герой стоит), закрытие кнопкой и Escape (мир зовёт closeComplete)
+    let cw = null;
+    function closeComplete() {
+        if (!cw) return false;
+        const d = cw;
+        cw = null;
+        d.ctx.questModal = Math.max(0, (d.ctx.questModal || 1) - 1);
+        if (d.node && !d.node.destroyed) d.node.destroy({ children: true });
+        return true;
+    }
+    function showComplete(ctx, n) {
+        if (!ctx || !n || cw) return false;
+        const G = ctx.G;
+        const t = globalThis.GAME_LOC.t;
+        const { T, button } = globalThis.GAME_UI;
+        const node = new globalThis.PIXI.Container();
+        node.eventMode = "static";
+        const dim = new globalThis.PIXI.Graphics();
+        dim.rect(-3000, -2000, 7920, 5080);
+        dim.fill({ color: 0x000000, alpha: 0.55 });
+        node.addChild(dim);
+        const w = 720, h = 460, top = 540 - h / 2;
+        const panel = new globalThis.PIXI.Graphics();
+        panel.roundRect(960 - w / 2, top, w, h, 18);
+        panel.fill({ color: 0x171310, alpha: 0.96 });
+        panel.stroke({ width: 4, color: 0x6b5c40 });
+        node.addChild(panel);
+        const title = T(t("sideq.doneWin.head"), 44, 0xbfd489,
+            { stroke: { color: 0x241505, width: 8 } });
+        title.anchor.set(0.5, 0);
+        title.position.set(960, top + 24);
+        title.eventMode = "none";
+        node.addChild(title);
+        const name = T(n.type === "hunt" ? t("sideq.hunt.name")
+            : t("sideq.letter.name", { city: poiName(G, n.target) }),
+        30, 0xf0c96a);
+        name.anchor.set(0.5, 0);
+        name.position.set(960, top + 100);
+        name.eventMode = "none";
+        node.addChild(name);
+        const body = T(n.type === "hunt"
+            ? t("sideq.doneWin.hunt", { mob: mobName(n.elem) })
+            : t("sideq.doneWin.letter", { city: poiName(G, n.target) }),
+        24, 0xd8c79d,
+        { wordWrap: true, wordWrapWidth: w - 120, align: "center" });
+        body.anchor.set(0.5, 0);
+        body.position.set(960, top + 156);
+        body.eventMode = "none";
+        node.addChild(body);
+        // награда: иконка ресурса слева от строки (как в окне поручения)
+        const rew = T(t("sideq.reward", { res: resName(n.elem) }), 27, 0xffe2a8);
+        rew.anchor.set(0.5, 0);
+        rew.position.set(960 + 16, top + 268);
+        rew.eventMode = "none";
+        node.addChild(rew);
+        const rewIcon = new globalThis.PIXI.Sprite(
+            ctx.uiTex(`resources/res_${n.elem}.png`));
+        rewIcon.anchor.set(0.5);
+        rewIcon.scale.set(0.34);
+        rewIcon.eventMode = "none";
+        rewIcon.position.set(960 - rew.width / 2 - 24, top + 286);
+        node.addChild(rewIcon);
+        const okBtn = button(ctx, {
+            tex: "button_menu.png", label: t("sideq.doneWin.ok"),
+            x: 960, y: top + h - 70, scale: 1,
+            onTap: () => closeComplete(),
+        });
+        node.addChild(okBtn);
+        ctx.ui.addChild(node);
+        ctx.questModal = (ctx.questModal || 0) + 1;
+        cw = { ctx, node };
+        return true;
+    }
+    // для проб: открыто ли окно завершения поручения
+    function completeState() {
+        return { open: !!cw };
+    }
+
     // Принять: письмо берёт адресат из окна (targetKey — тот же, что
     // показан, иначе случайный); охота спавнит монстра. Возвращает квест
     // или null. (W45, юзер) ОДНОВРЕМЕННО висит только одно поручение:
@@ -467,7 +549,10 @@
         if (i >= 0) sq.active.splice(i, 1);
         const done = sq.done[q.city] = sq.done[q.city] || {};
         done[q.type] = true;
-        G.world.sideNote = { key: noteKey, elem: q.elem }; // всплывёт в мире
+        // W54 (юзер): при входе в мир — ИНФООКНО «поручение выполнено»
+        // с рассказом, ЧТО герой сделал, и строкой награды (не «плюсик»)
+        G.world.sideNote = { key: noteKey, elem: q.elem,
+            type: q.type, target: q.target || null };
         if (G.saveRun) G.saveRun();
     }
     // Победа над охотничьим монстром (arenaFlow, ключ wild:q…)
@@ -532,6 +617,8 @@
         arrowTargets, glowCities, huntMobs,
         // окно активного поручения (W45): кнопка в HUD мира/города
         showReview, closeReview, reviewOpen, activeModel, reviewState,
+        // инфоокно «поручение выполнено» (W54, юзер)
+        showComplete, closeComplete, completeState,
         // имя монстра стихии и имя города по ключу (тосты после принятия)
         mobTitle: (elem) => globalThis.GAME_LOC.t("enc." + encOf(elem) + ".title"),
         cityName: (G, key) => poiName(G, key),

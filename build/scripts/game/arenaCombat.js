@@ -145,6 +145,44 @@
                 healUnit(u, u.def.vampHeal);
             };
 
+            // «Проросший огр» (sg242, W54 спека юзера): после своей атаки
+            // (по существу или по базе) получает +2 к урону и +2 к жизням
+            // (growOnAttack). Жизни здесь — текущий пул (как у «Дара леса»)
+            A.ogrGrow = function ogrGrow(u) {
+                if (!u || !u.def || !u.def.growOnAttack
+                    || !B.units.includes(u)) return;
+                const n = u.def.growOnAttack;
+                u.bonusAtk = (u.bonusAtk || 0) + n;
+                recalcAuras();
+                u.hp += n;
+                const an = u.node.getChildByName("atk");
+                if (an) an.text = String(u.curAtk);
+                const hn = u.node.getChildByName("hp");
+                if (hn) hn.text = String(u.hp);
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 39, `+${n}⚔ +${n}♥`, 0x9fd489);
+                fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.8 });
+                sfx("chpoc");
+            };
+
+            // «Большой размер» (sgrBig — герой «Рыжего леса», W54 спека
+            // юзера): когда СУЩЕСТВО героя с уроном 6+ атакует (существо
+            // или базу), оно наносит 1 урон базе противника (bigStomp)
+            A.bigStomp = function bigStomp(u) {
+                if (!u || !B.units.includes(u)) return;
+                if ((u.curAtk || 0) < 6) return;
+                const hd = heroDefOf(u.side);
+                if (!hd || hd.ability !== "bigStomp") return;
+                const op = u.side === "p" ? "e" : "p";
+                damageBase(op, hd.abilityVal || 1,
+                    op === "p"
+                        ? { x: cellXY(u.col, GRID - 1).x,
+                            y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff8f6e }
+                        : { x: cellXY(u.col, 0).x,
+                            y: cellXY(u.col, 0).y - 15, fill: 0xffb26e });
+                sfx("chpoc");
+            };
+
             // «Выросшие духи» (wis96): после перемещения разыгрывает ловушку
             // из руки владельца на пустую соседнюю (верт/гориз) клетку БЕЗ
             // траты энергии. Берётся первая подходящая ловушка руки: руна и

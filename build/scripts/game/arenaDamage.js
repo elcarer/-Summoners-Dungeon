@@ -891,6 +891,30 @@
                     side === "p"
                         ? { x: cellXY(u.col, 0).x, y: cellXY(u.col, 0).y - 15, fill: 0xff8f6e }
                         : { x: cellXY(u.col, GRID - 1).x, y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff5f4e });
+                bigStomp(u); // «Большой размер» (sgrBig): существо 6+⚔ атакует базу — +1 урон базе
+            };
+
+            // «Ярость природы» (Рыжий лес, W54 — спека юзера; текст в HUD
+            // данжа): ДВУХЦВЕТНАЯ карта Сила+Рост (multi содержит обе
+            // стихии) при розыгрыше наносит 1 урон базе ВРАГА играющего.
+            // Особенность данжа — читаем CAVES[fury] по данжу забега.
+            // Хуки: addUnit (юниты/постройки — общая точка ОБОИХ сторон) и
+            // spendCard (игрок, заклинания/ловушки); у мульти-заклинаний
+            // и ловушек хук появится вместе с ними
+            A.multiFury = function multiFury(cardId, side) {
+                const def = CARDS[cardId];
+                if (!def || !def.multi
+                    || !def.multi.includes("strength")
+                    || !def.multi.includes("growth")) return;
+                const cd = G.dungeon
+                    && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
+                if (!cd || !cd.fury) return;
+                const op = side === "p" ? "e" : "p";
+                floatText(960, op === "p" ? 758 : 318,
+                    GAME_LOC.t("dungeon.furyShort"), 0xc86a3e);
+                damageBase(op, 1, { x: 960, y: op === "p" ? 830 : 250,
+                    fill: 0xc86a3e });
+                sfx("chpoc");
             };
 
             // «Круг стихий» (wis102): в начале хода владельца разыгрывает

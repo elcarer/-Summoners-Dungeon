@@ -17,21 +17,27 @@
             // палитру собираем из стихийного цвета события (ramp). raw —
             // мультицветные (конфетти) не перекрашивать. Бандла нет или
             // эффект не создался — работает прежний Graphics-пресет ниже.
+            // W54 (юзер: «эффекты не исчезают»):-loop-эффекты каталога
+            // (divine-shield, rune-circle, power-star, poison-cloud) на
+            // одноразовых событиях крутились вечно (done() у loop не
+            // наступает) — заменены одноразовыми; постройке — свой эффект
+            // вместо призывного (heavy-landing: пол треснул, пыль).
             const PFX_SRC = globalThis.GAME_FX;
             const PFX = PFX_SRC && PFX_SRC.available ? {
                 impact: { id: "impacts/hit-spark", h: 92 },
                 heal: { id: "holy/heal", h: 120 },
                 death: { id: "spawn/shatter-death", h: 120 },
                 summon: { id: "spawn/summon-rise", h: 150 },
+                build: { id: "impacts/heavy-landing", h: 96 },
                 cast: { id: "arcane/magic-circle-cast", h: 170 },
                 ice: { id: "ice/snowflake-burst", h: 120 },
-                poison: { id: "nature/poison-cloud", h: 130 },
+                poison: { id: "nature/spore-burst", h: 140 },
                 trap: { id: "shadow/hex-sigil", h: 120 },
-                seal: { id: "arcane/rune-circle", h: 96 },
+                seal: { id: "arcane/mana-burst", h: 130 },
                 base: { id: "explosions/small-explosion", h: 220 },
-                buff: { id: "pickups/power-star", h: 110 },
+                buff: { id: "pickups/collect-burst", h: 110 },
                 debuff: { id: "shadow/curse", h: 110 },
-                ward: { id: "holy/divine-shield", h: 120 },
+                ward: { id: "impacts/shield-block", h: 100 },
                 victory: { id: "ui/confetti", h: 430, raw: true },
                 defeat: { id: "shadow/dark-explosion", h: 260 },
             } : null;
@@ -203,6 +209,27 @@
                                 ay: 140, spin: rnd(-6, 6), alpha: 0.8 });
                     }
                     dot(e, 0, 4, 24, e.color, { total: 0.24, alpha: 0.45 });
+                },
+
+                // Постройка (W54, юзер: постройке — не призывной эффект):
+                // пол треснул, кольцо пыли, комья и камешки разлетелись.
+                build(e) {
+                    part(e, { type: "ellipse", r: 58, h: 18, w: 3.4,
+                        color: 0xa08a6a, total: 0.5, oy: 0 });
+                    ring(e, 6, 84, 4.5, 0xc9b090, { total: 0.45 });
+                    ring(e, 3, 52, 2.4, 0xe8d8b8, { total: 0.32 });
+                    for (let i = 0; i < 12; i++) {
+                        const a = rnd(0, TAU), sp = rnd(60, 220);
+                        shard(e, 0, 0, Math.cos(a) * sp, Math.sin(a) * sp * 0.6,
+                            rnd(3, 7), i % 3 ? 0x9a7a56 : 0x6e5a42,
+                            { total: rnd(0.4, 0.75), ay: rnd(320, 560),
+                                spin: rnd(-6, 6), alpha: 0.85 });
+                    }
+                    for (let i = 0; i < 6; i++) {
+                        smoke(e, rnd(-30, 30), rnd(0, 18), rnd(-30, 30),
+                            rnd(-40, -10), rnd(9, 17), 0x8a7458,
+                            { total: rnd(0.5, 0.85), alpha: 0.24 });
+                    }
                 },
 
                 // Каст: магический круг, руны на орбите и спираль энергии.
@@ -480,7 +507,18 @@
                         size: d.h * (opts.scale || 1) * pw,
                         palette: d.raw ? undefined : PFX_SRC.ramp(e.color),
                     });
-                    if (h2) return h2;
+                    if (h2) {
+                        // Страховка (юзер: «эффекты должны заканчиваться»):
+                        // если в таблицу попадёт loop-эффект каталога — он
+                        // никогда не кончится сам (done() у loop не вернёт
+                        // true) — гасим его через собственную длительность
+                        // (stop → затухание 0.3с в ядре pixelfx)
+                        const lm = h2.inst.meta;
+                        if (lm && lm.loop)
+                            setTimeout(() => { try { h2.stop(); } catch (x) {} },
+                                Math.max(0.8, lm.duration || 2) * 1000);
+                        return h2;
+                    }
                 }
                 BUILD[kind](e, opts);
                 if (!e.parts.length) return null;

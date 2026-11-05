@@ -1768,6 +1768,30 @@
                        subtype: "human", // подтип — по спеке юзера (существо Человека)
                        rarity: "common", elem: "honor",
                        color: 0xcfc7b0 },
+
+        // ── МУЛЬТИЦВЕТ «Сила + Рост» (W54, спека юзера): карты 241–242,
+        // встречаются только в мультицветном подземелье «Рыжий лес»
+        // (cave "sgr"). elem "strGro" — собственная мульти-стихия (рубашка
+        // card_multi_back.png, цвет «рыжего леса»); multi — обе родные
+        // стихии (правило колод и «Ярость природы» читают его)
+        // «Эльф огня» (sg241): Эльф 2/1 — после призыва наносит 2 раза
+        // по 1 урону случайным соседним (верт/гориз) существам противника
+        sg241: { type: "unit", cost: 3, atk: 2, hp: 1, speed: 1,
+                 creature: "elf",
+                 subtype: "elf", // подтип — по спеке юзера (существо Эльфа)
+                 fireSnipe: 2,
+                 rarity: "common", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xc86a3e, img: "strength_growth/241" },
+        // «Проросший огр» (sg242): Гоблин 3/3 — после своей атаки получает
+        // +2 к урону и +2 к жизням (growOnAttack)
+        sg242: { type: "unit", cost: 5, atk: 3, hp: 3, speed: 1,
+                 creature: "goblin",
+                 subtype: "goblin", // подтип — по спеке юзера (существо Гоблина)
+                 growOnAttack: 2,
+                 rarity: "common", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0x8a6a3e, img: "strength_growth/242" },
     };
     const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
 
@@ -1796,6 +1820,16 @@
         time: ["tim201", "tim201", "tim201", "tim202", "tim202",
                "tim203", "tim203", "tim205", "tim206", "tim206",
                "tim207", "tim207"],
+        // W54 (спека юзера): ядро начальной колоды врага «Большой размер»
+        // (Рыжий лес) — 32 карты, Сила+Рост+мультицвет
+        strGro: [
+            "str4", "str4", "str5", "str5", "str16", "str16",
+            "str23", "str23", "str26", "str26", "str30", "str30",
+            "str32", "str32", "str33", "str33", "str35", "str35",
+            "grw7", "grw7", "grw31", "grw36", "grw36", "grw33",
+            "grw37", "grw37", "grw16", "grw16",
+            "sg241", "sg241", "sg242", "sg242",
+        ],
     };
 
     // Лимита ловушек НЕТ (просил юзер: «если он есть — это и есть баг»).
@@ -1894,6 +1928,15 @@
         grwBoss: { id: "grwBoss", rarity: "epic", baseHp: 18,
                    elems: ["growth"], starter: "growth",
                    img: "15", ability: "buildingDeathReplay" },
+        // ── «Рыжий лес» (мультицвет Сила+Рост, W54, спека юзера) ─────────
+        // «Большой размер» (арт heroes/66.png): ДВУХЦВЕТНЫЙ герой — elems
+        // из двух стихий (правило колод: карты обеих стихий + мультицветные
+        // с хотя бы одной из них). 16♥, редкая; способность bigStomp:
+        // когда ваше существо с уроном 6+ атакует, оно наносит 1 урон
+        // базе противника
+        sgrBig: { id: "sgrBig", rarity: "rare", baseHp: 16,
+                  elems: ["strength", "growth"], starter: "strGro",
+                  img: "66", ability: "bigStomp", abilityVal: 1 },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -2224,6 +2267,7 @@
         "gobMaster", "boss",
         "grwBeasts", "grwGrove", "grwWild", "grwMagic", "grwCity",
         "grwControl", "grwBoss",
+        "sgrBig", // «Рыжий лес»: двухцветный враг 1-го этажа (W54)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

@@ -21,6 +21,9 @@
         decay: starterCollection(STARTER_DECKS.decay), // стартер Мортиса
         honor: starterCollection(STARTER_DECKS.honor), // стартер Леона
         time: starterCollection(STARTER_DECKS.time), // стартер Тордина
+        // W54: ядро врага «Большой размер» (Рыжий лес) — не игрок, но
+        // ключ держим для симметрии реестра
+        strGro: starterCollection(STARTER_DECKS.strGro),
     };
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N
@@ -34,8 +37,12 @@
     // мир живёт по прежнему минимуму 12 (стартовые колоды) — бои с
     // бродячими отрядами идут по deckMinFor(1); данж требует своё:
     // вход (этаж 1) и все бои этажа — caveDeckFor(1) = 16, спуск с
-    // этажа N требует caveDeckFor(N+1) = 16+N
-    function caveDeckFor(floor) {
+    // этажа N требует caveDeckFor(N+1) = 16+N.
+    // W54 (спека юзера): «Рыжий лес» (sgr) — своя лестница: 1-й этаж —
+    // 24 карты, дальше +2 (26 на 2-м, 28 на 3-м)
+    function caveDeckFor(cave, floor) {
+        if (cave === "sgr") // (cave может прийти undefined из старых вызовов)
+            return Math.min(DECK_MAX, 22 + 2 * Math.max(1, floor | 0));
         return Math.min(DECK_MAX, 15 + Math.max(1, floor | 0));
     }
 
@@ -64,6 +71,28 @@
     // стихии (просил юзер: в гоблинских пещерах зелёные карты не встречаются)
     const REWARD_POOLS = {
         strength: REWARD_POOL,
+        // W54 (спека юзера): сундуки/магазин «Рыжего леса» — смесь Силы,
+        // Роста и мультицветных (встречаются только в этом данже)
+        strGro: ["str1", "str1", "str1", "str2", "str2", "str2",
+                 "str3", "str3", "str3", "str4", "str4", "str4",
+                 "str9", "str9", "str9", "str13", "str13", "str13",
+                 "str16", "str16", "str16", "str23", "str23", "str23",
+                 "str26", "str26", "str26", "str30", "str30", "str30",
+                 "str32", "str32", "str32", "str33", "str33", "str33",
+                 "str35", "str35", "str35",
+                 "grw1", "grw1", "grw1", "grw2", "grw2", "grw2",
+                 "grw3", "grw3", "grw3", "grw4", "grw4", "grw4",
+                 "grw5", "grw5", "grw5", "grw7", "grw7", "grw7",
+                 "grw8", "grw8", "grw8", "grw10", "grw10", "grw10",
+                 "grw16", "grw16", "grw16", "grw17", "grw17", "grw17",
+                 "grw19", "grw19", "grw19",
+                 "grw9", "grw9", "grw11", "grw11", "grw12", "grw12",
+                 "grw13", "grw13", "grw14", "grw14", "grw20", "grw20",
+                 "grw25", "grw25", "grw27", "grw27",
+                 "grw36", "grw36", "grw37", "grw37", "grw38", "grw38",
+                 "grw39", "grw39",
+                 "grw31", "grw33",
+                 "sg241", "sg241", "sg242", "sg242"],
         growth: ["grw1", "grw1", "grw1", "grw2", "grw2", "grw2",
                  "grw3", "grw3", "grw3", "grw4", "grw4", "grw4",
                  "grw5", "grw5", "grw5", "grw6", "grw6", "grw6",
@@ -646,6 +675,32 @@
                     grow: ["tim204", "tim205", "tim207", "tim210",
                            "tim211", "tim212", "tim217", "tim232",
                            "tim233", "tim236"] },
+        // ── «Рыжий лес» — МУЛЬТИЦВЕТНЫЙ данж Сила+Рост (W54, спека юзера).
+        // 3 этажа; враг этажей — двухцветный «Большой размер» (герой 66):
+        // 16♥, редкая, способность bigStomp (существо 6+⚔ атакует — 1 урон
+        // базе противника); ядро — ровно 32 карты из спеки (Сила+Рост+
+        // мультицветные sg241/sg242). elem "strGro" — рубашки и добор
+        // ENEMY_FILLS.strGro (смесь Силы/Роста/мультицветных)
+        sgrBig:   { scene: 1, baseHp: 16, elem: "strGro", hero: "sgrBig",
+                    core: ["str4", "str4", "str5", "str5", "str16", "str16",
+                           "str23", "str23", "str26", "str26", "str30",
+                           "str30", "str32", "str32", "str33", "str33",
+                           "str35", "str35", "grw7", "grw7", "grw31",
+                           "grw36", "grw36", "grw33", "grw37", "grw37",
+                           "grw16", "grw16", "sg241", "sg241", "sg242",
+                           "sg242"] },
+        // Босс 3-го этажа — тот же «Большой размер», растёт с глубиной:
+        // +2 карты/этаж из grow (мультицветные sg241/sg242) и добор из
+        // ENEMY_FILLS.strGro (механика вождя гоблинов)
+        sgrBoss:  { scene: 1, baseHp: 16, elem: "strGro", hero: "sgrBig",
+                    core: ["str4", "str4", "str5", "str5", "str16", "str16",
+                           "str23", "str23", "str26", "str26", "str30",
+                           "str30", "str32", "str32", "str33", "str33",
+                           "str35", "str35", "grw7", "grw7", "grw31",
+                           "grw36", "grw36", "grw33", "grw37", "grw37",
+                           "grw16", "grw16", "sg241", "sg241", "sg242",
+                           "sg242"],
+                    grow: ["sg241", "sg242"] },
         // ── «Охранники мостов» открытого мира (просил юзер): бродячие
         // враги у мостов через реки в зонах своих стихий. Ядро — ровно
         // 25 карт по спеке юзера (enemyDeck без grow играют как есть —
@@ -795,6 +850,14 @@
         dec: { elem: "decay", maxFloor: 6, boss: "decLichBoss" },  // Земли мёртвых — главарь «Архилич»
         hon: { elem: "honor", maxFloor: 6, boss: "honThrone" },    // Залы Чести — 6 этажей, босс «Претендент на трон» на каждом (просил юзер)
         tim: { elem: "time", maxFloor: 6, boss: "darklord" },      // Логово Времени — 6 этажей, босс «Тёмный владыка» на каждом (просил юзер)
+        // W54 (спека юзера): «Рыжий лес» — МУЛЬТИЦВЕТНЫЙ данж Сила+Рост:
+        // 3 этажа, босс только на последнем; особенность fury — «Ярость
+        // природы»: двухцветные карты Сила+Рост наносят 1 урон базе врага
+        // при розыгрыше (текст — в HUD данжа). elems — стихии ДРАФТА
+        // «Карты сокровищ» (Сила, Рост, двухцветные); elem — мульти-стихия
+        // (рубашки card_multi_back.png)
+        sgr: { elem: "strGro", elems: ["strength", "growth"],
+               maxFloor: 3, boss: "sgrBoss", bossLast: true, fury: true },
     };
     // Этаж → какой обычный враг на нём водится: на каждом этаже ОДИН архетип
     // (просил юзер: этаж N приводит N-й вид, без перемешивания — как в
@@ -862,9 +925,19 @@
         ["paradox"],                            // 5 «Опасности парадоксов» (просил юзер)
         ["answers"],                            // 6 «Поиск ответов» (просил юзер)
     ];
+    // «Рыжий лес» (W54, спека юзера): 3 этажа, враг — двухцветный
+    // «Большой размер» (один новый противник задан спекой для 1-го этажа,
+    // глубже он же — колода неизменна, сложность дают этаж и босс);
+    // босс только на 3-м этаже (sgrBoss, CAVES.sgr.boss)
+    const FLOOR_MOBS_SGR = [
+        ["sgrBig"],                             // 1
+        ["sgrBig"],                             // 2
+        ["sgrBig"],                             // 3
+    ];
     const MOB_TABLES = { gob: FLOOR_MOBS, grw: FLOOR_MOBS_GROWTH,
                          wis: FLOOR_MOBS_WISDOM, dec: FLOOR_MOBS_DECAY,
-                         hon: FLOOR_MOBS_HONOR, tim: FLOOR_MOBS_TIME };
+                         hon: FLOOR_MOBS_HONOR, tim: FLOOR_MOBS_TIME,
+                         sgr: FLOOR_MOBS_SGR };
     // Пул добора колоды врага по редкости. Панельные карты (str11 жертва,
     // str25 руны, str26 путешествие) ИИ теперь разыгрывает сам — цель он
     // выбирает по своим приоритетам, без экрана (просил юзер).
@@ -951,6 +1024,20 @@
                      "tim236"],
             epic:   ["tim216", "tim223", "tim228", "tim229",
                      "tim237", "tim238", "tim239", "tim240"],
+        },
+        // W54 (спека юзера): добор врагов «Рыжего леса» — смесь Силы,
+        // Роста и мультицветных (enc.elem у них "strGro")
+        strGro: {
+            common: ["str1", "str2", "str3", "str4", "str9", "str13",
+                     "str16", "str23", "str26", "str30", "str32", "str33",
+                     "grw1", "grw2", "grw3", "grw4", "grw5", "grw7",
+                     "grw8", "grw16", "sg241"],
+            rare:   ["str5", "str11", "str14", "str17", "str19", "str20",
+                     "str24", "grw9", "grw12", "grw13", "grw14", "grw20",
+                     "grw27", "grw36", "grw37", "sg242"],
+            epic:   ["str6", "str8", "str10", "str18", "str21", "str25",
+                     "grw15", "grw18", "grw21", "grw23", "grw26", "grw31",
+                     "grw33", "grw40"],
         },
     };
     // Колода врага: ядро архетипа; весь добор — только боссу (просил

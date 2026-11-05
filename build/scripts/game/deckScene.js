@@ -22,7 +22,7 @@
         // показывает минимум контекста
         const deckMinNow = () => (G.dungeon && !G.dungeon.city
             ? globalThis.GAME_DATA.caveDeckFor(
-                G.run && G.run.floor ? G.run.floor : 1)
+                G.run && G.run.cave, G.run && G.run.floor ? G.run.floor : 1)
             : DECK_MIN);
         let root = null, leftPane = null, rightPane = null, heroesPane = null;
         let tab = "deck"; // вкладка сцены: «Колода» | «Герои» (просил юзер)
@@ -80,9 +80,20 @@
             return G.deck.reduce((n, c) => n + (c === id ? 1 : 0), 0);
         }
         // герой забега и его стихии: карты других стихий в колоду класть
-        // нельзя (герой определяет стихии колоды — просил юзер)
+        // нельзя (герой определяет стихии колоды — просил юзер).
+        // W54 (спека юзера): мультицветные карты (multi: [список стихий])
+        // разрешены, если ХОТЯ БЫ ОДНА их стихия есть у героя — двухцветный
+        // персонаж Силы и Роста берёт карты обеих стихий и мультицветные;
+        // одностихийному герою мульти-карта разрешена по его стихии
         const heroDef = () => HEROES[G.heroId] || HEROES.gorbag;
-        const heroElemOk = (id) => !!CARDS[id] && heroDef().elems.includes(CARDS[id].elem);
+        const heroElemOk = (id) => {
+            const c = CARDS[id];
+            if (!c) return false;
+            const he = heroDef().elems || [];
+            return c.multi
+                ? c.multi.some((e) => he.includes(e))
+                : he.includes(c.elem);
+        };
         function passes(id) {
             const def = CARDS[id];
             if (!def) return false;

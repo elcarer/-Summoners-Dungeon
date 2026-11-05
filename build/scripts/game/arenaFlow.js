@@ -436,6 +436,8 @@
                 afterAttackPush(u, occ); // «Проросший кабан»
                 triggerAttackTraps(u); // руна: существо атаковало
                 vampireHeal(u); // «Вампир»: после атаки
+                ogrGrow(u); // «Проросший огр»: +2⚔/+2♥ после атаки
+                bigStomp(u); // «Большой размер»: 6+⚔ атакует — 1 урон базе
             };
 
             A.marchSide = async function marchSide(side) {
@@ -485,6 +487,8 @@
                             afterAttackPush(u, occ); // «Проросший кабан»
                             triggerAttackTraps(u); // руна: существо атаковало
                             vampireHeal(u); // «Вампир»: после атаки
+                            ogrGrow(u); // «Проросший огр»: +2⚔/+2♥ после атаки
+                            bigStomp(u); // «Большой размер»: 6+⚔ атакует — 1 урон базе
                             refreshHud();
                             if (checkEnd()) return;
                         }
@@ -567,6 +571,8 @@
                                 afterAttackPush(u, occ); // «Проросший кабан»
                                 triggerAttackTraps(u); // руна: существо атаковало
                                 vampireHeal(u); // «Вампир»: после атаки
+                                ogrGrow(u); // «Проросший огр»: +2⚔/+2♥ после атаки
+                                bigStomp(u); // «Большой размер»: 6+⚔ атакует — 1 урон базе
                                 refreshHud();
                                 if (checkEnd()) return;
                             }

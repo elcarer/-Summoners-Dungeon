@@ -699,10 +699,14 @@
                 punches.push({ node, life: 0.3 / animK(), total: 0.3 / animK() });
                 root.unitsLayer.addChild(node);
                 const sp = cellXY(col, row);
-                fxEvent("summon", {
+                // W54 (юзер: «при розыгрыше постройки играется эффект
+                // существа»): строениям — своё событие (пыль и трещины
+                // пола), существам — прежний призыв
+                fxEvent(def.type === "building" ? "build" : "summon", {
                     x: sp.x, y: sp.y + 24, color: fxColorOf(def.elem),
                     scale: opts.token ? 0.72 : 1,
                 });
+                multiFury(cardId, side); // «Ярость природы» (Рыжий лес, W54)
                 sfx("aqua"); // призыв (обе стороны)
                 B.units.push(u);
                 recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда
@@ -993,6 +997,7 @@
                     else if (def.illusion) heroMageDouble(u, () => summonIllusion(u)); // иллюзия
                     else if (def.lakeMaid) heroMageDouble(u, () => summonLakeMaid(u)); // озёрная дева
                     else if (def.sulfurBurst) summonSulfur(u); // элементаль серы: −2⚔ −1♥ соседям
+                    else if (def.fireSnipe) summonFireElf(u); // «Эльф огня»: 2×1 урон соседям противника
                     if (def.berserkSummon) addBerserk(u, def.berserkSummon); // «Берсерк» — уже при призыве
                     // Способность героя (просил юзер): ПЕРВОЕ призванное игроком
                     // существо получает бонус — Горбаг +2 к урону, Эльмир +3 к
@@ -1238,6 +1243,8 @@
                         frostNeighbors(u); // «Старший ледовик»: лёд соседям
                         afterAttackPush(u, occ); // «Проросший кабан»
                         vampireHeal(u); // «Вампир»: после атаки
+                        ogrGrow(u); // «Проросший огр»: +2⚔/+2♥ после атаки
+                        bigStomp(u); // «Большой размер»: 6+⚔ атакует — 1 урон базе
                         refreshHud();
                         checkEnd();
                         acted = true;
