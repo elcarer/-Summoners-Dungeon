@@ -25,6 +25,8 @@
     </script>
     <!-- ЛОКАЛЬНЫЙ PixiJS -->
     <script src="./dll/pixi.min.js"></script>
+    <!-- pixelfx: пиксель-арт эффекты (бандл MIT, W53) — глобаль PIXELFX -->
+    <script src="./dll/pixelfx.min.js"></script>
     <!-- Дата-файл ядра (UNIT_CONFIGS читается в init) -->
     <script src="./scripts/data/units.js"></script>
     <!-- ДВИЖОК zero_engine в dual-mode (глобали): порядок важен -->
@@ -61,6 +63,8 @@
     <script src="./scripts/game/worldGen.js"></script>
     <script src="./scripts/game/worldTiles.js"></script>
     <script src="./scripts/game/world.js"></script>
+    <!-- мост pixelfx→PIXI (GAME_FX) — до города/арены, эффекты в сценах -->
+    <script src="./scripts/game/pixelfx.js"></script>
     <script src="./scripts/game/city.js"></script>
     <script src="./scripts/game/dungeon.js"></script>
     <!-- АРЕНА: ядро → модули логики → сборка сцены (порядок важен) -->

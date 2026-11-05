@@ -523,6 +523,8 @@
                 CITY.addCityWaterBanks({ ctx, st: myState, MAPROWS, W, H }, c);
                 CITY.addCityGroundOverlays(
                     { ctx, st: myState, MAPROWS, W, H }, c);
+                // W53: живые огни pixelfx — горн кузницы, факелы ратуши
+                CITY.addCityFires({ st: myState }, c);
             }
             return c;
         }

@@ -1,6 +1,6 @@
 # Журнал волн — project3
 
-Журнал: строка на волну + детальные записи последних волн (W41–W52
+Журнал: строка на волну + детальные записи последних волн (W41–W53
 дословно). Сжат 2026-11-04 (волна W47): волны до W40 — однострочники,
 их подробности — git log, ловушки — docs/traps.md.
 
@@ -392,9 +392,16 @@ docs/traps.md.
 - **W51 (2026-11-04)**: тайлы мостов (арт юзера) вместо заглушки-настила —
   moats.png в открытом мире, moats_64.png в городах (1:1, без мыла); фикс
   «дырки» между мостом и берегом. Детали ниже.
+- **Волна W52 (3ea9812)**: выход из города — проход в нижней стене
+  (st.exitPassage, CITY_V=7), мосты городов в 2 секции с заходом на
+  берега. Детали ниже.
+- **Волна W53**: пиксель-арт эффекты pixelfx (юзер дал библиотеку):
+  бандл dll/pixelfx.min.js (MIT) + мост GAME_FX (canvas→PIXI
+  nearest), 15 событий боя через fxEvent (Graphics-фолбэк) + огни
+  города (горн кузницы, факелы ратуши). Детали ниже.
 
 
-## Детали последних волн (W41–W51 дословно)
+## Детали последних волн (W41–W53 дословно)
 
 ## Волна W41 (2026-11-03) — города открытого мира крупнее (9×6 / 9×7.5)
 
@@ -1006,3 +1013,60 @@ CDP) — повторное объявление роняет eval, оборач
 клампится к краям карты и лагает за телепортом — скринам прохода нужен
 покой 2–3с. Чёрные провалы в городе (не рисуем толщу стен — W34) —
 до-волны, не регресс W52.
+
+## Волна W53 (2026-11-05) — пиксель-арт эффекты pixelfx в бою и городе
+
+Просил юзер: «установи библиотеку эффектов https://github.com/patch-gg/pixelfx
+как плагин и используй эти эффекты в игре», затем «исследуй, как в таких играх
+используются эффекты, и внедряй».
+
+- РЕСЁРЧ (веб): карточные рогалики (Hearthstone/STS) держат эффекты на
+  событиях боя — удар/каст/смерть/призыв, короткие вспышки без стробов;
+  пиксель-арт RPG добавляют ambient-огни. Выводы легли на ГОТОВЫЕ хуки
+  fxEvent арены (arenaFx.js) — боевую логику не трогали.
+- БИБЛИОТЕКА: pixelfx 0.3.0 (MIT, patch-gg; часть рецептов — MIT Hugo
+  Duprez) — 244 эффекта кодом в два буфера (color+light), composite →
+  RGBA, зависимостей нет. Бандл esbuild → build/dll/pixelfx.min.js
+  (164 КБ, глобаль PIXELFX: ядро + 18 эффектов), лицензия —
+  dll/pixelfx/LICENSE.md. Скилл автора — в ~/.zcode/skills/pixelfx.
+  Оффлайн-смоук ядра: 0.6 мс/кадр прогретый fireball.
+- МОСТ build/scripts/game/pixelfx.js (GAME_FX, подключён в index.html
+  после pixi и перед city): spawn(parent, id, {x,y,size,palette,flip,
+  angle,light,seed}) — canvas+ImageData → PIXI.Texture (nearest) →
+  спрайт в слое сцены; якорь — meta.origin эффекта; общий тик
+  PIXI.Ticker.shared; one-shot умирает по done(), loop — с контейнером
+  или FX.clear; ramp(0xцвет) — палитра 5 ступеней из цвета события
+  (PIXELFX.scale/mix/WHITE). Нет бандла → available=false, spawn=null,
+  сцены живут штатно. Имя fx.js занято движком → pixelfx.js.
+- АРЕНА (arenaFx.js): таблица PFX (событие → эффект + высота в дизайне):
+  impact→impacts/hit-spark (×power), heal→holy/heal, death→
+  spawn/shatter-death, summon→spawn/summon-rise, cast→arcane/
+  magic-circle-cast, ice→ice/snowflake-burst, poison→nature/poison-cloud,
+  trap→shadow/hex-sigil, seal→arcane/rune-circle, base→explosions/
+  small-explosion, buff→pickups/power-star, debuff→shadow/curse, ward→
+  holy/divine-shield, victory→ui/confetti (raw), defeat→shadow/
+  dark-explosion. Палитра — ramp(color события), лимит 48 живых,
+  Graphics-пресет BUILD остался ФОЛБЭКОМ (нет бандла / spawn дал null /
+  перебор лимита). Отбор эффектов — по контакт-щитам tools/render.mjs
+  (монтаж for_work/fx_candidates.png).
+- ГОРОД (city.js addCityFires ← dungeon.js buildMapGfx после оверлеев):
+  fire/brazier (горн, size 76) у левого угла фасада кузницы (armory),
+  fire/torch (size 62) по углам фасада ратуши (townHall) — loop, seed
+  по координатам, живут до выхода (контейнер карты умирает — тик
+  вычищает сам).
+- ЛОВУШКА (ВАЖНО): fxClear зовётся из enter() сцены арены ДО построения
+  root — обращение к root.fx без guard роняло ВЕСЬ enter (рука/HUD не
+  строились: сцена «arena», phase player, root мёртв; «тихая» ошибка
+  видна только в console — scenes.js глотает). Фикс:
+  `if (PFX_SRC && root && root.fx)`.
+- Пробы: НОВАЯ probe_w53 25/0 (PIXELFX с бута; юниты моста ramp/one-shot/
+  loop/clear/nearest; город: 3 loop-огня; бой: вход данж→арена (телепорт
+  +18px от центра якоря, deckAdd(16)), фолбэк spawn→null со счётчиком,
+  summon-rise + скрины удара/призыва; у города герой у прохода).
+  Регресс: check_city 394/0, mini_test 19/0, quest_test 30/0 (обновлён
+  под W52: у города нет st.ladder — выход проходом; проба не гонялась с
+  W49 и устарела — не регресс), probe_w52 24/0. Полный смоук не гонялся
+  — не распоряжали.
+- Прочее: MAP_V=10/CITY_V=7/GEN.V=17 целы (эффекты — рендер-слой, сейвы
+  не тронуты). Правило юзера «хватит закрывать мой хром»: НИКОГДА не
+  taskkill по //IM — только PID своих процессов по портам (netstat).

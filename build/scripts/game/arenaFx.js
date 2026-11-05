@@ -12,6 +12,31 @@
             const ELEM_FX = { strength: 0xff7a4e, growth: 0x8fe06a, wisdom: 0x5cc8ff };
             const GOLD = 0xffd98c;
 
+            // W53: пиксель-арт эффекты pixelfx (GAME_FX, dll/pixelfx.min.js).
+            // Событие боя → эффект каталога + высота в дизайне 1920×1080;
+            // палитру собираем из стихийного цвета события (ramp). raw —
+            // мультицветные (конфетти) не перекрашивать. Бандла нет или
+            // эффект не создался — работает прежний Graphics-пресет ниже.
+            const PFX_SRC = globalThis.GAME_FX;
+            const PFX = PFX_SRC && PFX_SRC.available ? {
+                impact: { id: "impacts/hit-spark", h: 92 },
+                heal: { id: "holy/heal", h: 120 },
+                death: { id: "spawn/shatter-death", h: 120 },
+                summon: { id: "spawn/summon-rise", h: 150 },
+                cast: { id: "arcane/magic-circle-cast", h: 170 },
+                ice: { id: "ice/snowflake-burst", h: 120 },
+                poison: { id: "nature/poison-cloud", h: 130 },
+                trap: { id: "shadow/hex-sigil", h: 120 },
+                seal: { id: "arcane/rune-circle", h: 96 },
+                base: { id: "explosions/small-explosion", h: 220 },
+                buff: { id: "pickups/power-star", h: 110 },
+                debuff: { id: "shadow/curse", h: 110 },
+                ward: { id: "holy/divine-shield", h: 120 },
+                victory: { id: "ui/confetti", h: 430, raw: true },
+                defeat: { id: "shadow/dark-explosion", h: 260 },
+            } : null;
+            const PFX_MAX = 48; // живых pixelfx-эффектов на арене разом
+
             A.fxList = [];
             A.fxSeq = 0;
             A.fxEnabled = true;
@@ -445,6 +470,18 @@
                     color: opts.color || A.fxColorOf(opts.elem),
                     parts: [],
                 };
+                // W53: сначала пиксель-арт эффект pixelfx (сочно и в стиле
+                // игры); не вышло — прежний Graphics-пресет BUILD ниже
+                if (PFX && PFX[kind] && PFX_SRC.live.length < PFX_MAX) {
+                    const d = PFX[kind];
+                    const pw = kind === "impact" ? (opts.power || 1) : 1;
+                    const h2 = PFX_SRC.spawn(root.fx, d.id, {
+                        x: e.x, y: e.y,
+                        size: d.h * (opts.scale || 1) * pw,
+                        palette: d.raw ? undefined : PFX_SRC.ramp(e.color),
+                    });
+                    if (h2) return h2;
+                }
                 BUILD[kind](e, opts);
                 if (!e.parts.length) return null;
                 const k = animK();
@@ -499,6 +536,10 @@
             A.fxClear = function fxClear() {
                 for (const e of A.fxList) destroyFx(e);
                 A.fxList.length = 0;
+                // W53: и pixelfx-эффекты. ВНИМАНИЕ: fxClear зовётся и из
+                // enter сцены — ДО построения root (root===null), поэтому
+                // guard обязателен: без него падает весь enter арены
+                if (PFX_SRC && root && root.fx) PFX_SRC.clear(root.fx);
             };
 
             // ── Рисование ────────────────────────────────────────────────────

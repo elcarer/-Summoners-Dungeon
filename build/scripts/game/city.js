@@ -1048,9 +1048,42 @@
         return { node: c, refs };
     }
 
+    // Живые огни города (W53, юзер просил эффекты pixelfx в игре): горн
+    // кузницы (armory) и факелы у дверей ратуши (townHall). Loop-эффекты
+    // fire/brazier и fire/torch через GAME_FX (мост pixelfx.js): бандл
+    // dll/pixelfx.min.js не загрузился — город просто без огней, ошибки
+    // не бывает. Живут до выхода из города (FX-спрайты умирают вместе с
+    // контейнером карты, тик сам вычищает мёртвых).
+    // Зовётся dungeon.js ПОСЛЕ addCityGroundOverlays — огонь поверх
+    // моста/берега, если здание вдруг у воды.
+    function addCityFires(env, c) {
+        const FX = globalThis.GAME_FX;
+        if (!FX || !FX.available || !env.st.objects) return;
+        const TS = 64;
+        for (const o of env.st.objects) {
+            if (o.type === "armory") {
+                // горн у левого края фасада, на полу перед дверью
+                FX.spawn(c, "fire/brazier", {
+                    x: (o.gx + 0.45) * TS, y: (o.row + 0.62) * TS,
+                    size: 76, seed: o.gx * 7 + o.gy,
+                });
+            } else if (o.type === "townHall") {
+                // факелы по углам фасада
+                FX.spawn(c, "fire/torch", {
+                    x: (o.gx + 0.4) * TS, y: (o.row + 0.6) * TS,
+                    size: 62, seed: o.gx * 3 + 1,
+                });
+                FX.spawn(c, "fire/torch", {
+                    x: (o.gx + o.w - 0.4) * TS, y: (o.row + 0.6) * TS,
+                    size: 62, seed: o.gx * 3 + 2,
+                });
+            }
+        }
+    }
+
     globalThis.GAME_CITY = {
         CITY_VARIANTS, CITY_V, newCityState, addCityDeco,
         addCityGroundOverlays, addCityWaterBanks, buildForgeWin,
-        buildQuestWin,
+        buildQuestWin, addCityFires,
     };
 })();

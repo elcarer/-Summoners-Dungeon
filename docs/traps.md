@@ -614,3 +614,33 @@
   (dungeon.js cityEnv()); смена окна кузницы (вскрытие → анимация →
   добыча) — replaceWin, источником forgeTap/forgeState остаётся winRefs
   сцены. WORLD: cityStateFor зовёт GAME_CITY.newCityState/CITY_V.
+
+## Волна W53 (pixelfx: эффекты боя и города)
+
+- **fxClear из enter() арены при root=null**: A.fxClear зовётся сцены
+  enter-ом ДО построения root — обращение к root.fx без guard роняло ВЕСЬ
+  enter («arena», phase player, root мёртв, рука/HUD не построены; сцена
+  «жива» по stats). «Тихие» ошибки update/enter видны ТОЛЬКО в console
+  (scenes.js глотает) — в пробах ставить перехват console.error ДО шага.
+- **Правило юзера «хватит закрывать мой хром»**: НИКОГДА `taskkill //IM
+  chrome.exe` — валит браузер юзера. Только PID своих процессов: $! при
+  запуске или `netstat -ano | grep :<порт>` → `taskkill //PID`; после
+  проверять netstat'ом (taskkill в Git Bash бывает молча не срабатывает).
+- **evalJs-обёртка inst**: вставлять в строку ГОТОВЫЙ IIFE нельзя —
+  обёртка `(function(){ ... })()` теряет return → JSON.parse(undefined).
+  Писать тело с `return` без вложенного IIFE.
+- **Старт боя в пробах из мира**: вход в данж — колода ≥ caveDeckFor(1)
+  (`worldApi.deckAdd(16)`) + телепорт `worldApi.setHeroPos(gx*32+16+18,
+  gy*32+16)` (радиус 0.85 клетки от ЦЕНТРА якоря; на якорь нельзя —
+  коллайдер горы выталкивает). Каталог карт — `GAME_CARD_DATA.CARDS[id]`
+  (не GAME_CARD_DATA[id]).
+- **Устаревание проб**: quest_test не гонялся с W49 и использовал
+  st.ladder города (удалён в W52) — «упавшая» проба ≠ регресс: сверять,
+  что именно она ждёт от ТЕКУЩЕЙ версии. Первый запуск `npx esbuild`
+  может упасть при скачивании — повторить (пакет уже в кэше).
+- **pixelfx-стек**: скилл автора в ~/.zcode/skills/pixelfx; checkout
+  for_work/pixelfx_upstream (tools/render.mjs контакт-щиты — отбор
+  эффектов глазами); бандл = for_work/pixelfx_entry.js → `npx --yes
+  esbuild@0.25.10 ... --format=iife --outfile=build/dll/pixelfx.min.js`;
+  рампа из одного цвета — PIXELFX.scale/mix/WHITE (числа 0xRRGGBB);
+  эффект сам ресемплит рампу под длину своего дефолта.
