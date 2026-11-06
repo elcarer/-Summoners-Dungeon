@@ -20,7 +20,7 @@ Git-правило: `build/`, `PLAN.md`, `README.md`, этот файл и `docs
 
 ```bash
 cd build && python dev_server.py 8147     # http://127.0.0.1:8147/index.html
-bash for_work/smoke.sh                    # полный смоук (последний полный — 745/0, 2026-11-04; счётчик меняется с волнами)
+bash for_work/smoke.sh                    # полный смоук (последний полный — 740/0, 2026-11-06; счётчик меняется с волнами)
 bash for_work/mini.sh for_work/quest_test.mjs   # мини-пробы волн: свой сервер 8174 + chrome 9344
 
 ```
