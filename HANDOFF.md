@@ -36,7 +36,10 @@ probe_wander, probe_time, probe_bridge, probe_tim2, probe_tim3, probe_w18,
 probe_w19, probe_w20, probe_w21, probe_w22, probe_fix1, probe_fix2, probe_ai_smart (свой раннер, 8164/9347) + оффлайн
 tiles_offline /
 forest_offline; генератор отдельно — `check_worldgen.mjs` (2000 сидов).
-Прочие пробы — история волн, не перепрогонять. Паттерн
+⚠ regress_v5 не гонялся с эры W19–W30 и частично протух: probe_world
+падает пачкой (генератор не отдаёт v, арок 8 — W54/W61; помечен в шапке),
+актуальное покрытие мира — полный смоук (740/0, 2026-11-06) + probe_wander
+38/0. Прочие пробы — история волн, не перепрогонять. Паттерн
 пробы: свой порт 8174+ и одноразовый Chrome-профиль.
 CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 
@@ -79,7 +82,12 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
   регресс: check_city 394/0, mini_test 19/0 (каталог 268), probe_w61 37/0
   (maxFloor 2), probe_w62 40/0, probe_w63 34/0. Ловушки — docs/traps.md
   (eDeck≠ядро; inst не ждёт промисы; lastMoveDir во всех точках; второй
-  цели deselect/onCardTap чистят swapPick).
+  цели deselect/onCardTap чистят swapPick). Полный смоук 740/0 (2026-11-06,
+  поймал регрессию руны W60). Поправка юзера (2026-11-07): стражи арки
+  «Белой пущи» ходят листом РЫЦАРЯ (groHon в makeSquadNode → knight,
+  «Рыжий лес»/strGro — по-прежнему гоблин) — probe_ghsheet 9/0, регресс
+  mini_test 19/0 + probe_wander 38/0 (поднят на 32 отряда/8 арок, агро по
+  squadsList(), замер скорости одним in-page evaluate).
 
 - **W64** — рефакторинг по просьбе юзера: большие файлы
   разбиты на логические части (тела дословно, логика не менялась).

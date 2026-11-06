@@ -520,7 +520,12 @@
         // общий y-sort слой (zIndex по позиции ставит контроллер),
         // под ним — тень, как у героя
         function makeSquadNode(s) {
-            const sheet = ctx.heroSheets[s.elem] || ctx.heroSheets.strength;
+            // у мультицветных данжей своей строки в heroSheets нет:
+            // «Белая пуща» (groHon) ходит рыцарем — «они же рыцари даже
+            // по названию» (просил юзер), «Рыжий лес» (strGro) остаётся
+            // гоблином-разбойником; прочее — гоблин, как прежде
+            const sheet = ctx.heroSheets[s.elem]
+                || ctx.heroSheets[s.elem === "groHon" ? "honor" : "strength"];
             const sprite = new PIXI.AnimatedSprite(sheet.animations.walk_front, false);
             sprite.anchor.set(0.5, 1);
             sprite.scale.set(0.375); // как герой (96×96)
