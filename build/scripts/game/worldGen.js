@@ -34,7 +34,7 @@
     // v17 — дороги в обход городов (W45, юзер): A* не режет спрайт города
     // (footprint 9×6/9×7.5 клеток — с W42 тело непроходимо, дорога к
     // «воротам» подходила сквозь него); старые миры (v16) перегенерируются
-    const V = 19; // W58 (юзер): между POI и водой минимум 1 клетка (миры пересобираются)
+    const V = 20; // W60 (юзер): дикие точки — только в достижимой герою суше (миры пересобираются)
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // деревья лесных массивов по зонам стихий (просил юзер): вместо
@@ -1356,12 +1356,42 @@
             const poiPts = pois.map((p) => [p.gx, p.gy]);
             const farAll = (x, y, pts, d) => pts.every(([px, py]) =>
                 Math.hypot(px - x, py - y) >= d);
+            // W60 (юзер): «карманы» — суша, запертая рекой и горами, —
+            // героя недостижимы, дикий там неопровержим. Достижимая суша =
+            // компонента связности точек появления героя (многоисточниковый
+            // BFS по «.»); точка вне её не берётся вообще
+            const reach = new Map();
+            {
+                const queue = [];
+                const seeds = Object.values(spawn).filter(Boolean);
+                for (const sp of seeds) {
+                    // spawn-точка — { gx, gy } (клетка у города), null — мимо
+                    if (!sp) continue;
+                    const sx = sp.gx, sy = sp.gy;
+                    if (sx < 0 || sy < 0 || sx >= W || sy >= H) continue;
+                    if (rows[sy][sx] !== ".") continue;
+                    const k0 = sy * W + sx;
+                    if (!reach.has(k0)) { reach.set(k0, 0); queue.push([sx, sy]); }
+                }
+                while (queue.length) {
+                    const [x, y] = queue.shift();
+                    const d = reach.get(y * W + x);
+                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        const nx = x + dx, ny = y + dy;
+                        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                        const nk = ny * W + nx;
+                        if (reach.has(nk) || rows[ny][nx] !== ".") continue;
+                        reach.set(nk, d + 1);
+                        queue.push([nx, ny]);
+                    }
+                }
+            }
             for (let k = 0; k < 6; k++) {
                 const chosen = [];
                 for (let n = 0; n < 12; n++) {
                     // смягчение: если зона тесная (чащи/болота/стражи),
                     // порог разрежения опускается — точка всё равно
-                    // обязана быть проходимой и вне запретов
+                    // обязана быть проходимой, достижимой и вне запретов
                     for (const minD of [16, 10, 5, 0]) {
                         let best = null, bd = -1;
                         for (let t = 0; t < 60; t++) {
@@ -1369,6 +1399,7 @@
                             const y = 3 + (rng() * (H - 6)) | 0;
                             const i = y * W + x;
                             if (zone[i] !== k || rows[y][x] !== ".") continue;
+                            if (!reach.has(i)) continue; // недостижимый «карман»
                             if (poiMask[i]) continue; // площади и стены зданий
                             if (!farAll(x, y, guardPts, 8)) continue;
                             if (!farAll(x, y, poiPts, 6)) continue;

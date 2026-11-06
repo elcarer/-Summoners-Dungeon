@@ -122,6 +122,16 @@
                 if (!own.length) return null;
                 let best = null, bestScore = -Infinity;
                 for (const v of own) {
+                    // W60 (юзер): существо, которое умрёт от атаки и которому
+                    // бафф не спасёт жизни, усиливать НЕЛЬЗЯ — карта впустую.
+                    // Обречён = прямо впереди стоит существо игрока, чья
+                    // атака снимает жизни цели даже С баффом (усиления
+                    // жизни дают только buffHp; прочие — нет)
+                    const att = unitAt(v.col, v.row + 1);
+                    const incoming = att && att.side === "p"
+                        && att.def.type === "unit" ? att.curAtk : 0;
+                    if (incoming && v.hp <= incoming
+                        && !(s.buffHp && v.hp + s.buffHp > incoming)) continue;
                     const rowBonus = v.row * 0.2;
                     let score = 0;
                     if (s.buffAtk) {
@@ -432,6 +442,12 @@
                 // «Эльф корней» (sg247): на 5×5 поле нет пустой клетки —
                 // карту переводить зря (призыв некуда)
                 if (s.rootSummon && B.units.length >= 25) return false;
+                // «Рождение феникса» (sg244, W60 юзер): ИИ играет её ЧАЩЕ —
+                // уже от 3 построек на поле (свои + чужие): жертв меньше
+                // трёх — карта бесполезна, держим до подходящего поля
+                if (s.phoenix
+                    && B.units.filter((v) => v.def.type === "building").length < 3)
+                    return false;
                 // «Огнелис»/«Огнемедведь» (sg249/250): то же — некуда призывать
                 if (s.summonPoints && B.units.length >= 25) return false;
                 // «Древомощь» (sg243): есть своё существо и запас ≥2⚡ —

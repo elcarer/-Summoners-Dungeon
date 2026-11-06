@@ -290,6 +290,11 @@
                     if (s.captivate) return 2; // hon197: вынос карты призыва — контроль
                     if (s.resurrect) return 3; // hon200: бесплатное тело — как призыв
                     if (s.lightAura) return 4; // hon199: метка — как усиление
+                    // W60 (юзер): «Рождение феникса» — расчистка поля,
+                    // играется РАНЬШЕ уже от 3 построек (гейт в aiSpellPlayable)
+                    if (s.phoenix
+                        && B.units.filter((v) => v.def.type === "building").length >= 3)
+                        return 2;
                     return 6; // поиск рун / гадание / поиск знаний / глубокое путешествие
                 }
                 // «Три монолита» — без спешки (просил юзер: не в приоритете):
@@ -856,6 +861,8 @@
                     if (s.wolfVolley) v += 2.0;
                     if (s.baseHit) v += 1.6;
                     if (s.exhumingMark) v += 1.1; // dec137: вторая жизнь существу
+                    if (s.phoenix) v += 2.2 + 0.5 * Math.min(5,
+                        B.units.filter((u) => u.def.type === "building").length);
                     if (s.freeze) v += 1.0;
                     if (s.iceStrike) v += 2.0;
                     if (s.hydroPunch) v += 1.2; // урон 1 + полезный сдвиг назад

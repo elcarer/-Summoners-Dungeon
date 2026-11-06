@@ -115,8 +115,7 @@
                 if (!near.length) return false;
                 const picks = deck.map((id, i) => ({ id, i, def: CARDS[id] }))
                     .filter((x) => x.def && x.def.type === "trap" && x.def.cost <= 2
-                        && x.def.trap.effect !== "castRandom"
-                        && x.def.trap.effect !== "sporeCurse");
+                        && x.def.trap.effect !== "castRandom"); // руна — юнит-ловушка
                 if (!picks.length) return false;
                 const pick = picks[(Math.random() * picks.length) | 0];
                 const [col, row] = near[(Math.random() * near.length) | 0];

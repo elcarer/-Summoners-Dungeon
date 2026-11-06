@@ -476,7 +476,7 @@
             A.trapPlayableNow = function trapPlayableNow(side, def) {
                 const foe = side === "p" ? "e" : "p";
                 const e2 = def.trap.effect;
-                if (e2 === "castRandom" || e2 === "sporeCurse")
+                if (e2 === "castRandom") // руна — на существо (W60: споры клеточные)
                     return B.units.some((v) => v.side === foe && v.def.type === "unit");
                 if (e2 === "ambushRise")
                     return B.units.some((v) => v.side === side

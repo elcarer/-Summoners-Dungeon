@@ -298,13 +298,13 @@
                             break;
                         }
                         if (def.type === "trap") {
-                            // лимита ловушек нет (просил юзер) — ставим любую
-                            // руна («Наскальная рунопись») и споры («Призрачные
-                            // споры») — на существо игрока: руна на сильнейшего
-                            // (при его атаке ИИ бесплатно разыграет случайное
-                            // заклинание своей колоды), споры тоже — чем больше
-                            // урона наносит проклятый, тем больше летит в базу
-                            if (def.trap.effect === "castRandom" || def.trap.effect === "sporeCurse") {
+                            // лимита ловушек нет (просил юзер) — ставим любую.
+                            // Руна («Наскальная рунопись») — на существо игрока:
+                            // на сильнейшего (при его атаке ИИ бесплатно
+                            // разыграет случайное заклинание своей колоды).
+                            // W60: «Призрачные споры» — КЛЕТОЧНАЯ ловушка,
+                            // ставится на общих основаниях ниже (aiTrapSpot)
+                            if (def.trap.effect === "castRandom") {
                                 const pu = B.units.filter((v) => v.side === "p" && v.def.type === "unit")
                                     .sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
                                 if (!pu) continue;
@@ -316,9 +316,9 @@
                                 B.eEnergy -= effCost(cardId, "e");
                                 notePlay("e"); // «Конвейер» (tim225)
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
+                                multiFury(cardId, "e"); // «Ярость природы» (Рыжий лес)
                                 cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
-                                if (def.trap.effect === "sporeCurse") addSpores(pu);
-                                else armTrap("e", cardId, 0, 0, pu);
+                                armTrap("e", cardId, 0, 0, pu);
                                 hideEnemyCard();
                                 played = true;
                                 break;
@@ -369,6 +369,7 @@
                             notePlay("e"); // «Конвейер» (tim225)
                             consumeEpicDiscount(cardId, "e"); // «Архилич»
                             cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
+                            multiFury(cardId, "e"); // «Ярость природы» (Рыжий лес, W60)
                             armTrap("e", cardId, col, row);
                             hideEnemyCard();
                             played = true;
@@ -403,6 +404,10 @@
                             // ставится на эффекты карты; возврат — в noteDiscard
                             // при выходе самой карты в сброс ниже
                             B.playCtx = { side: "e", cardId };
+                            // «Ярость природы» (Рыжий лес, W60): зеркала
+                            // spendCard игрока у ИИ НЕ БЫЛО — мультицветные
+                            // заклинания врага (sg243–247) молча не били базу
+                            multiFury(cardId, "e");
                             if (def.spell.copyLast) {
                                 // «Горящие руны»: повтор ПОСЛЕДНЕГО заклинания тем
                                 // же кодом эффектов (бесплатно для его цены)

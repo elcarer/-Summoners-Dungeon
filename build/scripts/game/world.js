@@ -96,6 +96,11 @@
         let mtnCount = 0; // спрайтов гор построено (тесты)
         let uiHud = null;
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
+        // W60: во время первой половины «прожига» (кольцо сжимается над
+        // миром до смены сцены) герой стоит и триггеры городов/пещер молчат
+        let worldLock = false;
+        // счётчик дней открытого мира: 20 секунд реального времени = 1 день
+        let daysAcc = 0;
         let zoneRef = null; // клик-зона местности (тесты: clickAt)
         const hudBtns = []; // иконки-кнопки HUD (тесты: hudNodes)
         let floaties = []; // всплывающие подписи («Скоро…» у арки)
@@ -159,7 +164,17 @@
             if (!G.world.wildLevel) G.world.wildLevel = {};
             {
                 const D = globalThis.GAME_DATA;
-                if (map.wildSpawns)
+                if (map.wildSpawns) {
+                    // W60 (юзер): недостижимые «карманы» вырезаны из
+                    // генератора — осиротевшие точки старых сейвов (индекс
+                    // за пределами нового wildSpawns) больше не спавнят
+                    for (const k of Object.keys(G.world.wander)) {
+                        const m = /^wild:([^:]+):(\d+)$/.exec(k);
+                        if (!m) continue;
+                        const idx = Number(m[2]);
+                        const d2 = map.wildSpawns[idx];
+                        if (!d2 || d2.elem !== m[1]) delete G.world.wander[k];
+                    }
                     for (let i = 0; i < map.wildSpawns.length; i++) {
                         const d = map.wildSpawns[i];
                         const k = "wild:" + d.elem + ":" + i;
@@ -183,6 +198,7 @@
                                     (G.world.seed ^ ((i + 1) * 2654435761)) | 0),
                         };
                     }
+                }
             }
             // миграция старых ключей "gob:0" → "cave:gob:0" (до v13)
             for (const k of Object.keys(G.world.wander))
@@ -722,6 +738,19 @@
                 scenes.go("settings");
             });
             c.addChild(settingsBtn);
+            // счётчик дней открытого мира (W60, юзер): слева от иконки
+            // настроек — иконка icon_day.png и число, по принципу ресурсов
+            // (позиция — ежекадрово от края окна, как у настроек)
+            const dayPlate = new PIXI.Container();
+            const dayIcon = new PIXI.Sprite(uiTex("icon_day.png"));
+            dayIcon.anchor.set(0.5);
+            dayIcon.scale.set(0.44);
+            dayIcon.position.set(14, 66);
+            dayPlate.addChild(dayIcon);
+            const dayT = new PIXI.Text({ text: String(G.days || 0), style: resStyle });
+            dayT.position.set(30, 54);
+            dayPlate.addChild(dayT);
+            c.addChild(dayPlate);
             // карточка героя (просил юзер): под иконкой золота, клик —
             // в колоду, наведение — рост до натурального размера (ctx.heroHover)
             const wHero = globalThis.GAME_DATA.HEROES[G.heroId]
@@ -755,7 +784,7 @@
             // из полноэкранного в оконный letterbox-полосы канваса
             // отодвигали золото/карточку героя и настройки от краёв)
             c.userData = { goldT, resT, mini, goldPlate, heroHolder,
-                settingsBtn, qRune, qSide };
+                settingsBtn, qRune, qSide, dayPlate, dayT };
             return c;
         }
 
@@ -855,8 +884,11 @@
                 G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
             }
             // уходим в ДРУГОЙ данж — текущий этаж архивируется, чтобы
-            // прогресс (враги/объекты/позиция) не потерялся
-            if (G.dungeon && G.dungeon.v === globalThis.GAME_DUNGEON.MAP_V
+            // прогресс (враги/объекты/позиция) не потерялся. W60 (юзер):
+            // city-состояние (G.dungeon в городе) архивом этажа НЕ
+            // становится — оно живёт в G.cityStates
+            if (G.dungeon && !G.dungeon.city
+                && G.dungeon.v === globalThis.GAME_DUNGEON.MAP_V
                 && G.dungeon.cave !== caveId) {
                 G.dungeonStates[(G.dungeon.cave || "gob") + ":" + G.dungeon.floor] = G.dungeon;
             }
@@ -875,10 +907,34 @@
             // (просил юзер). Остаток МС, тикает в update данжа, — НЕ
             // performance.now(): метка, уехавшая в сейв, после «Продолжить»
             // блокировала выход до конца сессии (баг W22)
-            st.ladderCoolMs = 2000;
+            // W60: 4с — 2с «остывания» ПЛЮС время «прожига» входа (~3с):
+            // герой прибывает на лестнице и стоит весь переход — без
+            // поправки первый кадр после кольца выбрасывал его в мир
+            st.ladderCoolMs = 4000;
             G.dungeon = st;
+            G.cityOut = null; // stale-выход из города пещеру не перебивает (W60)
             if (ctx.sfx) ctx.sfx("coins"); // вход в подземелье (W34, юзер)
-            scenes.go("dungeon");
+            // W60 (юзер): вход в подземелье — ДВУХФАЗНЫЙ «прожиг»: первая
+            // половина эффекта (сужающееся кольцо) играет поверх ОТКРЫТОГО
+            // МИРА, к её концу сцена мира сменяется подземельем, и доигрывает
+            // вторая половина (расширяющееся кольцо), открывая его экран.
+            // Эффект живёт на ctx.ui — общей подложке сцен — поэтому
+            // переживает смену; свой эффект данж не запускает (st.descentFx)
+            const FX = globalThis.GAME_FX;
+            const fx = FX && FX.available
+                ? FX.spawn(ctx.ui, "transitions/burn-away",
+                    { x: 0, y: 0, size: 1080 })
+                : null;
+            if (fx) {
+                st.descentFx = true;
+                worldLock = true; // кольцо жнёт мир — герой стоит
+                setTimeout(() => {
+                    worldLock = false;
+                    scenes.go("dungeon");
+                }, 1250); // кольцо сузилось (CLOSE ≈ 1.2с эффекта)
+            } else {
+                scenes.go("dungeon");
+            }
             return true;
         }
 
@@ -1312,6 +1368,7 @@
                 }
             },
             exit() {
+                worldLock = false;
                 if (heroId !== null) {
                     G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
                 }
@@ -1470,6 +1527,16 @@
                     ud.goldPlate.position.set(lt.x + 18, 14);
                     ud.heroHolder.position.set(lt.x + 58, 76);
                     ud.settingsBtn.position.set(rt.x - 81, 66);
+                    ud.dayPlate.position.set(rt.x - 166, 0);
+                }
+                // дни открытого мира (W60, юзер): тикают ТОЛЬКО здесь —
+                // 20 секунд реального времени = 1 день; бой/город/подземелье/
+                // меню счётчик не двигают (update мира не выполняется)
+                daysAcc += ticker.deltaMS / 1000;
+                if (daysAcc >= 20) {
+                    daysAcc -= 20;
+                    G.days = (G.days || 0) + 1;
+                    uiHud.userData.dayT.text = String(G.days);
                 }
 
                 // всплывающие подписи («Скоро…») — вверх и растворение
@@ -1513,9 +1580,17 @@
                 if (ctx.input.wasPressed("KeyM"))
                     setMiniMode(miniMode === 1 ? 2 : 1);
 
+                // C — колода/коллекция (W60, юзер): как клик по карте героя
+                if (ctx.input.wasPressed("KeyC") && !(ctx.questModal > 0)
+                    && !worldLock) {
+                    if (ctx.sfx) ctx.sfx();
+                    G.uiReturn = "world";
+                    scenes.go("deck");
+                }
+
                 // квест-диалог открыт (модальный) — герой стоит и не входит
                 // в пещеры, пока окно не закрыто
-                if (ctx.questModal) {
+                if (ctx.questModal || worldLock) {
                     setHeroAxes(0, 0);
                     path = null;
                 } else {
@@ -1682,9 +1757,17 @@
                 // арки подземелий — касание (диалог открыт — молчат).
                 // Вход закрыт малой колодой или данж ещё впереди —
                 // всплывает предупреждение (кулдаун 2.5с — без спама)
-                if (!ctx.questModal && layer)
+                if (!ctx.questModal && !worldLock && layer) {
+                // W60 (юзер): герой вошёл во вход подземелья «Роща роста»,
+                // а попал в столицу «Вечная Роща» — радиусы триггеров
+                // перекрывались (город 1.3 клетки, пещера 0.85), и побеждал
+                // ПЕРВЫЙ в списке POI. Теперь собираем всех подходящих и
+                // входим в БЛИЖАЙШИЙ (ничья — пещера: её радиус жёстче,
+                // герой целился именно в неё)
+                let bestPoi = null, bestKind = null, bestD = Infinity;
                 for (const p of G.world.map.pois) {
                     const c = px(p);
+                    const d = Math.hypot(c.x - hx, c.y - hy);
                     // города (W30/W31): касание СТАРТОВОГО — вход в НЕГО
                     // (раньше всегда открывался первый spawnTown в pois —
                     // город Силы, баг юзера). W40 (юзер): входят ВСЕ города
@@ -1693,18 +1776,28 @@
                     // препятствие), радиус 1.3 клетки — вход с клетки
                     // перед воротами (диагональ 45px ещё молчит)
                     if ((p.kind === "town" || p.kind === "capital")
-                        && Math.hypot(c.x - hx, c.y - hy) < TS * 1.3) {
+                        && d < TS * 1.3) {
                         // (W49, юзер) 3с после выхода вход в ЭТОТ же город
                         // закрыт — ворота можно спокойно пройти мимо; в
                         // другие города и после остывания вход как был
-                        if (!(G.world.cityCoolMs > 0
-                            && G.world.cityCoolTw === p.gx + ":" + p.gy)) {
-                            enterCity(p);
-                            return;
-                        }
+                        if (G.world.cityCoolMs > 0
+                            && G.world.cityCoolTw === p.gx + ":" + p.gy) continue;
+                        if (d < bestD) { bestD = d; bestPoi = p; bestKind = "city"; }
                     }
                     if (p.kind !== "dungeon") continue;
-                    if (Math.hypot(c.x - hx, c.y - hy) < TS * 0.85) {
+                    if (d < TS * 0.85
+                        && (bestKind !== "city" || d <= bestD)) {
+                        bestD = d; bestPoi = p; bestKind = "cave";
+                    }
+                }
+                if (bestPoi) {
+                    const p = bestPoi;
+                    const c = px(p);
+                    if (bestKind === "city") {
+                        enterCity(p);
+                        return;
+                    }
+                    {
                         const deniedAt = p.denyAt || p.soonAt;
                         if (globalThis.GAME_DATA.CAVES[p.cave]
                             ? !enterCave(p.cave)
@@ -1736,6 +1829,7 @@
                         }
                         return;
                     }
+                }
                 }
             },
             heroId: () => heroId,

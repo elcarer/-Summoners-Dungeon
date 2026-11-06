@@ -232,7 +232,7 @@
                 rarity: "common", elem: "growth",
                 color: 0x2e5a3e, img: "growth/46" },
         // ── Рост, вторая партия (глаза юзера): 47–56 ────────────────────────
-        grw7: { type: "spell", cost: 1,
+        grw7: { type: "spell", cost: 2, // W60 (юзер): было 1
                 spell: { target: "anyUnit", buffAtkByHp: true },
                 kind: "buff", // тип эффекта — по спеке юзера (cards.txt)
                 rarity: "common", elem: "growth",
@@ -269,7 +269,10 @@
                  rarity: "rare", elem: "growth",
                  color: 0x3f6d3a, img: "growth/54" },
         grw15: { type: "trap", cost: 2,
-                 trap: { event: "onUnitDamage", effect: "sporeCurse" },
+                 // W60 (юзер): ловушка на ПУСТОЙ КЛЕТКЕ — существо врага,
+                 // вступившее на неё перемещением/призывом, получает
+                 // проклятие спор (sporeCurse: его урон бьёт и его базу)
+                 trap: { event: "onEnemyCell", effect: "sporeCurse" },
                  kind: "damage", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x2e5a2e, img: "growth/55" },
@@ -1778,6 +1781,7 @@
         // по 1 урону случайным соседним (верт/гориз) существам противника
         sg241: { type: "unit", cost: 3, atk: 2, hp: 1, speed: 1,
                  creature: "elf",
+                 sheet: "elf", // W60 (юзер): был лист гоблина — лист стихии по умолчанию
                  subtype: "elf", // подтип — по спеке юзера (существо Эльфа)
                  fireSnipe: 2,
                  rarity: "common", elem: "strGro",
@@ -1855,7 +1859,8 @@
         // ЖЕТОН БЕЗ multi: «Ярость природы» бьёт при РОЗЫГРЫШЕ карт,
         // а не при призыве жетона — multiFury читает def.multi
         sgrRootElf: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
-                      creature: "elf", rootGrab: 1,
+                      creature: "elf", sheet: "elf", // W60: лист эльфа, не гоблина
+                      rootGrab: 1,
                       subtype: "elf", // подтип — по спеке юзера (Эльф)
                       rarity: "common", elem: "strGro",
                       color: 0x6f8a4e },

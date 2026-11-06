@@ -48,7 +48,10 @@
     const stKey = (cave, floor) => (caveOf(cave) && cave !== undefined ? cave : "gob") + ":" + floor;
     function stateFor(states, cave, floor) {
         const st = states && states[stKey(cave, floor)];
-        return st && st.v === MAP_V ? st : newDungeonState(cave, floor);
+        // W60 (юзер): city-состояние в архиве этажей не этаж — старые
+        // сейвы с таким мусором получают свежий этаж, а не столицу
+        return st && st.v === MAP_V && !st.city
+            ? st : newDungeonState(cave, floor);
     }
     // #: стена, .: пол, H: старт героя, e: враг, B: главарь, X: выход.
     // Враги стоят В КОРИДОРАХ, перекрывая входы в комнаты (просил юзер),
@@ -379,6 +382,9 @@
         let refreshShop = null; // живое обновление окна магазина (пишет buildShopWin)
         let shopZoomHook = null; // ховер-зум карт магазина (пишет buildShopWin)
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
+        // W60: первая половина «прожига» перехода между этажами — герой
+        // стоит и триггеры лестниц/спусков молчат до смены сцены
+        let floorLock = false;
         let zoneRef = null; // клик-зона местности (тесты: clickAt)
         let pathLayer = null; // fx-слой следа клика (кольцо + точки маршрута)
 
@@ -446,6 +452,27 @@
             }
             return null;
         }
+        // W60 (юзер): переход между этажами — двухфазный «прожиг»:
+        // первая половина эффекта (сужающееся кольцо) играет над СТАРЫМ
+        // этажом, к её концу сцена перезаходит (floorSwap), вторая половина
+        // (расширяющееся кольцо) открывает новый этаж. Эффект живёт на
+        // ctx.ui и переживает перезаход; в новом состоянии ставится
+        // descentFx — вход сцены поднимет эффект над своим HUD.
+        // Бандл не загрузился — обычный мгновенный переход
+        function descentGo() {
+            const FX = globalThis.GAME_FX;
+            const fx = FX && FX.available
+                ? FX.spawn(ctx.ui, "transitions/burn-away",
+                    { x: 0, y: 0, size: 1080 })
+                : null;
+            if (!fx) { scenes.go("floorSwap"); return; }
+            floorLock = true;
+            setTimeout(() => {
+                floorLock = false;
+                scenes.go("floorSwap");
+            }, 1250); // кольцо сузилось (CLOSE ≈ 1.2с эффекта)
+        }
+
         function setHeroAxes(ix, iy) {
             COMPONENTS.ctrlVI[heroId] = ix;
             COMPONENTS.ctrlVJ[heroId] = iy;
@@ -1535,24 +1562,44 @@
                 camera.centerOn(st.heroPos.x, st.heroPos.y);
                 uiHud = buildHud();
                 ctx.ui.addChild(uiHud);
-                // W59 (юзер): вход героя в ПОДЗЕМЕЛЬЕ — «прожиг» экрана
-                // (transitions/burn-away, one-shot 3с) поверх всего UI:
-                // экран вгорает от краёв и раскрывается к середине, открывая
-                // этаж. Город входит без прожига. Спрайт добавлен после HUD —
-                // накрывает и его. Бандл не загрузился — вход без эффекта
+                // W60 (юзер): «прожиг» экрана (transitions/burn-away)
+                // запускает сам ПЕРЕХОД — спуск из открытого мира
+                // (world.enterCave) и переходы между этажами по лестнице
+                // (descentGo): эффект живёт на общей подложке ctx.ui и
+                // переживает смену сцены. Вход сцены только ПОДНИМАЕТ его
+                // над своим HUD (сцена сменилась под играющим кольцом) и
+                // снимает флаг. После боя/выхода из колоды эффекта НЕТ.
+                // Город входит без прожига
                 {
                     const FX = globalThis.GAME_FX;
-                    if (FX && FX.available && !st.city)
-                        FX.spawn(ctx.ui, "transitions/burn-away",
-                            { x: 0, y: 0, size: 1080 });
+                    if (FX && FX.available && !st.city && st.descentFx) {
+                        st.descentFx = false;
+                        for (const h of FX.live)
+                            if (h.sprite && !h.sprite.destroyed
+                                && h.sprite.parent === ctx.ui
+                                && h.inst.meta && h.inst.meta.name === "Burn away")
+                                ctx.ui.addChild(h.sprite); // наверх, над HUD
+                    }
                 }
                 // квест-диалоги: окно награды за выполненный квест открывается
                 // именно здесь — после экрана выбора наградной карты (просил
                 // юзер); также анонс нового задания поверх подземелья
                 globalThis.GAME_QUESTS.onSceneEnter(ctx);
+                // W60 (юзер): окно «поручение выполнено» и награда письма —
+                // СРАЗУ при входе в город-адресат, а не при выходе из него
+                // (прежде окно ждало возврата в открытый мир)
+                if (st.city && G.world.sideNote && globalThis.GAME_SIDEQ) {
+                    const n = G.world.sideNote;
+                    G.world.sideNote = null;
+                    if (!globalThis.GAME_SIDEQ.showComplete(ctx, n)) {
+                        // окно не открылось — заметка возвращается (мир покажет)
+                        G.world.sideNote = n;
+                    }
+                }
             },
             exit() {
                 const st = myState;
+                floorLock = false;
                 globalThis.GAME_QUESTS.forcedClose(ctx); // диалог не сиротеет
                 // heroPos пишем только пока G.dungeon — всё ещё состояние
                 // этой сцены: подъём/спуск свапнули его до переключения
@@ -1602,6 +1649,14 @@
                     }
                 }
 
+                // C — колода/коллекция (W60, юзер): как клик по карте героя
+                if (ctx.input.wasPressed("KeyC") && !(ctx.questModal > 0)
+                    && !floorLock) {
+                    if (ctx.sfx) ctx.sfx();
+                    G.uiReturn = "dungeon";
+                    scenes.go("deck");
+                }
+
                 // скорость анимаций из настроек (0..10; 5 = скорость листа,
                 // ниже 2 — ползунок в минимум) — живая, как в бою (просил юзер)
                 COMPONENTS.animationSpeed[heroId] = (ctx.heroSheet.animationSpeed || 0.2)
@@ -1613,7 +1668,11 @@
                 heroShadow.zIndex = hy - 0.5;
 
                 // ── ведение по пути (клик-перемещение) ─────────────────────
-                if (path && (charInput.ix || charInput.iy)) path = null; // клавиши главнее
+                // W60: во время «прожига» герой стоит (кольцо жнёт старый этаж)
+                if (floorLock) {
+                    path = null;
+                    setHeroAxes(0, 0);
+                } else if (path && (charInput.ix || charInput.iy)) path = null; // клавиши главнее
                 if (path && !path.length) path = null;
                 if (path) {
                     const dx = path[0].x - hx, dy = path[0].y - hy;
@@ -1629,7 +1688,9 @@
                         }
                     }
                 }
-                if (path) {
+                if (floorLock) { // «прожиг» перехода — герой стоит
+                    setHeroAxes(0, 0);
+                } else if (path) {
                     const dx = path[0].x - hx, dy = path[0].y - hy;
                     const d = Math.hypot(dx, dy) || 1;
                     setHeroAxes(dx / d, dy / d);
@@ -1853,7 +1914,7 @@
                         && Math.floor(hx / TS) <= psg.x1
                     : !!st.ladder
                         && Math.hypot(st.ladder.x - hx, st.ladder.y - hy) < TS * 1.02;
-                if (!st.win && !ctx.questModal && hitExit
+                if (!st.win && !ctx.questModal && !floorLock && hitExit
                     && !(st.ladderCoolMs > 0)) {
                     const from = st.floor;
                     st.heroPos = { x: hx, y: hy };
@@ -1877,6 +1938,11 @@
                         G.world.heroPos = null;
                         G.world.out = true; // из пещеры — к самому входу
                         G.world.outCave = st.cave || "gob"; // к входу ЭТОГО данжа
+                        // W60 (юзер): выход из ПОДЗЕМЛЬЯ — герой встаёт у
+                        // входа этого данжа; stale-выход из города его не
+                        // перебивает (баг «вышел из „Рыжего леса“ — попал
+                        // в другой части мира у города»)
+                        G.cityOut = null;
                         scenes.go("world");
                     } else {
                         G.run.floor = from - 1;
@@ -1884,18 +1950,19 @@
                         const prev = stateFor(G.dungeonStates, st.cave, from - 1);
                         prev.heroPos = { x: prev.exit.x, y: prev.exit.y }; // у спуска
                         prev.exitCool = true; // не провалиться сразу обратно
+                        prev.descentFx = true; // вход нового этажа поднимет эффект
                         G.dungeon = prev;
-                        scenes.go("floorSwap"); // перезаход в ту же сцену
+                        descentGo(); // W60: 2-фазный «прожиг» подъёма
                     }
                     return;
                 }
                 // «остывание» спуска после подъёма: считаем ДО проверки
                 // близости — герой уже ушёл, ветка касания не выполняется
-                if (st.exit && st.exitCool
+                if (!floorLock && st.exit && st.exitCool
                     && Math.hypot(st.exit.x - hx, st.exit.y - hy) > TS * 1.25) {
                     st.exitCool = false;
                 }
-                if (!st.win && !ctx.questModal && st.exit
+                if (!st.win && !ctx.questModal && !floorLock && st.exit
                     && Math.hypot(st.exit.x - hx, st.exit.y - hy) < TS * 0.85) {
                     if (st.exitCool) {
                         // поднялись и стоим на спуске: уйдём на клетку-другую —
@@ -1923,11 +1990,15 @@
                         // стоит от неё в СОСЕДНЕЙ клетке, а порог выхода
                         // теперь шире клетки (W22) — без остывания его
                         // мгновенно выкидывало на предыдущий этаж
-                        next.ladderCoolMs = 2000;
+                        // W60: 4с = 2с остывания + «прожиг» перехода (~1.3с),
+                        // чтобы лестница не сработала сразу после кольца
+                        next.ladderCoolMs = 4000;
                         G.dungeon = next;
+                        next.descentFx = true; // вход нового этажа поднимет эффект
                         // сразу на следующий этаж, без меню «этаж пройден»
-                        // (просил юзер); floorSwap — перезаход в ту же сцену
-                        scenes.go("floorSwap");
+                        // (просил юзер); W60: 2-фазный «прожиг» спуска —
+                        // floorSwap по таймеру, после сужения кольца
+                        descentGo();
                         return;
                     }
                 }

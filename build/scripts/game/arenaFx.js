@@ -29,7 +29,7 @@
                 impact: { id: "impacts/hit-spark", h: 92 },
                 attack: { id: "melee/claw-swipe", h: 116 }, // атака существа
                 spellHit: { id: "impacts/parry", h: 118 }, // заклинание по одному
-                massHit: { id: "impacts/impact-frame", h: 128 }, // массовый урон
+                massHit: { id: "arcane/star-fall", h: 172 }, // массовый урон (W60)
                 trapHit: { id: "impacts/blunt-hit", h: 112 }, // ловушка на существе
                 hpLost: { id: "ui/heart-lost", h: 104, raw: true }, // потеря жизней (сердечки — родная палитра)
                 heal: { id: "holy/heal", h: 120 },
@@ -38,10 +38,10 @@
                 summon: { id: "spawn/summon-rise", h: 150 }, // (вне списка юзера)
                 build: { id: "impacts/heavy-landing", h: 96 }, // (вне списка)
                 portal: { id: "arcane/portal", h: 150 }, // появление (за 0.5с до)
-                cast: { id: "arcane/magic-circle-cast", h: 170 },
+                cast: { id: "holy/feather-burst", h: 150 }, // розыгрыш заклинания — на карте (W60)
                 ice: { id: "ice/snowflake-burst", h: 120 },
                 poison: { id: "nature/spore-burst", h: 140 },
-                trap: { id: "shadow/hex-sigil", h: 120 },
+                trap: { id: "status/confused", h: 128 }, // сработавшая ловушка (W60)
                 seal: { id: "arcane/mana-burst", h: 130 },
                 base: { id: "explosions/small-explosion", h: 220 },
                 buff: { id: "lightning/electrified", h: 110 }, // усиление
@@ -523,7 +523,13 @@
                 if (PFX && PFX[kind] && PFX_SRC.live.length < PFX_MAX) {
                     const d = PFX[kind];
                     const pw = kind === "impact" ? (opts.power || 1) : 1;
-                    const h2 = PFX_SRC.spawn(root.fx, d.id, {
+                    // W60 (юзер): портал появления — ПОД жетонами (спрайт
+                    // существа выходит ПЕРЕД порталом, а не за ним):
+                    // fireLayer стоит ниже unitsLayer, прочие эффекты —
+                    // как раньше, поверх всего поля
+                    const fxParent = kind === "portal" && root.fireLayer
+                        ? root.fireLayer : root.fx;
+                    const h2 = PFX_SRC.spawn(fxParent, d.id, {
                         x: e.x, y: e.y,
                         size: d.h * (opts.scale || 1) * pw,
                         palette: d.raw ? undefined : PFX_SRC.ramp(e.color),
@@ -803,20 +809,21 @@
             };
 
             // Удобный хелпер для кастов: позиция цели/базы/центра и цвет стихии.
-            // origin — центр РАЗЫГРАННОЙ карты (просил юзер): заклинание
-            // без позиции цели рождается на карте в руке игрока или на
-            // показанной карте врага, а не в центре экрана
+            // W60 (юзер): эффект розыгрыша — НА РАЗЫГРЫВАЕМОЙ КАРТЕ
+            // (Feather burst): origin (центр карты в руке игрока или
+            // показанной карты врага) главнее позиции цели; без карты —
+            // цель/база/центр, как раньше
             A.fxSpellCast = function fxSpellCast(cardId, target, side, origin) {
                 const def = typeof cardId === "string" ? CARDS[cardId] : cardId;
                 if (!def) return null;
                 let x = 960, y = 540;
-                if (target && target.col !== undefined) {
+                if (origin) {
+                    x = origin.x; y = origin.y;
+                } else if (target && target.col !== undefined) {
                     const p = cellXY(target.col, target.row);
                     x = p.x; y = p.y - 8;
                 } else if (target && target.base) {
                     x = 960; y = 70;
-                } else if (origin) {
-                    x = origin.x; y = origin.y;
                 }
                 return A.fxEvent("cast", {
                     x, y, color: A.fxColorOf(def.elem), scale: 0.9,

@@ -311,6 +311,8 @@
                 if (s.target === "anyUnitDmg") {
                     const targets = aiDmgTargets(def);
                     if (s.purge) { // «Извлечение духа»: чистим самую «заряженную» цель
+                        // (W60 юзер: на существа БЕЗ эффектов и способностей
+                        // дух не извлекать — карта и энергия в никуда)
                         let best = null, bestScore = 0;
                         for (const v of targets) {
                             const n = countProps(v);
@@ -318,7 +320,9 @@
                             const sc = n * 3 + aiThreat(v) * 0.5;
                             if (sc > bestScore) { bestScore = sc; best = v; }
                         }
-                        if (focus && targets.includes(focus)) best = focus; // руна
+                        // руна: фокус только «заряженный», иначе лучший по счёту
+                        if (focus && targets.includes(focus)
+                            && countProps(focus) > 0) best = focus;
                         if (best) {
                             best = reflectAim("p", best); // «Отражение» (wis120) игрока
                             const n = purgeUnit(best);

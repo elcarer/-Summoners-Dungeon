@@ -176,8 +176,9 @@
                         return deny();
                     tap = spotIn(def.type === "unit" ? rows[0] : rows[rows.length - 1]);
                 } else if (def.type === "trap") {
-                    if (def.trap.effect === "castRandom" || def.trap.effect === "sporeCurse") {
-                        // руна/споры — сильнейшее существо врага
+                    if (def.trap.effect === "castRandom") {
+                        // руна — сильнейшее существо врага (W60: споры —
+                        // клеточные, ставятся как мины)
                         const foes = B.units.filter((v) => v.side === "e"
                             && v.def.type === "unit")
                             .sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row));
@@ -333,7 +334,8 @@
                     return;
                 }
                 if (def.type === "trap") {
-                    // руна и споры вешаются на существо; лимита ловушек нет
+                    // руна вешается на существо; W60: «Призрачные споры» —
+                    // клеточная, ставится как мины; лимита ловушек нет
                     // (просил юзер) — можно ставить сколько угодно
                     if (effCost(B.hand[idx]) > B.energy) return;
                     // мина ставится на выбранную пустую клетку — выбор как у юнитов
@@ -459,27 +461,18 @@
                     return;
                 }
                 if (def.type === "trap") {
-                    // руна («Наскальная рунопись») и споры («Призрачные споры») —
-                    // наоборот, на существо; споры — только на существо ВРАГА
-                    if (def.trap.effect === "castRandom" || def.trap.effect === "sporeCurse") {
+                    // руна («Наскальная рунопись») — на существо
+                    // (W60: «Призрачные споры» — клеточные, ставятся как мины)
+                    if (def.trap.effect === "castRandom") {
                         const u = unitAt(col, row);
-                        if (!u || u.def.type !== "unit"
-                            || (def.trap.effect === "sporeCurse" && u.side === "p")) {
+                        if (!u || u.def.type !== "unit" || u.side === "p") {
                             deselect();
                             return;
                         }
                         B.energy -= effCost(B.hand[B.selected]); // цена ловушки
                         const cardId = spendCard(B.selected);
                         consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
-                        if (def.trap.effect === "sporeCurse") {
-                            // «Битва умов» (wis114) врага отменяет и споры:
-                            // карта и энергия потрачены, эффект не срабатывает
-                            if (trapPlayCountered("p")) {
-                                const sp = cellXY(u.col, u.row);
-                                floatText(sp.x, sp.y - 60,
-                                    "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
-                            } else addSpores(u);
-                        } else if (!armTrap("p", cardId, 0, 0, u)) {
+                        if (!armTrap("p", cardId, 0, 0, u)) {
                             const sp = cellXY(u.col, u.row);
                             floatText(sp.x, sp.y - 60,
                                 "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);

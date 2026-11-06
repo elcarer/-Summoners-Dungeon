@@ -43,42 +43,33 @@
     function fresh() {
         return {
             active: QUESTS[0].id, done: {}, announced: false, pending: null,
-            progress: {}, qv: 2,
+            progress: {}, qv: 3,
         };
     }
     // Подъём из сейва: null — квесты явно выключены (профиль без квестов).
-    // qv=2 — формат линейки «Путь призывателя» (4 квеста, прогресс);
-    // сейвы старого формата (q1 win / q2 boss) мигрируют: смыслы сдвинулись
-    // на квест позже — выполненный «win» = новый q2, «boss» = новый q3
-    const MIGRATE = { q1: "q2", q2: "q3" };
+    // qv=3 — формат линейки «Путь призывателя» (4 квеста, прогресс).
+    // W60 (юзер): цепочка Глома даётся и выполняется СТРОГО последовательно
+    // с первого квеста; сейвы старых форматов (qv=2 и ранние, с миграцией
+    // «сдвиг на квест позже») поднимаются ЗАНОВО с q1 — у юзера после
+    // старой миграции Глом сразу давал «Голову с плеч», пропустив первые
+    // задания цепочки
     function revive(saved) {
         if (saved === null) return null;
-        if (saved && typeof saved === "object" && saved.qv === 2
+        if (saved && typeof saved === "object" && saved.qv === 3
             && (QUESTS.some((q) => q.id === saved.active) || saved.active === null)) {
             return {
                 active: saved.active || null,
                 done: saved.done && typeof saved.done === "object" ? { ...saved.done } : {},
-                announced: saved.announced !== false,
+                announced: saved.announced === true,
                 pending: QUESTS.some((q) => q.id === saved.pending) ? saved.pending : null,
                 progress: saved.progress && typeof saved.progress === "object"
                     ? { ...saved.progress } : {},
-                qv: 2,
+                qv: 3,
             };
         }
+        // сейвы qv=2 и старее — цепочка заново с первого квеста (не взят)
         const st = fresh();
-        if (saved && typeof saved === "object") {
-            // старый формат: сдвиг идентификаторов на шаг позже
-            for (const k of Object.keys(saved.done || {}))
-                if (MIGRATE[k]) st.done[MIGRATE[k]] = true;
-            const shift = (id) => (id && MIGRATE[id]) || null;
-            st.active = saved.active ? shift(saved.active)
-                : (Object.keys(st.done).length >= 3 ? null : st.active);
-            if (st.active && st.done[st.active]) st.active = nextOf(st.active);
-            st.pending = shift(saved.pending);
-            st.announced = saved.announced !== false;
-        } else {
-            st.announced = true; // сейв без квестов — диалог посреди чужого забега не выскакивает
-        }
+        if (!(saved && typeof saved === "object")) st.announced = true;
         return st;
     }
 
@@ -108,7 +99,9 @@
     function questVars(G, q) {
         const P = (G.quests && G.quests.progress) || {};
         if (q.id === "q1") return { n: Math.min(P.wildKills || 0, q.kills || 3) };
-        if (q.id === "q2") return { boss: bossName(G) };
+        // W60 (юзер): у q3 в тексте тоже {boss} — без подстановки печаталась
+        // сырая ссылка «{boss}» (был открыт только q2)
+        if (q.id === "q2" || q.id === "q3") return { boss: bossName(G) };
         if (q.id === "q4") return {
             boss: bossName(G),
             b1: P.bottom ? "+" : "-", b2: P.finalBoss ? "+" : "-",

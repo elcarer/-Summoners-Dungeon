@@ -61,10 +61,13 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 
 ## Текущее состояние
 
-- Последняя волна: **W59** — эффекты событий по списку юзера. Бандл
-  pixelfx пересобран (18→31: arrow, claw-swipe, parry, blunt-hit,
-  impact-frame, heart-lost, disintegrate, poof, portal, stunned,
-  electrified, leaf-storm, burn-away). Урон по источнику (damageUnit +
+- Последняя волна: **W60** — 16 поправок + 6 багов юзера (эффекты
+  Feather burst/Star fall/Confused; споры — клеточная ловушка; ИИ
+  purge/баффы/феникс/multiFury; счётчик дней; коллекция X/Y; клавиша C;
+  квесты qv3+{boss}+окно в городе; 2-фазный burn away; баги «Рощи»/
+  карманов/выхода). Бандл
+  pixelfx 31→34 (W60: feather-burst, star-fall, confused). Волна W59 —
+  эффекты событий по списку юзера; урон по источнику (damageUnit +
   подсказка A.fxHint): атака → Claw swipe, заклинание по одному →
   Parry, массовый → Impact frame, ловушка на существе → Blunt hit,
   прочие потери → Heart lost; смерть существа/постройки → Disintegrate/

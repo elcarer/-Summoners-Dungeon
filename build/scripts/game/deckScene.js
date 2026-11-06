@@ -160,7 +160,10 @@
                 card.on("pointerover", () => showZoom(id, "right", cx, cy, card));
                 card.on("pointerout", () => hideZoom(false));
                 c.addChild(card);
-                const cnt = T(t("deck.owned", { n: owned }), 19, canAdd ? 0xd8c79d : 0x8a7c5e);
+                // W60 (юзер): «в коллекции: X/Y» — X свободные копии
+                // (не в колоде), Y все копии этого названия
+                const cnt = T(t("deck.owned", { n: owned - inDeck, total: owned }),
+                    19, canAdd ? 0xd8c79d : 0x8a7c5e);
                 cnt.anchor.set(0.5, 0);
                 cnt.position.set(cx, cy + 138); // под картой (×1.5 от базы 1280)
                 cnt.eventMode = "none";

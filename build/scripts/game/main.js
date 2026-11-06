@@ -35,7 +35,8 @@
             "arc_rune", "bg_corridor_1", "bg_corridor_2", "board", "button_1", "button_attack",
             "button_end", "button_menu", "card_back_min", "card_back_screen",
             "card_back_small", "icon_bag", "icon_boss", "icon_down", "icon_enemy",
-            "icon_gold", "icon_map", "icon_rune", "icon_setting", "icon_shop",
+            "icon_day", "icon_gold", "icon_map", "icon_rune", "icon_setting",
+            "icon_shop",
             "panel_1", "panel_2", "panel_allert", "panel_buff", "panel_buff_circle",
             "panel_down", "panel_label", "panel_minimap", "panel_skill", "panel_top",
             "portrate_hero", "sign_mana", "sign_shield", "start_back",
@@ -470,6 +471,7 @@
 
         const G = {
             hero: { hp: 10, maxHp: 10 }, gold: 0,
+            days: 0, // счётчик дней в открытом мире (W60, юзер)
             // ресурсы стихий и бустеры кузницы (W40, просил юзер): на начало
             // игры нули; ресурсы дают побочные квесты ратуши, тратятся в
             // кузнице города (3 → бустер стихии города)
@@ -569,6 +571,7 @@
                 this.live = true; // забег поднят в G — «Сохранить» берёт его
                 this.hero.hp = this.hero.maxHp;
                 this.gold = 0;
+                this.days = 0; // дни открытого мира — с нуля (W60)
                 // ресурсы стихий и бустеры — с нуля (W40)
                 for (const e of Object.keys(this.resources)) this.resources[e] = 0;
                 for (const e of Object.keys(this.boosters)) this.boosters[e] = 0;
@@ -615,6 +618,7 @@
                     elem: this.elem,
                     hero: { hp: this.hero.hp, maxHp: this.hero.maxHp },
                     gold: this.gold,
+                    days: this.days || 0, // дни открытого мира (W60)
                     // ресурсы стихий/бустеры (W40) и побочные квесты ратуши
                     resources: { ...this.resources },
                     boosters: { ...this.boosters },
@@ -626,6 +630,7 @@
                     cityOut: this.cityOut || null,
                     worldPos: this.world.heroPos,
                     worldOut: this.world.out,
+                    worldOutCave: this.world.outCave || null,
                     // бродячие отряды: жив/мёртв и позиции (геометрия — из сида)
                     worldWander: this.world.wander
                         ? JSON.parse(JSON.stringify(this.world.wander)) : null,
@@ -817,6 +822,7 @@
             G.live = true;
             G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp || 10 };
             G.gold = r.gold || 0;
+            G.days = Number.isInteger(r.days) && r.days >= 0 ? r.days : 0;
             // ресурсы стихий/бустеры (W40): старые сейвы — нули
             for (const e of Object.keys(G.resources))
                 G.resources[e] = (r.resources && r.resources[e]) || 0;
@@ -842,12 +848,14 @@
             G.dungeonStates = {};
             for (const k in (r.dungeonStates || {})) {
                 const st = r.dungeonStates[k];
-                if (!st || st.v !== mapV) continue;
+                // W60 (юзер): city-состояния в архиве этажей не живут —
+                // старые сейвы с таким мусором чистятся здесь
+                if (!st || st.v !== mapV || st.city) continue;
                 st.cave = st.cave || "gob";
                 G.dungeonStates[st.cave + ":" + st.floor] = st;
             }
             if (!G.dungeon) G.dungeon = G.dungeonStates[(r.cave || "gob") + ":" + r.floor] || null;
-            if (G.dungeon)
+            if (G.dungeon && !G.dungeon.city)
                 G.dungeonStates[G.dungeon.cave + ":" + G.dungeon.floor] = G.dungeon;
             if (G.dungeon)
                 // «Продолжить» ставит героя к прибытию у лестницы: без
@@ -879,6 +887,10 @@
                     ? r.worldSeed : (Math.random() * 0x7fffffff) | 0,
                 heroPos: r.worldV === globalThis.GAME_WORLDGEN.V ? (r.worldPos || null) : null,
                 out: !!r.worldOut,
+                // W60: вход КАКОГО данжа ждать при out (сейв хранит) —
+                // старые сейвы без ключа поведут к входу gob, как раньше
+                outCave: r.worldV === globalThis.GAME_WORLDGEN.V
+                    && r.worldOutCave ? r.worldOutCave : null,
                 // отряды той же версии генератора: жив/мёртв и позиции
                 wander: r.worldV === globalThis.GAME_WORLDGEN.V
                     && r.worldWander ? r.worldWander : null,
