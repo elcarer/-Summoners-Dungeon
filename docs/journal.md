@@ -1785,3 +1785,60 @@ summonPoints 7, жетон sgrFox 4/3 + statPoints 7 (ceil/floor от 7),
 check_city — ассерты версий сняты (probe_w58/w60 протухли раньше — история).
 Регресс: probe_w62 41/0, mini_test 19/0, check_city 394/0, probe_w61 37/0.
 Полный смоук не гонялся — не распоряжали.
+
+## W64 (2026-11-06) — рефакторинг: большие файлы разбиты на логические части
+
+Просьба юзера: файлы разрослись, работать тяжело и в контекст грузятся большие
+объёмы кода. Разрез БЕЗ изменения логики — тела переносились дословно,
+порядок `rng`-вызовов сохранён, экспорты не менялись. Два подхода: чистые
+данные режутся на части-глобали, сборщик их склеивает; установщики с `with (A)`
+режутся на несколько установщиков.
+
+Разрезы:
+- `loc.js` (2283) → `locRu.js` (`GAME_LOC_RU`) + `locEn.js` (`GAME_LOC_EN`) +
+  ядро `loc.js` (30 строк: STRINGS из глобалей, t/arr/setLang).
+- `cardsData.js` (2544) → 7 файлов по стихиям `cardsStrength/Growth/Wisdom/
+  Decay/Honor/Time/Multi.js` (`GAME_CARDS_<СТИХИЯ>`) + `heroesData.js`
+  (`GAME_HEROES_DATA`: HEROES/HERO_ORDER/HERO_FOE_ORDER/ELEM_LOGO) + ядро
+  `cardsData.js` (127 строк: Object.assign каталога, правила колод, экспорт
+  `GAME_CARD_DATA` — форма прежняя). `tools/cards.html` грузит тот же набор.
+- `dataCards.js` (1359) → `dataEncounters.js` (`GAME_ENCOUNTERS`: ENCOUNTERS,
+  FLOOR_MOBS*, MOB_TABLES, ENEMY_FILL/ENEMY_FILLS) + ядро `dataCards.js` (556:
+  коллекции/минимумы/пулы наград/CAVES/дикие/магазин; деструктурирует
+  GAME_ENCOUNTERS — экспорт `GAME_DATA` не изменился).
+- `arenaActions.js` (1604) → + `arenaSpells.js` (863): заклинания игрока
+  (domeTarget/repairTarget/applySpellP/applySpellPInner/autoTargetFor/
+  replaySpell/castSpell) — у установщиков `with (A)` нет локалов, имена
+  резолвятся динамически; `arena.js` зовёт installSpells рядом с
+  installActions.
+- `dungeon.js` (2066) → `dungeonGen.js` (299: TS/ROWS/DW/DH, TILE_SETS,
+  stKey/stateFor, ROOM_CENTERS, genObjects, deckNeed, mulberry32/genMap,
+  newDungeonState → `GAME_DUNGEON_GEN`) + сцена `dungeon.js` (1789: W/H/MAPROWS
+  остаются здесь — их ставит enter по st.rows; retreatCell/wall* читают их же;
+  экспорт GAME_DUNGEON прежний через деструктуризацию).
+- `main.js` (1330) → `menuScene.js` (339: сцены «Меню» и «Выбор героя»,
+  `GAME_MENU_SCENE.createMenuScene(ctx)` по образцу deckScene; `applySavedRun`
+  поднят в ctx — меню зовёт ctx.applySavedRun) + main.js (1005).
+- `worldGen.js` (1546) → `worldGenGuards.js` (427: секции 8b–8e — бродячие
+  отряды, стражи мостов, стражи Тлена, фильтр «не у старта», дикие точки;
+  `GAME_WORLDGEN_GUARDS.placeGuards(env)` получает снимок состояния generate
+  и возвращает 4 массива) + worldGen.js (1140). rng общий — детерминизм сида
+  сохранён.
+
+world.js (2179) НЕ резан: сцена-замыкание с ~20 общими мутабельными именами
+(chunkCache, poiNodes, treeCount…), механический разрез опаснее пользы —
+если понадобится, по образцу cityEnv/with-установщиков отдельной волной.
+
+Порядок скриптов обновлён: index.html (13 новых тегов), tools/cards.html
+(10), check_city.mjs (dungeonGen перед dungeon), оффлайн-утилиты с
+`eval(worldGen.js)` грузят worldGenGuards.js первым (check_worldgen/map_png/
+forest_offline/tiles_offline, probe_w44/w45).
+
+Проверки: оффлайн-эквивалентность по байтам — GAME_CARD_DATA (264 карты,
+71 герой) и GAME_DATA против HEAD; карта мира `generate(seed)` байт-в-байт;
+состояние этажа+объекты при фиксированном rng. node --check всех файлов.
+Регресс: check_city 394/0, probe_w63 34/0, mini_test 19/0, probe_w62 40/0
+(без FAIL; у пробы стохастические ветки — счёт плавает), probe_w61 36/0.
+Полный смоук не гонялся — не распоряжали. Ловушка волны: локальная `t()` в
+main.js жила ВНЕ блока меню — при выносе menuScene.js enter() падал молча
+(scenes.js глотает), поймано пробой probe_w63 («heroPick.pick undefined»).

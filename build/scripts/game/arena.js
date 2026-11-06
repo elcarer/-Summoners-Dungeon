@@ -50,6 +50,7 @@
         NS.installFlow(A);
         NS.installAI(A); // внутри — installAiValue/Target/Spells/Play
         NS.installActions(A);
+        NS.installSpells(A); // заклинания — вторая половина actions (W64)
         NS.installFx(A);
         NS.installScene(A);
         NS.installApi(A);

@@ -1,0 +1,175 @@
+// МУЛЬТИЦВЕТНЫЕ карты (Сила+Рост «Рыжий лес», Рост+Честь «Белая пуща») —
+// данные. Часть cardsData.js (см. cardsStrength.js).
+(function () {
+    globalThis.GAME_CARDS_MULTI = {
+        // ── МУЛЬТИЦВЕТ «Сила + Рост» (W54, спека юзера): карты 241–242,
+        // встречаются только в мультицветном подземелье «Рыжий лес»
+        // (cave "sgr"). elem "strGro" — собственная мульти-стихия (рубашка
+        // card_multi_back.png, цвет «рыжего леса»); multi — обе родные
+        // стихии (правило колод и «Ярость природы» читают его)
+        // «Эльф огня» (sg241): Эльф 2/1 — после призыва наносит 2 раза
+        // по 1 урону случайным соседним (верт/гориз) существам противника
+        sg241: { type: "unit", cost: 3, atk: 2, hp: 1, speed: 1,
+                 creature: "elf",
+                 sheet: "elf", // W60 (юзер): был лист гоблина — лист стихии по умолчанию
+                 subtype: "elf", // подтип — по спеке юзера (существо Эльфа)
+                 fireSnipe: 2,
+                 rarity: "common", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xc86a3e, img: "strength_growth/241" },
+        // «Проросший огр» (sg242): Гоблин 3/3 — после своей атаки получает
+        // +2 к урону и +2 к жизням (growOnAttack)
+        sg242: { type: "unit", cost: 5, atk: 3, hp: 3, speed: 1,
+                 creature: "goblin",
+                 subtype: "goblin", // подтип — по спеке юзера (существо Гоблина)
+                 growOnAttack: 2,
+                 rarity: "common", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0x8a6a3e, img: "strength_growth/242" },
+        // ── W55 (спека юзера): карты 243–246, тоже только «Рыжий лес» ─────
+        // «Древомощь» (sg243): заклинание — потратить ВСЮ оставшуюся
+        // энергию, цель получает «Сокрушение» и +к урону/жизням по числу
+        // потраченной энергии (crushEnergy — обработка в arenaActions/
+        // aiSpells; флаг u.crushGrant читает crushHit в arenaCombat)
+        sg243: { type: "spell", cost: 1,
+                 spell: { target: "anyUnit", crushEnergy: true },
+                 kind: "buff", // тип эффекта — по спеке юзера
+                 rarity: "common", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xc8873e, img: "strength_growth/243" },
+        // «Рождение феникса» (sg244): уничтожить ВСЕ постройки, в
+        // случайной пустой клетке появляется Элементаль с «Полётом» и
+        // ⚔/♥ = числу уничтоженных построек (phoenix — phoenixRise в
+        // arenaActions, жетон sgrElem)
+        sg244: { type: "spell", cost: 5,
+                 spell: { target: "none", phoenix: true },
+                 kind: "summon", // тип эффекта — по спеке юзера
+                 rarity: "rare", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xd8824e, img: "strength_growth/244" },
+        // «Горящие рунокамни» (sg245): постройка 0/5 — умирая, наносит
+        // всем СУЩЕСТВАМ противника и его базе урон = числу заклинаний
+        // в сбросе владельца (runeBurn — killUnit в arenaDamage)
+        sg245: { type: "building", cost: 3, atk: 0, hp: 5, runeBurn: true,
+                 rarity: "epic", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xb8652e, img: "strength_growth/245" },
+        // «Закат перворожденных» (sg246): постройка 0/2 — после розыгрыша
+        // 6 верхних карт своей колоды в сброс; за каждое сброшенное
+        // заклинание соседние (верт/гориз) существа получают −1 к урону
+        // (sunsetMill — addUnit в arenaBoard)
+        sg246: { type: "building", cost: 1, atk: 0, hp: 2, sunsetMill: 6,
+                 rarity: "rare", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0x8f7a52, img: "strength_growth/246" },
+        // Элементаль из «Рождения феникса» (sg244) — служебная карта без
+        // лица, как icePixie/skel: спавнится только заклинанием. Статы
+        // (= числу уничтоженных построек) ставит phoenixRise поверх базы
+        // 1/1. ЖЕТОН БЕЗ multi: «Ярость природы» бьёт при РОЗЫГРЫШЕ карт,
+        // а не при призыве жетона — multiFury читает def.multi
+        sgrElem: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
+                   creature: "goblin", sheet: "air_el", ability: "flyOver",
+                   subtype: "elemental", // подтип — по спеке юзера (Элементаль)
+                   rarity: "common", elem: "strGro",
+                   color: 0xd8824e },
+        // ── W56 (спека юзера): карта 247, тоже только «Рыжий лес» ──────────
+        // «Эльф корней» (sg247): заклинание призыва — Эльф 1/1 (жетон
+        // sgrRootElf) на случайную пустую клетку поля. Способность жетона
+        // rootGrab: после приезда случайное вражеское существо получает
+        // «Опутывание 1» (summonRootElf — arenaSummons)
+        sg247: { type: "spell", cost: 1,
+                 spell: { target: "none", rootSummon: true },
+                 kind: "summon", // тип эффекта — по спеке юзера
+                 rarity: "common", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0x6f8a4e, img: "strength_growth/247" },
+        // Эльф корней из «Эльфа корней» (sg247) — служебная карта без
+        // лица, как icePixie/skel: спавнится только заклинанием. rootGrab —
+        // «Опутывание N» случайному вражескому существу после приезда.
+        // ЖЕТОН БЕЗ multi: «Ярость природы» бьёт при РОЗЫГРЫШЕ карт,
+        // а не при призыве жетона — multiFury читает def.multi
+        sgrRootElf: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
+                      creature: "elf", sheet: "elf", // W60: лист эльфа, не гоблина
+                      rootGrab: 1,
+                      subtype: "elf", // подтип — по спеке юзера (Эльф)
+                      rarity: "common", elem: "strGro",
+                      color: 0x6f8a4e },
+        // ── W57 (спека юзера): карты 248–250, тоже только «Рыжий лес» ──────
+        // «Лужи магмы» (sg248): ловушка на пустую клетку — существо,
+        // оказавшееся на ней перемещением/призывом, получает 1 урон;
+        // выжило — ловушка НЕ исчезает, а переезжает в случайную пустую
+        // клетку поля (magmaPool/relocateMagma — arenaTraps)
+        sg248: { type: "trap", cost: 2,
+                 trap: { event: "onCell", effect: "magmaPool", amount: 1 },
+                 rarity: "rare", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xb06a3e, img: "strength_growth/248" },
+        // «Огнелис» (sg249): заклинание призыва — Животное (жетон sgrFox)
+        // в случайную пустую клетку; после призыва игрок распределяет
+        // 7 очков характеристик между уроном и жизнями (панель
+        // openSplitPanel — arenaPanels; ИИ — авто поровну)
+        sg249: { type: "spell", cost: 3,
+                 spell: { target: "none", summonPoints: 7, summonToken: "sgrFox" },
+                 kind: "summon", // тип эффекта — по спеке юзера
+                 rarity: "epic", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xd8824e, img: "strength_growth/249" },
+        // «Огнемедведь» (sg250): то же, что «Огнелис», но 9 очков и жетон
+        // sgrBear (лист медведя)
+        sg250: { type: "spell", cost: 4,
+                 spell: { target: "none", summonPoints: 9, summonToken: "sgrBear" },
+                 kind: "summon", // тип эффекта — по спеке юзера
+                 rarity: "epic", elem: "strGro",
+                 multi: ["strength", "growth"],
+                 color: 0xc4763e, img: "strength_growth/250" },
+        // Огнелис из «Огнелиса» (sg249) — служебная карта без лица, как
+        // icePixie/skel: спавнится только заклинанием. statPoints — очки
+        // характеристик: распределение происходит при РОЗЫГРЫШЕ карты
+        // (панель/ИИ-авто), базовые статы = авто-распределению ceil/floor
+        // (у sgrFox 4/3 из 7 очков, у sgrBear 5/4 из 9).
+        // ЖЕТОН БЕЗ multi: «Ярость природы» бьёт при РОЗЫГРЫШЕ карт, а не
+        // при призыве жетона — multiFury читает def.multi
+        sgrFox: { type: "unit", cost: 3, atk: 4, hp: 3, speed: 1,
+                  creature: "animal", sheet: "wolf", statPoints: 7,
+                  subtype: "animal", // подтип — по спеке юзера (Животное)
+                  rarity: "epic", elem: "strGro",
+                  color: 0xd8824e },
+        // Огнемедведь из «Огнемедведя» (sg250) — как sgrFox, 9 очков
+        sgrBear: { type: "unit", cost: 4, atk: 5, hp: 4, speed: 1,
+                   creature: "animal", sheet: "bear", statPoints: 9,
+                   subtype: "animal", // подтип — по спеке юзера (Животное)
+                   rarity: "epic", elem: "strGro",
+                   color: 0xc4763e },
+        // ── W61 (спека юзера): карты 251–252 — МУЛЬТИЦВЕТ «Рост + Честь»,
+        // встречаются только в мультицветном подземелье «Белая пуща»
+        // (cave "gh"). elem "groHon" — собственная мульти-стихия (рубашка
+        // card_multi_back.png); multi — обе родные стихии
+        // «Корона леса» (gh251): постройка 0/8 — когда СВОЁ существо
+        // получает усиление, оно получает это усиление ещё 1 раз
+        // (buffEcho — единый хук onBuff в arenaCombat; каждая Корона на
+        // поле даёт по одному повтору)
+        gh251: { type: "building", cost: 5, atk: 0, hp: 8, buffEcho: true,
+                 rarity: "rare", elem: "groHon",
+                 multi: ["growth", "honor"],
+                 color: 0x4e7a52, img: "growth_honor/251" },
+        // «Белый волк» (gh252): заклинание призыва — Животное (жетон
+        // ghWolf) 2/3 в случайную пустую клетку поля (wolfSpawn —
+        // arenaActions/aiSpells)
+        gh252: { type: "spell", cost: 3,
+                 spell: { target: "none", wolfSummon: true },
+                 kind: "summon", // тип эффекта — по спеке юзера
+                 rarity: "common", elem: "groHon",
+                 multi: ["growth", "honor"],
+                 color: 0x8a9a7e, img: "growth_honor/252" },
+        // Белый волк из «Белого волка» (gh252) — служебная карта без лица,
+        // спавнится только заклинанием. Способность wolfPack: когда волк
+        // получает усиление, соседние (верт/гориз) СВОИ существа получают
+        // +1 к урону и +1 к жизням (onBuff в arenaCombat).
+        // ЖЕТОН БЕЗ multi — как sgrRootElf/sgrFox
+        ghWolf: { type: "unit", cost: 1, atk: 2, hp: 3, speed: 1,
+                  creature: "animal", sheet: "wolf", wolfPack: true,
+                  subtype: "animal", // подтип — по спеке юзера (Животное)
+                  rarity: "common", elem: "groHon",
+                  color: 0x8a9a7e },
+    };
+})();

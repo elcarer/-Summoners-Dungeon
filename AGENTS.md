@@ -51,24 +51,33 @@
 - `build/` — вся игра (корень dev-сервера): `index.html`, `scripts/game/`,
   `images/`, `sound/`, `dll/pixi.min.js`, `tools/cards.html`. Порядок
   `<script>` в `index.html` ВАЖЕН: `data/units.js` до `engine.js`,
-  `cardsData.js` до `dataCards.js`, игровые скрипты в конце body (main ищет `#boot`).
-- Код игры: `loc` (все тексты RU/EN, строки только отсюда), `meta`
-  (localStorage: `sd_settings`, `sd_meta` — коллекция/колоды/герои, `sd_run` —
-  забег), `cardsData` (ЧИСТЫЕ ДАННЫЕ карт/героев → `GAME_CARD_DATA`; его же
-  читает cards.html), `dataCards` (логика: архетипы врагов, enemyDeck, пулы
-  наград/добора, магазин → `GAME_DATA`), `uiKit`, `world` (открытый мир),
-  `city` (построение города: планировка/декор/окна кузницы-ратуши →
-  `GAME_CITY`, W47), `dungeon` (этажи и общий движок их сцены, генератор,
-  объекты), `arenaCore` + модули `arena*`
-  (бой: Cards/Board/Combat/Hand/Panels/Hud/Flow/AI/Actions/Scene/Api;
+  части каталога карт до `cardsData.js`, `cardsData.js` до `dataCards.js`
+  (и `dataEncounters.js` до него), `dungeonGen.js` до `dungeon.js`,
+  `menuScene.js` до `main.js`, игровые скрипты в конце body (main ищет `#boot`).
+- Код игры (крупные файлы разбиты по частям, W64 — см. docs/architecture.md):
+  `locRu`/`locEn` (словари RU/EN) → `loc` (ядро t/arr; все тексты только
+  отсюда), `meta` (localStorage: `sd_settings`, `sd_meta` —
+  коллекция/колоды/герои, `sd_run` — забег), `cardsStrength/Growth/Wisdom/
+  Decay/Honor/Time/Multi` + `heroesData` (ЧИСТЫЕ ДАННЫЕ карт по стихиям и
+  персонажей; их же читает cards.html) → `cardsData` (сборка каталога и
+  правила колод → `GAME_CARD_DATA`), `dataEncounters` (энкаунтеры и таблицы
+  врагов → `GAME_ENCOUNTERS`) → `dataCards` (логика: enemyDeck, пулы
+  наград/добора, магазин → `GAME_DATA`), `uiKit`, `worldGenGuards` →
+  `worldGen` (генератор мира: рельеф/дороги/POI; охрана/дикие — отдельным
+  файлом), `world` (открытый мир), `city` (построение города:
+  планировка/декор/окна кузницы-ратуши → `GAME_CITY`, W47), `dungeonGen`
+  (раскладка этажа, объекты, stateFor/newDungeonState) → `dungeon` (сцена
+  данжа и города), `arenaCore` + модули `arena*`
+  (бой: Cards/Board/Combat/Hand/Panels/Hud/Flow/AI/Actions/Spells/Scene/Api;
   `arena.js` — только сборка), `deckScene`/`rewardScene`/`draftScene`/
-  `settingsScene`, `main` (бут, меню, выбор героя, сцены).
+  `settingsScene`/`menuScene` (меню и выбор героя), `main` (бут, сцены).
 - Сцены — через `createScenes`; UI-координаты — дизайн 1920×1080 (letterbox);
   для кликов переводить `__GAME.toScreen(x,y)`, в сценах карт — `worldToScreen`.
-- Смена геометрии/раскладки этажа → поднять `MAP_V` (`GAME_DUNGEON.MAP_V`):
-  сейвы другой версии пересобираются автоматически.
+- Совместимости со старыми сейвами нет (W63): состояние поднимается как
+  есть, гейтов/миграций/версий (MAP_V/CITY_V/GEN.V) в коде не заводить.
 - Новая карта: арт-лицо `images/cards/<elem>/<N>.png` (готовое 230×338),
-  данные в `cardsData.js`, строки в loc, веса в пулы (`REWARD_POOLS`,
+  данные в своём файле стихии (`cardsGrowth.js` и т.п. — часть каталога
+  W64), строки в loc (locRu/locEn), веса в пулы (`REWARD_POOLS`,
   `ENEMY_FILLS`, архетипы) и нули в DEFAULT_COLLECTION. Содержание (в т.ч.
   подтип и `kind`) — ТОЛЬКО из спеки `for_work/cards.txt`;
   `creature` — плейсхолдер спрайт-листа, НЕ подтип.

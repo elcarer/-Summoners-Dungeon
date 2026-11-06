@@ -52,20 +52,36 @@
 <body>
     <div id="boot">запуск…</div>
     <!-- ИГРА: локализация → мета → данные → кит → сцены → бут (в body: main.js ищет #boot) -->
+    <!-- Локализация частями (W64): словари RU/EN, ядро t()/arr() собирает -->
+    <script src="./scripts/game/locRu.js"></script>
+    <script src="./scripts/game/locEn.js"></script>
     <script src="./scripts/game/loc.js"></script>
     <script src="./scripts/game/meta.js"></script>
-    <!-- ЧИСТЫЕ ДАННЫЕ КАРТ (их же читает tools/cards.html) → логика поверх -->
+    <!-- ЧИСТЫЕ ДАННЫЕ КАРТ (их же читает tools/cards.html) → логика поверх.
+         Каталог разбит по стихиям (W64): части → герои → сборка → логика -->
+    <script src="./scripts/game/cardsStrength.js"></script>
+    <script src="./scripts/game/cardsGrowth.js"></script>
+    <script src="./scripts/game/cardsWisdom.js"></script>
+    <script src="./scripts/game/cardsDecay.js"></script>
+    <script src="./scripts/game/cardsHonor.js"></script>
+    <script src="./scripts/game/cardsTime.js"></script>
+    <script src="./scripts/game/cardsMulti.js"></script>
+    <script src="./scripts/game/heroesData.js"></script>
     <script src="./scripts/game/cardsData.js"></script>
+    <script src="./scripts/game/dataEncounters.js"></script>
     <script src="./scripts/game/dataCards.js"></script>
     <script src="./scripts/game/uiKit.js"></script>
     <script src="./scripts/game/quests.js"></script>
     <script src="./scripts/game/sidequests.js"></script>
+    <script src="./scripts/game/worldGenGuards.js"></script>
     <script src="./scripts/game/worldGen.js"></script>
     <script src="./scripts/game/worldTiles.js"></script>
     <script src="./scripts/game/world.js"></script>
     <!-- мост pixelfx→PIXI (GAME_FX) — до города/арены, эффекты в сценах -->
     <script src="./scripts/game/pixelfx.js"></script>
     <script src="./scripts/game/city.js"></script>
+    <!-- Генератор/состояние этажей → сцена подземелья (W64) -->
+    <script src="./scripts/game/dungeonGen.js"></script>
     <script src="./scripts/game/dungeon.js"></script>
     <!-- АРЕНА: ядро → модули логики → сборка сцены (порядок важен) -->
     <script src="./scripts/game/arenaCore.js"></script>
@@ -87,6 +103,7 @@
     <script src="./scripts/game/aiPlay.js"></script>
     <script src="./scripts/game/arenaAI.js"></script>
     <script src="./scripts/game/arenaActions.js"></script>
+    <script src="./scripts/game/arenaSpells.js"></script>
     <script src="./scripts/game/arenaFx.js"></script>
     <script src="./scripts/game/arenaScene.js"></script>
     <script src="./scripts/game/arenaApi.js"></script>
@@ -95,6 +112,7 @@
     <script src="./scripts/game/rewardScene.js"></script>
     <script src="./scripts/game/draftScene.js"></script>
     <script src="./scripts/game/settingsScene.js"></script>
+    <script src="./scripts/game/menuScene.js"></script>
     <script src="./scripts/game/main.js"></script>
 </body>
 </html>

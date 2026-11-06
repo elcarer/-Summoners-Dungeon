@@ -61,7 +61,22 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 
 ## Текущее состояние
 
-- Последняя волна: **W63** — правило юзера: совместимость со старыми
+- Последняя волна: **W64** — рефакторинг по просьбе юзера: большие файлы
+  разбиты на логические части (тела дословно, логика не менялась).
+  loc.js → locRu+locEn+ядро; cardsData.js → 7 файлов по стихиям +
+  heroesData + ядро; dataCards.js → dataEncounters + ядро;
+  arenaActions.js → + arenaSpells (паттерн with (A)); dungeon.js →
+  dungeonGen (генератор/состояние) + сцена; main.js → menuScene (меню и
+  выбор героя, applySavedRun поднят в ctx) + main; worldGen.js →
+  worldGenGuards (охрана/дикие точки, rng общий) + worldGen. world.js не
+  резан (сцена-замыкание с общими мутабельными именами). Порядок скриптов
+  обновлён в index.html/tools/cards.html/check_city и оффлайн-утилитах с
+  eval(worldGen). Эквивалентность подтверждена по байтам: GAME_CARD_DATA
+  (264/71), GAME_DATA, generate(seed), состояние этажа. Регресс:
+  check_city 394/0, probe_w63 34/0, mini_test 19/0, probe_w62 40/0,
+  probe_w61 36/0. Списки модулей — docs/architecture.md и AGENTS.md.
+
+- **W63** — правило юзера: совместимость со старыми
   сейвами НЕ ведётся (этап внутренней разработки, тесты всегда с «Новой
   игры»; записано в AGENTS.md). Срезан весь компат-код: версии геометрии
   MAP_V/CITY_V/GEN.V целиком (константы, поля v в состояниях, проверки
