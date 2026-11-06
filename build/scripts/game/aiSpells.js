@@ -77,6 +77,25 @@
                     }
                     return;
                 }
+                if (s.swap) { // «Перемена мест» (gh254, W65): своё заднее ↔
+                    // чужое переднее — своё продвигается к базе игрока,
+                    // чужое отбрасывается назад; чужое поопаснее — приятнее
+                    let best = null, bs = 0;
+                    for (const a of B.units) {
+                        if (a.side !== "e") continue;
+                        for (const b of B.units) {
+                            if (b.side !== "p" || b.row <= a.row) continue;
+                            const sc = (b.row - a.row) * 2 + aiThreat(b) * 0.5;
+                            if (sc > bs) { bs = sc; best = [a, b]; }
+                        }
+                    }
+                    if (best) swapObjectsAct(best[0], best[1]);
+                    return;
+                }
+                if (s.cyclone) { // «Циклон» (gh256, W65): без цели
+                    cycloneAct();
+                    return;
+                }
                 if (s.target === "anyUnit" && !s.nova) { // усиление/очарование — лучшему
                     // «Древомощь» (sg243): вся оставшаяся энергия →
                     // «Сокрушение» и +N⚔/+N♥ лучшему своему существу.

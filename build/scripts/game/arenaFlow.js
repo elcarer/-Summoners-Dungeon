@@ -367,6 +367,7 @@
                     checkEnd();
                     return;
                 }
+                u.lastMoveDir = [0, back - u.row]; // W65: направление входа
                 u.row = back;
                 const p = cellXY(u.col, u.row);
                 glide(u, p.x, p.y);
@@ -387,6 +388,7 @@
             A.portalLeapAct = async function portalLeapAct(u, occ, dir) {
                 const over = occ.row + dir;
                 if (over < 0 || over >= GRID || unitAt(occ.col, over)) return false;
+                u.lastMoveDir = [0, over - u.row]; // W65: направление входа
                 u.col = occ.col;
                 u.row = over;
                 u.bonusAtk += 1; // перманентный бонус — снимается «Извлечением духа»
@@ -548,6 +550,7 @@
                                 if (unitHasFly(u) && occ.def.type === "unit"
                                     && over >= 0 && over < GRID && !unitAt(u.col, over)) {
                                 const flyFromCol = u.col, flyFromRow = u.row;
+                                u.lastMoveDir = [0, over - flyFromRow]; // W65: вход
                                 u.row = over;
                                 heroElementalDraw(u); // «Сонм духов»: способность элементаля (Полёт)
                                 const p = cellXY(u.col, u.row);
@@ -559,7 +562,7 @@
                                     sfx("step");
                                     await delay(0.52 / animK()); // глиссада: полный шаг
                                     if (B.stopped) return;
-                                    afterMoved(u); // перемещение — ловушки врага
+                                    afterMoved(u, true); // марш-шаг (W65: не событие)
                                     siegeFollowAct(u, flyFromCol, flyFromRow);
                                     if (checkEnd()) return;
                                     break;
@@ -586,6 +589,7 @@
                         if (!B.units.includes(u)) break; // приманка убила шагнувшего
                         const ddx = dest[0] - u.col; // боковой шаг (приманка) — боковая походка
                         const fromCol = u.col, fromRow = u.row; // куда встаёт «Осадная башня»
+                        u.lastMoveDir = [ddx, dest[1] - fromRow]; // W65: вход
                         u.col = dest[0];
                         u.row = dest[1];
                         const p = cellXY(u.col, u.row);
@@ -594,7 +598,7 @@
                         sfx("step");
                         await delay(0.52 / animK()); // глиссада + пауза: полный шаг походки
                         if (B.stopped) return;
-                        afterMoved(u); // перемещение — ловушки врага
+                        afterMoved(u, true); // марш-шаг: обычное перемещение начала хода (W65)
                         siegeFollowAct(u, fromCol, fromRow); // башня едет следом и стреляет
                         if (checkEnd()) return;
                     }

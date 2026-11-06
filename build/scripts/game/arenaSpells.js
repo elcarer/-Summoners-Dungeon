@@ -51,6 +51,99 @@
                 sfx("chpoc");
             };
 
+            // «Перемена мест» (gh254, W65): выбор целей ПООЧЕРЁДНО. Первая
+            // ждёт в B.swapPick с жёлтым маркером (swapMark) на объекте;
+            // вторая цель передаётся в эффект через target.first. Снимается
+            // deselect'ом, сменой карты в руке и после каста
+            A.swapMarkDraw = function swapMarkDraw(u) {
+                const mark = new PIXI.Graphics();
+                mark.circle(0, 0, 10.5);
+                mark.fill({ color: 0x5a4a20 });
+                mark.stroke({ width: 3, color: 0xffd98c });
+                mark.position.set(-36, -54);
+                mark.name = "swapMark";
+                mark.eventMode = "none";
+                u.node.addChild(mark);
+            };
+            A.swapPickClear = function swapPickClear() {
+                B.swapPick = null;
+                for (const v of B.units) {
+                    if (!v.node || v.node.destroyed) continue;
+                    const m = v.node.getChildByName("swapMark");
+                    if (m) {
+                        m.parent.removeChild(m);
+                        m.destroy({ children: true });
+                    }
+                }
+            };
+            // «Перемена мест» (gh254, W65, спека юзера): обменять местами
+            // два объекта (существо/постройку). Обмен — ПЕРЕМЕЩЕНИЕ: оба
+            // получают направление входа (lastMoveDir — для «Пути
+            // одуванчиков») и триггерят ловушки новых клеток (afterMoved);
+            // «Краевой камень»/«Лабиринт» могут докинуть обменявшегося.
+            // Общая для игрока (applySpellPInner) и ИИ (aiSpells)
+            A.swapObjectsAct = function swapObjectsAct(a, b) {
+                const pa = cellXY(a.col, a.row), pb = cellXY(b.col, b.row);
+                const ca = a.col, ra = a.row;
+                a.lastMoveDir = [b.col - ca, b.row - ra];
+                b.lastMoveDir = [ca - b.col, ra - b.row];
+                a.col = b.col;
+                a.row = b.row;
+                b.col = ca;
+                b.row = ra;
+                a.node.zIndex = a.row;
+                b.node.zIndex = b.row;
+                glide(a, pb.x, pb.y); // a летит на место b и наоборот
+                glide(b, pa.x, pa.y);
+                floatText(pa.x, pa.y - 72, "⇄", 0xb7d0ef);
+                floatText(pb.x, pb.y - 72, "⇄", 0xb7d0ef);
+                fxEvent("cast", { x: pa.x, y: pa.y - 12, color: 0x8fae7d });
+                sfx("chpoc");
+                for (const u of [a, b])
+                    if (B.units.includes(u)) afterMoved(u);
+            };
+
+            // «Циклон» (gh256, W65, спека юзера): каждое СУЩЕСТВО поля
+            // сдвигается в случайную пустую соседнюю (верт/гориз) клетку —
+            // по образцу «Снежного кома» (snowballShift); сдвигов нет —
+            // существо возвращается в руку владельца (bounceUnit, как
+            // «Смыв»). Порядок обработки — снапшот поля (перемешанный):
+            // каждый следующий видит клетки, занятые предыдущими. Сдвиг —
+            // перемещение: ловушки новых клеток и лечение героя
+            // «Долгая прогулка» через afterMoved; возврат в руку — нет
+            A.cycloneAct = function cycloneAct() {
+                const moved = [];
+                for (const u of shuffle(B.units.slice())) {
+                    if (!B.units.includes(u) || u.def.type !== "unit") continue;
+                    const spots = [];
+                    for (const [dc, dr] of shuffle(
+                        [[-1, 0], [1, 0], [0, -1], [0, 1]])) {
+                        const c2 = u.col + dc, r2 = u.row + dr;
+                        if (c2 < 0 || c2 >= GRID || r2 < 0 || r2 >= GRID) continue;
+                        if (unitAt(c2, r2)) continue;
+                        spots.push([c2, r2, dc, dr]);
+                    }
+                    if (!spots.length) { // некуда — в руку владельца
+                        const p = cellXY(u.col, u.row);
+                        bounceUnit(u);
+                        floatText(p.x, p.y - 96,
+                            "↩ " + GAME_LOC.t("status.return.name"), 0xc9a0ef);
+                        continue;
+                    }
+                    const [c2, r2, dc, dr] = spots[0]; // dirs перемешаны — [0] случаен
+                    u.lastMoveDir = [dc, dr]; // W65: направление входа
+                    u.col = c2;
+                    u.row = r2;
+                    u.node.zIndex = r2;
+                    glide(u, cellXY(c2, r2));
+                    moved.push(u);
+                }
+                for (const u of moved)
+                    if (B.units.includes(u)) afterMoved(u);
+                refreshHud();
+                checkEnd();
+            };
+
             // Эффекты заклинаний игрока, валидация цели внутри (false — цель не
             // годится, тогда и оплаты/сброса/панелей не будет). Отделено от
             // оплаты карты, чтобы «Горящие руны» могли повторить эффект
@@ -116,6 +209,25 @@
                     if (def.spell.dome) domeTarget(u); // повторный купол
                     // бессмыслен, но и безвреден — не запрещаем
                     else repairTarget(u); // «Ремонт»: повтор тоже безвреден
+                    return true;
+                }
+                if (tg === "anyObj" && def.spell.swap) {
+                    // «Перемена мест» (gh254, W65): две цели выбираются
+                    // ПООЧЕРЁДНО — первая ждёт в B.swapPick (клик/хук),
+                    // вторая приходит в target.first. Оба объекта живы
+                    // (первый могли потерять между кликами — не бывает:
+                    // фаза игрока, но послеMoved «Горящих рун» повторяет
+                    // эффект сразу — тоже проверяем)
+                    if (!target || target.col === undefined || !target.first)
+                        return false;
+                    const a = unitAt(target.first.col, target.first.row);
+                    const b = unitAt(target.col, target.row);
+                    if (!a || !b || a === b) return false;
+                    swapObjectsAct(a, b);
+                    return true;
+                }
+                if (def.spell.cyclone) { // «Циклон» (gh256, W65): без цели
+                    cycloneAct();
                     return true;
                 }
                 if (tg === "anyUnit") { // усиление/Смыв/Слабость

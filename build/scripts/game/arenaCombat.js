@@ -347,11 +347,13 @@
 
             // Перемещение завершилось: ловушка врага на этой клетке срабатывает,
             // затем «Выстрел 1» лучника (перемещение состоялось)
-
-            // Перемещение завершилось: ловушка врага на этой клетке срабатывает,
-            // затем «Выстрел 1» лучника (перемещение состоялось)
-            A.afterMoved = function afterMoved(u) {
+            // regular — обычный марш-шаг в начале хода (marchSide): для
+            // героя «Долгая прогулка» это НЕ перемещение-событие (спека
+            // W65). Все прочие вызовы (Скорость, прыжок портала, сбитое
+            // с толку, обмен, Циклон, толчок Тракта и т.д.) — обычные
+            A.afterMoved = function afterMoved(u, regular) {
                 if (!B.units.includes(u) || u.def.type !== "unit") return;
+                if (!regular) walkHealTick(u); // «Долгая прогулка» (ghWalk, W65)
                 triggerCellTraps(u);
                 moatAct(u); // «Крепостной ров» (Честь): подошёл к постройке — 1 урона
                 roadPushAct(u); // «Тракт» (Честь): соседняя постройка гонит вперёд
@@ -369,6 +371,22 @@
                 // точка наведения (tr.__mx/__my) должны переехать на новую клетку
                 if (B.traps.p.some((tr) => tr.unit === u)
                     || B.traps.e.some((tr) => tr.unit === u)) redrawTraps();
+            };
+
+            // «Долгая прогулка» (ghWalk, heroes/71, W65, спека юзера):
+            // когда ЛЮБОЕ существо перемещается — помимо своего обычного
+            // перемещения в начале хода (марш зовёт afterMoved с
+            // regular=true) — герой лечит 1 жизнь СВОЕЙ базе. Сторона не
+            // важна: перемещение существа ЛЮБОЙ стороны (и своё, и чужое).
+            // Способность симметрична — сработает и у героя-игрока, если
+            // такая карта у него (HEROES общий каталог)
+            A.walkHealTick = function walkHealTick(u) {
+                if (!B || !u || !u.def || u.def.type !== "unit") return;
+                for (const side of ["p", "e"]) {
+                    const hd = heroDefOf(side);
+                    if (hd && hd.ability === "walkHeal")
+                        healBase(side, hd.abilityVal || 1);
+                }
             };
 
             // «Крепостной ров» (hon175, просил юзер): существо противника,
@@ -402,6 +420,7 @@
                     if (b.row !== u.row) continue;
                     const nr = b.row + (b.side === "p" ? -1 : 1); // перед камнем
                     if (nr < 0 || nr >= GRID || unitAt(b.col, nr)) continue;
+                    u.lastMoveDir = [0, nr - u.row]; // W65: направление входа
                     u.col = b.col;
                     u.row = nr;
                     const p = cellXY(u.col, u.row);
@@ -459,6 +478,7 @@
                     moved = true;
                 }
                 if (!moved) return;
+                u.lastMoveDir = [0, dir]; // W65: направление входа (вперёд)
                 const p = cellXY(u.col, u.row);
                 glide(u, p.x, p.y);
                 setWalk(u, true);
@@ -496,6 +516,7 @@
                     }
                     if (!spots.length) continue; // кругом занято — не переносим
                     const [nc, nr] = spots[(Math.random() * spots.length) | 0];
+                    u.lastMoveDir = [nc - u.col, nr - u.row]; // W65: вход
                     u.col = nc;
                     u.row = nr;
                     const p = cellXY(nc, nr);

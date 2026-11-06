@@ -256,6 +256,7 @@
                             || e === "selfDmg" // «Удар двойника»: существо бьёт себя
                             || e === "massRet" // «В гуще боя»: существам «Возврат 1»
                             || e === "magmaPool" // «Лужи магмы» — только существа
+                            || e === "dandelionPath" // «Путь одуванчиков» — только существа (W65)
                             || e === "sporeCurse") // «Призрачные споры» — только существа (W60)
                             return u.def.type === "unit";
                         return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
@@ -269,12 +270,15 @@
                     // и «Ловушка времени» нейтральны: срабатывают на ЛЮБОЕ
                     // существо, оказавшееся на клетке, — включая хозяина
                     // ловушки («Котлы со смолой» — на любое СУЩЕСТВО:
-                    // перемещение/призыв, спека hon191)
+                    // перемещение/призыв, спека hon191). «Путь одуванчиков»
+                    // (gh253, W65) — тоже нейтральная: «перемещение ЛЮБОГО
+                    // существа» (своё — продолжит движение, чужое — развернётся)
                     side = u.side;
                     i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                         && (t.def.trap.effect === "cellDmgAll" || t.def.trap.effect === "cellDebuff"
                             || t.def.trap.effect === "entangle"
                             || t.def.trap.effect === "timeTrap"
+                            || t.def.trap.effect === "dandelionPath"
                             || (t.def.trap.effect === "tarKettles"
                                 && u.def.type === "unit")));
                 }
@@ -347,6 +351,7 @@
                         break;
                     }
                     if (!dest) continue; // кругом занято — с места не сдвинуть
+                    v.lastMoveDir = [dest[0] - v.col, dest[1] - v.row]; // W65: вход
                     v.col = dest[0];
                     v.row = dest[1];
                     const p = cellXY(v.col, v.row);
@@ -376,6 +381,7 @@
                 const dr = u.side === "p" ? 1 : -1;
                 const r2 = u.row + dr;
                 if (r2 < 0 || r2 >= GRID || unitAt(u.col, r2)) return false;
+                u.lastMoveDir = [0, dr]; // W65: направление входа
                 u.row = r2;
                 const p = cellXY(u.col, u.row);
                 glide(u, p.x, p.y);
@@ -383,6 +389,43 @@
                 sfx("step");
                 triggerCellTraps(u); // втолкнули на ловушку — она срабатывает
                 return true;
+            };
+
+            // «Путь одуванчиков» (gh253, W65, спека юзера): ловушка на
+            // пустую клетку — вошедшее на неё ЛЮБОЕ существо делает
+            // последовательные перемещения, пока не окажется перед
+            // препятствием: существо ВЛАДЕЛЬЦА ловушки — в том же
+            // направлении, в котором вошло, существо ПРОТИВНИКА — в
+            // противоположном. Направление входа — u.lastMoveDir, его
+            // ставят все точки перемещений (W65): марш, Скорость, прыжок
+            // портала, толчок Тракта, переносы, сдвиги ловушками. Серия —
+            // одно перемещение-событие: в конце afterMoved (ловушки новой
+            // клетки — возможна цепочка одуванчиков, «Тракт», лабиринт,
+            // лечение героя «Долгая прогулка» — один раз за серию)
+            A.dandelionPathAct = function dandelionPathAct(trap, side, u) {
+                if (!B.units.includes(u) || u.def.type !== "unit") return;
+                const dir = u.lastMoveDir && (u.lastMoveDir[0] || u.lastMoveDir[1])
+                    ? u.lastMoveDir : [0, u.side === "p" ? -1 : 1];
+                let [dc, dr] = dir;
+                if (u.side !== side) { dc = -dc; dr = -dr; } // чужое — разворот
+                let steps = 0;
+                for (;;) {
+                    const nc = u.col + dc, nr = u.row + dr;
+                    if (nc < 0 || nc >= GRID || nr < 0 || nr >= GRID) break; // край
+                    if (unitAt(nc, nr)) break; // препятствие — стоим перед ним
+                    u.col = nc;
+                    u.row = nr;
+                    u.node.zIndex = nr;
+                    const p = cellXY(nc, nr);
+                    glide(u, p.x, p.y);
+                    setWalk(u, true,
+                        dc < 0 ? "walk_left" : dc > 0 ? "walk_right" : undefined);
+                    sfx("step");
+                    steps++;
+                }
+                if (!steps) return; // впереди сразу препятствие — остаётся
+                u.lastMoveDir = [dc, dr];
+                afterMoved(u); // доехал: ловушки новой клетки и хуки перемещения
             };
 
             // Эффект сработавшей ловушки на клетке (отделён от поиска ловушки —
@@ -398,6 +441,14 @@
                 } finally { A.fxHint = null; }
             };
             A.applyCellTrapRaw = function applyCellTrapRaw(trap, side, u) {
+                if (trap.def.trap.effect === "dandelionPath") {
+                    // «Путь одуванчиков» (gh253, W65, спека юзера): вошедшее
+                    // существо едет последовательными шагами до препятствия —
+                    // своё владельцу ловушки в том же направлении, в котором
+                    // вошло, чужое — в противоположном (dandelionPathAct)
+                    dandelionPathAct(trap, side, u);
+                    return;
+                }
                 if (trap.def.trap.effect === "sporeCurse") {
                     // «Призрачные споры» (grw15, W60 юзер): ловушка на
                     // пустой клетке — вошедшее на неё существо врага

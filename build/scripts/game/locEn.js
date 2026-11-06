@@ -636,6 +636,18 @@
             // W61: враг 1-го этажа «Белой пущи»
             "enc.ghKnight.title": "Green Knights",
             "hero.ghKnight.ability": "Whenever your unit receives a buff, heal 1 health to your base",
+            // W65: карты 253–256 «Белой пущи» (спека юзера)
+            "card.gh253.name": "Dandelion Path",
+            "card.gh253.desc": "Trap on an empty cell. A unit that moves onto the chosen cell keeps moving until it is blocked: your own unit continues in the direction it was moving, an enemy unit moves in the opposite direction",
+            "card.gh254.name": "Switch of Places",
+            "card.gh254.desc": "Choose any unit or building and swap places with another unit or building (this counts as moving)",
+            "card.gh255.name": "Recruit",
+            "card.gh255.desc": "Ability: \"Speed 2\"",
+            "card.gh256.name": "Cyclone",
+            "card.gh256.desc": "Move every unit to an adjacent empty cell; if there is none, return that unit to its owner's hand",
+            // W65: враг 2-го этажа «Белой пущи»
+            "enc.ghWalk.title": "Long Stroll",
+            "hero.ghWalk.ability": "Whenever any unit moves (other than its regular move at the start of the turn), heal 1 health to your base",
             "split.title": "Distribute points",
             "split.hint": "Distribute the points between this unit's attack and health",
             "split.done": "Done",
@@ -647,6 +659,7 @@
             "time.sweep.done": "Trap tokens removed",
             "status.speed.name": "Speed 1",
             "spell.dome.name": "Power Dome",
+            "spell.swap.pick2": "Choose the second target to swap",
             "spell.dome.desc": "All damage dealt to this creature or building is reduced to 1; the dome lasts until the target dies",
             "spell.repair.name": "Repair",
             "spell.repair.desc": "When this creature or building would die, it does not — its card returns to its owner's hand",

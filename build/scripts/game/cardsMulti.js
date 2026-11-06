@@ -171,5 +171,48 @@
                   subtype: "animal", // подтип — по спеке юзера (Животное)
                   rarity: "common", elem: "groHon",
                   color: 0x8a9a7e },
+        // ── W65 (спека юзера): карты 253–256 — мультицвет «Рост + Честь»,
+        // встречаются только в «Белой пуще». Ключ — «перемещение»:
+        // ловушка-гонка, обмен местами, эльф со Скоростью и Циклон
+        // «Путь одуванчиков» (gh253): ловушка на пустую клетку — вошедшее
+        // на неё ЛЮБОЕ существо едет последовательными шагами до
+        // препятствия: своё владельцу — в том же направлении, в котором
+        // вошло, чужое — в противоположном (dandelionPath —
+        // dandelionPathAct в arenaTraps). Направление входа —
+        // u.lastMoveDir, его ставят все точки перемещений (W65)
+        gh253: { type: "trap", cost: 1,
+                 trap: { event: "onAnyCell", effect: "dandelionPath" },
+                 kind: "move", // тип эффекта — по спеке юзера (Перемещение)
+                 rarity: "common", elem: "groHon",
+                 multi: ["growth", "honor"],
+                 color: 0x7fa06e, img: "growth_honor/253" },
+        // «Перемена мест» (gh254): поменять местами два объекта
+        // (существо/постройку) — считается перемещением: оба триггерят
+        // ловушки новых клеток (swap — swapObjectsAct в arenaSpells;
+        // выбор поочерёдный — B.swapPick в arenaActions)
+        gh254: { type: "spell", cost: 1,
+                 spell: { target: "anyObj", swap: true },
+                 kind: "move", // тип эффекта — по спеке юзера (Перемещение)
+                 rarity: "common", elem: "groHon",
+                 multi: ["growth", "honor"],
+                 color: 0x8fae7d, img: "growth_honor/254" },
+        // «Новобранец» (gh255): Эльф 0/1 за 0⚡ — «Скорость 2»
+        // (dashN/abilityVal — как у Колесницы hon187)
+        gh255: { type: "unit", cost: 0, atk: 0, hp: 1, speed: 2,
+                 creature: "elf", sheet: "elf", ability: "dashN",
+                 abilityVal: 2,
+                 subtype: "elf", // подтип — по спеке юзера (Эльф)
+                 rarity: "common", elem: "groHon",
+                 multi: ["growth", "honor"],
+                 color: 0x9fbe8c, img: "growth_honor/255" },
+        // «Циклон» (gh256): каждое существо поля сдвигается в случайную
+        // пустую соседнюю клетку; некуда — возвращается в руку владельца
+        // (cyclone — cycloneAct в arenaSpells, по образцу rowShift)
+        gh256: { type: "spell", cost: 5,
+                 spell: { target: "none", cyclone: true },
+                 kind: ["move", "control"], // типы эффекта — по спеке юзера
+                 rarity: "epic", elem: "groHon",
+                 multi: ["growth", "honor"],
+                 color: 0x6ea08e, img: "growth_honor/256" },
     };
 })();

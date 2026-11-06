@@ -470,6 +470,15 @@
                 if (s.repair && !B.units.some((v) => v.side === "e" && !v.repair
                     && (v.def.type === "unit" || v.def.type === "building")))
                     return false;
+                // «Перемена мест» (gh254, W65): нет пары «своё + чужое», где
+                // чужое стоит БЛИЖЕ базы ИИ (выгодного обмена нет) — держим
+                if (s.swap && !B.units.some((v) => v.side === "e")
+                    || s.swap && !B.units.some((v) => v.side === "p"
+                        && B.units.some((w) => w.side === "e" && w.row < v.row)))
+                    return false;
+                // «Циклон» (gh256, W65): существ на поле нет — карту переводить зря
+                if (s.cyclone && !B.units.some((v) => v.def.type === "unit"))
+                    return false;
                 if (s.sacrifice && !aiSacrificePick()) return false;
                 // «Взрыв твари» (dec150) — есть своё существо с суммой ⚔+♥ 3+
                 // (иначе карта переводится зря)

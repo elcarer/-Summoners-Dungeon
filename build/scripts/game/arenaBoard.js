@@ -1314,6 +1314,7 @@
                     const dest = lureRedirect(u, u.col, u.row, u.col, ahead);
                     if (!B.units.includes(u)) break; // приманка убила шагнувшего
                     const ddx = dest[0] - u.col; // боковой шаг (приманка)
+                    u.lastMoveDir = [ddx, dest[1] - u.row]; // W65: направление входа
                     u.col = dest[0];
                     u.row = dest[1];
                     u.node.zIndex = u.row;
@@ -1321,7 +1322,7 @@
                     glide(u, p.x, p.y);
                     setWalk(u, true, ddx < 0 ? "walk_left" : ddx > 0 ? "walk_right" : undefined);
                     sfx("step");
-                    afterMoved(u); // перемещение — вражеские ловушки могут сработать
+                    afterMoved(u); // Скорость — не марш: герой «Долгая прогулка» лечится (W65)
                     acted = true;
                 }
                 return acted;

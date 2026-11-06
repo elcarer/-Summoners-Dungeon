@@ -130,6 +130,15 @@
         ghKnight: { id: "ghKnight", rarity: "rare", baseHp: 16,
                     elems: ["growth", "honor"], starter: "groHon",
                     img: "70", ability: "buffHeal", abilityVal: 1 },
+        // «Долгая прогулка» (арт heroes/71.png): враг 2-го этажа (W65,
+        // спека юзера). ДВУХЦВЕТНЫЙ герой Рост+Честь. 18♥, редкая;
+        // способность walkHeal: когда ЛЮБОЕ существо перемещается — кроме
+        // своего обычного перемещения в начале хода (марша) — его база
+        // лечится на 1 жизнь (walkHealTick в arenaCombat; марш зовёт
+        // afterMoved с regular=true — лечение не триггерит)
+        ghWalk: { id: "ghWalk", rarity: "rare", baseHp: 18,
+                  elems: ["growth", "honor"], starter: "groHon",
+                  img: "71", ability: "walkHeal", abilityVal: 1 },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -465,6 +474,7 @@
         "sgrPack", // «Безумие стаи»: враг 3-го этажа (W56)
         "sgrApostate", // «Эльф-отступник»: босс «Рыжего леса» (W57)
         "ghKnight", // «Зелёные рыцари»: враг 1-го этажа «Белой пущи» (W61)
+        "ghWalk", // «Долгая прогулка»: враг 2-го этажа «Белой пущи» (W65)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

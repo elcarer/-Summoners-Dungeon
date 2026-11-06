@@ -233,6 +233,7 @@
             // снять выбор карты: карты руки снова интерактивны
             A.deselect = function deselect() {
                 tokenPanelClose(); // панель «Управления временем» закрывается
+                swapPickClear(); // «Перемена мест»: первая цель и маркер (W65)
                 if (B.selected === null && !B.spellTarget) return;
                 B.selected = null;
                 B.spellTarget = false;
@@ -332,6 +333,7 @@
             A.onCardTap = function onCardTap(idx) {
                 if (B.phase !== "player" || B.discarding || B.picking) return;
                 if (B.journeySummon) return; // сначала поставьте (или отмените) призыв
+                swapPickClear(); // «Перемена мест»: сменена карта — цели заново (W65)
                 const def = CARDS[B.hand[idx]];
                 if (!def) return;
                 if (ctx.sfx) ctx.sfx();
@@ -426,6 +428,29 @@
                     const sdef = CARDS[B.hand[B.selected]];
                     const u = unitAt(col, row);
                     const tg = sdef.spell.target;
+                    if (sdef.spell.swap) { // «Перемена мест» (gh254, W65):
+                        // две цели выбираются ПООЧЕРЁДНО — единственное в
+                        // игре заклинание со второй целью. Первая ждёт в
+                        // B.swapPick (маркер «swapMark», карта ещё не
+                        // потрачена), вторая уходит в castSpell как
+                        // target.first. Клик мимо цели или по той же клетке —
+                        // ждём/снимаем выбор как у остальных прицелов
+                        if (!u || !spellAimable(u)) { swapPickClear(); deselect(); return; }
+                        if (!B.swapPick) { // первая цель
+                            B.swapPick = { col, row };
+                            swapMarkDraw(u);
+                            const p = cellXY(col, row);
+                            floatText(p.x, p.y - 108,
+                                GAME_LOC.t("spell.swap.pick2"), 0xb7d0ef);
+                            return;
+                        }
+                        if (B.swapPick.col === col && B.swapPick.row === row)
+                            return; // та же клетка — ждём другую
+                        const first = B.swapPick;
+                        swapPickClear();
+                        castSpell(B.selected, { col, row, first });
+                        return;
+                    }
                     if (tg === "anyCell") { // стена костров — подходит любая клетка
                         castSpell(B.selected, { col, row });
                         return;
