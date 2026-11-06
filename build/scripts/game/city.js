@@ -1049,8 +1049,9 @@
     }
 
     // Живые огни города (W53, юзер просил эффекты pixelfx в игре): горн
-    // кузницы (armory) и факелы у дверей ратуши (townHall). Loop-эффекты
-    // fire/brazier и fire/torch через GAME_FX (мост pixelfx.js): бандл
+    // кузницы (armory) и горны у дверей ратуши (townHall). W59 (юзер):
+    // факелы (Torch) заменены на горны (Brazier) — fire/brazier везде.
+    // Loop-эффекты через GAME_FX (мост pixelfx.js): бандл
     // dll/pixelfx.min.js не загрузился — город просто без огней, ошибки
     // не бывает. Живут до выхода из города (FX-спрайты умирают вместе с
     // контейнером карты, тик сам вычищает мёртвых).
@@ -1068,14 +1069,14 @@
                     size: 76, seed: o.gx * 7 + o.gy,
                 });
             } else if (o.type === "townHall") {
-                // факелы по углам фасада
-                FX.spawn(c, "fire/torch", {
+                // горны по углам фасада (W59: были факелы — заменил юзер)
+                FX.spawn(c, "fire/brazier", {
                     x: (o.gx + 0.4) * TS, y: (o.row + 0.6) * TS,
-                    size: 62, seed: o.gx * 3 + 1,
+                    size: 68, seed: o.gx * 3 + 1,
                 });
-                FX.spawn(c, "fire/torch", {
+                FX.spawn(c, "fire/brazier", {
                     x: (o.gx + o.w - 0.4) * TS, y: (o.row + 0.6) * TS,
-                    size: 62, seed: o.gx * 3 + 2,
+                    size: 68, seed: o.gx * 3 + 2,
                 });
             }
         }

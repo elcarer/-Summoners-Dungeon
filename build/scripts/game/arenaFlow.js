@@ -546,11 +546,14 @@
                                 const over = ahead + dir;
                                 if (unitHasFly(u) && occ.def.type === "unit"
                                     && over >= 0 && over < GRID && !unitAt(u.col, over)) {
-                                    const flyFromCol = u.col, flyFromRow = u.row;
-                                    u.row = over;
-                                    heroElementalDraw(u); // «Сонм духов»: способность элементаля (Полёт)
-                                    const p = cellXY(u.col, u.row);
-                                    glide(u, p.x, p.y);
+                                const flyFromCol = u.col, flyFromRow = u.row;
+                                u.row = over;
+                                heroElementalDraw(u); // «Сонм духов»: способность элементаля (Полёт)
+                                const p = cellXY(u.col, u.row);
+                                // W59 (юзер): полёт существа — Leaf storm
+                                fxEvent("fly", { x: p.x, y: p.y - 14,
+                                    color: 0x9fd489 });
+                                glide(u, p.x, p.y);
                                     setWalk(u, true);
                                     sfx("step");
                                     await delay(0.52 / animK()); // глиссада: полный шаг

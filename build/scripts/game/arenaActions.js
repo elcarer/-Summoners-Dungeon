@@ -1011,11 +1011,15 @@
                         // (первое уронное — на всю серию, по образцу aoeDmg)
                         const dmg = def.spell.columnDmg + altarBonus("p");
                         const fs = heroSpellBonus(def, "p", false, true);
-                        for (const v of B.units.slice()) {
-                            if (v.col !== target.col || v.def.type !== "unit") continue;
-                            damageUnit(v, dmg + fs
-                                + heroSpellBonus(def, "p", true), null, "rocket");
-                        }
+                        A.fxHint = "mass"; // массовый урон — Impact frame
+                        try {
+                            for (const v of B.units.slice()) {
+                                if (v.col !== target.col
+                                    || v.def.type !== "unit") continue;
+                                damageUnit(v, dmg + fs
+                                    + heroSpellBonus(def, "p", true), null, "rocket");
+                            }
+                        } finally { A.fxHint = null; }
                         sfx("chpoc");
                         return true;
                     }
@@ -1210,10 +1214,14 @@
                     // первое уронное заклинание — +1 ко ВСЕМ ударам этого каста;
                     // «Поджигатели» — +1 только существам (постройки не считаются)
                     const fs = heroSpellBonus(def, "p", false, true);
-                    for (const v of B.units.slice()) if (v.side !== "p")
-                        damageUnit(v, dmg + fs
-                            + (v.def.type === "unit" ? heroSpellBonus(def, "p", true) : 0),
-                            null, "rocket");
+                    A.fxHint = "mass"; // массовый урон — Impact frame
+                    try {
+                        for (const v of B.units.slice()) if (v.side !== "p")
+                            damageUnit(v, dmg + fs
+                                + (v.def.type === "unit"
+                                    ? heroSpellBonus(def, "p", true) : 0),
+                                null, "rocket");
+                    } finally { A.fxHint = null; }
                     sfx("chpoc");
                 }
                 if (def.spell.buffAllAtk) { // «Поднять стяги!»: +1 урона всем своим существам

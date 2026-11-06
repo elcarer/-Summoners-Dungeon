@@ -61,7 +61,22 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 
 ## Текущее состояние
 
-- Последняя волна: **W58** — 5 поправок + 2 бага юзера. Кнопки: свет
+- Последняя волна: **W59** — эффекты событий по списку юзера. Бандл
+  pixelfx пересобран (18→31: arrow, claw-swipe, parry, blunt-hit,
+  impact-frame, heart-lost, disintegrate, poof, portal, stunned,
+  electrified, leaf-storm, burn-away). Урон по источнику (damageUnit +
+  подсказка A.fxHint): атака → Claw swipe, заклинание по одному →
+  Parry, массовый → Impact frame, ловушка на существе → Blunt hit,
+  прочие потери → Heart lost; смерть существа/постройки → Disintegrate/
+  Poof; усиление/ослабление → Electrified/Stunned; полёт → Leaf storm;
+  появление → Portal (юнит скрыт 0.5с, явление — тик arrivals, портал
+  гасится stop-ом); «Выстрел» — стрела летит по клеткам (A.flyArrow +
+  тик A.shots, archerShot/siegeShot/wolfVolley); вход в подземелье —
+  Burn away во весь экран (город — без); город: факелы ратуши → горны
+  (Braziers). fxEvent пускает kinds без Graphics-пресета (BUILD ||
+  PFX). probe_w59 24/0; регресс mini/w55/w56/w57/city зелёный.
+
+- **W58** — 5 поправок + 2 бага юзера. Кнопки: свет
   ПО КОНТУРУ (addGlow = клон спрайта ×1.08 под кнопкой, овал-текстура
   удалена; world/dungeon hudIcon обновлены). Берсерк проверен пробой —
   цена 1♥ только за фактические доп. атаки самого существа (код верный).
@@ -280,6 +295,9 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 
 ## Дальше
 
+- Новый эффект каталога = правка for_work/pixelfx_entry.js + esbuild
+  (бандл) + строка в PFX-таблице arenaFx.js; kinds без Graphics-пресета
+  живут только в pixelfx. Таблица «событие → эффект» — journal W59.
 - Ловушки W58 в traps.md: Pixi v8 bubbling (notifyTarget/isInteractive),
   курсор body+canvas, CDP-wheel диагностика, расходные призывы
   (firstSummonAtk) в пробах.

@@ -162,6 +162,7 @@
                 drawCards(4);
                 drawEnemy(4); // у врага раньше было 0 карт — добор только на его ходу
                 moves.length = 0; floats.length = 0; punches.length = 0; // хвосты прошлого боя
+                arrivals.length = 0; shots.length = 0; // порталы появления и стрелы (W59)
                 fxClear(); // эффекты прошлого боя жили в уничтоженном root
                 overlay = null;
                 drag = null;
@@ -355,6 +356,39 @@
                             p.node.destroy({ children: true });
                         } else p.node.scale.set(1);
                         punches.splice(i, 1);
+                    }
+                }
+                // Появления за порталом (W59, юзер): юнит скрыт, пока на
+                // клетке играет портал; на нуле — показать и вырастить
+                // (прежний punch призыва). Юнит мог погибнуть, не явившись —
+                // тогда просто пропуск
+                for (let i = arrivals.length - 1; i >= 0; i--) {
+                    const a = arrivals[i];
+                    if (a.node.destroyed) { arrivals.splice(i, 1); continue; }
+                    a.life -= dt;
+                    if (a.life > 0) continue;
+                    arrivals.splice(i, 1);
+                    if (a.fx && a.fx.stop) { // портал гасится появлением
+                        try { a.fx.stop(); } catch (e) {}
+                    }
+                    if (!B.units.includes(a.u)) continue;
+                    a.node.visible = true;
+                    punches.push({ node: a.node,
+                        life: 0.3 / animK(), total: 0.3 / animK() });
+                }
+                // Полёт стрел «Выстрела» (W59, юзер): спрайт тащится от
+                // стрелка к цели; на прибытии loop-анимация гасится
+                // handle.stop() — спрайт доигрывает затухание и умирает сам
+                for (let i = shots.length - 1; i >= 0; i--) {
+                    const s = shots[i];
+                    if (!s.sprite || s.sprite.destroyed) { shots.splice(i, 1); continue; }
+                    s.life -= dt;
+                    const k = Math.max(0, Math.min(1, 1 - s.life / s.total));
+                    s.sprite.x = s.fx + (s.tx - s.fx) * k;
+                    s.sprite.y = s.fy + (s.ty - s.fy) * k;
+                    if (s.life <= 0) {
+                        shots.splice(i, 1);
+                        if (s.handle) { try { s.handle.stop(); } catch (e) {} }
                     }
                 }
                 for (let i = moves.length - 1; i >= 0; i--) {

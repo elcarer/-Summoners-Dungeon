@@ -51,6 +51,8 @@
             B: null,
             floats: [], punches: [], // всплывающий текст и тряска жетонов
             moves: [], // плавные переходы существ между клетками
+            arrivals: [], // появления за порталом: {u, node, life} (W59)
+            shots: [], // летящие стрелы «Выстрела» (W59)
             PURGE_DEF_KEYS,
             CARDS, ENCOUNTERS, TRAP_SLOTS, enemyDeck, HEROES,
         };

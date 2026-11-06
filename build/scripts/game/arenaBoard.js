@@ -696,16 +696,21 @@
                 const node = makeUnitNode(u);
                 u.node = node;
                 node.scale.set(0.2);
-                punches.push({ node, life: 0.3 / animK(), total: 0.3 / animK() });
                 root.unitsLayer.addChild(node);
                 const sp = cellXY(col, row);
-                // W54 (юзер: «при розыгрыше постройки играется эффект
-                // существа»): строениям — своё событие (пыль и трещины
-                // пола), существам — прежний призыв
-                fxEvent(def.type === "building" ? "build" : "summon", {
+                // W59 (юзер): появление существа/постройки — ПОРТАЛ, который
+                // играет ЗА 0.5с ДО появления: юнит скрыт (visible=false),
+                // портал играет на клетке, на нуле таймера юнит показывается
+                // и вырастает (бывший punch приезда — в тике arrivals),
+                // портал гасится (stop — затухание 0.3с в ядре pixelfx).
+                // Умер, не явившись (ловушка на призыв и т.п.) — портал
+                // просто доигрывает, показа нет
+                node.visible = false;
+                const portalFx = fxEvent("portal", {
                     x: sp.x, y: sp.y + 24, color: fxColorOf(def.elem),
                     scale: opts.token ? 0.72 : 1,
                 });
+                arrivals.push({ u, node, life: 0.5 / animK(), fx: portalFx });
                 multiFury(cardId, side); // «Ярость природы» (Рыжий лес, W54)
                 sfx("aqua"); // призыв (обе стороны)
                 B.units.push(u);

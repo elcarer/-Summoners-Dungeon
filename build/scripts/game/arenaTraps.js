@@ -383,11 +383,18 @@
             };
 
             // Эффект сработавшей ловушки на клетке (отделён от поиска ловушки —
-            // «Роща лоз» применяет его дважды); u — существо, наступившее на неё
-
-            // Эффект сработавшей ловушки на клетке (отделён от поиска ловушки —
-            // «Роща лоз» применяет его дважды); u — существо, наступившее на неё
+            // «Роща лоз» применяет его дважды); u — существо, наступившее на неё.
+            // W59 (юзер): срабатывание ловушки на существе — Blunt hit.
+            // Обёртка ставит подсказку источника урона на весь эффект;
+            // «Тёмные цепи» снимают её перед атаками своих существ (это
+            // атаки существ, не урон ловушки)
             A.applyCellTrap = function applyCellTrap(trap, side, u) {
+                A.fxHint = "trap";
+                try {
+                    applyCellTrapRaw(trap, side, u);
+                } finally { A.fxHint = null; }
+            };
+            A.applyCellTrapRaw = function applyCellTrapRaw(trap, side, u) {
                 if (trap.def.trap.effect === "selfDmg") {
                     // «Удар двойника» (tim221, просил юзер): существо
                     // наносит САМО СЕБЕ урон, равный своему параметру
@@ -436,6 +443,7 @@
                     const allies = shuffle(B.units.filter((v) => v.side === side
                         && v !== u && v.def.type === "unit"
                         && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1));
+                    A.fxHint = null; // дальше атаки СУЩЕСТВ — Claw swipe, не урон ловушки
                     for (const a of allies) {
                         if (!B.units.includes(u)) break; // цель уже погибла
                         if (!B.units.includes(a)) continue;

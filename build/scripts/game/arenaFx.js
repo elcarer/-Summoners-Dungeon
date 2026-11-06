@@ -24,19 +24,29 @@
             // вместо призывного (heavy-landing: пол треснул, пыль).
             const PFX_SRC = globalThis.GAME_FX;
             const PFX = PFX_SRC && PFX_SRC.available ? {
+                // W59 (юзер): эффекты событий по списку. impact — запасной
+                // (вне списка); удары разделяются по источнику в damageUnit
                 impact: { id: "impacts/hit-spark", h: 92 },
+                attack: { id: "melee/claw-swipe", h: 116 }, // атака существа
+                spellHit: { id: "impacts/parry", h: 118 }, // заклинание по одному
+                massHit: { id: "impacts/impact-frame", h: 128 }, // массовый урон
+                trapHit: { id: "impacts/blunt-hit", h: 112 }, // ловушка на существе
+                hpLost: { id: "ui/heart-lost", h: 104, raw: true }, // потеря жизней (сердечки — родная палитра)
                 heal: { id: "holy/heal", h: 120 },
-                death: { id: "spawn/shatter-death", h: 120 },
-                summon: { id: "spawn/summon-rise", h: 150 },
-                build: { id: "impacts/heavy-landing", h: 96 },
+                death: { id: "spawn/disintegrate", h: 120 }, // смерть существа
+                poof: { id: "spawn/poof", h: 112 }, // смерть постройки
+                summon: { id: "spawn/summon-rise", h: 150 }, // (вне списка юзера)
+                build: { id: "impacts/heavy-landing", h: 96 }, // (вне списка)
+                portal: { id: "arcane/portal", h: 150 }, // появление (за 0.5с до)
                 cast: { id: "arcane/magic-circle-cast", h: 170 },
                 ice: { id: "ice/snowflake-burst", h: 120 },
                 poison: { id: "nature/spore-burst", h: 140 },
                 trap: { id: "shadow/hex-sigil", h: 120 },
                 seal: { id: "arcane/mana-burst", h: 130 },
                 base: { id: "explosions/small-explosion", h: 220 },
-                buff: { id: "pickups/collect-burst", h: 110 },
-                debuff: { id: "shadow/curse", h: 110 },
+                buff: { id: "lightning/electrified", h: 110 }, // усиление
+                debuff: { id: "status/stunned", h: 108 }, // ослабление
+                fly: { id: "nature/leaf-storm", h: 126 }, // полёт существа
                 ward: { id: "impacts/shield-block", h: 100 },
                 victory: { id: "ui/confetti", h: 430, raw: true },
                 defeat: { id: "shadow/dark-explosion", h: 260 },
@@ -46,6 +56,13 @@
             A.fxList = [];
             A.fxSeq = 0;
             A.fxEnabled = true;
+            // Подсказка источника урона для damageUnit (W59): "mass" —
+            // массовый урон (Impact frame), "trap" — сработавшая ловушка
+            // (Blunt hit). Ставится точками вызова вокруг петель урона
+            A.fxHint = null;
+            // Летящие стрелы «Выстрела» (W59, юзер): { sprite, handle,
+            // fx, fy, tx, ty, life, total } — тик в update сцены
+            A.shots = [];
 
             const rnd = (a, b) => a + Math.random() * (b - a);
             const pick = (arr) => arr[(Math.random() * arr.length) | 0];
@@ -485,7 +502,11 @@
 
             // ── Создание/жизненный цикл ──────────────────────────────────────
             A.fxEvent = function fxEvent(kind, opts = {}) {
-                if (!A.fxEnabled || !root || !root.fx || !BUILD[kind]) return null;
+                // W59: kinds бывают и БЕЗ Graphics-пресета (attack/spellHit/
+                // massHit/trapHit/hpLost/portal/fly/poof — только pixelfx):
+                // пусто в обеих таблицах — события нет
+                if (!A.fxEnabled || !root || !root.fx
+                    || !(BUILD[kind] || (PFX && PFX[kind]))) return null;
                 if (A.fxList.length >= MAX_FX) {
                     const old = A.fxList.shift();
                     if (old) destroyFx(old);
@@ -520,8 +541,12 @@
                         return h2;
                     }
                 }
-                BUILD[kind](e, opts);
-                if (!e.parts.length) return null;
+                // Graphics-пресет есть не у всех kinds (W59): у pixelfx-only
+                // событий провал спавна = эффекта просто нет
+                if (BUILD[kind]) {
+                    BUILD[kind](e, opts);
+                    if (!e.parts.length) return null;
+                } else return null;
                 const k = animK();
                 let dur = 0.2;
                 for (const p of e.parts) {
@@ -574,10 +599,34 @@
             A.fxClear = function fxClear() {
                 for (const e of A.fxList) destroyFx(e);
                 A.fxList.length = 0;
+                A.shots.length = 0; // летящие стрелы умирают вместе с боем
                 // W53: и pixelfx-эффекты. ВНИМАНИЕ: fxClear зовётся и из
                 // enter сцены — ДО построения root (root===null), поэтому
                 // guard обязателен: без него падает весь enter арены
                 if (PFX_SRC && root && root.fx) PFX_SRC.clear(root.fx);
+            };
+
+            // «Выстрел» — полёт стрелы ПО КЛЕТКАМ от стрелка к цели
+            // (W59, юзер). Стрела pixelfx (projectiles/arrow, loop) летит
+            // по прямой from→to: спрайт тащит тик сцены (A.shots), на
+            // прибытии loop гасится handle.stop() (затухание 0.3с в ядре).
+            // Нос стрелы — origin эффекта, угол — в радианах (painter.place).
+            // Бандл не загрузился — выстрела без стрелы (урон как раньше).
+            A.flyArrow = function flyArrow(from, to) {
+                if (!root || !root.fx || !from || !to) return;
+                let sprite = null, handle = null;
+                if (PFX_SRC && PFX_SRC.available) {
+                    handle = PFX_SRC.spawn(root.fx, "projectiles/arrow", {
+                        x: from.x, y: from.y, size: 64,
+                        angle: Math.atan2(to.y - from.y, to.x - from.x),
+                    });
+                    if (handle) sprite = handle.sprite;
+                }
+                if (!sprite) return;
+                const dur = Math.max(0.16, Math.hypot(to.x - from.x,
+                    to.y - from.y) / 1100) / animK();
+                A.shots.push({ sprite, handle, fx: from.x, fy: from.y,
+                    tx: to.x, ty: to.y, life: dur, total: dur });
             };
 
             // ── Рисование ────────────────────────────────────────────────────

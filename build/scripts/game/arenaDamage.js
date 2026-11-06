@@ -98,7 +98,9 @@
                 }
                 if (u && B.units.includes(u)) {
                     const dp = cellXY(u.col, u.row);
-                    fxEvent("death", {
+                    // W59 (юзер): смерть существа — Disintegrate, постройки —
+                    // Poof
+                    fxEvent(u.def.type === "building" ? "poof" : "death", {
                         x: dp.x, y: dp.y - 8, color: fxColorOf(u.def.elem),
                         scale: u.def.type === "building" ? 1.2 : 1,
                     });
@@ -678,14 +680,24 @@
                 if (undyingGuard) // страж «Снизошедшего»: уцелел с 1 жизнью
                     floatText(p.x, p.y - 78, "⇒1♥", 0x8cd0ef);
                 if (amt > 0) {
-                    fxEvent("impact", {
+                    // W59 (юзер): эффект урона — по ИСТОЧНИКУ. Массовый урон
+                    // (петли с fxHint "mass") — Impact frame; сработавшая
+                    // ловушка (fxHint "trap") — Blunt hit; заклинание по
+                    // одному существу (идёт разрешение каста, убийцы-юнита
+                    // нет) — Parry; атака существа (удар мечом от юнита) —
+                    // Claw swipe; прочие потери жизней — Heart lost
+                    const kind = A.fxHint === "mass" ? "massHit"
+                        : A.fxHint === "trap" ? "trapHit"
+                        : (A.spellCasting && !killer) ? "spellHit"
+                        : (killer && killer.def && killer.def.type === "unit"
+                            && snd === "sword") ? "attack" : "hpLost";
+                    fxEvent(kind, {
                         x: p.x, y: p.y - 16,
                         color: (snd === "acid" || snd === "poison") ? 0x9fd46a
                             : snd === "rocket" ? 0xffa45e
                             : snd === "monolith" ? 0xd0b0ef : 0xffb26e,
                         power: Math.min(1.8, 0.72 + amt * 0.12),
                         scale: target.def.type === "building" ? 1.12 : 0.9,
-                        slash: snd === "sword",
                     });
                 }
                 punch(target.node);

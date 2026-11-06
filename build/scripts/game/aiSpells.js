@@ -355,11 +355,14 @@
                         if (col === null) return; // невыгодной колонки нет
                         const dmg = s.columnDmg + altarBonus("e");
                         const fs = heroSpellBonus(def, "e", false, true);
-                        for (const v of B.units.slice()) {
-                            if (v.col !== col || v.def.type !== "unit") continue;
-                            damageUnit(v, dmg + fs
-                                + heroSpellBonus(def, "e", true), null, "rocket");
-                        }
+                        A.fxHint = "mass"; // массовый урон — Impact frame
+                        try {
+                            for (const v of B.units.slice()) {
+                                if (v.col !== col || v.def.type !== "unit") continue;
+                                damageUnit(v, dmg + fs
+                                    + heroSpellBonus(def, "e", true), null, "rocket");
+                            }
+                        } finally { A.fxHint = null; }
                         sfx("chpoc");
                         return;
                     }
@@ -571,10 +574,14 @@
                 if (s.aoeDmg) { // «Раскалённые обломки»: всем существам и постройкам игрока
                     const dmg = s.aoeDmg + altarBonus("e");
                     const fs = heroSpellBonus(def, "e", false, true); // первое уронное — всем ударам
-                    for (const v of B.units.slice()) if (v.side !== "e")
-                        damageUnit(v, dmg + fs
-                            + (v.def.type === "unit" ? heroSpellBonus(def, "e", true) : 0),
-                            null, "rocket");
+                    A.fxHint = "mass"; // массовый урон — Impact frame
+                    try {
+                        for (const v of B.units.slice()) if (v.side !== "e")
+                            damageUnit(v, dmg + fs
+                                + (v.def.type === "unit"
+                                    ? heroSpellBonus(def, "e", true) : 0),
+                                null, "rocket");
+                    } finally { A.fxHint = null; }
                     sfx("chpoc");
                 }
                 if (s.buffAllAtk) { // «Поднять стяги!»: +1 урона всем своим существам

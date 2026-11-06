@@ -1449,3 +1449,64 @@ summonPoints 7, жетон sgrFox 4/3 + statPoints 7 (ceil/floor от 7),
   держится; призыв за постройкой −2.2). Регресс: check_city 394/0
   (WORLDGEN.V), probe_w57 29/0. Полный смоук не гонялся — не
   распоряжали. Прочее: каталог 261 цел, MAP_V/CITY_V целы.
+
+## W59 (2026-11-06) — замена эффектов событий по списку юзера + Brazier в городах
+
+Спека юзера: таблица «событие → эффект» (имена каталога pixelfx) + город.
+
+- Бандл dll/pixelfx.min.js пересобран (entry for_work/pixelfx_entry.js,
+  esbuild): 18 → 31 эффект. Добавлены: projectiles/arrow (полёт стрелы),
+  melee/claw-swipe (атака), impacts/parry (заклинание по одному),
+  impacts/blunt-hit (ловушка на существе), impacts/impact-frame
+  (массовый урон), ui/heart-lost (потеря жизней), spawn/disintegrate
+  (смерть существа), spawn/poof (смерть постройки), arcane/portal
+  (появление), status/stunned (ослабление), lightning/electrified
+  (усиление), nature/leaf-storm (полёт), transitions/burn-away (вход
+  в подземелье). Старые id в каталоге целы (проба W54 проверяет).
+- Таблица PFX (arenaFx.js): death → spawn/disintegrate; buff →
+  lightning/electrified; debuff → status/stunned; + НОВЫЕ kinds:
+  attack (melee/claw-swipe), spellHit (impacts/parry), massHit
+  (impacts/impact-frame), trapHit (impacts/blunt-hit), hpLost
+  (ui/heart-lost, raw — родная палитра сердечек), portal
+  (arcane/portal), fly (nature/leaf-storm), poof (spawn/poof).
+  summon/build остались в таблице, но больше не запускаются.
+- fxEvent: guard пускает kinds и без Graphics-пресета
+  (BUILD[kind] || PFX[kind]); провал спавна pixelfx-only события =
+  эффекта нет (не падение).
+- Урон по источнику (damageUnit): эффект выбирается источником —
+  fxHint "mass" → massHit; fxHint "trap" → trapHit; spellCasting и без
+  killer-юнита → spellHit; удар мечом от существа (snd "sword") →
+  attack; остальное → hpLost. Подсказка A.fxHint ставится точками
+  вызова: массовые петли (thicketSplash, fireSplash, novaSplash,
+  stormStrike, columnDmg ×2, aoeDmg ×2 — try/finally); ловушки —
+  обёртка applyCellTrap → applyCellTrapRaw (весь эффект ловушки = trap;
+  «Тёмные цепи» снимают подсказку перед атаками своих — там Claw
+  swipe). summonFireElf лишился отдельного impact (урон сам покажет).
+- Смерть (killUnit): постройка → poof, существо → death/disintegrate.
+- Появление (addUnit): существо/постройка СКРЫТЫ (node.visible=false)
+  0.5с (дизайн-время), на клетке играет портал (arcane/portal, loop —
+  гасится при появлении handle.stop()); явление — тик arrivals в
+  arenaScene (массив A.arrivals, чистится в enter) — показ + бывший
+  punch приезда. Умер, не явившись (ловушка на призыв) — портал
+  доигрывает, показа нет. Борд-логика мгновенна (ауры/сдвиги как
+  раньше), скрыта только картинка.
+- «Выстрел» — стрела летит ПО КЛЕТКАМ: A.flyArrow(from, to) в arenaFx
+  (спавн projectiles/arrow с углом atan2 — радианы painter.place;
+  loop-стрела тащится тиком сцены — массив A.shots; на прибытии
+  handle.stop()). Точки: archerShot (цель/база), siegeShot
+  (в т.ч. уничтожение постройки), wolfVolley. Баллиста/лучники —
+  обычный марш-удар остался Claw swipe (в списке юзера «атака»).
+- Полёт существа (перепрыг в марше) — fxEvent("fly") → Leaf storm.
+- Вход героя в ПОДЗЕМЛЬЕ — transitions/burn-away во весь экран:
+  FX.spawn(ctx.ui, …, {x:0, y:0, size:1080}) после HUD (город входит
+  без прожига).
+- Город: факелы ратуши → горны (fire/brazier ×2, size 68) — юзер.
+- Проба probe_w59 24/0: эффекты ассертятся по GAME_FX.live
+  (inst.meta.name): Claw swipe/Heart lost/Parry/Impact frame/Blunt hit
+  (набор «свежих» имён до/после — переезд магмопула затирает последний)/
+  Poof/Disintegrate/Electrified/Stunned/Leaf storm; Portal (юнит скрыт
+  → показан через ~0.5с); стрела (A.shots + meta Arrow); Burn away при
+  входе в данж; город — Brazier ≥1, Torch 0; скрин контурной подсветки
+  кнопки (W58). Регресс: mini_test 19/0, probe_w55 26/0, probe_w56
+  25/0, probe_w57 29/0, check_city 394/0. Полный смоук не гонялся —
+  не распоряжали. Прочее: каталог 261, MAP_V/CITY_V/WORLDGEN.V целы.

@@ -40,13 +40,18 @@
                     || !B.units.includes(attacker)) return;
                 // «Пастух росянок»: всплеск — способность Растения, бьёт дважды
                 const times = 1 + (attacker.def.plant ? plantEcho(attacker.side) : 0);
-                for (let t = 0; t < times; t++) {
-                    for (const v of B.units.slice()) {
-                        if (v === attacker || v === target || !B.units.includes(v)) continue;
-                        if (Math.abs(v.col - attacker.col) + Math.abs(v.row - attacker.row) !== 1) continue;
-                        damageUnit(v, attacker.curAtk, attacker, "sword");
+                A.fxHint = "mass"; // массовый урон по соседям — Impact frame
+                try {
+                    for (let t = 0; t < times; t++) {
+                        for (const v of B.units.slice()) {
+                            if (v === attacker || v === target
+                                || !B.units.includes(v)) continue;
+                            if (Math.abs(v.col - attacker.col)
+                                + Math.abs(v.row - attacker.row) !== 1) continue;
+                            damageUnit(v, attacker.curAtk, attacker, "sword");
+                        }
                     }
-                }
+                } finally { A.fxHint = null; }
             };
             // «Поджигатель» (tim238, просил юзер): при атаке существа или
             // постройки его урон получают ВСЕ существа и постройки по
@@ -56,11 +61,16 @@
             A.fireSplash = function fireSplash(attacker, target) {
                 if (!attacker || !attacker.def || !attacker.def.fireSplash
                     || !B.units.includes(attacker) || !target) return;
-                for (const v of B.units.slice()) {
-                    if (v === attacker || v === target || !B.units.includes(v)) continue;
-                    if (Math.abs(v.col - target.col) + Math.abs(v.row - target.row) !== 1) continue;
-                    damageUnit(v, attacker.curAtk, attacker, "sword");
-                }
+                A.fxHint = "mass"; // массовый урон по соседям — Impact frame
+                try {
+                    for (const v of B.units.slice()) {
+                        if (v === attacker || v === target
+                            || !B.units.includes(v)) continue;
+                        if (Math.abs(v.col - target.col)
+                            + Math.abs(v.row - target.row) !== 1) continue;
+                        damageUnit(v, attacker.curAtk, attacker, "sword");
+                    }
+                } finally { A.fxHint = null; }
             };
             // «Круговая атака» (grw34): цель наносит 1 урон каждому соседу
             // (верт/гориз) — существам и постройкам обеих сторон (фикс 1,
@@ -70,11 +80,14 @@
             // аура алтаря не добавляется)
             A.novaSplash = function novaSplash(u) {
                 if (!u || !B.units.includes(u)) return;
-                for (const v of B.units.slice()) {
-                    if (v === u || !B.units.includes(v)) continue;
-                    if (Math.abs(v.col - u.col) + Math.abs(v.row - u.row) !== 1) continue;
-                    damageUnit(v, 1, u, "dam");
-                }
+                A.fxHint = "mass"; // массовый урон по соседям — Impact frame
+                try {
+                    for (const v of B.units.slice()) {
+                        if (v === u || !B.units.includes(v)) continue;
+                        if (Math.abs(v.col - u.col) + Math.abs(v.row - u.row) !== 1) continue;
+                        damageUnit(v, 1, u, "dam");
+                    }
+                } finally { A.fxHint = null; }
                 refreshHud();
                 checkEnd();
             };
@@ -689,16 +702,17 @@
             A.stormStrike = function stormStrike(side, cardId, free = false) {
                 const cost = free ? 0 : effCost(cardId, side);
                 const strikes = Math.max(0, (side === "p" ? B.energy : B.eEnergy) - cost);
-                for (let n = 0; n < strikes; n++) {
-                    const targets = spellTargets(B.units.filter((v) => v.side !== side));
-                    if (!targets.length) break; // целей нет — энергия всё равно сгорает
-                    const t = targets[(Math.random() * targets.length) | 0];
-                    const p = cellXY(t.col, t.row);
-                    fxEvent("impact", { x: p.x, y: p.y - 24, color: 0xffe28a,
-                        power: 0.75 });
-                    punch(t.node);
-                    damageUnit(t, 2, null, "dam");
-                }
+                A.fxHint = "mass"; // «Гроза» — массовый урон: Impact frame
+                try {
+                    for (let n = 0; n < strikes; n++) {
+                        const targets = spellTargets(B.units.filter((v) => v.side !== side));
+                        if (!targets.length) break; // целей нет — энергия всё равно сгорает
+                        const t = targets[(Math.random() * targets.length) | 0];
+                        const p = cellXY(t.col, t.row);
+                        punch(t.node);
+                        damageUnit(t, 2, null, "dam");
+                    }
+                } finally { A.fxHint = null; }
                 if (strikes > 0) sfx("chpoc");
                 refreshHud();
                 checkEnd();
@@ -779,6 +793,8 @@
                 for (let r = u.row + dir; r >= 0 && r < GRID; r += dir) {
                     const o = unitAt(u.col, r);
                     if (o) {
+                        // W59 (юзер): стрела летит по клеткам до цели
+                        flyArrow(cellXY(u.col, u.row), cellXY(o.col, o.row));
                         damageUnit(o, dmg, u, "dam");
                         refreshHud();
                         checkEnd();
@@ -786,6 +802,10 @@
                     }
                 }
                 sfx("crash");
+                // пустая вертикаль — стрела к базе противника
+                flyArrow(cellXY(u.col, u.row), { x: cellXY(u.col, 0).x,
+                    y: cellXY(u.col, u.side === "p" ? 0 : GRID - 1).y
+                        + (u.side === "p" ? -15 : 15) });
                 damageBase(u.side === "p" ? "e" : "p", dmg,
                     u.side === "p"
                         ? { x: cellXY(u.col, 0).x, y: cellXY(u.col, 0).y - 15, fill: 0xff8f6e }
@@ -806,6 +826,8 @@
                 for (let r = u.row + dir; r >= 0 && r < GRID; r += dir) {
                     const o = unitAt(u.col, r);
                     if (!o) continue;
+                    // W59 (юзер): стрела летит по клеткам до цели
+                    flyArrow(cellXY(u.col, u.row), cellXY(o.col, o.row));
                     if (o.side !== u.side && o.def.type === "building") {
                         const sp = cellXY(o.col, o.row);
                         floatText(sp.x, sp.y - 66, "✖", 0xffb26e);
@@ -816,6 +838,9 @@
                     return;
                 }
                 sfx("crash");
+                flyArrow(cellXY(u.col, u.row), { x: cellXY(u.col, 0).x,
+                    y: cellXY(u.col, u.side === "p" ? 0 : GRID - 1).y
+                        + (u.side === "p" ? -15 : 15) });
                 damageBase(u.side === "p" ? "e" : "p", dmg,
                     u.side === "p"
                         ? { x: cellXY(u.col, 0).x, y: cellXY(u.col, 0).y - 15, fill: 0xff8f6e }
@@ -866,8 +891,13 @@
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, "➤", 0xcfe8b0);
                 if (hit) {
+                    // W59 (юзер): стрела летит по клеткам до цели
+                    flyArrow(p, cellXY(hit.col, hit.row));
                     damageUnit(hit, u.curAtk, u, "dam");
                 } else {
+                    flyArrow(p, { x: cellXY(u.col, 0).x,
+                        y: cellXY(u.col, u.side === "p" ? 0 : GRID - 1).y
+                            + (u.side === "p" ? -15 : 15) });
                     baseHit(u.side, u); // вертикаль пуста — выстрел в базу
                 }
                 for (const r of path) addUnit(u.side, "grw2", u.col, r, { token: true });

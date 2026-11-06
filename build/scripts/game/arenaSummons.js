@@ -208,10 +208,7 @@
                         && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
                     if (!near.length) return false;
                     const v = near[(Math.random() * near.length) | 0];
-                    const p = cellXY(v.col, v.row);
-                    fxEvent("impact", { x: p.x, y: p.y - 24, color: 0xff8a5e,
-                        power: 0.55 });
-                    damageUnit(v, 1, u, "dam");
+                    damageUnit(v, 1, u, "dam"); // W59: урон сам покажет эффект
                     sfx("chpoc");
                 }
                 return true;
