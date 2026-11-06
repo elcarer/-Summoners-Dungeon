@@ -1287,7 +1287,7 @@
             A.summonDashN = function summonDashN(u, n) {
                 if (!B.units.includes(u)) return false; // мог умереть от мины при призыве
                 const dir = u.side === "p" ? -1 : 1;
-                let acted = false;
+                let acted = false, moved = false;
                 for (let k = 0; k < n; k++) {
                     if (!B.units.includes(u)) break; // погиб от шипов Ответа
                     const ahead = u.row + dir;
@@ -1322,9 +1322,12 @@
                     glide(u, p.x, p.y);
                     setWalk(u, true, ddx < 0 ? "walk_left" : ddx > 0 ? "walk_right" : undefined);
                     sfx("step");
-                    afterMoved(u); // Скорость — не марш: герой «Долгая прогулка» лечится (W65)
+                    afterMoved(u, false, true); // шаг рывка: 1♥ за срабатывание Скорости, не за клетку (поправка юзера)
                     acted = true;
+                    moved = true;
                 }
+                if (moved)
+                    walkHealTick(u); // одно срабатывание Скорости = 1♥, независимо от пройденных клеток
                 return acted;
             };
             A.summonDash = function summonDash(u) {
