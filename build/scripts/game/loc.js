@@ -37,6 +37,8 @@
             "world.caveTime": "Пески Времени",
             // W54: мультицветный данж у границы Силы и Роста
             "world.caveStrGro": "Рыжий лес",
+            // W61: мультицветный данж у границы Роста и Чести
+            "world.caveGh": "Белая пуща",
             "world.soon": "Скоро…",
             "world.deckLow": "Мало карт: для входа нужно не меньше {min}",
             // W54: вход в «Рыжий лес» — ещё и 2 ресурса стихий
@@ -630,6 +632,16 @@
             "card.sgrFox.desc": "Появляется из «Огнелиса»: очки характеристик (7) распределяются между уроном и жизнями при призыве",
             "card.sgrBear.name": "Огнемедведь",
             "card.sgrBear.desc": "Появляется из «Огнемедведя»: очки характеристик (9) распределяются между уроном и жизнями при призыве",
+            // W61: карты 251–252 «Белой пущи» (спека юзера)
+            "card.gh251.name": "Корона леса",
+            "card.gh251.desc": "Когда ваше существо получает усиление, оно получает это усиление ещё 1 раз",
+            "card.gh252.name": "Белый волк",
+            "card.gh252.desc": "Призывает Белого волка — Животное 2/3 — в случайную пустую клетку поля. Когда это существо получает усиление, все соседние с ним ваши существа получают +1 к урону и +1 к жизням",
+            "card.ghWolf.name": "Белый волк",
+            "card.ghWolf.desc": "Появляется из «Белого волка»: когда это существо получает усиление, все соседние с ним ваши существа получают +1 к урону и +1 к жизням",
+            // W61: враг 1-го этажа «Белой пущи»
+            "enc.ghKnight.title": "Зелёные рыцари",
+            "hero.ghKnight.ability": "Когда ваше существо получает усиление, вылечите 1 жизнь своей базы",
             "split.title": "Распределите очки",
             "split.hint": "Распределите очки между уроном и жизнями этого существа",
             "split.done": "Готово",
@@ -1153,6 +1165,8 @@
             "world.caveHonor": "Halls of Honor",
             "world.caveTime": "Sands of Time",
             "world.caveStrGro": "Rusty Forest",
+            // W61: мультицветный данж у границы Роста и Чести
+            "world.caveGh": "White Thicket",
             "world.soon": "Coming soon…",
             "world.deckLow": "Not enough cards: at least {min} required to enter",
             "world.resLow": "To enter you need: 1 Power Charm and 1 Life Sprout",
@@ -1742,6 +1756,16 @@
             "card.sgrFox.desc": "Appears from Fire Fox: its 7 stat points are distributed between attack and health on summon",
             "card.sgrBear.name": "Fire Bear",
             "card.sgrBear.desc": "Appears from Fire Bear: its 9 stat points are distributed between attack and health on summon",
+            // W61: карты 251–252 «Белой пущи» (спека юзера)
+            "card.gh251.name": "Crown of the Forest",
+            "card.gh251.desc": "Whenever your unit receives a buff, it receives that buff one more time",
+            "card.gh252.name": "White Wolf",
+            "card.gh252.desc": "Summons a White Wolf — a 2/3 Animal — at a random empty cell. Whenever this unit receives a buff, all your adjacent units gain +1 attack and +1 health",
+            "card.ghWolf.name": "White Wolf",
+            "card.ghWolf.desc": "Appears from White Wolf: whenever this unit receives a buff, all your adjacent units gain +1 attack and +1 health",
+            // W61: враг 1-го этажа «Белой пущи»
+            "enc.ghKnight.title": "Green Knights",
+            "hero.ghKnight.ability": "Whenever your unit receives a buff, heal 1 health to your base",
             "split.title": "Distribute points",
             "split.hint": "Distribute the points between this unit's attack and health",
             "split.done": "Done",

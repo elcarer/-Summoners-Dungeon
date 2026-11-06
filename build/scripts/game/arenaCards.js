@@ -312,6 +312,7 @@
                         && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
                     for (const v of [u, ...near]) {
                         v.bonusAtk = (v.bonusAtk || 0) + 1;
+                        onBuff(v, 1, 0); // «Белая пуща» (W61)
                     }
                     recalcAuras();
                     const p = cellXY(u.col, u.row);
@@ -341,6 +342,7 @@
                             `+${u.def.spellGrow}⚔ +${u.def.spellGrow}♥`, 0x9fd489);
                         punch(u.node);
                         sfx("chpoc");
+                        onBuff(u, u.def.spellGrow, u.def.spellGrow); // «Белая пуща» (W61)
                         return true;
                     });
                 }

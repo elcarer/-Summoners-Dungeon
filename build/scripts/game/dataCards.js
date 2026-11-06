@@ -29,6 +29,8 @@
         strPack: starterCollection(STARTER_DECKS.strPack),
         // W57: ядро босса «Эльф-отступник» (3-й этаж) — та же симметрия
         strBoss: starterCollection(STARTER_DECKS.strBoss),
+        // W61: ядро врага «Зелёные рыцари» («Белая пуща») — та же симметрия
+        groHon: starterCollection(STARTER_DECKS.groHon),
     };
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N
@@ -106,6 +108,39 @@
                  "sg247", "sg247", "sg247",
                  "sg244", "sg244", "sg246", "sg246", "sg245",
                  "sg248", "sg248", "sg249", "sg250"],
+        // W61 (спека юзера): сундуки/магазин «Белой пущи» — смесь Роста,
+        // Чести и мультицветных (встречаются только в этом данже);
+        // веса по редкости: обычная ×3, редкая ×2, эпическая ×1
+        groHon: ["grw1", "grw1", "grw1", "grw2", "grw2", "grw2",
+                 "grw3", "grw3", "grw3", "grw4", "grw4", "grw4",
+                 "grw5", "grw5", "grw5", "grw6", "grw6", "grw6",
+                 "grw7", "grw7", "grw7", "grw8", "grw8", "grw8",
+                 "grw10", "grw10", "grw10", "grw13", "grw13", "grw13",
+                 "grw16", "grw16", "grw16", "grw17", "grw17", "grw17",
+                 "grw19", "grw19", "grw19", "grw29", "grw29", "grw29",
+                 "grw34", "grw34", "grw34", "grw35", "grw35", "grw35",
+                 "grw9", "grw9", "grw11", "grw11", "grw12", "grw12",
+                 "grw14", "grw14", "grw20", "grw20", "grw25", "grw25",
+                 "grw27", "grw27", "grw36", "grw36", "grw37", "grw37",
+                 "grw38", "grw38", "grw39", "grw39",
+                 "grw15", "grw18", "grw21", "grw22", "grw23", "grw24",
+                 "grw26", "grw30", "grw31", "grw33", "grw40",
+                 "hon161", "hon161", "hon161", "hon162", "hon162", "hon162",
+                 "hon163", "hon163", "hon163", "hon164", "hon164", "hon164",
+                 "hon165", "hon165", "hon165", "hon166", "hon166", "hon166",
+                 "hon167", "hon167", "hon167", "hon168", "hon168", "hon168",
+                 "hon169", "hon169", "hon169", "hon170", "hon170", "hon170",
+                 "hon172", "hon172", "hon172", "hon174", "hon174", "hon174",
+                 "hon179", "hon179", "hon179", "hon181", "hon181", "hon181",
+                 "hon189", "hon189", "hon189", "hon191", "hon191", "hon191",
+                 "hon171", "hon171", "hon173", "hon173", "hon175", "hon175",
+                 "hon178", "hon178", "hon180", "hon180", "hon182", "hon182",
+                 "hon183", "hon183", "hon184", "hon184", "hon186", "hon186",
+                 "hon187", "hon187", "hon188", "hon188", "hon193", "hon193",
+                 "hon195", "hon195",
+                 "hon176", "hon177", "hon185", "hon190", "hon192", "hon194",
+                 "hon196", "hon197", "hon198", "hon199", "hon200",
+                 "gh252", "gh252", "gh252", "gh251", "gh251"],
         growth: ["grw1", "grw1", "grw1", "grw2", "grw2", "grw2",
                  "grw3", "grw3", "grw3", "grw4", "grw4", "grw4",
                  "grw5", "grw5", "grw5", "grw6", "grw6", "grw6",
@@ -738,6 +773,21 @@
                            "sg249", "sg250", "sg250", "sg250", "grw28",
                            "grw28", "grw22", "grw22", "grw19", "str13",
                            "str13", "str10"] },
+        // W61 (спека юзера): «Зелёные рыцари» — враг 1-го этажа «Белой
+        // пущи» (мультицвет Рост+Честь, heroes/70). 16♥, редкая,
+        // способность buffHeal — когда существо владельца получает
+        // усиление, его база лечится на 1 жизнь (onBuff — единый хук
+        // усиления в arenaCombat). Ядро — ровно 32 карты из спеки
+        // (Рост+Честь+мультицветные gh251/gh252)
+        ghKnight: { scene: 1, baseHp: 16, elem: "groHon", hero: "ghKnight",
+                    core: ["grw5", "grw5", "grw6", "grw7", "grw7",
+                           "grw10", "grw10", "grw19", "grw19", "grw21",
+                           "grw29", "grw29", "grw37", "grw37",
+                           "hon163", "hon163", "hon164", "hon164",
+                           "hon170", "hon170", "hon179", "hon179",
+                           "hon181", "hon181", "hon182", "hon182",
+                           "hon195", "hon195", "gh251", "gh251",
+                           "gh252", "gh252"] },
         // ── «Охранники мостов» открытого мира (просил юзер): бродячие
         // враги у мостов через реки в зонах своих стихий. Ядро — ровно
         // 25 карт по спеке юзера (enemyDeck без grow играют как есть —
@@ -895,6 +945,13 @@
         // (рубашки card_multi_back.png)
         sgr: { elem: "strGro", elems: ["strength", "growth"],
                maxFloor: 3, boss: "sgrBoss", bossLast: true, fury: true },
+        // W61 (спека юзера): «Белая пуща» — МУЛЬТИЦВЕТНЫЙ данж Рост+Честь
+        // (по образцу «Рыжего леса»). Пока задан только враг 1-го этажа
+        // («Зелёные рыцари», герой 70, 16♥) — данж растёт волнами, босса
+        // и особенности спека не задаёт. elems — стихии ДРАФТА «Карты
+        // сокровищ» (Рост, Честь, двухцветные groHon); elem — мульти-
+        // стихия (рубашки card_multi_back.png)
+        gh: { elem: "groHon", elems: ["growth", "honor"], maxFloor: 1 },
     };
     // Этаж → какой обычный враг на нём водится: на каждом этаже ОДИН архетип
     // (просил юзер: этаж N приводит N-й вид, без перемешивания — как в
@@ -973,10 +1030,16 @@
         ["sgrBurn"],                            // 2
         ["sgrPack"],                            // 3
     ];
+    // «Белая пуща» (W61, спека юзера): враг 1-го этажа — двухцветные
+    // «Зелёные рыцари». Глубже враги спекой пока не заданы (данж растёт
+    // волнами — как «Рыжий лес» в W54–W57), этаж один
+    const FLOOR_MOBS_GH = [
+        ["ghKnight"],                           // 1
+    ];
     const MOB_TABLES = { gob: FLOOR_MOBS, grw: FLOOR_MOBS_GROWTH,
                          wis: FLOOR_MOBS_WISDOM, dec: FLOOR_MOBS_DECAY,
                          hon: FLOOR_MOBS_HONOR, tim: FLOOR_MOBS_TIME,
-                         sgr: FLOOR_MOBS_SGR };
+                         sgr: FLOOR_MOBS_SGR, gh: FLOOR_MOBS_GH };
     // Пул добора колоды врага по редкости. Панельные карты (str11 жертва,
     // str25 руны, str26 путешествие) ИИ теперь разыгрывает сам — цель он
     // выбирает по своим приоритетам, без экрана (просил юзер).
@@ -1078,6 +1141,27 @@
             epic:   ["str6", "str8", "str10", "str18", "str21", "str25",
                      "grw15", "grw18", "grw21", "grw23", "grw26", "grw31",
                      "grw33", "grw40", "sg245", "sg249", "sg250"],
+        },
+        // W61 (спека юзера): добор врагов «Белой пущи» — смесь Роста,
+        // Чести и мультицветных (enc.elem у них "groHon")
+        groHon: {
+            common: ["grw1", "grw2", "grw3", "grw4", "grw5", "grw6",
+                     "grw7", "grw8", "grw10", "grw13", "grw16", "grw19",
+                     "grw29", "grw34", "grw35",
+                     "hon161", "hon162", "hon163", "hon164", "hon165",
+                     "hon166", "hon167", "hon168", "hon169", "hon170",
+                     "hon172", "hon174", "hon179", "hon181", "hon189",
+                     "hon191", "gh252"],
+            rare:   ["grw9", "grw11", "grw12", "grw14", "grw20", "grw25",
+                     "grw27", "grw36", "grw37", "grw38", "grw39",
+                     "hon171", "hon173", "hon175", "hon178", "hon180",
+                     "hon182", "hon183", "hon184", "hon186", "hon187",
+                     "hon188", "hon193", "hon195", "gh251"],
+            epic:   ["grw15", "grw18", "grw21", "grw22", "grw23", "grw24",
+                     "grw26", "grw30", "grw31", "grw33", "grw40",
+                     "hon176", "hon177", "hon185", "hon190", "hon192",
+                     "hon194", "hon196", "hon197", "hon198", "hon199",
+                     "hon200"],
         },
     };
     // Колода врага: ядро архетипа; весь добор — только боссу (просил

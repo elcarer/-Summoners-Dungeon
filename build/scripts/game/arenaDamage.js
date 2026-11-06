@@ -200,6 +200,7 @@
                     punch(v.node);
                     sfx("chpoc");
                     packFrenzy(v); // «Безумие стаи»: способность растения сработала
+                    onBuff(v, k, k); // «Белая пуща» (W61)
                 }
                 // ловушки стороны погибшего: триггер «при гибели своего существа»
                 if (killer && killer.def && killer.def.type === "unit" && killer.side !== u.side) {
@@ -234,6 +235,7 @@
                     floatText(p.x, p.y - 66, `+${a}⚔ +${h}♥`, 0x9fd489);
                     punch(v.node);
                     sfx("chpoc");
+                    onBuff(v, a, h); // «Белая пуща» (W61)
                 }
                 // «Жажда смерти» (decThirst, heroes/30): ПЕРВАЯ за бой гибель
                 // СВОЕГО существа лечит базу владельца на 3

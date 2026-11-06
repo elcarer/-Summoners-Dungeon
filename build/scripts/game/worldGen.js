@@ -34,7 +34,7 @@
     // v17 — дороги в обход городов (W45, юзер): A* не режет спрайт города
     // (footprint 9×6/9×7.5 клеток — с W42 тело непроходимо, дорога к
     // «воротам» подходила сквозь него); старые миры (v16) перегенерируются
-    const V = 20; // W60 (юзер): дикие точки — только в достижимой герою суше (миры пересобираются)
+    const V = 21; // W61 (юзер): вход «Белой пущи» у границы Роста и Чести (миры пересобираются)
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // деревья лесных массивов по зонам стихий (просил юзер): вместо
@@ -61,6 +61,7 @@
         wisdom: "world.caveWisdom", decay: "world.caveDecay",
         honor: "world.caveHonor", time: "world.caveTime",
         strGro: "world.caveStrGro", // W54: «Рыжий лес»
+        groHon: "world.caveGh", // W61: «Белая пуща»
     };
     // габариты зданий в клетках (просил юзер): город 5×3, столица 5×4;
     // (gx,gy) POI — якорь-площадь: у города нижняя средняя клетка,
@@ -794,6 +795,57 @@
             }
         }
 
+        // ── 5c. «Белая пуща» (W61, спека юзера): МУЛЬТИЦВЕТНЫЙ данж
+        // Рост+Честь (cave "gh", elem "groHon") — по образцу «Рыжего
+        // леса»: у ГРАНИЦЫ зон Роста и Чести, дистанции от POI — как у
+        // городов (ослабление 22 → 12). Дорога — от остова РОСТА
+        {
+            const kg = ELEMS.indexOf("growth"), kh = ELEMS.indexOf("honor");
+            const footOk = (x, y) => {
+                if (x < 3 || y < 2 || x >= W - 3 || y >= H - 3) return false;
+                for (const [fx, fy] of footCells("dungeon", x, y)) {
+                    const i = fy * W + fx, z = zone[i];
+                    if (z !== kg && z !== kh) return false;
+                    const t = ter[i];
+                    if (t !== T_GROUND && t !== T_FOREST && t !== T_SWAMP)
+                        return false;
+                }
+                return true;
+            };
+            const cands = [];
+            for (let y = 3; y < H - 3; y++)
+                for (let x = 3; x < W - 3; x++) {
+                    if (!footOk(x, y)) continue;
+                    let border = false;
+                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        const z = zone[(y + dy) * W + x + dx];
+                        if (z === kg || z === kh) border = true;
+                    }
+                    if (border) cands.push([x, y]);
+                }
+            for (let i = cands.length - 1; i > 0; i--) {
+                const j = (rng() * (i + 1)) | 0;
+                const t = cands[i]; cands[i] = cands[j]; cands[j] = t;
+            }
+            let site = null;
+            for (const minD of [22, 16, 12]) {
+                site = cands.find(([x, y]) => !pois.some((p) =>
+                    Math.hypot(p.gx - x, p.gy - y) < minD)) || null;
+                if (site) break;
+            }
+            if (site) {
+                const [x, y] = site;
+                for (const [fx, fy] of footCells("dungeon", x, y)) {
+                    ter[fy * W + fx] = T_GROUND;
+                    blocked[fy * W + fx] = 1;
+                }
+                markPoiMask("dungeon", x, y);
+                blocked[y * W + x] = 0;
+                pois.push({ kind: "dungeon", elem: "groHon",
+                    gx: x, gy: y, cave: "gh" });
+            }
+        }
+
         // ── 6. дороги: A* между площадями/арками. Внутри зоны — остов
         // (Прим) + одно «кольцевое» ребро; между смежными зонами —
         // ближайшая пара. Дорога прокладывается и сквозь горы/чащи
@@ -867,9 +919,11 @@
         const edges = [];
         for (let k = 0; k < 6; k++) {
             // W54: «Рыжий лес» (elem "strGro") едет дорогой остова СИЛЫ —
-            // юзер: «чтобы к нему вела дорога»
+            // юзер: «чтобы к нему вела дорога». W61: «Белая пуща» (groHon)
+            // — дорогой остова РОСТА (первая стихия сочетания)
             const nodes = pois.filter((p) => p.elem === ELEMS[k]
-                || (p.cave === "sgr" && ELEMS[k] === "strength"));
+                || (p.cave === "sgr" && ELEMS[k] === "strength")
+                || (p.cave === "gh" && ELEMS[k] === "growth"));
             const inTree = [0];
             const rest = nodes.map((_, i) => i).slice(1);
             while (rest.length) { // остов Прима по евклиду

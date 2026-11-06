@@ -27,13 +27,17 @@
 
         function draftPool() {
             // W54 (спека юзера): «Карта сокровищ» «Рыжего леса» — карты
-            // ОБОИХ стихий (elems) и мультицветные с хотя бы одной из них;
-            // прочие данжи драфтят одну стихию (elem) как раньше
+            // ОБОИХ стихий (elems) и мультицветные; W61 (спека юзера):
+            // мультицветные карты встречаются ТОЛЬКО в мультицветных
+            // подземельях своего сочетания стихий — набор multi должен
+            // совпадать с elems данжа. Прочие данжи драфтят одну стихию
+            // (elem), мультицветные в них не попадают
             const cave = G.dungeon && G.dungeon.cave;
             const info = cave && globalThis.GAME_DATA.CAVES[cave];
             const elems = info && info.elems ? info.elems : [draftElemOf(G)];
             const okElem = (c) => c.multi
-                ? c.multi.some((e) => elems.includes(e))
+                ? (elems.length > 1 && c.multi.length === elems.length
+                    && c.multi.every((e) => elems.includes(e)))
                 : elems.includes(c.elem);
             return Object.keys(CARDS).filter((id) =>
                 okElem(CARDS[id]) && CARDS[id].img);

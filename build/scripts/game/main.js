@@ -91,7 +91,7 @@
             "walls/wall_end4"];
         for (const lair of ["goblins_lair", "growth_lair", "water_lair",
                             "necro_lair", "honor_lair", "time_lair",
-                            "str_gro"]) { // W54: «Рыжий лес» (тайлы юзера)
+                            "str_gro", "gro_hon"]) { // W54/W61: тайлы юзера
             for (const f of TILE_FILES) {
                 uiTextures[`dungeon_tiles/${lair}/${f}.png`] =
                     await assets.loadTexture(`./images/dungeon_tiles/${lair}/${f}.png`);

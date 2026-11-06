@@ -402,6 +402,7 @@
                 floatText(p.x, p.y - 72, "+1⚔ +1♥", 0x9fd489);
                 punch(u.node);
                 sfx("chpoc");
+                onBuff(u, 1, 1); // «Белая пуща» (W61)
                 await delay(0.52 / animK()); // глиссада: полный шаг
                 if (B.stopped) return true;
                 afterMoved(u); // перемещение — ловушки врага

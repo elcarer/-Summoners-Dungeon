@@ -652,6 +652,22 @@
                 return true;
             };
 
+            // «Белый волк» (gh252, W61): призыв Животного (жетон ghWolf)
+            // 2/3 в случайную пустую клетку поля боя. Поле забито — волка
+            // нет. Способность жетона («соседи +1⚔/+1♥ при его усилении»)
+            // срабатывает из onBuff (arenaCombat). Возвращает true, если
+            // призвал
+            A.wolfSpawn = function wolfSpawn(side) {
+                const empty = [];
+                for (let row = 0; row < GRID; row++)
+                    for (let col = 0; col < GRID; col++)
+                        if (!unitAt(col, row)) empty.push([col, row]);
+                if (!empty.length) return false;
+                const [col, row] = empty[(Math.random() * empty.length) | 0];
+                addUnit(side, "ghWolf", col, row, { token: true });
+                return true;
+            };
+
             // «Огнелис»/«Огнемедведь» (sg249/250, W57): призыв Животного
             // (жетон sgrFox/sgrBear) в СЛУЧАЙНУЮ пустую клетку поля боя с
             // распределёнными очками характеристик. База жетона в каталоге =
@@ -862,6 +878,7 @@
                         fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
                         punch(u.node);
                         sfx("chpoc");
+                        onBuff(u, pool, pool); // «Белая пуща» (W61)
                         return true;
                     }
                     if (def.spell.iceStrike) { // «Ледяной удар»: цель бьёт соседа
@@ -936,10 +953,16 @@
                         // «Претендента на трон»)
                         if (def.spell.healPlayer) healBase("p", def.spell.healPlayer);
                         if (def.spell.buffAtkByHp) { // «Природная мощь»: +урона = жизням
-                            u.bonusAtk = (u.bonusAtk || 0) + u.hp;
+                            const bump = u.hp;
+                            u.bonusAtk = (u.bonusAtk || 0) + bump;
                             recalcAuras();
-                            floatText(p.x, p.y - 39, `+${u.hp}⚔`, 0x9fd489);
+                            floatText(p.x, p.y - 39, `+${bump}⚔`, 0x9fd489);
+                            onBuff(u, bump, 0); // «Белая пуща» (W61)
                         }
+                        // Обычные усиления (+N⚔/+N♥ — «Дар леса», «Молитва»,
+                        // «Праведный гнев»): хук после обоих применений
+                        if (def.spell.buffAtk || def.spell.buffHp)
+                            onBuff(u, def.spell.buffAtk || 0, def.spell.buffHp || 0);
                         if (def.spell.berserk) addBerserk(u, def.spell.berserk);
                         if (def.spell.venom) addVenom(u, def.spell.venom); // «Отравленные лезвия»
                         if (def.spell.poison) addPoison(u, def.spell.poison); // «Трупный яд»
@@ -1175,6 +1198,9 @@
                 if (def.spell.rootSummon) { // «Эльф корней»: Эльф 1/1 на случайную пустую клетку
                     if (rootElfSpawn("p")) sfx("aqua");
                 }
+                if (def.spell.wolfSummon) { // «Белый волк» (gh252, W61): Животное 2/3 на случайную пустую клетку
+                    if (wolfSpawn("p")) sfx("aqua");
+                }
                 if (def.spell.summonPoints) { // «Огнелис»/«Огнемедведь» (sg249/250):
                     // Животное в случайную пустую клетку — очки характеристик
                     // распределяет игрок (панель); поле забито — не призывается
@@ -1188,10 +1214,12 @@
                         if (v.side !== "p" || v.def.type !== "unit"
                             || v.curAtk === v.hp) continue;
                         const a = v.curAtk;
+                        let dAtk = 0, dHp = 0;
                         if (a < v.hp) {
-                            v.bonusAtk = (v.bonusAtk || 0) + (v.hp - a);
+                            dAtk = v.hp - a;
+                            v.bonusAtk = (v.bonusAtk || 0) + dAtk;
                             recalcAuras();
-                        } else v.hp = a;
+                        } else { dHp = a - v.hp; v.hp = a; }
                         const an = v.node.getChildByName("atk");
                         if (an) an.text = String(v.curAtk);
                         const hn = v.node.getChildByName("hp");
@@ -1199,6 +1227,7 @@
                         const vp = cellXY(v.col, v.row);
                         floatText(vp.x, vp.y - 60, "⇔", 0xffd98c);
                         punch(v.node);
+                        onBuff(v, dAtk, dHp); // «Белая пуща» (W61)
                     }
                     sfx("chpoc");
                 }
@@ -1224,6 +1253,7 @@
                         const p = cellXY(v.col, v.row);
                         floatText(p.x, p.y - 39, `+${def.spell.buffAllAtk}⚔`, 0x9fd489);
                         fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.6 });
+                        onBuff(v, def.spell.buffAllAtk, 0); // «Белая пуща» (W61)
                     }
                     recalcAuras();
                     sfx("chpoc");
@@ -1241,6 +1271,7 @@
                         const p = cellXY(v.col, v.row);
                         floatText(p.x, p.y - 39, `+${def.spell.forge}⚔`, 0x9fd489);
                         fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.6 });
+                        onBuff(v, def.spell.forge, 0); // «Белая пуща» (W61)
                     }
                     recalcAuras();
                     sfx("chpoc");

@@ -107,6 +107,7 @@
                         fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
                         punch(best.node);
                         sfx("chpoc");
+                        onBuff(best, pool, pool); // «Белая пуща» (W61)
                         return;
                     }
                     // «Гидроудар» (wis99): 1 урон + сдвиг К ЕГО базе,
@@ -282,11 +283,16 @@
                             healBase("e", s.healPlayer);
                         }
                         if (s.buffAtkByHp) { // «Природная мощь»: +урона = жизням
-                            best.bonusAtk = (best.bonusAtk || 0) + best.hp;
+                            const bump = best.hp;
+                            best.bonusAtk = (best.bonusAtk || 0) + bump;
                             recalcAuras();
                             const p = cellXY(best.col, best.row);
-                            floatText(p.x, p.y - 39, `+${best.hp}⚔`, 0x9fd489);
+                            floatText(p.x, p.y - 39, `+${bump}⚔`, 0x9fd489);
+                            onBuff(best, bump, 0); // «Белая пуща» (W61)
                         }
+                        // Обычные усиления — хук после обоих применений
+                        if (s.buffAtk || s.buffHp)
+                            onBuff(best, s.buffAtk || 0, s.buffHp || 0);
                         if (s.berserk) addBerserk(best, s.berserk);
                         if (s.venom) addVenom(best, s.venom); // «Отравленные лезвия»
                         // «Метка некроманта» (dec137): «Выкапливание» на самое
@@ -427,6 +433,12 @@
                     rootElfSpawn("e");
                     return;
                 }
+                if (s.wolfSummon) { // «Белый волк» (gh252, W61): Животное 2/3
+                    // в случайную пустую клетку (wolfSpawn)
+                    wolfSpawn("e");
+                    sfx("aqua");
+                    return;
+                }
                 if (s.summonPoints) { // «Огнелис»/«Огнемедведь» (sg249/250):
                     // Животное в случайную пустую клетку, очки поровну
                     // (лис 4/4, медведь 5/4) — распределение только у игрока
@@ -561,10 +573,12 @@
                         if (v.side !== "e" || v.def.type !== "unit"
                             || v.curAtk === v.hp) continue;
                         const a = v.curAtk;
+                        let dAtk = 0, dHp = 0;
                         if (a < v.hp) {
-                            v.bonusAtk = (v.bonusAtk || 0) + (v.hp - a);
+                            dAtk = v.hp - a;
+                            v.bonusAtk = (v.bonusAtk || 0) + dAtk;
                             recalcAuras();
-                        } else v.hp = a;
+                        } else { dHp = a - v.hp; v.hp = a; }
                         const an = v.node.getChildByName("atk");
                         if (an) an.text = String(v.curAtk);
                         const hn = v.node.getChildByName("hp");
@@ -572,6 +586,7 @@
                         const vp = cellXY(v.col, v.row);
                         floatText(vp.x, vp.y - 60, "⇔", 0xffd98c);
                         punch(v.node);
+                        onBuff(v, dAtk, dHp); // «Белая пуща» (W61)
                     }
                     sfx("chpoc");
                 }
@@ -594,6 +609,7 @@
                         punch(v.node);
                         const p = cellXY(v.col, v.row);
                         floatText(p.x, p.y - 39, `+${s.buffAllAtk}⚔`, 0x9fd489);
+                        onBuff(v, s.buffAllAtk, 0); // «Белая пуща» (W61)
                     }
                     recalcAuras();
                     sfx("chpoc");
@@ -606,6 +622,7 @@
                         punch(v.node);
                         const p = cellXY(v.col, v.row);
                         floatText(p.x, p.y - 39, `+${s.forge}⚔`, 0x9fd489);
+                        onBuff(v, s.forge, 0); // «Белая пуща» (W61)
                     }
                     recalcAuras();
                     sfx("chpoc");

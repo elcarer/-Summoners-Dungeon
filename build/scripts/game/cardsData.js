@@ -1910,6 +1910,37 @@
                    subtype: "animal", // подтип — по спеке юзера (Животное)
                    rarity: "epic", elem: "strGro",
                    color: 0xc4763e },
+        // ── W61 (спека юзера): карты 251–252 — МУЛЬТИЦВЕТ «Рост + Честь»,
+        // встречаются только в мультицветном подземелье «Белая пуща»
+        // (cave "gh"). elem "groHon" — собственная мульти-стихия (рубашка
+        // card_multi_back.png); multi — обе родные стихии
+        // «Корона леса» (gh251): постройка 0/8 — когда СВОЁ существо
+        // получает усиление, оно получает это усиление ещё 1 раз
+        // (buffEcho — единый хук onBuff в arenaCombat; каждая Корона на
+        // поле даёт по одному повтору)
+        gh251: { type: "building", cost: 5, atk: 0, hp: 8, buffEcho: true,
+                 rarity: "rare", elem: "groHon",
+                 multi: ["growth", "honor"],
+                 color: 0x4e7a52, img: "growth_honor/251" },
+        // «Белый волк» (gh252): заклинание призыва — Животное (жетон
+        // ghWolf) 2/3 в случайную пустую клетку поля (wolfSpawn —
+        // arenaActions/aiSpells)
+        gh252: { type: "spell", cost: 3,
+                 spell: { target: "none", wolfSummon: true },
+                 kind: "summon", // тип эффекта — по спеке юзера
+                 rarity: "common", elem: "groHon",
+                 multi: ["growth", "honor"],
+                 color: 0x8a9a7e, img: "growth_honor/252" },
+        // Белый волк из «Белого волка» (gh252) — служебная карта без лица,
+        // спавнится только заклинанием. Способность wolfPack: когда волк
+        // получает усиление, соседние (верт/гориз) СВОИ существа получают
+        // +1 к урону и +1 к жизням (onBuff в arenaCombat).
+        // ЖЕТОН БЕЗ multi — как sgrRootElf/sgrFox
+        ghWolf: { type: "unit", cost: 1, atk: 2, hp: 3, speed: 1,
+                  creature: "animal", sheet: "wolf", wolfPack: true,
+                  subtype: "animal", // подтип — по спеке юзера (Животное)
+                  rarity: "common", elem: "groHon",
+                  color: 0x8a9a7e },
     };
     const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
 
@@ -1986,6 +2017,17 @@
             "sg249", "sg249", "sg249", "sg250", "sg250", "sg250",
             "grw28", "grw28", "grw22", "grw22", "grw19",
             "str13", "str13", "str10",
+        ],
+        // W61 (спека юзера): ядро колоды врага «Зелёные рыцари»
+        // («Белая пуща») — 32 карты, Рост+Честь+мультицвет
+        groHon: [
+            "grw5", "grw5", "grw6", "grw7", "grw7",
+            "grw10", "grw10", "grw19", "grw19", "grw21",
+            "grw29", "grw29", "grw37", "grw37",
+            "hon163", "hon163", "hon164", "hon164", "hon170", "hon170",
+            "hon179", "hon179", "hon181", "hon181", "hon182", "hon182",
+            "hon195", "hon195",
+            "gh251", "gh251", "gh252", "gh252",
         ],
     };
 
@@ -2117,6 +2159,14 @@
         sgrApostate: { id: "sgrApostate", rarity: "epic", baseHp: 22,
                        elems: ["strength", "growth"], starter: "strBoss",
                        img: "69", ability: "baseRage", abilityVal: 1 },
+        // ── «Белая пуща» (мультицвет Рост+Честь, W61, спека юзера) ─────────
+        // «Зелёные рыцари» (арт heroes/70.png): враг 1-го этажа. ДВУХЦВЕТНЫЙ
+        // герой — elems из двух стихий. 16♥, редкая; способность buffHeal:
+        // когда существо владельца получает усиление, его база лечится на
+        // 1 жизнь (onBuff — единый хук усиления в arenaCombat)
+        ghKnight: { id: "ghKnight", rarity: "rare", baseHp: 16,
+                    elems: ["growth", "honor"], starter: "groHon",
+                    img: "70", ability: "buffHeal", abilityVal: 1 },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -2451,6 +2501,7 @@
         "sgrBurn", // «Горящая местность»: враг 2-го этажа (W55)
         "sgrPack", // «Безумие стаи»: враг 3-го этажа (W56)
         "sgrApostate", // «Эльф-отступник»: босс «Рыжего леса» (W57)
+        "ghKnight", // «Зелёные рыцари»: враг 1-го этажа «Белой пущи» (W61)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

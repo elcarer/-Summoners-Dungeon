@@ -66,6 +66,7 @@
                     floatText(p.x, p.y - 39, "+1⚔", 0x9fd489);
                     punch(u.node);
                     sfx("chpoc");
+                    onBuff(u, 1, 0); // «Белая пуща» (W61)
                     heroElementalDraw(u); // «Сонм духов»: способность элементаля
                 }
             };

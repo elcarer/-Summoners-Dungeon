@@ -178,6 +178,7 @@
                 fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.8 });
                 sfx("chpoc");
                 packFrenzy(u); // «Безумие стаи»: способность огра сработала
+                onBuff(u, n, n); // «Белая пуща» (W61)
             };
 
             // «Большой размер» (sgrBig — герой «Рыжего леса», W54 спека
@@ -219,6 +220,74 @@
                         : { x: cellXY(u.col, 0).x,
                             y: cellXY(u.col, 0).y - 15, fill: 0x9fb06e });
                 sfx("chpoc");
+            };
+
+            // ── «Белая пуща» (W61, спека юзера): единый хук УСИЛЕНИЯ ────────
+            // Вызывается ПОСЛЕ фактического применения баффа существу из
+            // всех точек усиления: заклинания игрока (applySpellPInner) и
+            // ИИ (enemyCastSpellEffectInner), способности существ (ogrGrow,
+            // slimeGain, predator, fatBelly, spellGrow, spellBuffAura,
+            // trapGrow), прыжок через портал. opts.fromTrigger помечает
+            // применения, порождённые самим хуком (эхо Короны, соседи
+            // волка): они НЕ триггерят хуки снова — иначе две Короны или
+            // два волка рядом зацикливаются. Призывные подстройки статов
+            // (keeperScale, energyToStats, forge при призыве и т.п.) — НЕ
+            // усиления, onBuff из addUnit не зовётся.
+            A.onBuff = function onBuff(u, atk, hp, opts = {}) {
+                if (!u || u.def.type !== "unit" || !B.units.includes(u)) return;
+                if (opts.fromTrigger || (!atk && !hp)) return;
+                const side = u.side;
+                // «Корона леса» (gh251): когда СВОЁ существо получает
+                // усиление, оно получает это усиление ещё 1 раз. Каждая
+                // Корона на поле владельца — по одному повтору дельты.
+                const crowns = B.units.filter((b) => b !== u && b.side === side
+                    && b.def.type === "building" && b.def.buffEcho
+                    && B.units.includes(b));
+                for (let i = 0; i < crowns.length; i++) {
+                    if (atk) u.bonusAtk = (u.bonusAtk || 0) + atk;
+                    if (hp) u.hp += hp;
+                    recalcAuras();
+                    const an = u.node.getChildByName("atk");
+                    if (an) an.text = String(u.curAtk);
+                    const hn = u.node.getChildByName("hp");
+                    if (hn) hn.text = String(u.hp);
+                    const p = cellXY(u.col, u.row);
+                    floatText(p.x, p.y - 39,
+                        `+${atk || 0}⚔${hp ? ` +${hp}♥` : ""}`, 0x9fd489);
+                    fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.7 });
+                    sfx("chpoc");
+                }
+                // «Белый волк» (жетон gh252): когда волк получает усиление,
+                // все соседние (верт/гориз) СВОИ существа получают
+                // +1 к урону и +1 к жизням.
+                if (u.def.wolfPack) {
+                    for (const v of B.units.slice()) {
+                        if (v === u || v.side !== side
+                            || v.def.type !== "unit" || !B.units.includes(v))
+                            continue;
+                        if (Math.abs(v.col - u.col) + Math.abs(v.row - u.row) !== 1)
+                            continue;
+                        v.bonusAtk = (v.bonusAtk || 0) + 1;
+                        v.hp += 1;
+                        recalcAuras();
+                        const an2 = v.node.getChildByName("atk");
+                        if (an2) an2.text = String(v.curAtk);
+                        const hn2 = v.node.getChildByName("hp");
+                        if (hn2) hn2.text = String(v.hp);
+                        const p2 = cellXY(v.col, v.row);
+                        floatText(p2.x, p2.y - 39, "+1⚔ +1♥", 0x9fd489);
+                        fxEvent("buff", { x: p2.x, y: p2.y - 12, scale: 0.7 });
+                        sfx("chpoc");
+                    }
+                }
+                // «Зелёные рыцари» (ghKnight — враг 1-го этажа «Белой пущи»):
+                // когда существо владельца получает усиление, его база
+                // лечится на 1 жизнь (healBase — единая точка лечения базы)
+                const hd = heroDefOf(side);
+                if (hd && hd.ability === "buffHeal") {
+                    healBase(side, hd.abilityVal || 1);
+                    sfx("chpoc");
+                }
             };
 
             // «Выросшие духи» (wis96): после перемещения разыгрывает ловушку
@@ -655,6 +724,7 @@
                     const p = cellXY(v.col, v.row);
                     floatText(p.x, p.y - 39, `+${n}⚔`, 0x9fd489);
                     punch(v.node);
+                    onBuff(v, n, 0); // «Белая пуща» (W61)
                 }
                 // «Проклятые артефакты» (dec138): СВОЯ сброшенная карта
                 // запоминается постройкой (ids — карты, реально ушедшие

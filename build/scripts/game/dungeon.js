@@ -35,7 +35,8 @@
                         dec: "necro_lair",
                         hon: "honor_lair",
                         tim: "time_lair",
-                        sgr: "str_gro" }; // W54: «Рыжий лес» (тайлы юзера)
+                        sgr: "str_gro", // W54: «Рыжий лес» (тайлы юзера)
+                        gh: "gro_hon" }; // W61: «Белая пуща» (тайлы юзера)
     const tileSetOf = (cave) => TILE_SETS[cave] || TILE_SETS.gob;
     // Версия раскладки этажа: тайлы 64px данжа (v9 — у 5-го этажа
     // «Подземных ключей» появился спуск на новый 6-й; старые сейвы без
