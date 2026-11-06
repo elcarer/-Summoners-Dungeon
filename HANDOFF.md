@@ -72,9 +72,10 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
   соседние пустые, некуда — в руку владельца. Враг 2-го этажа «Долгая
   прогулка» (ghWalk, heroes/71, 18♥, walkHeal — лечит свою базу за
   перемещение ЛЮБОГО существа, кроме обычного марша: afterMoved(u,
-  regular), regular=true только marchSide). Ядро ровно 32 карты по спеке;
-  CAVES.gh maxFloor 2; пулы groHon дополнены. probe_w65 35/0; регресс:
-  check_city 394/0, mini_test 19/0 (каталог 268), probe_w61 37/0
+  regular), regular=true только marchSide и полёт феи внутри марша;
+  «Скорость» — НЕ марш, лечит, поправка юзера). Ядро ровно 32 карты по
+  спеке; CAVES.gh maxFloor 2; пулы groHon дополнены. probe_w65 36/0;
+  регресс: check_city 394/0, mini_test 19/0 (каталог 268), probe_w61 37/0
   (maxFloor 2), probe_w62 40/0, probe_w63 34/0. Ловушки — docs/traps.md
   (eDeck≠ядро; inst не ждёт промисы; lastMoveDir во всех точках; второй
   цели deselect/onCardTap чистят swapPick).
