@@ -48,13 +48,9 @@
     // спрайты montain); Время — запутанные проходы: пальцы стен внутри
     // кварталов. Связность (двери/ворота/все клетки пола) проверяет
     // check_city по всем стихиям.
-    const CITY_V = 7; // версия планировки города: старые cityStates пересобираются
     // (W52 — выход-проход в нижней стене вместо таблички-«лестницы»)
 
     function newCityState(elem, capital) {
-        // city-состояние живёт в том же слоте G.dungeon, что и этажи:
-        // v — версия архива этажей, читаем её у GAME_DUNGEON в рантайме
-        const MAP_V = globalThis.GAME_DUNGEON.MAP_V;
         const D = globalThis.GAME_DATA;
         const caveId = Object.keys(D.CAVES).find(
             (k) => D.CAVES[k].elem === elem) || "gob";
@@ -215,7 +211,7 @@
         const px2 = capital ? 13 : 16, py2 = CH - 1;
         for (let x = px2 - 1; x <= px2 + 1; x++) g[py2][x] = ".";
         const st = {
-            v: MAP_V, cityV: CITY_V, city: true, isCapital: !!capital,
+            city: true, isCapital: !!capital,
             elem, cave: caveId, floor: 1,
             enemies: [], exit: null, exitCool: false, bossDead: true,
             toast: null, toastT: 0, win: null,
@@ -1083,7 +1079,7 @@
     }
 
     globalThis.GAME_CITY = {
-        CITY_VARIANTS, CITY_V, newCityState, addCityDeco,
+        CITY_VARIANTS, newCityState, addCityDeco,
         addCityGroundOverlays, addCityWaterBanks, buildForgeWin,
         buildQuestWin, addCityFires,
     };

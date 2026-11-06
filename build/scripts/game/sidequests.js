@@ -32,12 +32,11 @@
     const LETTER_MIN = 110, LETTER_MAX = 200; // ~2–3 экрана (60 клеток/экран;
     // W49, юзер: было 230–320 — города-адресаты были слишком далеко)
 
-    function fresh() { return { v: 1, done: {}, active: [] }; }
-    // Подъём состояния в забеге (лениво; сейвы без поля — новый забег квестов)
+    function fresh() { return { done: {}, active: [] }; }
+    // Подъём состояния в забеге (лениво; нет поля — новый забег квестов)
     function stateOf(G) {
         if (!G.world) return null;
-        if (!G.world.sideQuests || G.world.sideQuests.v !== 1)
-            G.world.sideQuests = fresh();
+        if (!G.world.sideQuests) G.world.sideQuests = fresh();
         return G.world.sideQuests;
     }
     const cityKey = (gx, gy) => gx + ":" + gy;
@@ -199,7 +198,7 @@
                 (G.world.seed ^ ((poi.gx * 131 + poi.gy * 17) | 0)) | 0),
             route, quest: true, // охотничий монстр (красное свечение, стрела)
         };
-        q.mobKey = "wild:q" + q.city; // префикс wild: — миграция сейва не трогает
+        q.mobKey = "wild:q" + q.city; // своё пространство ключей — «wild:q<город>»
         G.world.wander[q.mobKey] = st;
         return st;
     }

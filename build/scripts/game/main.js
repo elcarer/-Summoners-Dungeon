@@ -289,43 +289,24 @@
         // Стартовый герой «Новой игры» — ОТДЕЛЬНО от активного: активного
         // можно сменить во вкладке «Герои» на завоёванного, и тогда старый
         // фильтр «id === G.heroId» терял стартера из коллекции (баг).
-        // У старых сейвов поля starterId нет — выводим его из колод по
-        // героям (после смены активного стартовый там остаётся).
         function savedStarterId() {
             if (savedMeta && HERO_ORDER.includes(savedMeta.starterId))
                 return savedMeta.starterId;
-            const decks = savedMeta && savedMeta.heroDecks;
-            if (decks && typeof decks === "object") {
-                const fromDecks = HERO_ORDER.find((id) => Array.isArray(decks[id]));
-                if (fromDecks) return fromDecks;
-            }
-            if (savedMeta && HERO_ORDER.includes(savedMeta.activeHeroId))
-                return savedMeta.activeHeroId;
             return HERO_ORDER[0];
         }
-        // Нормализация меты (sd_meta или блока сохранения): карты прошлых
-        // версий (тестовые id) отфильтровываются; если коллекция опустела
-        // или в старой НЕПУСТОЙ колоде не осталось валидных карт — новые
-        // базовые значения. Одно место для бута и загрузки блока из
-        // настроек — состояние применяется одинаково.
-        // Пустая колода — НОРМА для завоёванного героя (начинает без карт,
-        // просил юзер); стартовую подставляем только совсем старому сейву,
-        // где все id отфильтровались миграцией.
+        // Нормализация меты (sd_meta или блока сохранения). Одно место
+        // для бута и загрузки блока из настроек — состояние применяется
+        // одинаково. Пустая колода — НОРМА для завоёванного героя
+        // (начинает без карт, просил юзер).
         function buildMetaState(m) {
-            const deck = m ? m.deck.filter((id) => GAME_DATA.CARDS[id]) : [];
-            const deckNeedsDefault = !m || (m.deck.length > 0 && deck.length === 0);
-            const coll = m
-                ? Object.fromEntries(Object.entries(m.collection || {})
-                    .filter(([id]) => GAME_DATA.CARDS[id]))
-                : {};
             return {
-                deck: deckNeedsDefault ? [...DEFAULT_DECK] : deck,
-                collection: Object.keys(coll).length ? coll : { ...DEFAULT_COLLECTION },
+                deck: m && Array.isArray(m.deck) ? m.deck : [...DEFAULT_DECK],
+                collection: m && m.collection ? m.collection : { ...DEFAULT_COLLECTION },
                 heroDecks: m && m.heroDecks ? m.heroDecks : null,
                 captured: m && Array.isArray(m.captured) ? m.captured : [],
                 // активный герой тоже переживает перезапуск (его меняют в «Героях»)
                 heroId: m && GAME_DATA.HEROES[m.activeHeroId] ? m.activeHeroId : "gorbag",
-                starterId: savedStarterId(m),
+                starterId: savedStarterId(),
             };
         }
         const metaState = buildMetaState(savedMeta);
@@ -467,7 +448,7 @@
             world, ECS, COMPONENTS, DATA, blocked, input: charInput, addSystem,
         });
 
-        // Миграция сейва — см. buildMetaState выше (общая с блоками сохранений)
+        // Нормализация меты — buildMetaState выше (общая с блоками сохранений)
 
         const G = {
             hero: { hp: 10, maxHp: 10 }, gold: 0,
@@ -580,7 +561,6 @@
                 // глобальная карта — каждый забег своя: сид крутится здесь,
                 // генерация детерминирована им (worldGen.js)
                 this.world = {
-                    v: globalThis.GAME_WORLDGEN.V,
                     seed: (Math.random() * 0x7fffffff) | 0,
                     heroPos: null, out: false, wander: null, wildLevel: {},
                     // стихия, под которую выбрана точка появления: смена
@@ -643,7 +623,6 @@
                     worldStartElem: this.world.startElem || null,
                     // глобальная карта: сейв хранит только сид — карта
                     // регенерируется детерминированно (worldGen.js)
-                    worldV: globalThis.GAME_WORLDGEN.V,
                     worldSeed: this.world.seed,
                     quests: this.quests ? {
                         active: this.quests.active,
@@ -820,41 +799,24 @@
             G.draft = null;
             G.draftBattle = false;
             G.live = true;
-            G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp || 10 };
+            G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp };
             G.gold = r.gold || 0;
-            G.days = Number.isInteger(r.days) && r.days >= 0 ? r.days : 0;
-            // ресурсы стихий/бустеры (W40): старые сейвы — нули
-            for (const e of Object.keys(G.resources))
-                G.resources[e] = (r.resources && r.resources[e]) || 0;
-            for (const e of Object.keys(G.boosters))
-                G.boosters[e] = (r.boosters && r.boosters[e]) || 0;
-            G.elem = r.elem || "strength";
-            // герой из сейва; у старых сейвов heroId ещё нет —
-            // герой восстанавливается по стихии забега
-            G.heroId = globalThis.GAME_DATA.HEROES[r.heroId]
-                ? r.heroId
-                : (G.elem === "growth" ? "elmir" : "gorbag");
-            // у старых сейвов забега поля нет — стартовый остаётся
-            // из sd_meta (с миграцией)
-            if (HERO_ORDER.includes(r.starterId)) G.starterId = r.starterId;
-            // поднимаются только этажи текущей геометрии (MAP_V —
-            // теперь тайлы 64px goblins_lair): сейвы волн с другой
-            // сеткой пересоберутся. Архив адресуется «данж:этаж»;
-            // у старых сейвов (одни гоблинские пещеры) данж по
-            // умолчанию gob
-            const mapV = GAME_DUNGEON.MAP_V;
-            G.dungeon = r.dungeon && r.dungeon.v === mapV ? r.dungeon : null;
-            if (G.dungeon && !G.dungeon.cave) G.dungeon.cave = "gob";
+            G.days = r.days || 0;
+            // ресурсы стихий/бустеры (W40)
+            G.resources = r.resources;
+            G.boosters = r.boosters;
+            G.elem = r.elem;
+            G.heroId = r.heroId;
+            G.starterId = r.starterId;
+            // этажи поднимаются как есть; архив адресуется «данж:этаж»
+            G.dungeon = r.dungeon || null;
             G.dungeonStates = {};
             for (const k in (r.dungeonStates || {})) {
                 const st = r.dungeonStates[k];
-                // W60 (юзер): city-состояния в архиве этажей не живут —
-                // старые сейвы с таким мусором чистятся здесь
-                if (!st || st.v !== mapV || st.city) continue;
-                st.cave = st.cave || "gob";
+                if (!st) continue;
                 G.dungeonStates[st.cave + ":" + st.floor] = st;
             }
-            if (!G.dungeon) G.dungeon = G.dungeonStates[(r.cave || "gob") + ":" + r.floor] || null;
+            if (!G.dungeon) G.dungeon = G.dungeonStates[r.cave + ":" + r.floor] || null;
             if (G.dungeon && !G.dungeon.city)
                 G.dungeonStates[G.dungeon.cave + ":" + G.dungeon.floor] = G.dungeon;
             if (G.dungeon)
@@ -862,53 +824,42 @@
                 // остывание — мгновенный подъём на этаж выше (остальные
                 // пути входа ставят его же: world.js, спуск dungeon.js)
                 G.dungeon.ladderCoolMs = 2000;
-            // города (W30): ключ «стихия»; состояние другой геометрии не поднимается
+            // города (W30): ключ «стихия»
             G.cityStates = {};
             for (const k in (r.cityStates || {})) {
                 const st = r.cityStates[k];
-                if (st && st.v === mapV) G.cityStates[st.elem || k] = st;
+                if (st) G.cityStates[st.elem] = st;
             }
             G.cityOut = r.cityOut || null;
             // глубина у каждого подземелья своя; активное — где герой
             G.run.floor = r.floor;
-            G.run.cave = G.dungeon ? G.dungeon.cave : (r.cave || "gob");
-            // глубины всех данжей каталога (gob/grw/wis): новые
-            // подземелья не должны терять прогресс при «Продолжить»
+            G.run.cave = G.dungeon ? G.dungeon.cave : r.cave;
+            // глубины всех данжей каталога: новые подземелья не должны
+            // терять прогресс при «Продолжить»
             const caveIds = Object.keys(globalThis.GAME_DATA.CAVES);
-            G.run.floors = r.floors && typeof r.floors === "object"
-                ? Object.fromEntries(caveIds.map((c) => [c, r.floors[c] || 1]))
-                : { gob: r.floor, grw: 1, wis: 1 };
-            // глобальная карта: сид из сейва (той же версии генератора)
-            // восстанавливает ту же карту; позиция героя имеет смысл
-            // только на карте той же версии — иначе спавн у данжа стихии
+            G.run.floors = Object.fromEntries(
+                caveIds.map((c) => [c, r.floors[c] || 1]));
+            // глобальная карта: сид из сейва восстанавливает ту же карту
+            // (детерминированная генерация — worldGen.js)
             G.world = {
-                v: globalThis.GAME_WORLDGEN.V,
-                seed: Number.isInteger(r.worldSeed) && r.worldV === globalThis.GAME_WORLDGEN.V
-                    ? r.worldSeed : (Math.random() * 0x7fffffff) | 0,
-                heroPos: r.worldV === globalThis.GAME_WORLDGEN.V ? (r.worldPos || null) : null,
+                seed: r.worldSeed,
+                heroPos: r.worldPos || null,
                 out: !!r.worldOut,
-                // W60: вход КАКОГО данжа ждать при out (сейв хранит) —
-                // старые сейвы без ключа поведут к входу gob, как раньше
-                outCave: r.worldV === globalThis.GAME_WORLDGEN.V
-                    && r.worldOutCave ? r.worldOutCave : null,
-                // отряды той же версии генератора: жив/мёртв и позиции
-                wander: r.worldV === globalThis.GAME_WORLDGEN.V
-                    && r.worldWander ? r.worldWander : null,
-                // стихия точки появления (W31): сейвы без неё получат
-                // перенос героя в зону его стихии при первом входе в мир
-                startElem: r.worldV === globalThis.GAME_WORLDGEN.V
-                    && r.worldStartElem ? r.worldStartElem : null,
-                // дикие враги: уровень видов (старые сейвы — пусто,
-                // ensureWander создаст с нуля)
-                wildLevel: r.worldV === globalThis.GAME_WORLDGEN.V
-                    && r.worldWild ? r.worldWild : null,
-                // побочные квесты ратуши (W40; старые сейвы — с нуля)
-                sideQuests: r.worldSideQ
-                    && r.worldSideQ.v === 1 ? r.worldSideQ : null,
+                // W60: вход КАКОГО данжа ждать при out (сейв хранит)
+                outCave: r.worldOutCave || null,
+                // отряды: жив/мёртв и позиции
+                wander: r.worldWander || null,
+                // стихия точки появления (W31): смена героя — перенос
+                // в зону новой стихии (world.enter)
+                startElem: r.worldStartElem || null,
+                // дикие враги: уровень видов (победы над одноимёнными
+                // усиливают всех — W29)
+                wildLevel: r.worldWild || null,
+                // побочные квесты ратуши (W40)
+                sideQuests: r.worldSideQ || null,
                 map: null,
             };
-            // сюжетная линия забега (старые сейвы — без неё: первый
-            // квест активен, но без окна-анонса)
+            // сюжетная линия забега
             G.quests = globalThis.GAME_QUESTS.revive(r.quests);
             // продолжение с середины этажа — в подземелье, иначе — в
             // открытый мир (герой вышел из пещер или только начал);

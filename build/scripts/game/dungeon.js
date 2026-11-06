@@ -38,21 +38,12 @@
                         sgr: "str_gro", // W54: «Рыжий лес» (тайлы юзера)
                         gh: "gro_hon" }; // W61: «Белая пуща» (тайлы юзера)
     const tileSetOf = (cave) => TILE_SETS[cave] || TILE_SETS.gob;
-    // Версия раскладки этажа: тайлы 64px данжа (v9 — у 5-го этажа
-    // «Подземных ключей» появился спуск на новый 6-й; старые сейвы без
-    // спуска пересобираются; cap глубины — 6 этажей). Сейвы другой
-    // геометрии (координаты в других клетках) не поднимаются — этаж
-    // пересобирается заново.
-    const MAP_V = 10;
     // Ключ архива этажей — «данж:этаж» (gob:1, grw:2…): у каждого
     // подземелья своя история подъёмов/спусков
     const stKey = (cave, floor) => (caveOf(cave) && cave !== undefined ? cave : "gob") + ":" + floor;
     function stateFor(states, cave, floor) {
-        const st = states && states[stKey(cave, floor)];
-        // W60 (юзер): city-состояние в архиве этажей не этаж — старые
-        // сейвы с таким мусором получают свежий этаж, а не столицу
-        return st && st.v === MAP_V && !st.city
-            ? st : newDungeonState(cave, floor);
+        return (states && states[stKey(cave, floor)])
+            || newDungeonState(cave, floor);
     }
     // #: стена, .: пол, H: старт героя, e: враг, B: главарь, X: выход.
     // Враги стоят В КОРИДОРАХ, перекрывая входы в комнаты (просил юзер),
@@ -115,7 +106,7 @@
         return false;
     }
     // центры комнат старой фиксированной карты — фолбэк для genObjects
-    // без раскладки (смоук зовёт с воздухом) и древних сейвов
+    // без раскладки (смоук зовёт с воздухом)
     const ROOM_CENTERS = [[3, 3], [11, 3], [22, 2], [5, 12]];
 
     // Объекты этажа: по одному в центре каждой комнаты, кроме стартовой
@@ -308,7 +299,6 @@
         const { mobForFloor, enemyDeck } = globalThis.GAME_DATA;
         const map = genMap(caveId, floor); // раскладка этажа (просил юзер)
         const st = {
-            v: MAP_V,
             cave: caveId,
             floor, heroPos: null, spawn: null, ladder: null, enemies: [],
             exit: null, exitCool: false,
@@ -896,10 +886,8 @@
         // жетоны врагов НЕ интерактивны, чтобы не съедать клики движения.
         let tip = null; // { enemy, node, h }
         function deckSummary(enemy) {
-            // колода хранится в враге (кидается при генерации этажа); для
-            // врагов из старых сейвов — генерим от этажа подземелья
-            const deck = enemy.deck
-                || globalThis.GAME_DATA.enemyDeck(enemy.enc, G.dungeon ? G.dungeon.floor : 1);
+            // колода хранится в враге (кидается при генерации этажа)
+            const deck = enemy.deck;
             const counts = new Map();
             for (const id of deck) counts.set(id, (counts.get(id) || 0) + 1);
             return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
@@ -1385,20 +1373,11 @@
             return c;
         }
 
-        return {
-            enter() {
+            return {
+                enter() {
                 if (ctx.music) ctx.music("dungeon");
-                // сейв другой геометрии (v≠MAP_V) — этаж пересобирается; сейвы
-                // до вторых данжей жили в гоблинских пещерах
-                if (!G.dungeon || G.dungeon.v !== MAP_V)
+                if (!G.dungeon)
                     G.dungeon = newDungeonState(G.run.cave, G.run.floor);
-                if (!G.dungeon.cave) G.dungeon.cave = "gob";
-                // город другой планировки (cityV старше W34) — пересобирается
-                // по новым правилам; floors данжа это не задевает.
-                // Генератор города — city.js (W47)
-                if (G.dungeon.city && G.dungeon.cityV !== CITY.CITY_V)
-                    G.dungeon = CITY.newCityState(G.dungeon.elem || "strength",
-                        !!G.dungeon.isCapital);
                 const st = G.dungeon;
                 myState = st;
                 MAPROWS = st.rows || ROWS; // активная раскладка этажа
@@ -1420,23 +1399,8 @@
                     if (pcy === pg.y && pcx >= pg.x0 && pcx <= pg.x1)
                         st.heroPos = { ...st.spawn };
                 }
-                // сейвы старых волн без объектов — генерируются при заходе
-                if (!st.objects) { st.objects = genObjects(st.floor, st.cave, st.lootCenters || st.roomCenters); st.win = null; }
-                for (const o of st.objects)
-                    if (o.type === "shop" && !o.sold) o.sold = [false, false, false, false, false, false];
-                // сейвы до «объектов вне стартовой комнаты»: в стартовой
-                // комнате героя объектов больше не бывает — выкидываем.
-                // У города своих комнат нет (здания в кварталах) — не трогаем
-                if (!st.city && st.roomCenters && st.roomCenters.length) {
-                    const [sc, sr] = st.roomCenters[0];
-                    const n0 = st.objects.length;
-                    st.objects = st.objects.filter((o) => o.col !== sc || o.row !== sr);
-                    if (st.objects.length !== n0) st.win = null;
-                }
-                // (пересадка врагов «до волны в коридорах» удалена: этажи
-                // v5 генерируются с врагами уже в узких проходах — см. genMap)
-                // сейвы до волны «лестница наверх»: старт и лестница
-                // восстанавливаются из карты этажа
+                // старт без «лестницы наверх» (ленивая инициализация):
+                // восстанавливается из карты этажа
                 if (!st.spawn) {
                     for (let j = 0; j < H; j++) {
                         const i = MAPROWS[j].indexOf("H");
@@ -1447,14 +1411,7 @@
                 // проход в стене (W52), st.ladder у города нет
                 if (!st.ladder && !st.city && st.spawn)
                     st.ladder = { x: st.spawn.x, y: st.spawn.y - TS };
-                if (st.city) {
-                    // город (W30): страховки сейвов — торговец без sold,
-                    // врагов в городе нет и не будет
-                    st.enemies = [];
-                    for (const o of st.objects)
-                        if (o.type === "shop" && !o.sold)
-                            o.sold = [false, false, false, false, false, false];
-                } else if (globalThis.GAME_QUESTS) {
+                if (!st.city && globalThis.GAME_QUESTS) {
                     globalThis.GAME_QUESTS.noteFloor(G, st.floor); // «Дно»: галочка дна
                 }
                 closeModal(); // окно объекта не переживает уход из сцены
@@ -1928,10 +1885,11 @@
                         // города, в который вошли (W31: объект с координатами)
                         G.cityStates[st.elem] = st;
                         G.dungeon = null;
-                        if (!G.cityOut || typeof G.cityOut !== "object")
-                            G.cityOut = st.exitTown
-                                ? { elem: st.elem, gx: st.exitTown.gx, gy: st.exitTown.gy }
-                                : st.elem; // старое состояние без exitTown — как раньше
+                        // cityOut ставится при входе в город (world.js);
+                        // нет его — выход к дверям города, в котором герой
+                        if (!G.cityOut)
+                            G.cityOut = { elem: st.elem,
+                                gx: st.exitTown.gx, gy: st.exitTown.gy };
                         if (G.saveRun) G.saveRun();
                         scenes.go("world");
                         return;
@@ -2102,7 +2060,7 @@
 
     globalThis.GAME_DUNGEON = {
         createDungeonScene, newDungeonState, stateFor, deckNeed,
-        retreatCell, genObjects, MAX_FLOOR, MAP_V,
+        retreatCell, genObjects, MAX_FLOOR,
         get ROWS() { return MAPROWS; }, // активная раскладка этажа
     };
 })();

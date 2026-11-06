@@ -43,34 +43,26 @@
     function fresh() {
         return {
             active: QUESTS[0].id, done: {}, announced: false, pending: null,
-            progress: {}, qv: 3,
+            progress: {},
         };
     }
     // Подъём из сейва: null — квесты явно выключены (профиль без квестов).
-    // qv=3 — формат линейки «Путь призывателя» (4 квеста, прогресс).
     // W60 (юзер): цепочка Глома даётся и выполняется СТРОГО последовательно
-    // с первого квеста; сейвы старых форматов (qv=2 и ранние, с миграцией
-    // «сдвиг на квест позже») поднимаются ЗАНОВО с q1 — у юзера после
-    // старой миграции Глом сразу давал «Голову с плеч», пропустив первые
-    // задания цепочки
+    // с первого квеста; активным может быть только валидный id или null.
+    // Некорректное/отсутствующее состояние — новый забег с первого квеста
     function revive(saved) {
         if (saved === null) return null;
-        if (saved && typeof saved === "object" && saved.qv === 3
-            && (QUESTS.some((q) => q.id === saved.active) || saved.active === null)) {
-            return {
-                active: saved.active || null,
-                done: saved.done && typeof saved.done === "object" ? { ...saved.done } : {},
-                announced: saved.announced === true,
-                pending: QUESTS.some((q) => q.id === saved.pending) ? saved.pending : null,
-                progress: saved.progress && typeof saved.progress === "object"
-                    ? { ...saved.progress } : {},
-                qv: 3,
-            };
-        }
-        // сейвы qv=2 и старее — цепочка заново с первого квеста (не взят)
-        const st = fresh();
-        if (!(saved && typeof saved === "object")) st.announced = true;
-        return st;
+        if (!(saved && typeof saved === "object")
+            || !(QUESTS.some((q) => q.id === saved.active) || saved.active === null))
+            return fresh();
+        return {
+            active: saved.active,
+            done: saved.done && typeof saved.done === "object" ? { ...saved.done } : {},
+            announced: saved.announced === true,
+            pending: QUESTS.some((q) => q.id === saved.pending) ? saved.pending : null,
+            progress: saved.progress && typeof saved.progress === "object"
+                ? { ...saved.progress } : {},
+        };
     }
 
     function caveOfElem(elem) {

@@ -121,8 +121,7 @@
         function ensureMap() {
             if (G.world.seed === undefined || G.world.seed === null)
                 G.world.seed = (Math.random() * 0x7fffffff) | 0;
-            if (!G.world.map || G.world.map.seed !== G.world.seed
-                || G.world.map.v !== GEN.V)
+            if (!G.world.map || G.world.map.seed !== G.world.seed)
                 G.world.map = GEN.generate(G.world.seed);
             if (G.world.map.lang !== GAME_LOC.lang)
                 GEN.namePois(G.world.map, GAME_LOC.lang);
@@ -165,21 +164,6 @@
             {
                 const D = globalThis.GAME_DATA;
                 if (map.wildSpawns) {
-                    // W60 (юзер): недостижимые «карманы» вырезаны из
-                    // генератора — осиротевшие точки старых сейвов (индекс
-                    // за пределами нового wildSpawns) больше не спавнят.
-                    // W62 (юзер): шаблон — ТОЛЬКО настоящие стихии. Прежний
-                    // `[^:]+` совпадал и с ключом охоты ратуши
-                    // "wild:q<gx>:<gy>" (sidequests.js): город, у которого
-                    // gy меньше числа диких точек, вычищал монстра охоты
-                    // при КАЖДОМ входе в мир — ни врага, ни красной стрелки
-                    for (const k of Object.keys(G.world.wander)) {
-                        const m = /^wild:(strength|growth|wisdom|decay|honor|time):(\d+)$/.exec(k);
-                        if (!m) continue;
-                        const idx = Number(m[2]);
-                        const d2 = map.wildSpawns[idx];
-                        if (!d2 || d2.elem !== m[1]) delete G.world.wander[k];
-                    }
                     for (let i = 0; i < map.wildSpawns.length; i++) {
                         const d = map.wildSpawns[i];
                         const k = "wild:" + d.elem + ":" + i;
@@ -205,13 +189,6 @@
                     }
                 }
             }
-            // миграция старых ключей "gob:0" → "cave:gob:0" (до v13)
-            for (const k of Object.keys(G.world.wander))
-                if (!k.startsWith("cave:") && !k.startsWith("bridge:")
-                    && !k.startsWith("decay:") && !k.startsWith("wild:")) {
-                    G.world.wander["cave:" + k] = G.world.wander[k];
-                    delete G.world.wander[k];
-                }
         }
         // архетип отряда-охраны данжа: 1-й этаж охраняемого подземелья;
         // при двух архетипах этажа выбор детерминирован сидом (тутип мира
@@ -919,17 +896,14 @@
             // прогресс (враги/объекты/позиция) не потерялся. W60 (юзер):
             // city-состояние (G.dungeon в городе) архивом этажа НЕ
             // становится — оно живёт в G.cityStates
-            if (G.dungeon && !G.dungeon.city
-                && G.dungeon.v === globalThis.GAME_DUNGEON.MAP_V
-                && G.dungeon.cave !== caveId) {
+            if (G.dungeon && !G.dungeon.city && G.dungeon.cave !== caveId) {
                 G.dungeonStates[(G.dungeon.cave || "gob") + ":" + G.dungeon.floor] = G.dungeon;
             }
             if (G.run.cave !== caveId) {
                 G.run.cave = caveId;
                 G.run.floor = (G.run.floors || (G.run.floors = {}))[caveId] || 1;
             }
-            // архив этажей другой геометрии (v≠MAP_V) не поднимается —
-            // stateFor отдаст свежий этаж текущей сетки
+            // stateFor: этаж из архива или свежий
             const st = globalThis.GAME_DUNGEON.stateFor(G.dungeonStates, caveId, G.run.floor);
             st.cave = caveId;
             if (st.spawn) st.heroPos = { ...st.spawn }; // прибытие к лестнице
@@ -977,10 +951,7 @@
         // поверхность зоны; внутри торговец картами и NPC Глом, врагов нет
         function cityStateFor(elem) {
             const saved = G.cityStates && G.cityStates[elem];
-            // планировка города своей версии (cityV, W34) — иначе пересбор:
-            // новый генератор живёт в city.js (GAME_CITY, W47)
-            if (saved && saved.v === globalThis.GAME_DUNGEON.MAP_V
-                && saved.cityV === globalThis.GAME_CITY.CITY_V) return saved;
+            if (saved) return saved;
             // столица — стартовый город СВОЕЙ стихии (8 районов, дом Глома);
             // прочие города — обычные (5 районов)
             const st = globalThis.GAME_CITY.newCityState(
@@ -1063,10 +1034,8 @@
                 const spawnPx = px(map.spawn[G.elem] || map.spawn.strength);
                 let hp = G.world.heroPos ? { ...G.world.heroPos } : null;
                 if (G.cityOut) { // вышли из города — к дверям ЭТОГО города (W31)
-                    // старые сейвы хранят строку-стихию — таких дверей нет,
-                    // герой пойдёт по обычным правилам ниже.
                     // W40: города-столицы тоже входят — выход к их дверям
-                    const co = typeof G.cityOut === "object" ? G.cityOut : null;
+                    const co = G.cityOut;
                     G.cityOut = null;
                     // (W49, юзер) 3с нельзя зайти в ЭТОТ же город обратно:
                     // герой выходит у ворот (свободная клетка в 1.4 клетки
@@ -1084,8 +1053,6 @@
                     hp = freeCellNear(px(at).x, px(at).y);
                     G.world.out = false;
                 } else if (!hp) hp = spawnOk(spawnPx);
-                else if (!walkable(Math.floor(hp.x / TS), Math.floor(hp.y / TS)))
-                    hp = spawnOk(spawnPx); // чужая/старая карта — к спавну
                 else {
                     // сохранённая позиция у самой арки не должна мгновенно
                     // сработать триггер — отодвигаем на свободную клетку
@@ -1097,8 +1064,8 @@
                     if (near) hp = freeCellNear(hp.x, hp.y);
                 }
                 // активный герой сменился с момента выбора точки появления
-                // (вкладка «Герои» меняет стихию забега на ходу; сейвы без
-                // якоря): герой отправляется в зону СВОЕЙ стихии — к спавну
+                // (вкладка «Герои» меняет стихию забега на ходу): герой
+                // отправляется в зону СВОЕЙ стихии — к спавну
                 // (баг юзера W31: герой Тлена начинал в зоне Силы)
                 if (G.world.startElem !== G.elem) {
                     G.world.startElem = G.elem;
@@ -1261,9 +1228,9 @@
                 if (map.decayGuards) spawnSquads(map.decayGuards, "decay");
                 if (map.wildSpawns) spawnSquads(map.wildSpawns, "wild");
                 // охотничьи монстры ратуши (побочные квесты, W40): живут
-                // в G.world.wander с ключами "wild:q<город>" (миграция сейва
-                // не трогает — префикс wild:), маршрут вокруг города — в
-                // состоянии (st.route). Спрайт с красным свечением (пульс)
+                // в G.world.wander с ключами "wild:q<город>", маршрут
+                // вокруг города — в состоянии (st.route). Спрайт с красным
+                // свечением (пульс)
                 for (const a of ((globalThis.GAME_SIDEQ
                     && globalThis.GAME_SIDEQ.stateOf(G).active) || [])) {
                     if (a.type !== "hunt" || !a.mobKey) continue;
