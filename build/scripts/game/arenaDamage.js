@@ -976,6 +976,45 @@
                 sfx("chpoc");
             };
 
+            // «Растущая доблесть» (Белая пуща, W62 — спека юзера; текст в
+            // HUD данжа): ЗЕЛЁНО-БЕЛАЯ (двухцветная Рост+Честь) карта при
+            // розыгрыше даёт СЛУЧАЙНОМУ существу ИГРАЮЩЕГО +1/+1. Особенность
+            // данжа — читаем CAVES[valor] по данжу забега. Бафф — через
+            // общий хук onBuff: Корона леса повторит усиление, волк усилит
+            // соседей, «Зелёные рыцари» вылечат базу. Хуки: addUnit (юниты/
+            // постройки, обе стороны), castSpell игрока ДО эффекта
+            // (призванное самой картой в пул не попадает; отменённое
+            // «Отменой заклинания» молчит), ловушки игрока — в spendCard,
+            // заклинания/ловушки ИИ — в aiPlay перед эффектом
+            A.multiValor = function multiValor(cardId, side) {
+                const def = CARDS[cardId];
+                if (!def || !def.multi
+                    || !def.multi.includes("growth")
+                    || !def.multi.includes("honor")) return;
+                const cd = G.dungeon
+                    && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
+                if (!cd || !cd.valor) return;
+                floatText(960, side === "p" ? 758 : 318,
+                    GAME_LOC.t("dungeon.valorShort"), 0x9fd489);
+                const own = B.units.filter((v) => v.side === side
+                    && v.def.type === "unit" && B.units.includes(v));
+                if (own.length) {
+                    const u = own[(Math.random() * own.length) | 0];
+                    u.bonusAtk = (u.bonusAtk || 0) + 1;
+                    u.hp += 1;
+                    recalcAuras();
+                    const an = u.node.getChildByName("atk");
+                    if (an) an.text = String(u.curAtk);
+                    const hn = u.node.getChildByName("hp");
+                    if (hn) hn.text = String(u.hp);
+                    const p = cellXY(u.col, u.row);
+                    floatText(p.x, p.y - 39, "+1⚔ +1♥", 0x9fd489);
+                    fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.7 });
+                    onBuff(u, 1, 1);
+                }
+                sfx("chpoc");
+            };
+
             // «Круг стихий» (wis102): в начале хода владельца разыгрывает
             // случайного Элементаля из руки в случайную пустую соседнюю
             // (верт/гориз) клетку без траты энергии. Карта уходит в сброс,

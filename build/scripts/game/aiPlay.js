@@ -317,6 +317,7 @@
                                 notePlay("e"); // «Конвейер» (tim225)
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 multiFury(cardId, "e"); // «Ярость природы» (Рыжий лес)
+                                multiValor(cardId, "e"); // «Растущая доблесть» (Белая пуща, W62)
                                 cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                                 armTrap("e", cardId, 0, 0, pu);
                                 hideEnemyCard();
@@ -370,6 +371,7 @@
                             consumeEpicDiscount(cardId, "e"); // «Архилич»
                             cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                             multiFury(cardId, "e"); // «Ярость природы» (Рыжий лес, W60)
+                            multiValor(cardId, "e"); // «Растущая доблесть» (W62)
                             armTrap("e", cardId, col, row);
                             hideEnemyCard();
                             played = true;
@@ -408,6 +410,7 @@
                             // spendCard игрока у ИИ НЕ БЫЛО — мультицветные
                             // заклинания врага (sg243–247) молча не били базу
                             multiFury(cardId, "e");
+                            multiValor(cardId, "e"); // «Растущая доблесть» (W62)
                             if (def.spell.copyLast) {
                                 // «Горящие руны»: повтор ПОСЛЕДНЕГО заклинания тем
                                 // же кодом эффектов (бесплатно для его цены)

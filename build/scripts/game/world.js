@@ -167,9 +167,14 @@
                 if (map.wildSpawns) {
                     // W60 (юзер): недостижимые «карманы» вырезаны из
                     // генератора — осиротевшие точки старых сейвов (индекс
-                    // за пределами нового wildSpawns) больше не спавнят
+                    // за пределами нового wildSpawns) больше не спавнят.
+                    // W62 (юзер): шаблон — ТОЛЬКО настоящие стихии. Прежний
+                    // `[^:]+` совпадал и с ключом охоты ратуши
+                    // "wild:q<gx>:<gy>" (sidequests.js): город, у которого
+                    // gy меньше числа диких точек, вычищал монстра охоты
+                    // при КАЖДОМ входе в мир — ни врага, ни красной стрелки
                     for (const k of Object.keys(G.world.wander)) {
-                        const m = /^wild:([^:]+):(\d+)$/.exec(k);
+                        const m = /^wild:(strength|growth|wisdom|decay|honor|time):(\d+)$/.exec(k);
                         if (!m) continue;
                         const idx = Number(m[2]);
                         const d2 = map.wildSpawns[idx];
@@ -301,17 +306,44 @@
             COMPONENTS.ctrlVJ[heroId] = iy;
         }
         const px = (p) => ({ x: p.gx * TS + TS / 2, y: p.gy * TS + TS / 2 });
+        // большой ли регион у клетки (кап 120 клеток): карманы (лес + тело
+        // города, баг юзера W62) малы — герой в них застревает; достигнутый
+        // кап означает выход в открытый мир
+        function bigRegion(gx, gy) {
+            if (!walkable(gx, gy)) return false;
+            const W = G.world.map.w;
+            const seen = new Set([gy * W + gx]);
+            const q = [[gx, gy]];
+            for (let qi = 0; qi < q.length; qi++) {
+                if (q.length >= 120) return true;
+                const [cx, cy] = q[qi];
+                for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                    const nx = cx + dx, ny = cy + dy, k = ny * W + nx;
+                    if (seen.has(k) || !walkable(nx, ny)) continue;
+                    seen.add(k);
+                    q.push([nx, ny]);
+                }
+            }
+            return false;
+        }
         // ближайшая свободная клетка не ближе 1.4 клетки от точки (герой
-        // выходит из пещеры рядом с аркой, но не на самом триггере)
+        // выходит из пещеры рядом с аркой, но не на самом триггере).
+        // W62 (юзер): первый проход берёт только клетки БОЛЬШОГО региона —
+        // свободная клетка внутри закрытого кармана героя запирает; если
+        // таких рядом нет — прежнее поведение (как получится)
         function freeCellNear(x, y) {
             const gx = Math.floor(x / TS), gy = Math.floor(y / TS);
-            for (let r = 2; r <= 5; r++)
-                for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
-                    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-                    if (Math.hypot(dx, dy) < 1.4) continue;
-                    if (walkable(gx + dx, gy + dy))
-                        return { x: (gx + dx) * TS + TS / 2, y: (gy + dy) * TS + TS / 2 };
-                }
+            for (let pass = 0; pass < 2; pass++)
+                for (let r = 2; r <= 5; r++)
+                    for (let dy = -r; dy <= r; dy++)
+                        for (let dx = -r; dx <= r; dx++) {
+                            if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+                            if (Math.hypot(dx, dy) < 1.4) continue;
+                            const nx = gx + dx, ny = gy + dy;
+                            if (!walkable(nx, ny)) continue;
+                            if (pass === 0 && !bigRegion(nx, ny)) continue;
+                            return { x: nx * TS + TS / 2, y: ny * TS + TS / 2 };
+                        }
             return { x, y };
         }
         const cavePoi = (caveId) =>
@@ -1002,6 +1034,14 @@
                 if (ctx.music) ctx.music("menu"); // трек мира (пока общий с меню)
                 const map = ensureMap();
                 ensureWander(); // жив/мёртв и позиции отрядов (создать/дописать)
+                // самолечение поручений ратуши (W62, юзер): охота без живого
+                // монстра получает нового (состояние вычищено багом шаблона
+                // W60 или пересборкой мира), письмо с пропавшим адресатом —
+                // новый город. До спавна отрядов — починенный монстр сразу
+                // выйдет на поле
+                if (globalThis.GAME_SIDEQ
+                    && globalThis.GAME_SIDEQ.repairQuests)
+                    globalThis.GAME_SIDEQ.repairQuests(G);
                 ctx.collide.rows = map.rows; // коллизии героя — по карте мира
                 ctx.collide.ts = TS; // после подземелья (клетка 64) — шаг мира
                 // ходьба (в т.ч. клавиатурой) тоже respectит тело городов
@@ -1012,9 +1052,14 @@
                 // ГОРОДА (не столицы, просил юзер), общая для всех стихий.
                 // W42: спавн-точка могла попасть в тело города (теперь
                 // непроходимо) — сдвиг к ближайшей свободной клетке
-                const spawnOk = (q) =>
-                    walkable(Math.floor(q.x / TS), Math.floor(q.y / TS))
+                const spawnOk = (q) => {
+                    // W62 (юзер): спавн только в БОЛЬШОМ регионе — точка в
+                    // закрытом кармане (лес + тело города) сдвигается к
+                    // ближайшей открытой клетке
+                    const gx = Math.floor(q.x / TS), gy = Math.floor(q.y / TS);
+                    return walkable(gx, gy) && bigRegion(gx, gy)
                         ? q : freeCellNear(q.x, q.y);
+                };
                 const spawnPx = px(map.spawn[G.elem] || map.spawn.strength);
                 let hp = G.world.heroPos ? { ...G.world.heroPos } : null;
                 if (G.cityOut) { // вышли из города — к дверям ЭТОГО города (W31)

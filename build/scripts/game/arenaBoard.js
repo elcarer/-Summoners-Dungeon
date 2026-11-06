@@ -712,6 +712,7 @@
                 });
                 arrivals.push({ u, node, life: 0.5 / animK(), fx: portalFx });
                 multiFury(cardId, side); // «Ярость природы» (Рыжий лес, W54)
+                multiValor(cardId, side); // «Растущая доблесть» (Белая пуща, W62)
                 sfx("aqua"); // призыв (обе стороны)
                 B.units.push(u);
                 recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда

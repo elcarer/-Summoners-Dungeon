@@ -34,7 +34,7 @@
     // v17 — дороги в обход городов (W45, юзер): A* не режет спрайт города
     // (footprint 9×6/9×7.5 клеток — с W42 тело непроходимо, дорога к
     // «воротам» подходила сквозь него); старые миры (v16) перегенерируются
-    const V = 21; // W61 (юзер): вход «Белой пущи» у границы Роста и Чести (миры пересобираются)
+    const V = 22; // W62 (юзер): спавн героя — вне тела города и карманов (миры пересобираются)
     const W = 384, H = 256;
     const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
     // деревья лесных массивов по зонам стихий (просил юзер): вместо
@@ -1000,34 +1000,64 @@
         // непроходимы) ─────────────────────────────────────────────────────
         const spawn = {};
         {
-            const passable = (i) => !blocked[i] && ter[i] !== T_MOUNTAIN
-                && ter[i] !== T_FOREST && ter[i] !== T_WATER
-                && ter[i] !== T_SWAMP;
             const nearTown = (tw) => {
-                // суша, соединённая с городом (после прокладки дорог)
-                const comp = new Uint8Array(N);
-                const q = [tw.gy * W + tw.gx];
-                comp[q[0]] = 1;
-                for (let qi = 0; qi < q.length; qi++) {
-                    const c = q[qi], cx = c % W, cy = (c / W) | 0;
-                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-                        const nx = cx + dx, ny = cy + dy;
-                        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-                        const ni = ny * W + nx;
-                        if (!comp[ni] && passable(ni)) { comp[ni] = 1; q.push(ni); }
+                // Суша ВНЕ тела города (W42: в мире город — препятствие,
+                // cityBlockAt в sidequests.js): флуд от «ворот» — свободных
+                // клеток вокруг города. Флуд ОТ ЦЕНТРА проходил сквозь тело
+                // (площади — не стены) и отмечал клетки-карманы между лесом
+                // и городом, где герой застревал намертво (баг юзера W62),
+                // а кандидаты 1.9–4.5 клетки включали САМО тело города
+                const top = tw.kind === "capital" ? tw.gy - 7 : tw.gy - 5;
+                const passable = (x, y) => {
+                    if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) return false;
+                    if (x >= tw.gx - 4 && x <= tw.gx + 4
+                        && y > top && y <= tw.gy) return false; // тело города
+                    const i = y * W + x;
+                    return !blocked[i] && ter[i] !== T_MOUNTAIN
+                        && ter[i] !== T_FOREST && ter[i] !== T_WATER
+                        && ter[i] !== T_SWAMP;
+                };
+                // регион за воротами: флуд от каждой свободной клетки в
+                // радиусе 5 (подходов у города несколько); берём САМЫЙ
+                // большой — малый регион значит карман, из него герою
+                // хода нет
+                let best = null;
+                for (let dy = -5; dy <= 5; dy++)
+                    for (let dx = -5; dx <= 5; dx++) {
+                        const gx0 = tw.gx + dx, gy0 = tw.gy + dy;
+                        if (!passable(gx0, gy0)) continue;
+                        const comp = new Uint8Array(N);
+                        const q = [gy0 * W + gx0];
+                        comp[q[0]] = 1;
+                        for (let qi = 0; qi < q.length; qi++) {
+                            const c = q[qi], cx = c % W, cy = (c / W) | 0;
+                            for (const [ex, ey] of
+                                [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                                const nx = cx + ex, ny = cy + ey;
+                                if (!passable(nx, ny)) continue;
+                                const ni = ny * W + nx;
+                                if (!comp[ni]) { comp[ni] = 1; q.push(ni); }
+                            }
+                        }
+                        if (!best || q.length > best.size)
+                            best = { comp, size: q.length };
                     }
-                }
                 const cand = [];
-                for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) {
-                    const i = y * W + x, dist = Math.hypot(x - tw.gx, y - tw.gy);
-                    if (dist >= 1.9 && dist <= 4.5 && comp[i])
-                        cand.push({ gx: x, gy: y });
+                if (best) {
+                    for (let y = 2; y < H - 2; y++)
+                        for (let x = 2; x < W - 2; x++) {
+                            const i = y * W + x;
+                            const dist = Math.hypot(x - tw.gx, y - tw.gy);
+                            if (dist >= 1.9 && dist <= 4.5 && best.comp[i])
+                                cand.push({ gx: x, gy: y });
+                        }
                 }
                 if (!cand.length) { // страховка: любая суша рядом с городом
                     const c = spiral(tw.gx, tw.gy,
                         (x, y) => x >= 2 && y >= 2 && x < W - 2 && y < H - 2
-                            && passable(y * W + x), 8);
-                    cand.push(c || { gx: tw.gx, gy: Math.min(H - 3, tw.gy + 2) });
+                            && passable(x, y), 8);
+                    cand.push(c ? { gx: c.x, gy: c.y }
+                        : { gx: tw.gx, gy: Math.min(H - 3, tw.gy + 2) });
                 }
                 return cand[(rng() * cand.length) | 0];
             };

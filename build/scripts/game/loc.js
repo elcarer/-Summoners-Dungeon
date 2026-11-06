@@ -19,6 +19,9 @@
             // W54 (юзер): особенность «Рыжего леса» — текст в HUD данжа
             "dungeon.fury": "Ярость природы: двухцветные карты Сила+Рост наносят 1 урон базе врага при розыгрыше",
             "dungeon.furyShort": "Ярость природы",
+            // W62 (юзер): особенность «Белой пущи» — текст в HUD данжа
+            "dungeon.valor": "Растущая доблесть: при розыгрыше Зелёно-Белой (двухцветной) карты ваше случайное существо получает +1/+1",
+            "dungeon.valorShort": "Растущая доблесть",
             "dungeon.deckLow": "Колода меньше минимума ({min}) — соберите колоду",
             "dungeon.hp": "HP {hp}/{max}",
             "dungeon.exitLabel": "СПУСК",
@@ -796,6 +799,10 @@
             // W54: мульти-стихия «Рыжего леса»
             "elem.strGro": "Сила + Рост",
             "elem.strGro.short": "С+Р",
+            // W61: мульти-стихия «Белой пущи» (кнопка фильтра картотеки,
+            // бейджи карт — баг юзера W62: печатался сырой ключ)
+            "elem.groHon": "Рост + Честь",
+            "elem.groHon.short": "Р+Ч",
             "menu.pickHero": "ВЫБЕРИТЕ ГЕРОЯ",
             "menu.pickHeroSub": "Герой определяет жизни базы, стихии колоды и особую способность",
             "menu.pickHeroSoon": "Скоро…",
@@ -1148,6 +1155,8 @@
             "dungeon.floor": "Floor {n}",
             "dungeon.fury": "Nature's Fury: two-color Strength+Growth cards deal 1 damage to the enemy base when played",
             "dungeon.furyShort": "Nature's Fury",
+            "dungeon.valor": "Growing Valor: when a Green-White (two-color) card is played, your random creature gets +1/+1",
+            "dungeon.valorShort": "Growing Valor",
             "dungeon.deckLow": "Deck is below the minimum ({min}) — build your deck",
             "dungeon.hp": "HP {hp}/{max}",
             "dungeon.exitLabel": "DESCEND",
@@ -1917,6 +1926,8 @@
             "elem.time.short": "Time",
             "elem.strGro": "Strength + Growth",
             "elem.strGro.short": "S+G",
+            "elem.groHon": "Growth + Honor",
+            "elem.groHon.short": "G+H",
             "menu.pickHero": "CHOOSE YOUR HERO",
             "menu.pickHeroSub": "The hero defines your base health, deck elements and special ability",
             "menu.pickHeroSoon": "Coming soon…",

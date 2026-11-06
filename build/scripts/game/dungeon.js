@@ -1725,11 +1725,14 @@
                     ? GAME_LOC.t("city.name")
                     : GAME_LOC.t("dungeon.floor", { n: st.floor });
                 // особенность подземелья в инфоокне сверху (W54, юзер):
-                // «Ярость природы» — только внутри «Рыжего леса»
+                // «Ярость природы» — «Рыжий лес»; «Растущая доблесть» —
+                // «Белая пуща» (W62, юзер)
                 {
                     const cd = globalThis.GAME_DATA.CAVES[st.cave];
-                    uiHud.userData.featT.text = !st.city && cd && cd.fury
-                        ? GAME_LOC.t("dungeon.fury") : "";
+                    uiHud.userData.featT.text = !st.city && cd
+                        ? (cd.fury ? GAME_LOC.t("dungeon.fury")
+                            : cd.valor ? GAME_LOC.t("dungeon.valor") : "")
+                        : "";
                 }
                 uiHud.userData.goldT.text = String(G.gold);
                 // ресурсы стихий в HUD (W40) — числа каждый кадр

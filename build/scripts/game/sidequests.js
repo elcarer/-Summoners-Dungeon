@@ -564,6 +564,43 @@
         complete(G, q, "sideq.huntDone");
         return true;
     }
+    // Самолечение поручений (W62, юзер): активная охота без живого
+    // состояния монстра получает нового разбойника (состояние вычищено
+    // багом W60-шаблона очистки диких точек — ключ "wild:q<город>" был
+    // неотличим от "wild:<стихия>:<индекс>" — или пересборкой мира);
+    // письмо с адресатом, которого на карте больше нет, — новый город.
+    // Вызывается миром при входе (после ensureWander, до спавна отрядов)
+    function repairQuests(G) {
+        const sq = stateOf(G);
+        if (!sq || !G.world || !G.world.map) return 0;
+        let n = 0;
+        const heroCell = () => ({
+            gx: Math.floor((G.world.heroPos ? G.world.heroPos.x : 0) / TS),
+            gy: Math.floor((G.world.heroPos ? G.world.heroPos.y : 0) / TS),
+        });
+        for (const a of sq.active) {
+            if (a.type === "hunt") {
+                const st = G.world.wander && G.world.wander[a.mobKey];
+                if (st && st.alive) continue;
+                if (!poiByKey(G, a.city)) {
+                    // город-заказчик пропал с карты (мир пересобран) —
+                    // перепривязываем к ближайшему к герою
+                    const hc = heroCell();
+                    const near = citiesOf(G).sort((p, q2) =>
+                        Math.hypot(p.gx - hc.gx, p.gy - hc.gy)
+                            - Math.hypot(q2.gx - hc.gx, q2.gy - hc.gy))[0];
+                    if (!near) continue;
+                    a.city = keyOf(near);
+                    a.elem = near.elem;
+                }
+                if (spawnHuntMob(G, a)) n++;
+            } else if (a.type === "letter" && !poiByKey(G, a.target)) {
+                const tgt = letterTarget(G, poiByKey(G, a.city) || heroCell());
+                if (tgt) { a.target = keyOf(tgt); n++; }
+            }
+        }
+        return n;
+    }
     // Вход в город (world.enterCity): письмо доставлено?
     function onEnterCity(G, tw) {
         const sq = stateOf(G);
@@ -614,7 +651,7 @@
 
     globalThis.GAME_SIDEQ = {
         fresh, stateOf, model, accept, onHuntWin, onEnterCity,
-        arrowTargets, glowCities, huntMobs,
+        arrowTargets, glowCities, huntMobs, repairQuests,
         // окно активного поручения (W45): кнопка в HUD мира/города
         showReview, closeReview, reviewOpen, activeModel, reviewState,
         // инфоокно «поручение выполнено» (W54, юзер)
