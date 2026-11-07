@@ -622,6 +622,10 @@
                     // стихия точки появления (W31): смена героя —
                     // перенос в зону новой стихии (world.enter)
                     worldStartElem: this.world.startElem || null,
+                    // стартовый город новой игры и вход в него (W67, юзер):
+                    // жёлтое свечение — пока герой не зайдёт в него
+                    worldStartCity: this.world.startCity || null,
+                    worldStartCitySeen: !!this.world.startCitySeen,
                     // глобальная карта: сейв хранит только сид — карта
                     // регенерируется детерминированно (worldGen.js)
                     worldSeed: this.world.seed,
@@ -854,6 +858,10 @@
                 // стихия точки появления (W31): смена героя — перенос
                 // в зону новой стихии (world.enter)
                 startElem: r.worldStartElem || null,
+                // стартовый город новой игры и вход в него (W67, юзер):
+                // старые сейвы поля не имеют (null) — свечение им не показывается
+                startCity: r.worldStartCity || null,
+                startCitySeen: !!r.worldStartCitySeen,
                 // дикие враги: уровень видов (победы над одноимёнными
                 // усиливают всех — W29)
                 wildLevel: r.worldWild || null,

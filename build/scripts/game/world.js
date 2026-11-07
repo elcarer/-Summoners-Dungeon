@@ -114,6 +114,7 @@
         let squads = [];
         let tip = null; // { squad, node, hero } — подсказка на отряде (курсор)
         let poiGlows = []; // жёлтые свечения городов-адресатов писем (W40)
+        let startGlow = null; // свечение стартового города новой игры (W67)
         let sideArrows = null; // стрелки побочных квестов: red/yellow (W40)
 
         // карта мира живёт в забеге: генерится по сиду один раз и
@@ -985,6 +986,11 @@
             // (тесты/программный вход) — «свой» стартовый
             if (!tw) tw = ownStartTown(m);
             if (!tw) return false;
+            // (W67, юзер) вошли в подсвеченный стартовый город — его
+            // свечение больше не показывается (запомнить в забеге)
+            if (G.world.startCity && tw.gx === G.world.startCity.gx
+                && tw.gy === G.world.startCity.gy)
+                G.world.startCitySeen = true;
             if (heroId !== null)
                 G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
             // выход — к дверям ЭТОГО города (не первого spawnTown в pois!)
@@ -1181,8 +1187,46 @@
                 for (const poi of map.pois) {
                     const node = poi.kind === "capital" ? makeCapital(poi)
                         : poi.kind === "town" ? makeTown(poi) : makeCave(poi);
-                    poiNodes.push({ node, x: node.x, y: node.y });
+                    poiNodes.push({ node, poi, x: node.x, y: node.y });
                     objLayer.addChild(node);
+                }
+                // (W67, юзер) город рядом с точкой появления в НОВОЙ игре:
+                // жёлтое свечение вокруг его спрайта — куда идти в начале.
+                // Город запоминается в забеге (startCity), флаг startCitySeen
+                // ставит enterCity — после входа свечение не показывается
+                if (G.world.startCity === undefined) {
+                    let best = null, bd = Infinity;
+                    for (const p of map.pois) {
+                        if (p.kind !== "town" && p.kind !== "capital") continue;
+                        const d = Math.hypot((p.gx + 0.5) * TS - hp.x,
+                            (p.gy + 1) * TS - hp.y);
+                        if (d < bd) { bd = d; best = p; }
+                    }
+                    G.world.startCity = best
+                        ? { gx: best.gx, gy: best.gy } : null;
+                }
+                startGlow = null;
+                if (G.world.startCity && !G.world.startCitySeen) {
+                    const tw = map.pois.find((p) =>
+                        (p.kind === "town" || p.kind === "capital")
+                        && p.gx === G.world.startCity.gx
+                        && p.gy === G.world.startCity.gy);
+                    const pn = tw && poiNodes.find((n) => n.poi === tw);
+                    const sp = pn && pn.node.children[0];
+                    // свечение ВОКРУГ спрайта (стиль W58): копия спрайта
+                    // чуть больше ПОД спрайтом — светится только кромка
+                    // силуэта, прозрачные поля текстуры не светятся
+                    if (sp) {
+                        const glow = new PIXI.Sprite(sp.texture);
+                        glow.anchor.set(0.5, 1);
+                        glow.scale.set(sp.scale.x * 1.14, sp.scale.y * 1.14);
+                        glow.tint = 0xffd75e;
+                        glow.blendMode = "add";
+                        glow.alpha = 0.5;
+                        glow.eventMode = "none";
+                        pn.node.addChildAt(glow, 0);
+                        startGlow = glow;
+                    }
                 }
                 // бродячие отряды (просил юзер): охрана данжей + охранники
                 // мостов — персонажи мира на спрайтшитах своих стихий;
@@ -1254,10 +1298,18 @@
                     s.sprite.zIndex = st.y;
                     s.shadow.position.set(st.x, st.y - 9.8);
                     s.shadow.zIndex = st.y - 0.5;
-                    s.glow = new PIXI.Graphics();
-                    s.glow.ellipse(0, 0, 26, 12);
-                    s.glow.fill({ color: 0xd03028, alpha: 0.42 });
-                    s.glow.position.set(st.x, st.y - 2);
+                    // красное свечение ВОКРУГ спрайта (W67, юзер): копия
+                    // спрайта чуть больше ПОД спрайтом — светится кромка
+                    // силуэта, а не тень-эллипс под ногами; кадр анимации
+                    // и позицию копирует тик update
+                    s.glow = new PIXI.Sprite(made.sprite.texture);
+                    s.glow.anchor.set(0.5, 1);
+                    s.glow.scale.set(0.375 * 1.24);
+                    s.glow.tint = 0xff4a30;
+                    s.glow.blendMode = "add";
+                    s.glow.alpha = 0.5;
+                    s.glow.eventMode = "none";
+                    s.glow.position.set(st.x, st.y);
                     s.glow.zIndex = st.y - 0.4;
                     objLayer.addChild(s.glow);
                     objLayer.addChild(s.shadow);
@@ -1509,6 +1561,14 @@
                             * Math.sin(performance.now() / 300);
                     }
                 }
+                // жёлтое свечение стартового города (W67, юзер): пульс,
+                // после входа в него — никогда больше
+                if (startGlow) {
+                    if (G.world.startCitySeen || startGlow.destroyed)
+                        startGlow = null;
+                    else startGlow.alpha = 0.5 + 0.2
+                        * Math.sin(performance.now() / 300);
+                }
                 // скорость по дорогам (просил юзер): дорога и мост дают
                 // ×1.2 к обычному шагу — переключается клеткой под ногами
                 {
@@ -1672,11 +1732,15 @@
                         s.st.x = sx; s.st.y = sy; // сейв-состояние живёт с ним
                         s.shadow.position.set(sx, sy - 9.8);
                         s.shadow.zIndex = sy - 0.5;
-                        // красное свечение охотничьего монстра (W40): пульс
+                        // красное свечение охотничьего монстра (W67, юзер):
+                        // копия спрайта ВОКРУГ него — кадр анимации и позиция
+                        // следом за спрайтом, альфа пульсирует
                         if (s.glow) {
-                            s.glow.position.set(sx, sy - 2);
+                            s.glow.texture =
+                                s.sprite.textures[s.sprite.currentFrame];
+                            s.glow.position.set(sx, sy);
                             s.glow.zIndex = sy - 0.4;
-                            s.glow.alpha = 0.6 + 0.3
+                            s.glow.alpha = 0.45 + 0.25
                                 * Math.sin(performance.now() / 260);
                         }
                         const dHero = Math.hypot(hx - sx, hy - sy);
@@ -2115,6 +2179,26 @@
                     x: s.id !== null ? COMPONENTS.positionX[s.id] : null,
                     y: s.id !== null ? COMPONENTS.positionY[s.id] : null,
                 })),
+                // подсветки мира (тесты, W67): стартовый город новой игры
+                // и кромка охотничьего монстра (копия спрайта, W67)
+                glowState: () => ({
+                    startCity: G.world.startCity || null,
+                    startCitySeen: !!G.world.startCitySeen,
+                    startGlow: (startGlow && !startGlow.destroyed
+                        && startGlow.visible) ? {
+                        alpha: +startGlow.alpha.toFixed(3),
+                        rim: +startGlow.scale.x.toFixed(3),
+                        tint: startGlow.tint,
+                    } : null,
+                    huntGlows: squads.filter((s) => s.glow).map((s) => ({
+                        key: s.key,
+                        alpha: +s.glow.alpha.toFixed(3),
+                        rim: +s.glow.scale.x.toFixed(3),
+                        tint: s.glow.tint,
+                        follows: s.glow.texture
+                            === s.sprite.textures[s.sprite.currentFrame],
+                    })),
+                }),
                 // мини-карта (правый нижний угол): бокс и маркер героя
                 mini: () => {
                     const mini = uiHud && uiHud.userData.mini;
