@@ -67,7 +67,7 @@
     // rows/здания/проход-выход/спавн/болота/деревья — как нарисовал юзер.
     // Витринное довешивается как в процедурной генерации: товар магазина
     // (rollLootCard — на новый забег), якорь Глома (по дому Глома).
-    function designToState(d, elem, capital) {
+    function designToState(d, elem, capital, home) {
         const D = globalThis.GAME_DATA;
         const caveId = Object.keys(D.CAVES).find(
             (k) => D.CAVES[k].elem === elem) || "gob";
@@ -96,10 +96,15 @@
             : { x0: (CW >> 1) - 1, x1: (CW >> 1) + 1, y: CH - 1 };
         // спавн: клетка из дизайна или над центром прохода
         const sp = d.spawn || { x: (pg.x0 + pg.x1) >> 1, y: pg.y - 1 };
+        // Глом (W70, юзер): живёт ТОЛЬКО в стартовом городе героя (home) —
+        // у дома из плана, без дома — у ратуши; в столице и прочих городах
+        // его нет (дом там — декорация)
         const house = blds.find((b) => b.type === "glomHouse");
-        const glomHome = house ? {
-            x: (house.col + 1) * TS + TS / 2, // появляется у двери дома
-            y: house.row * TS + TS / 2,
+        const anch = house
+            || (home ? blds.find((b) => b.type === "townHall") : null);
+        const glomHome = anch ? {
+            x: (anch.col + 1) * TS + TS / 2, // появляется у двери дома/ратуши
+            y: anch.row * TS + TS / 2,
         } : null;
         // особенности стихии из дизайна: рощи «F» и вода/мосты читаются
         // рендерами прямо из rows (rect — на всю карту, оверлей рисует
@@ -144,7 +149,7 @@
                 floors[k] = d.floors[k];
         }
         const st = {
-            city: true, isCapital: !!capital,
+            city: true, isCapital: !!capital, homeCity: !!home,
             elem, cave: caveId, floor: 1,
             enemies: [], exit: null, exitCool: false, bossDead: true,
             toast: null, toastT: 0, win: null,
@@ -156,18 +161,18 @@
             treeCells, // явные деревья + рощи «F»
             walls, // ручные варианты стен дизайна (пусто — авто-подбор)
             floors, // ручные плитки пола (пусто — квадранты листа стихии)
-            glom: house ? {
+            glom: home && glomHome ? {
                 state: "hidden", // hidden → walking → talking → idle
                 x: glomHome.x, y: glomHome.y,
             } : null,
-            glomHome,
+            glomHome: home && glomHome ? glomHome : null,
             exitPassage: pg,
             spawn: { x: sp.x * TS + TS / 2, y: sp.y * TS + TS / 2 },
         };
         return st;
     }
 
-    function newCityState(elem, capital) {
+    function newCityState(elem, capital, home) {
         // Дизайн юзера (W68): GAME_CITY_DESIGNS[стихия].capital/town —
         // планировка из редактора; нет (или файл пуст) — генерация ниже
         const DS = globalThis.GAME_CITY_DESIGNS;
@@ -175,7 +180,7 @@
         const dsg = rec && (capital ? rec.capital : rec.town);
         if (dsg && dsg.rows && dsg.rows.length) {
             try {
-                return designToState(dsg, elem, capital);
+                return designToState(dsg, elem, capital, home);
             } catch (e) {
                 // битый дизайн не роняет игру — откат к генерации
                 console.warn("cityDesigns: дизайн «" + elem + (capital
@@ -198,7 +203,7 @@
             [1, 1, 7, 5],     // северо-западная (магазин)
             [16, 1, 22, 5],   // северо-восточная
             [1, 7, 7, 12],    // западная (кузница)
-            [16, 7, 22, 12],  // восточная (дом Глома)
+            [16, 7, 22, 12],  // восточная
             [1, 14, 7, 17],   // юго-западная
             [9, 14, 14, 17],  // южная (ворота — проход-выход, W37/W52)
             [16, 14, 22, 17], // юго-восточная
@@ -223,7 +228,8 @@
             put(10, 8, 3, 3, "townHall", "town_hall.png");
             put(2, 2, 3, 2, "shop", "shop.png");      // северо-западная
             put(1, 8, 3, 2, "armory", "armory.png");  // западная
-            put(20, 8, 3, 2, "glomHouse", "glom_house.png"); // восточная
+            // (W70, юзер): дом Глома из столицы убран — Глом живёт
+            // в стартовом городе героя
             // W66 (юзер): коллекционер — юго-западная (свободный квартал);
             // у южной дуги, чтобы дверь (5,17) стояла на коридоре
             put(5, 15, 3, 2, "collect", "collect.png");
@@ -348,10 +354,15 @@
             }
             return o;
         });
+        // Глом (W70, юзер): только в стартовом городе героя (home) —
+        // у дома из плана (дизайн), без дома — у ратуши; в столице и
+        // прочих городах его нет
         const house = blds.find((b) => b.type === "glomHouse");
-        const glomHome = house ? {
-            x: (house.col + 1) * TS + TS / 2, // появляется у двери дома
-            y: house.row * TS + TS / 2,
+        const anch = house
+            || (home ? blds.find((b) => b.type === "townHall") : null);
+        const glomHome = anch ? {
+            x: (anch.col + 1) * TS + TS / 2, // появляется у двери дома/ратуши
+            y: anch.row * TS + TS / 2,
         } : null;
         // проход-выход (W52, юзер) вырезается ДО снимка rows ниже:
         // 3 клетки пола в нижнем ряду под воротным кварталом (W37:
@@ -359,7 +370,7 @@
         const px2 = capital ? 13 : 16, py2 = CH - 1;
         for (let x = px2 - 1; x <= px2 + 1; x++) g[py2][x] = ".";
         const st = {
-            city: true, isCapital: !!capital,
+            city: true, isCapital: !!capital, homeCity: !!home,
             elem, cave: caveId, floor: 1,
             enemies: [], exit: null, exitCool: false, bossDead: true,
             toast: null, toastT: 0, win: null,
@@ -370,11 +381,11 @@
             districts: rooms.length, // районов-комнат: 5 / 8
             roomRects: rooms, // [x0,y0,x1,y1] кварталов — для проб (W37)
             feat, // особенности стихии (W38): trees/forest/swamp/mounts/maze/water/bridges
-            glom: house ? {
+            glom: home && glomHome ? {
                 state: "hidden", // hidden → walking → talking → idle
                 x: glomHome.x, y: glomHome.y,
             } : null,
-            glomHome,
+            glomHome: home && glomHome ? glomHome : null,
         };
         // Ворота (W37, юзер): воротный квартал без зданий — якорь
         // исключений реки (W38) и декора; в столице — южный, в городе —

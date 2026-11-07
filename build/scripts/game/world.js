@@ -954,15 +954,20 @@
         // Состояние живёт в G.cityStates (отдельно от этажей подземелий,
         // чтобы не путать архив «данж:этаж»), сцена — dungeon в режиме
         // города (st.city): стены — набор тайлов данжа стихии, пол —
-        // поверхность зоны; внутри торговец картами и NPC Глом, врагов нет
-        function cityStateFor(elem) {
-            const saved = G.cityStates && G.cityStates[elem];
+        // поверхность зоны; внутри торговец картами, врагов нет.
+        // (W70, юзер) роль города — по типу POI на карте, НЕ по стихии
+        // героя: столица зоны (большой город, одна на стихию) — слот
+        // «столица», все обычные города (вкл. стартовый) — слот «город».
+        // Глом живёт только в стартовом городе героя (home). Ключ кэша —
+        // «стихия|роль»: у стихии до трёх состояний (cap/home/town)
+        function cityStateFor(elem, capital, home) {
+            const key = elem
+                + (capital ? "|cap" : home ? "|home" : "|town");
+            const saved = G.cityStates && G.cityStates[key];
             if (saved) return saved;
-            // столица — стартовый город СВОЕЙ стихии (8 районов, дом Глома);
-            // прочие города — обычные (5 районов)
             const st = globalThis.GAME_CITY.newCityState(
-                elem, elem === G.elem);
-            if (G.cityStates) G.cityStates[elem] = st;
+                elem, capital, home);
+            if (G.cityStates) G.cityStates[key] = st;
             return st;
         }
         // «свой» стартовый город стихии: городов-стартов шесть (по одному
@@ -995,7 +1000,11 @@
                 G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
             // выход — к дверям ЭТОГО города (не первого spawnTown в pois!)
             G.cityOut = { elem: tw.elem || G.elem, gx: tw.gx, gy: tw.gy };
-            const st = cityStateFor(tw.elem || G.elem);
+            // роль и Глом (W70): столица — POI «capital»; стартовый город
+            // СВОЕЙ стихии (spawnTown) — обычный город, где живёт Глом
+            const el = tw.elem || G.elem;
+            const st = cityStateFor(el, tw.kind === "capital",
+                !!tw.spawnTown && el === G.elem);
             st.exitTown = { gx: tw.gx, gy: tw.gy };
             // прибытие у прохода-выхода (W52); 2с «остывание» выхода —
             // герой встаёт рядом с ним, и первый же кадр не выкидывает

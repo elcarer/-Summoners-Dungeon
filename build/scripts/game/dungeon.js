@@ -1487,20 +1487,24 @@
                         if (d < TS * 0.85) { openObject(o); break; }
                     }
                 }
-                // ── Глом у своего дома (W34, юзер): квестовая сценка ───────
-                // Герой входит в город — Глома нет, у дома стоит сам дом.
-                // Подошёл к дому — Глом выходит, идёт к герою, начинается
-                // квестовый диалог. Разошлись — «остывает» и ждёт, куда
-                // дошёл (повторный разговор — подойти снова, как у объектов)
-                if (st.city && st.isCapital && st.glom && !st.win
+                // ── Глом у своего места (W34, юзер; W70 — только в
+                // стартовом городе героя): квестовая сценка ──────────────
+                // Герой входит в город — Глома нет, стоит дом (или ратуша,
+                // если дома в плане нет). Подошёл — Глом выходит, идёт к
+                // герою, начинается квестовый диалог. Разошлись —
+                // «остывает» и ждёт (повторный разговор — подойти снова)
+                if (st.city && st.glom && !st.win
                     && globalThis.GAME_QUESTS) {
                     const gl = st.glom;
                     if (gl.state === "hidden") {
-                        const house = st.objects.find((o) => o.type === "glomHouse");
+                        // якорь Глома: дом из плана, без него — ратуша
+                        const anch = st.objects.find(
+                                (o) => o.type === "glomHouse")
+                            || st.objects.find((o) => o.type === "townHall");
                         const q = G.quests;
-                        const busy = house && q && (q.pending || q.active);
-                        const hcx = (house.gx + house.w / 2) * TS,
-                            hcy = (house.gy + house.h / 2) * TS;
+                        const busy = anch && q && (q.pending || q.active);
+                        const hcx = (anch.gx + anch.w / 2) * TS,
+                            hcy = (anch.gy + anch.h / 2) * TS;
                         if (busy && !ctx.questModal
                             && Math.hypot(hx - hcx, hy - hcy) < TS * 4) {
                             spawnGlom(gl); // вышел из-за дома
@@ -1628,8 +1632,10 @@
                     if (st.city) {
                         // выход из города (W30): состояние — в G.cityStates
                         // (НЕ в архив «данж:этаж»), герой — к дверям ТОГО
-                        // города, в который вошли (W31: объект с координатами)
-                        G.cityStates[st.elem] = st;
+                        // города, в который вошли (W31: объект с
+                        // координатами). Ключ «стихия|роль» (W70)
+                        G.cityStates[st.elem + (st.isCapital ? "|cap"
+                            : st.homeCity ? "|home" : "|town")] = st;
                         G.dungeon = null;
                         // cityOut ставится при входе в город (world.js);
                         // нет его — выход к дверям города, в котором герой
@@ -1783,7 +1789,8 @@
                 const st = G.dungeon;
                 if (!st || !st.city) return null;
                 return {
-                    isCapital: !!st.isCapital, districts: st.districts,
+                    isCapital: !!st.isCapital, homeCity: !!st.homeCity,
+                    districts: st.districts,
                     w: st.rows[0].length, h: st.rows.length,
                     buildings: st.objects.filter((o) => o.build).map((o) => ({
                         type: o.type, gx: o.gx, gy: o.gy, w: o.w, h: o.h,
