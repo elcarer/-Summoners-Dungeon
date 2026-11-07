@@ -187,6 +187,8 @@
         <div class="h">Города</div>
         <div class="slots" id="slots"></div>
         <div class="hint">● — слот заполнен, он попадёт в экспорт.
+            Клик по городу сразу открывает его: твой дизайн, а пустому
+            слоту — процедурную планировку из игры как основу.
             «Стереть» — убрать дизайн текущего слота.</div>
         <div class="row">
             <button id="btnClearSlot" style="flex:1">Стереть слот</button>
@@ -252,6 +254,8 @@
         <p class="help"><b>1.</b> Выбери слот справа: стихия × «столица/город».
 Столица — стартовый город героя этой стихии (8 районов, дом Глома), «город» —
 обычные города зоны (5 районов). Размеры — традиционные, но можно любые.
+Клик по слоту сразу открывает город: заполненный — твой дизайн, пустой —
+процедурную планировку из игры, её и правь.
 
 <b>2.</b> Рисуй инструментами слева: клетки (пол/стена/роща/вода/мост/горы),
 здания из каталога, болота, деревья, проход-выход и спавн. ПКМ всегда рисует
@@ -573,7 +577,18 @@ function rebuild() {
     if (!world) return;
     world.removeChildren().forEach((c) => c.destroy({ children: true }));
     const d = curDesign();
-    if (!d) { applyView(); return; }
+    if (!d) { // пустой слот (после «Стереть слот»): подсказка, а не чёрная пустота
+        world.scale.set(1);
+        world.position.set(0, 0);
+        const host = document.getElementById("canvasHost");
+        const t = new PIXI.Text({ text:
+            "Слот пуст — нажмите «Пустой город» или «Из игры»",
+            style: { fontFamily: "Kereru", fontSize: 18, fill: 0x8a7c5e } });
+        t.anchor.set(0.5);
+        t.position.set(host.clientWidth / 2, host.clientHeight / 2);
+        world.addChild(t);
+        return;
+    }
     const elem = store.cur.elem;
     const W = d.rows[0].length, H = d.rows.length;
     const rows = d.rows.map((r) => r.split(""));
@@ -1305,6 +1320,31 @@ function refreshHeader() {
             badge.className = "badge err"; }
     }
 }
+// переключение слота (клик по городу справа / __CITYED.switchTo): пустой
+// слот сразу получает основу — процедурный город этой стихии из игры (как
+// «Из игры»), при неудаче — пустой город. Раньше пустой слот показывал
+// чёрную пустоту (рисовать нечего — rebuild выходит сразу), и править
+// город было нельзя, не начав с нуля; теперь клик по городу = увидеть
+// и редактировать этот город.
+function switchSlot(elem, kind) {
+    store.cur = { elem, kind };
+    undoStack = [];
+    updUndoBtn();
+    ghost = null;
+    view.zoom = 1;
+    view.panX = view.panY = 0;
+    if (!curDesign()) {
+        try {
+            slotRec(elem)[kind] = fromGame(elem, kind);
+        } catch (e) {
+            slotRec(elem)[kind] = emptyDesign(
+                ...(kind === "capital" ? CAP_SIZE : TOWN_SIZE));
+        }
+    }
+    touch();
+    refreshAll();
+    rebuild();
+}
 function refreshSlots() {
     const host = $("slots");
     host.innerHTML = "";
@@ -1317,17 +1357,7 @@ function refreshSlots() {
             `<span>${k === "capital" ? "столица" : "город"}</span>` +
             `<span class="dot"></span>`;
         b.style.borderLeft = `3px solid ${ELEM_COLOR[e]}`;
-        b.onpointerdown = () => {
-            store.cur = { elem: e, kind: k };
-            undoStack = [];
-            updUndoBtn();
-            ghost = null;
-            view.zoom = 1;
-            view.panX = view.panY = 0;
-            touch();
-            refreshAll();
-            rebuild();
-        };
+        b.onpointerdown = () => switchSlot(e, k);
         host.appendChild(b);
     }
 }
@@ -1609,10 +1639,7 @@ window.__CITYED = {
         const [w, h] = store.cur.kind === "capital" ? CAP_SIZE : TOWN_SIZE;
         slotRec(store.cur.elem)[store.cur.kind] = emptyDesign(w, h);
         touch(); refreshAll(); rebuild(); return true; },
-    switchTo: (elem, kind) => { store.cur = { elem, kind };
-        undoStack = []; updUndoBtn(); view.zoom = 1;
-        view.panX = view.panY = 0;
-        touch(); refreshAll(); rebuild(); },
+    switchTo: (elem, kind) => switchSlot(elem, kind),
     slots: () => allDesigns(),
     exportText,
     importAll: (t) => { const n = importAll(parseDesigns(t));
