@@ -115,8 +115,13 @@
                     : null),
                 // drag&drop (режим «Перетаскивание»): состояние для тестов
                 dragState() {
+                    const gl = (typeof dragFxGlowNode !== "undefined")
+                        ? dragFxGlowNode : null;
                     return drag ? { idx: drag.idx, moved: drag.moved, over: drag.over,
-                        nodeIdx: drag.node ? drag.node.__handIdx : null } : null;
+                        nodeIdx: drag.node ? drag.node.__handIdx : null,
+                        // слой свечения дуги (W66): жив и с блюром
+                        glow: !!(gl && !gl.destroyed && gl.filters && gl.filters.length),
+                    } : null;
                 },
                 // геометрия первой карты руки (дизайн-координаты) — тесты «не закрывает поле»
                 handGeom() {

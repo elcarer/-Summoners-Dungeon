@@ -604,6 +604,8 @@
             // ставятся кликом как раньше.
             A.drag = null;
             A.dragFx = null; // drag: {idx,node,homeX,homeY,sx,sy,moved,over}
+            A.dragFxGlowNode = null; // тестам: слой свечения дуги (W66)
+            let dragFxGlow = null; // слой свечения дуги под dragFx (W66)
             // Глобальные экранные → координаты 1920×1080: мировая трансформация
             // ui-корня (letterbox) — полная цепочка от экрана.
             A.toDesign = (g) => {
@@ -710,11 +712,25 @@
                 // после exit() сцены dragFx мог остаться ссылкой на уничтоженный
                 // Graphics (в Pixi v8 у него внутрь null) — проверяем живость
                 if (!dragFx || dragFx.destroyed) {
+                    // свечение дуги (W66, юзер: «не с четкими краями, а
+                    // полуразмытую, как бы со свечением») — отдельный слой
+                    // ПОД чёткой дугой: та же кривая широкими полосами через
+                    // BlurFilter; рамка клетки и точка старта остаются чёткими
+                    if (dragFxGlow && !dragFxGlow.destroyed)
+                        dragFxGlow.destroy({ children: true });
+                    dragFxGlow = new PIXI.Graphics();
+                    A.dragFxGlowNode = dragFxGlow; // тестам: слой свечения
+                    dragFxGlow.eventMode = "none";
+                    dragFxGlow.filters = [new PIXI.BlurFilter({
+                        strength: 10, quality: 3,
+                    })];
+                    if (root) root.addChild(dragFxGlow);
                     dragFx = new PIXI.Graphics();
                     dragFx.eventMode = "none";
                     if (root) root.addChild(dragFx); // поверх HUD (добавляется последним)
                 }
                 dragFx.clear();
+                if (dragFxGlow && !dragFxGlow.destroyed) dragFxGlow.clear();
                 if (!drag || !drag.moved || !drag.over) return;
                 const [c2, r2] = drag.over;
                 const target = cellXY(c2, r2);
@@ -723,11 +739,29 @@
                 const dx = target.x - drag.homeX, dy = target.y - drag.homeY;
                 const len = Math.hypot(dx, dy) || 1;
                 const bow = Math.min(210, len * 0.3);
+                const mx = drag.homeX + dx / 2 - dy / len * bow;
+                const my = drag.homeY + dy / 2 + dx / len * bow;
+                const col = ok ? 0xa8e890 : 0xef9f8c;
+                // полупрозрачное широкое свечение (размывается фильтром):
+                // три слоя — широкий ореол, средний, яркая середина
+                if (dragFxGlow && !dragFxGlow.destroyed) {
+                    dragFxGlow.moveTo(drag.homeX, drag.homeY - 75);
+                    dragFxGlow.quadraticCurveTo(mx, my, target.x, target.y);
+                    dragFxGlow.stroke({ width: 22, color: col, alpha: 0.34 });
+                    dragFxGlow.moveTo(drag.homeX, drag.homeY - 75);
+                    dragFxGlow.quadraticCurveTo(mx, my, target.x, target.y);
+                    dragFxGlow.stroke({ width: 13, color: col, alpha: 0.5 });
+                    dragFxGlow.moveTo(drag.homeX, drag.homeY - 75);
+                    dragFxGlow.quadraticCurveTo(mx, my, target.x, target.y);
+                    dragFxGlow.stroke({ width: 7, color: col, alpha: 0.65 });
+                    dragFxGlow.circle(drag.homeX, drag.homeY - 75, 10);
+                    dragFxGlow.fill({ color: col, alpha: 0.5 });
+                }
                 dragFx.moveTo(drag.homeX, drag.homeY - 75);
-                dragFx.quadraticCurveTo(drag.homeX + dx / 2 - dy / len * bow, drag.homeY + dy / 2 + dx / len * bow, target.x, target.y);
-                dragFx.stroke({ width: 4.5, color: ok ? 0xa8e890 : 0xef9f8c, alpha: 0.9 });
+                dragFx.quadraticCurveTo(mx, my, target.x, target.y);
+                dragFx.stroke({ width: 4.5, color: col, alpha: 0.72 });
                 dragFx.circle(drag.homeX, drag.homeY - 75, 7.5);
-                dragFx.fill({ color: ok ? 0xa8e890 : 0xef9f8c });
+                dragFx.fill({ color: col });
                 const rc = cellRect(c2, r2);
                 dragFx.rect(rc.x + 3, rc.y + 3, rc.w - 6, rc.h - 6);
                 dragFx.fill({ color: ok ? 0x7dc95e : 0xd05a3c, alpha: 0.4 });
@@ -738,6 +772,7 @@
                 const d = drag;
                 drag = null;
                 if (dragFx && !dragFx.destroyed) dragFx.clear();
+                if (dragFxGlow && !dragFxGlow.destroyed) dragFxGlow.clear();
                 if (!d.moved) { layoutHand(); return; } // короткий клик — выбор уже сыграл pointertap
                 let over = d.over;
                 if (ev && ev.clientX !== undefined) { // отпустили за пределами канваса — отмена

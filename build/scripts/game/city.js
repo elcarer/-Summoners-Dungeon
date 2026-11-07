@@ -93,10 +93,16 @@
             put(2, 2, 3, 2, "shop", "shop.png");      // северо-западная
             put(1, 8, 3, 2, "armory", "armory.png");  // западная
             put(20, 8, 3, 2, "glomHouse", "glom_house.png"); // восточная
+            // W66 (юзер): коллекционер — юго-западная (свободный квартал);
+            // у южной дуги, чтобы дверь (5,17) стояла на коридоре
+            put(5, 15, 3, 2, "collect", "collect.png");
         } else {
             put(8, 6, 3, 3, "townHall", "town_hall.png");
             put(2, 2, 3, 2, "shop", "shop.png");      // северо-западная
             put(15, 2, 3, 2, "armory", "armory.png"); // северо-восточная
+            // W66 (юзер): коллекционер — юго-западная (свободный квартал);
+            // коридор квартала переведён к западной стене (см. lows ниже)
+            put(2, 12, 3, 2, "collect", "collect.png");
         }
         // коридоры-проходы: от низа центральной комнаты к низам остальных
         // кварталов + дуги по периметру (L-форма, как в генераторе данжей —
@@ -111,6 +117,10 @@
         };
         const lows = rooms.map(([x0, y0, x1, y1]) =>
             [x0 + ((x1 - x0) >> 1), y1]); // центр НИЗА комнаты (пол)
+        // W66: в обычном городе коридор юго-западного квартала — у ЗАПАДНОЙ
+        // стены (x=1): пятая колонка комнаты занята коллекционером, старый
+        // вход по x=3 прорезал бы его пятно
+        if (!capital) lows[3] = [1, 14];
         const hub = lows[0]; // низ центральной комнаты — развязка
         for (let i = 1; i < lows.length; i++) corridor(hub, lows[i]);
         if (capital) {
@@ -138,7 +148,7 @@
         else if (elem === "growth") {
             feat.forest = capital
                 ? [[17, 2, 21, 4], [17, 15, 18, 16]] // северо-восток + юго-восток
-                : [[2, 12, 4, 13]];                 // юго-запад
+                : [[14, 1, 18, 1]]; // W66: была в юго-западной — там коллекционер
             fillRect(feat.forest, "F");
         } else if (elem === "wisdom") {
             // река по стеновой полосе между колонками кварталов (столица —
@@ -161,17 +171,20 @@
                 }
             }
         } else if (elem === "decay") {
-            // болота проходимы: оверлей swamp.png поверх пола (рендер)
+            // болота проходимы: оверлей swamp.png поверх пола (рендер).
+            // W66: юго-западные зоны подрезаны — там стоит коллекционер
             feat.swamp = capital
-                ? [[17, 2, 21, 4], [2, 15, 6, 16], [17, 15, 21, 16]]
-                : [[2, 13, 4, 14], [10, 9, 12, 10]];
+                ? [[17, 2, 21, 4], [2, 15, 4, 16], [17, 15, 21, 16]]
+                : [[2, 14, 4, 14], [10, 9, 12, 10]];
         } else if (elem === "honor") {
             // массивы НЕ перерезают вертикали коридоров (в столице это
-            // x=4 и x=19) и не оставляют отрезанных карманов у зданий
+            // x=4 и x=19) и не оставляют отрезанных карманов у зданий.
+            // W66: массив [5,15,6,16] убран — пятно коллекционера
             feat.mounts = capital
-                ? [[17, 2, 21, 3], [2, 15, 3, 16], [5, 15, 6, 16],
+                ? [[17, 2, 21, 3], [2, 15, 3, 16],
                    [17, 15, 18, 16], [20, 15, 21, 16]]
-                : [[2, 13, 4, 13], [15, 1, 17, 1], [12, 9, 12, 9]];
+                : [[15, 1, 17, 1], [12, 9, 12, 9]]; // W66: [2,13,4,13] убран —
+            // пятно коллекционера в юго-западном квартале
             fillRect(feat.mounts, "M");
         } else if (elem === "time") {
             // пальцы стен внутри кварталов (воротный квартал чист — W37):
@@ -184,13 +197,17 @@
                 [16, 2], [16, 3], [22, 2], [22, 3], [19, 2], // северо-восточная
                 [7, 8], [7, 9], [6, 10], [7, 10],           // западная
                 [16, 8], [16, 9],                           // восточная
-                [1, 15], [1, 16], [7, 15], [7, 16],         // юго-западная
+                [1, 15], [1, 16],                           // юго-западная
+                // (пальцы [7,15],[7,16] убраны — W66: пятно коллекционера)
                 [16, 15], [16, 16], [22, 15], [22, 16],     // юго-восточная
             ] : [
                 [12, 7], [12, 8], [12, 9],                  // центральная
-                [5, 12], [5, 13], [1, 13],                  // юго-западная
+                // (пальцы [5,12],[5,13],[1,13] убраны — W66: пятно
+                // коллекционера и коридор у западной стены)
             ];
-            for (const [x, y] of feat.maze) g[y][x] = "#";
+            // W66: палец, попавший в пятно здания, молчит (здание главнее
+            // декоративной стены — пятна зданий должны быть цельными «%»)
+            for (const [x, y] of feat.maze) if (g[y][x] !== "%") g[y][x] = "#";
         }
         const objects = blds.map((b) => {
             const o = { ...b, taken: false };
@@ -905,13 +922,15 @@
     // ратуше — окно с описанием, наградой и кнопками «Принять»/
     // «Отказаться». Выполненные квесты не возобновляются (model/accept —
     // sidequests.js); «охота» спавнит монстра у города, «письмо»
-    // выбирает город-адресат. Живёт в city.js (W47), связи со сценой —
+    // выбирает город-адресат. W66 (юзер): ТЕМ ЖЕ окном пользуется
+    // «Коллекционер» (rare=true) — «Поиск редкостей», сочетается с
+    // поручением ратуши. Живёт в city.js (W47), связи со сценой —
     // env (как у кузницы выше)
-    function buildQuestWin(env, o) {
+    function buildQuestWin(env, o, rare) {
         const ctx = env.ctx;
         const G = ctx.G, uiTex = ctx.uiTex;
         const t = GAME_LOC.t;
-        const { T, button } = globalThis.GAME_UI;
+        const { T, button, cardFace, cardZoomer } = globalThis.GAME_UI;
         const SQ = globalThis.GAME_SIDEQ;
         const c = new PIXI.Container();
         c.eventMode = "static";
@@ -925,8 +944,8 @@
         panel.fill({ color: 0x171310, alpha: 0.96 });
         panel.stroke({ width: 4, color: 0x6b5c40 });
         c.addChild(panel);
-        const title = T(t("sideq.title"), 44, 0xf0c96a,
-            { stroke: { color: 0x241505, width: 8 } });
+        const title = T(t(rare ? "sideq.titleRare" : "sideq.title"), 44,
+            0xf0c96a, { stroke: { color: 0x241505, width: 8 } });
         title.anchor.set(0.5, 0);
         title.position.set(960, top + 20);
         title.eventMode = "none";
@@ -937,6 +956,9 @@
             onTap: () => { o.cool = true; env.closeModal(); },
         });
         c.addChild(leaveBtn);
+        // ховер-зум карты-заказа (как в магазине/кузнице — просил юзер);
+        // копия кладётся в узел окна — при закрытии окна зум подчищается
+        const zr = cardZoomer(ctx, { host: c });
         // город, в котором герой: вход запомнил якорь (exitTown)
         const map = G.world && G.world.map;
         const et = G.dungeon.exitTown || null;
@@ -975,7 +997,7 @@
             rewIcon.visible = false;
             return { node: c, refs: { leaveBtn, quest: null } };
         }
-        const m = SQ.model(G, poi);
+        const m = rare ? SQ.rareModel(G, poi) : SQ.model(G, poi);
         let refs = null; // offer назначит свою, остальным — общий «Уйти»
         if (m.mode === "done") {
             head.text = "";
@@ -995,7 +1017,7 @@
             rewIcon.position.set(960 - rew.width / 2 - 24, top + 338);
             rewIcon.visible = true;
         } else { // offer
-            head.text = t("sideq.offerHead");
+            head.text = t(rare ? "sideq.rare.head" : "sideq.offerHead");
             name.text = m.name;
             body.text = m.text;
             rew.text = m.reward;
@@ -1007,14 +1029,19 @@
             // кнопки «Принять»/«Отказаться» вместо «Уйти»
             c.removeChild(leaveBtn);
             const acceptTap = () => {
-                const q = SQ.accept(G, poi, m.type, m.target);
+                const q = rare
+                    ? SQ.acceptRare(G, poi, m.cardId)
+                    : SQ.accept(G, poi, m.type, m.target);
                 if (!q) return;
                 if (ctx.sfx) ctx.sfx("up");
                 env.closeModal();
-                env.showToast(q.type === "hunt"
-                    ? t("sideq.hunt.active", { mob: SQ.mobTitle(q.elem) })
-                    : t("sideq.letter.active",
-                        { city: SQ.cityName(G, q.target) }));
+                env.showToast(rare
+                    ? t("sideq.rare.active",
+                        { card: t("card." + q.cardId + ".name") })
+                    : q.type === "hunt"
+                        ? t("sideq.hunt.active", { mob: SQ.mobTitle(q.elem) })
+                        : t("sideq.letter.active",
+                            { city: SQ.cityName(G, q.target) }));
             };
             const acceptBtn = button(ctx, {
                 tex: "button_menu.png", label: t("sideq.accept"),
@@ -1030,16 +1057,64 @@
             c.addChild(declineBtn);
             refs = { leaveBtn: declineBtn, quest: {
                 state: () => ({ mode: m.mode, type: m.type,
-                    name: name.text, text: body.text, reward: rew.text }),
+                    name: name.text, text: body.text, reward: rew.text,
+                    cardId: m.cardId || null, card: !!cardNode }),
                 accept: acceptTap,
+                zoom: () => zr.state(),
+                cardHover: (on) => { if (cardNode)
+                    cardNode.emit(on ? "pointerover" : "pointerout"); },
             } };
+        }
+        // W66: редкость уже в коллекции — кнопка «Отдать карту» слева,
+        // «Уйти» переезжает вправо (как «Принять»/«Отказаться»)
+        let giveTap = null;
+        if (rare && m.mode === "taken" && SQ.rareCardReady(G, poi)) {
+            c.removeChild(leaveBtn);
+            giveTap = () => {
+                if (!SQ.giveRareCard(G, poi)) return;
+                if (ctx.sfx) ctx.sfx("up");
+                env.closeModal();
+                env.showToast(t("sideq.rareDone",
+                    { res: t("res." + poi.elem) }));
+            };
+            c.addChild(button(ctx, {
+                tex: "button_menu.png", label: t("sideq.rare.give"),
+                x: 960 - 170, y: top + h - 70, scale: 1,
+                onTap: giveTap,
+            }));
+            leaveBtn.x = 960 + 170;
+            c.addChild(leaveBtn);
+        }
+        // W66 (юзер): у редкости справа — ЛИЦО заказанной карты с ховер-
+        // зумом (как в магазине); тексты сдвинуты влево, чтобы ужились
+        let cardNode = null;
+        if (rare && m.cardId) {
+            const tx = 830;
+            head.position.set(tx, top + 96);
+            name.position.set(tx, top + 136);
+            body.position.set(tx, top + 200);
+            body.style.wordWrapWidth = 380;
+            rew.position.set(tx + 16, top + 320);
+            rewIcon.position.set(tx - rew.width / 2 - 24, top + 338);
+            cardNode = cardFace(ctx, m.cardId, { scale: 0.62 });
+            cardNode.position.set(1165, top + 245);
+            cardNode.eventMode = "static";
+            cardNode.on("pointerover",
+                () => zr.show(m.cardId, 1165, top + 245, cardNode, 0.62));
+            cardNode.on("pointerout", () => zr.hide(false));
+            c.addChild(cardNode);
         }
         // taken/done: «Уйти» остаётся, принять нечего (offer выше
         // уже назначил refs с accept)
         if (!refs || !refs.quest) refs = { leaveBtn, quest: {
             state: () => ({ mode: m.mode, type: m.type || null,
-                name: name.text, text: body.text, reward: rew.text }),
+                name: name.text, text: body.text, reward: rew.text,
+                cardId: m.cardId || null, canGive: !!giveTap, card: !!cardNode }),
             accept: () => {},
+            give: giveTap || (() => {}),
+            zoom: () => zr.state(),
+            cardHover: (on) => { if (cardNode)
+                cardNode.emit(on ? "pointerover" : "pointerout"); },
         } };
         return { node: c, refs };
     }

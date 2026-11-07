@@ -718,15 +718,19 @@
                 winObj = null;
                 return;
             }
-            if (o.type === "armory" || o.type === "townHall") {
+            if (o.type === "armory" || o.type === "townHall"
+                || o.type === "collect") {
                 // кузница и ратуша (W40, просил юзер): крафт бустеров из
-                // ресурсов стихии города; побочные квесты города. Окна
-                // города строит city.js (W47) — сцена даёт ему связи
+                // ресурсов стихии города; побочные квесты города.
+                // W66 (юзер): коллекционер — ТЕМ ЖЕ окном квестов, но
+                // со своим заданием «Поиск редкостей» (rare-режим).
+                // Окна города строит city.js (W47) — сцена даёт ему связи
                 // (закрытие/тост/замена окна) и ставит их результат себе
                 o.cool = true;
                 G.dungeon.win = { idx: G.dungeon.objects.indexOf(o) };
                 const w = (o.type === "armory"
-                    ? CITY.buildForgeWin : CITY.buildQuestWin)(cityEnv(), o);
+                    ? CITY.buildForgeWin
+                    : CITY.buildQuestWin)(cityEnv(), o, o.type === "collect");
                 winNode = w.node;
                 winRefs = w.refs;
                 ctx.ui.addChild(winNode);
@@ -1779,6 +1783,20 @@
             questWinState: () => (winRefs && winRefs.quest
                 ? winRefs.quest.state() : null),
             questAccept: () => { if (winRefs && winRefs.quest) winRefs.quest.accept(); },
+            // W66: отдать карту коллекционеру (кнопка окна)
+            questGive: () => {
+                if (winRefs && winRefs.quest && winRefs.quest.give)
+                    winRefs.quest.give();
+            },
+            // W66: карта-заказ коллекционера — показана? состояние зума
+            questCardState: () => (winRefs && winRefs.quest
+                ? { card: !!winRefs.quest.state().card,
+                    zoom: winRefs.quest.zoom ? winRefs.quest.zoom() : null }
+                : null),
+            questCardHover: (on) => {
+                if (winRefs && winRefs.quest && winRefs.quest.cardHover)
+                    winRefs.quest.cardHover(on);
+            },
             winDismiss: () => { if (winObj) { winObj.cool = true; closeModal(); } },
         };
     }

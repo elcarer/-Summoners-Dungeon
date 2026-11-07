@@ -105,6 +105,31 @@
         }
         function save() { G.persistMeta(); } // колода героя — она же G.deck
 
+        // ── Перелёт карты между панелями (W66, юзер): как взятие карты
+        // в бою — лицо карты летит по дуге от исходной карточки к своей
+        // новой позиции в другой панели (колода ↔ коллекция). Позиции
+        // карточек — paneCards в координатах контента; глобальные получаем
+        // как в showZoom: смещение панели + сдвиг скролла
+        const flights = []; // { node, fx, fy, tx, ty, life, total }
+        const paneGlobal = (side, e) => {
+            const st = (side === "left" ? leftPane : rightPane).state;
+            const iy = -st.t * Math.max(0, st.contentH - st.viewH);
+            return { x: PANE_POS[side].x + e.cx, y: PANE_POS[side].y + e.cy + iy };
+        };
+        function flyCard(id, from, toSide) {
+            if (!root) return;
+            const tgt = paneCards[toSide].find((e) => e.id === id);
+            // фильтры могут прятать карту в целевой панели — летим к её шапке
+            const to = tgt ? paneGlobal(toSide, tgt)
+                : { x: PANE_POS[toSide].x + 300, y: PANE_POS[toSide].y + 110 };
+            const node = cardFace(ctx, id, { scale: 0.5 });
+            node.eventMode = "none";
+            node.position.set(from.x, from.y);
+            root.addChild(node);
+            flights.push({ node, fx: from.x, fy: from.y, tx: to.x, ty: to.y,
+                life: 0.42, total: 0.42 });
+        }
+
         // ── левое окно: колода карточками (как коллекция) ──────────────────
         function buildDeckList() {
             const c = new PIXI.Container();
@@ -600,18 +625,25 @@
                 if (!heroElemOk(id)) return false; // стихия не из героя
                 if (countIn(id) >= (G.collection[id] || 0)) return false;
                 if (countIn(id) >= DECK_COPIES) return false; // не более 3 одинаковых
+                // источник перелёта — карточка в коллекции (до пересборки)
+                const src = paneCards.right.find((e) => e.id === id);
                 G.deck.push(id);
                 save();
                 rebuildPanes();
+                if (src) flyCard(id, paneGlobal("right", src), "left");
                 return true;
             },
             remove(id) {
                 if (!root) return false; // вне редактора перерисовывать нечего
                 const i = G.deck.lastIndexOf(id);
                 if (i < 0 || G.deck.length <= deckMinNow()) return false;
+                // источник перелёта — карточка в колоде (до пересборки:
+                // последняя копия из списка исчезнет)
+                const src = paneCards.left.find((e) => e.id === id);
                 G.deck.splice(i, 1);
                 save();
                 rebuildPanes();
+                if (src) flyCard(id, paneGlobal("left", src), "right");
                 return true;
             },
             // совместимость с тестами/старыми вызовами: заменить ось одним
@@ -656,6 +688,11 @@
             zoomState: () => (zoom
                 ? { id: zoom.id, scale: Math.round(zoom.cur * 1000) / 1000, target: zoom.tgt }
                 : null),
+            // перелёты карт (тесты W66): живые полёты и их позиция
+            flightsState: () => flights.map((f) => ({
+                x: Math.round(f.node.x), y: Math.round(f.node.y),
+                ms: Math.round(f.life * 1000),
+            })),
             // узлы/геометрия карточек панелей (тесты: эмит pointerover/out)
             cardNode: (side, i) => (paneCards[side] && paneCards[side][i] ? paneCards[side][i].node : null),
             cardInfo: (side, i) => (paneCards[side] && paneCards[side][i]
@@ -712,6 +749,22 @@
                 // Эскейп = «Назад» (просил юзер): дублирует кнопку выхода,
                 // замок минимума колоды работает как у кнопки (внутри doBack)
                 if (ctx.input.wasPressed("Escape")) doBack();
+                // перелёты карт колода ↔ коллекция (W66): дуга с подъёмом,
+                // ease-out — как полёт карты при взятии в бою
+                for (let i = flights.length - 1; i >= 0; i--) {
+                    const f = flights[i];
+                    if (!f.node || f.node.destroyed) { flights.splice(i, 1); continue; }
+                    f.life -= ticker.deltaMS / 1000;
+                    const k = 1 - Math.max(0, f.life / f.total);
+                    const e = 1 - Math.pow(1 - k, 3);
+                    const lift = Math.sin(Math.PI * Math.min(1, k)) * 80;
+                    f.node.x = f.fx + (f.tx - f.fx) * e;
+                    f.node.y = f.fy + (f.ty - f.fy) * e - lift;
+                    if (f.life <= 0) {
+                        flights.splice(i, 1);
+                        f.node.destroy({ children: true });
+                    }
+                }
                 if (zoom) {
                     const z = zoom;
                     z.cur += (z.tgt - z.cur) * Math.min(1, (ticker.deltaMS / 1000) * 14);

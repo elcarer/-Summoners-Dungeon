@@ -196,9 +196,10 @@
             uiTextures["npc/glom.png"] =
                 await assets.loadTexture("./images/npc/glom.png");
         } catch (e) { /* арта ещё нет — окно с силуэтом */ }
-        // здания городов (арт юзера, W34): магазин/кузница/дом Глома 384×256
-        // и ратуша 384×384; W36 — рисуются в полразмера (пятно 3×2 / 3×3)
-        for (const f of ["shop", "armory", "town_hall", "glom_house"])
+        // здания городов (арт юзера, W34): магазин/кузница/дом Глома
+        // и коллекционер (W66) 384×256, ратуша 384×384; W36 — рисуются
+        // в полразмера (пятно 3×2 / 3×3)
+        for (const f of ["shop", "armory", "town_hall", "glom_house", "collect"])
             uiTextures[`buildings/${f}.png`] =
                 await assets.loadTexture(`./images/buildings/${f}.png`);
         // ресурсы и бустеры стихий (арт юзера, W40): иконки в HUD сверху

@@ -710,7 +710,19 @@
                     x: sp.x, y: sp.y + 24, color: fxColorOf(def.elem),
                     scale: opts.token ? 0.72 : 1,
                 });
-                arrivals.push({ u, node, life: 0.5 / animK(), fx: portalFx });
+                const arrEntry = { u, node, life: 0.5 / animK(), fx: portalFx,
+                    after: null }; // «после явления» — см. afterArrive
+                arrivals.push(arrEntry);
+                // «После призыва» — только ПОСЛЕ явления существа из портала
+                // (просил юзер): портал → существо показалось → рывок/удар.
+                // Раньше «Скорость» разрешалась сразу: удар и цифра урона
+                // выскакивали раньше существа, а glide доезжал скрытым —
+                // телепорт вместо плавной пробежки. Тест-хук _spawn
+                // (opts.testSummon) разрешает синхронно, как прежде.
+                const afterArrive = (fn) => {
+                    if (opts.testSummon) { fn(); return; }
+                    (arrEntry.after = arrEntry.after || []).push(fn);
+                };
                 multiFury(cardId, side); // «Ярость природы» (Рыжий лес, W54)
                 multiValor(cardId, side); // «Растущая доблесть» (Белая пуща, W62)
                 sfx("aqua"); // призыв (обе стороны)
@@ -1012,11 +1024,13 @@
                         && B.units.includes(v)
                         && Math.abs(v.col - col) + Math.abs(v.row - row) === 1)) {
                         u.spdBonus = 1;
-                        summonDash(u);
-                        const spN = cellXY(col, row);
-                        floatText(spN.x, spN.y - 96,
-                            "» " + GAME_LOC.t("status.speed.name"), 0xb7d0ef);
-                        sfx("step");
+                        afterArrive(() => { // рывок — после явления (просил юзер)
+                            summonDash(u);
+                            const spN = cellXY(u.col, u.row);
+                            floatText(spN.x, spN.y - 96,
+                                "» " + GAME_LOC.t("status.speed.name"), 0xb7d0ef);
+                            sfx("step");
+                        });
                     }
                     // «Секироносец царства» (tim220): при появлении наносит 1
                     // урон случайному соседнему (верт/гориз) существу ВРАГА
@@ -1032,9 +1046,11 @@
                             floatText(axA.x, axA.y - 75, `−${def.axeArrive}♥`, 0xef9f8c);
                         }
                     }
-                    if (def.ability === "dash1") honorRelayAct(u, () => summonDash(u)); // «Скорость 1»
+                    if (def.ability === "dash1") // «Скорость 1» — после явления
+                        afterArrive(() => honorRelayAct(u, () => summonDash(u)));
                     else if (def.ability === "dashN") // «Скорость N» (Колесница hon187)
-                        honorRelayAct(u, () => summonDashN(u, def.abilityVal || 2));
+                        afterArrive(() =>
+                            honorRelayAct(u, () => summonDashN(u, def.abilityVal || 2)));
                     else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
                     else if (def.ability === "spiritSummoner") summonSpiritCaller(u); // призыватель духов
                     else if (def.ability === "bombling") summonBombling(u); // бомблинг
@@ -1145,11 +1161,13 @@
                         const hdD = heroDefOf(side);
                         if (hdD && hdD.ability === "firstHonorDash") {
                             B.heroFlags.honorDash[side] = true;
-                            summonDash(u);
-                            const sp2 = cellXY(u.col, u.row);
-                            floatText(sp2.x, sp2.y - 96,
-                                "» " + GAME_LOC.t("status.dash.name"), 0xb7d0ef);
-                            sfx("step");
+                            afterArrive(() => { // рывок — после явления (просил юзер)
+                                summonDash(u);
+                                const sp2 = cellXY(u.col, u.row);
+                                floatText(sp2.x, sp2.y - 96,
+                                    "» " + GAME_LOC.t("status.dash.name"), 0xb7d0ef);
+                                sfx("step");
+                            });
                         }
                     }
                     // «Армия тьмы» (decArmy, просил юзер): первый призванный

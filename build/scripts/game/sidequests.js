@@ -225,11 +225,13 @@
         globalThis.GAME_LOC.t("enc." + encOf(elem) + ".title");
     const resName = (elem) => globalThis.GAME_LOC.t("res." + elem);
 
-    // Что ратуша города может предложить: вид(ы) не выполнен и не активен
+    // Что ратуша города может предложить: вид(ы) не выполнен и не активен.
+    // «Поиск редкостей» коллекционера (W66) ратушу не блокирует — тот
+    // сочетается с поручением ратуши
     function remainingTypes(G, city) {
         const sq = stateOf(G);
         if (!sq) return [];
-        if (sq.active.some((a) => a.city === city)) return [];
+        if (sq.active.some((a) => a.city === city && a.type !== "rare")) return [];
         const done = sq.done[city] || {};
         return TYPES.filter((tp) => !done[tp]);
     }
@@ -241,8 +243,9 @@
         if (!sq) return { mode: "done" };
         const left = remainingTypes(G, city);
         if (!left.length) return { mode: "done", text: t("sideq.done") };
-        if (sq.active.some((a) => a.city === city)) {
-            const a = sq.active.find((x) => x.city === city);
+        const own = sq.active.find((a) => a.city === city && a.type !== "rare");
+        if (own) {
+            const a = own;
             return {
                 mode: "taken",
                 head: t("sideq.taken"),
@@ -281,22 +284,112 @@
         return p ? p.name : globalThis.GAME_LOC.t("world.title");
     }
 
-    // Модель АКТИВНОГО поручения для окна-просмотра (W45, юзер): после
-    // поправки «одно одновременно» активное всегда одно
-    function activeModel(G) {
-        const sq = stateOf(G);
-        if (!sq || !sq.active.length) return null;
-        const a = sq.active[0];
+    // ── «Поиск редкостей» (W66, юзер) — квест здания «Коллекционер» ─────
+    // Случайная ОДНОСТИХИЙНАЯ карта стихии города из её наградного пула
+    // (двухцветные живут в отдельных пуллах groHon/strGro — сюда не
+    // попадают, как и просил юзер). Герой приносит ЭТУ карту, отдаёт её
+    // коллекционеру и получает 2 ресурса стихии города. Сочетается с
+    // поручением ратуши (висят параллельно, окно то же); взятие поиска
+    // в другом городе сбрасывает предыдущий.
+    const cardName = (id) => globalThis.GAME_LOC.t("card." + id + ".name");
+
+    function rarePoolCard(elem) {
+        const pool = globalThis.GAME_DATA.REWARD_POOLS[elem];
+        if (!pool || !pool.length) return null;
+        return pool[(Math.random() * pool.length) | 0];
+    }
+    // Модель окна коллекционера (тот же buildQuestWin, rare-режим):
+    // offer / taken / done — по редкости этого города
+    function rareModel(G, poi) {
         const t = globalThis.GAME_LOC.t;
+        const sq = stateOf(G);
+        const city = keyOf(poi);
+        const act = sq && sq.active.find((a) => a.type === "rare"
+            && a.city === city);
+        if (act) return {
+            mode: "taken", type: "rare",
+            head: t("sideq.taken"),
+            name: t("sideq.rare.name"),
+            text: t("sideq.rare.active", { card: cardName(act.cardId) }),
+            reward: t("sideq.reward2", { res: resName(act.elem) }),
+            cardId: act.cardId,
+        };
+        if (!sq || (sq.done[city] || {}).rare)
+            return { mode: "done", type: "rare", text: t("sideq.rare.doneCity") };
+        // карта выбирается СРАЗУ (и в окне, и при принятии — acceptRare
+        // получает её же, чтобы описание не разошлось с фактом)
+        const cardId = rarePoolCard(poi.elem);
+        if (!cardId) return { mode: "done", type: "rare", text: t("sideq.rare.doneCity") };
         return {
+            mode: "offer", type: "rare",
+            name: t("sideq.rare.name"),
+            text: t("sideq.rare.desc", { card: cardName(cardId) }),
+            reward: t("sideq.reward2", { res: resName(poi.elem) }),
+            cardId,
+        };
+    }
+    // Принять поиск редкостей: предыдущий (в любом городе) сбрасывается,
+    // поручение ратуши не задевается
+    function acceptRare(G, poi, cardId) {
+        const sq = stateOf(G);
+        if (!sq) return null;
+        const def = globalThis.GAME_DATA.CARDS[cardId];
+        if (!def || def.elem !== poi.elem) return null; // не стихия города
+        sq.active = sq.active.filter((a) => a.type !== "rare");
+        const q = { city: keyOf(poi), type: "rare", elem: poi.elem, cardId };
+        sq.active.push(q);
+        if (G.saveRun) G.saveRun();
+        return q;
+    }
+    // Сдача карты коллекционеру (кнопка «Отдать карту» в его окне):
+    // карта уходит НАВСЕГДА — из колоды тоже (как потерянная при
+    // поражении, loseCard в main.js), иначе редактор вернул бы её даром
+    function giveRareCard(G, poi) {
+        const sq = stateOf(G);
+        const q = sq && sq.active.find((a) => a.type === "rare"
+            && a.city === keyOf(poi));
+        if (!q || (G.collection[q.cardId] || 0) <= 0) return false;
+        const di = G.deck.lastIndexOf(q.cardId);
+        if (di >= 0) G.deck.splice(di, 1);
+        G.collection[q.cardId] = Math.max(0, G.collection[q.cardId] - 1);
+        if (G.persistMeta) G.persistMeta();
+        complete(G, q, "sideq.rareDone", 2);
+        return true;
+    }
+    // есть ли у героя карта активного поиска этого города (кнопка «Отдать»)
+    function rareCardReady(G, poi) {
+        const sq = stateOf(G);
+        const q = sq && sq.active.find((a) => a.type === "rare"
+            && a.city === keyOf(poi));
+        return !!q && (G.collection[q.cardId] || 0) > 0;
+    }
+
+    // Модели АКТИВНЫХ поручений для окна-просмотра (W45, юзер; W66 — их
+    // может быть ДВЕ: поручение ратуши + «Поиск редкостей» коллекционера
+    // висят параллельно — просил юзер)
+    function activeModels(G) {
+        const sq = stateOf(G);
+        if (!sq || !sq.active.length) return [];
+        const t = globalThis.GAME_LOC.t;
+        return sq.active.map((a) => ({
             type: a.type, elem: a.elem, city: a.city,
             name: a.type === "hunt" ? t("sideq.hunt.name")
+                : a.type === "rare" ? t("sideq.rare.name")
                 : t("sideq.letter.name", { city: poiName(G, a.target) }),
             text: a.type === "hunt"
                 ? t("sideq.hunt.active", { mob: mobName(a.elem) })
-                : t("sideq.letter.active", { city: poiName(G, a.target) }),
-            reward: t("sideq.reward", { res: resName(a.elem) }),
-        };
+                : a.type === "rare"
+                    ? t("sideq.rare.active", { card: cardName(a.cardId) })
+                    : t("sideq.letter.active", { city: poiName(G, a.target) }),
+            reward: a.type === "rare"
+                ? t("sideq.reward2", { res: resName(a.elem) })
+                : t("sideq.reward", { res: resName(a.elem) }),
+        }));
+    }
+    // совместимость: первое активное поручение (ратуша идёт раньше rare —
+    // acceptRare кладёт rare в конец)
+    function activeModel(G) {
+        return activeModels(G)[0] || null;
     }
 
     // ── Окно активного поручения (W45, юзер): кнопка рядом с кнопкой
@@ -317,17 +410,19 @@
     function showReview(ctx) {
         const G = ctx && ctx.G;
         if (!G || rev) return false;
-        const m = activeModel(G);
-        if (!m) return false;
+        const ms = activeModels(G);
+        if (!ms.length) return false;
         const t = globalThis.GAME_LOC.t;
-        const { T, button } = globalThis.GAME_UI;
+        const { T, button, fit, cardFace } = globalThis.GAME_UI;
         const node = new globalThis.PIXI.Container();
         node.eventMode = "static";
         const dim = new globalThis.PIXI.Graphics();
         dim.rect(-3000, -2000, 7920, 5080);
         dim.fill({ color: 0x000000, alpha: 0.55 });
         node.addChild(dim);
-        const w = 780, h = 540, top = 540 - h / 2;
+        // W66: поручений может быть два (ратуша + редкость) — окно выше,
+        // блоки поручений друг под другом
+        const w = 780, h = 580, top = 540 - h / 2;
         const panel = new globalThis.PIXI.Graphics();
         panel.roundRect(960 - w / 2, top, w, h, 18);
         panel.fill({ color: 0x171310, alpha: 0.96 });
@@ -339,35 +434,50 @@
         title.position.set(960, top + 20);
         title.eventMode = "none";
         node.addChild(title);
-        const head = T(t("sideq.taken"), 26, 0xbfae87);
+        const head = T(t("sideq.taken"), 22, 0xbfae87);
         head.anchor.set(0.5, 0);
-        head.position.set(960, top + 96);
+        head.position.set(960, top + 84);
         head.eventMode = "none";
         node.addChild(head);
-        const name = T(m.name, 32, 0xf0c96a);
-        name.anchor.set(0.5, 0);
-        name.position.set(960, top + 136);
-        name.eventMode = "none";
-        node.addChild(name);
-        const body = T(m.text, 24, 0xd8c79d,
-            { wordWrap: true, wordWrapWidth: w - 130, align: "center" });
-        body.anchor.set(0.5, 0);
-        body.position.set(960, top + 200);
-        body.eventMode = "none";
-        node.addChild(body);
-        const rewIcon = new globalThis.PIXI.Sprite(
-            ctx.uiTex(`resources/res_${m.elem}.png`));
-        rewIcon.anchor.set(0.5);
-        rewIcon.scale.set(0.34);
-        rewIcon.eventMode = "none";
-        node.addChild(rewIcon);
-        const rew = T(m.reward, 26, 0xffe2a8);
-        rew.anchor.set(0.5, 0);
-        rew.position.set(960, top + 320);
-        rew.eventMode = "none";
-        node.addChild(rew);
-        rew.position.y = top + 320;
-        rewIcon.position.set(960 - rew.width / 2 - 24, top + 338);
+        for (let i = 0; i < ms.length && i < 2; i++) {
+            const m = ms[i];
+            const by = top + 126 + i * 156;
+            // у редкости справа — лицо заказанной карты (текст уже)
+            const withCard = !!m.cardId;
+            const cx = withCard ? 960 - 105 : 960;
+            const name = T(m.name, 28, 0xf0c96a);
+            name.anchor.set(0.5, 0);
+            name.position.set(cx, by);
+            name.eventMode = "none";
+            fit(name, withCard ? w - 330 : w - 120, 26);
+            node.addChild(name);
+            const body = T(m.text, 21, 0xd8c79d,
+                { wordWrap: true, wordWrapWidth: withCard ? w - 350 : w - 130,
+                    align: "center" });
+            body.anchor.set(0.5, 0);
+            body.position.set(cx, by + 40);
+            body.eventMode = "none";
+            node.addChild(body);
+            const rewIcon = new globalThis.PIXI.Sprite(
+                ctx.uiTex(`resources/res_${m.elem}.png`));
+            rewIcon.anchor.set(0.5);
+            rewIcon.scale.set(0.3);
+            rewIcon.eventMode = "none";
+            node.addChild(rewIcon);
+            const rew = T(m.reward, 23, 0xffe2a8);
+            rew.anchor.set(0.5, 0);
+            rew.position.set(cx + 16, by + 104);
+            rew.eventMode = "none";
+            node.addChild(rew);
+            rewIcon.position.set(cx - rew.width / 2 - 22, by + 120);
+            if (withCard) { // лицо карты-заказа (W66, юзер)
+                const face = cardFace(ctx, m.cardId, { scale: 0.42 });
+                face.anchor.set(0.5);
+                face.position.set(1272, by + 62);
+                face.eventMode = "none";
+                node.addChild(face);
+            }
+        }
         // чек-бокс стрелки к цели ПОРУЧЕНИЯ (как у сюжетного — quests.js):
         // своё состояние sideqArrow, стрелки побочных квестов читают его
         // в world.js
@@ -390,9 +500,9 @@
         lab.anchor.set(0, 0.5);
         const rowW = 28 + 14 + lab.width;
         const rx = 960 - rowW / 2;
-        box.position.set(rx, top + 386);
-        mark.position.set(rx, top + 386);
-        lab.position.set(rx + 42, top + 400);
+        box.position.set(rx, top + 440);
+        mark.position.set(rx, top + 440);
+        lab.position.set(rx + 42, top + 454);
         box.eventMode = "static";
         mark.eventMode = "none";
         lab.eventMode = "none";
@@ -418,12 +528,13 @@
         ctx.questModal = (ctx.questModal || 0) + 1;
         rev = { ctx, node };
         revGeo = { box: [Math.round(box.x) + 14, Math.round(box.y) + 14],
-            on: on() };
+            on: on(), names: ms.map((m) => m.name) };
         return true;
     }
     // для проб: открыто ли окно поручения и где центр чек-бокса (клик мышью)
     function reviewState() {
-        return rev ? { open: true, box: revGeo.box, on: revGeo.on }
+        return rev ? { open: true, box: revGeo.box, on: revGeo.on,
+            names: revGeo.names || [] }
             : { open: false };
     }
 
@@ -465,6 +576,7 @@
         title.eventMode = "none";
         node.addChild(title);
         const name = T(n.type === "hunt" ? t("sideq.hunt.name")
+            : n.type === "rare" ? t("sideq.rare.name")
             : t("sideq.letter.name", { city: poiName(G, n.target) }),
         30, 0xf0c96a);
         name.anchor.set(0.5, 0);
@@ -473,6 +585,7 @@
         node.addChild(name);
         const body = T(n.type === "hunt"
             ? t("sideq.doneWin.hunt", { mob: mobName(n.elem) })
+            : n.type === "rare" ? t("sideq.doneWin.rare")
             : t("sideq.doneWin.letter", { city: poiName(G, n.target) }),
         24, 0xd8c79d,
         { wordWrap: true, wordWrapWidth: w - 120, align: "center" });
@@ -480,8 +593,9 @@
         body.position.set(960, top + 156);
         body.eventMode = "none";
         node.addChild(body);
-        // награда: иконка ресурса слева от строки (как в окне поручения)
-        const rew = T(t("sideq.reward", { res: resName(n.elem) }), 27, 0xffe2a8);
+        // награда: иконка ресурса слева от строки награды (как в окне поручения)
+        const rew = T(t(n.type === "rare" ? "sideq.reward2" : "sideq.reward",
+            { res: resName(n.elem) }), 27, 0xffe2a8);
         rew.anchor.set(0.5, 0);
         rew.position.set(960 + 16, top + 268);
         rew.eventMode = "none";
@@ -511,9 +625,11 @@
 
     // Принять: письмо берёт адресат из окна (targetKey — тот же, что
     // показан, иначе случайный); охота спавнит монстра. Возвращает квест
-    // или null. (W45, юзер) ОДНОВРЕМЕННО висит только одно поручение:
-    // взятие нового ОТМЕНЯЕТ текущее (монстр отменённой охоты уходит
-    // из мира; в done не пишем — можно вернуться и взять заново)
+    // или null. (W45, юзер) ОДНОВРЕМЕННО висит только одно поручение
+    // РАТУШИ: взятие нового ОТМЕНЯЕТ текущее (монстр отменённой охоты
+    // уходит из мира; в done не пишем — можно вернуться и взять заново).
+    // W66: «Поиск редкостей» коллекционера не задевается — тот висит
+    // параллельно (просил юзер)
     function accept(G, poi, type, targetKey = null) {
         const sq = stateOf(G);
         if (!sq) return null;
@@ -521,7 +637,7 @@
         for (const a of sq.active)
             if (a.type === "hunt" && a.mobKey && G.world
                 && G.world.wander) delete G.world.wander[a.mobKey];
-        sq.active.length = 0;
+        sq.active = sq.active.filter((a) => a.type === "rare");
         if (!remainingTypes(G, city).includes(type)) return null;
         const q = { city, type, elem: poi.elem };
         if (type === "hunt") {
@@ -539,11 +655,12 @@
     }
     // Отказаться — окно закрыто, квест не взят (предложение повторится)
 
-    // Награда + отметка выполнения (общий хвост охоты и письма)
-    function complete(G, q, noteKey) {
+    // Награда + отметка выполнения (общий хвост охоты, письма и редкости;
+    // W66: редкость платит 2 ресурса — resN)
+    function complete(G, q, noteKey, resN = 1) {
         const sq = stateOf(G);
         if (!G.resources) G.resources = {};
-        G.resources[q.elem] = (G.resources[q.elem] || 0) + 1;
+        G.resources[q.elem] = (G.resources[q.elem] || 0) + resN;
         const i = sq.active.indexOf(q);
         if (i >= 0) sq.active.splice(i, 1);
         const done = sq.done[q.city] = sq.done[q.city] || {};
@@ -577,7 +694,16 @@
             gx: Math.floor((G.world.heroPos ? G.world.heroPos.x : 0) / TS),
             gy: Math.floor((G.world.heroPos ? G.world.heroPos.y : 0) / TS),
         });
-        for (const a of sq.active) {
+        for (const a of sq.active.slice()) {
+            if (a.type === "rare") {
+                // редкость несётся в город-заказчик; город пропал (мир
+                // пересобран) — поиск сбрасывается (нести некому)
+                if (!poiByKey(G, a.city)) {
+                    sq.active.splice(sq.active.indexOf(a), 1);
+                    n++;
+                }
+                continue;
+            }
             if (a.type === "hunt") {
                 const st = G.world.wander && G.world.wander[a.mobKey];
                 if (st && st.alive) continue;
@@ -651,8 +777,11 @@
     globalThis.GAME_SIDEQ = {
         fresh, stateOf, model, accept, onHuntWin, onEnterCity,
         arrowTargets, glowCities, huntMobs, repairQuests,
+        // «Поиск редкостей» коллекционера (W66, юзер)
+        rareModel, acceptRare, giveRareCard, rareCardReady, rarePoolCard,
         // окно активного поручения (W45): кнопка в HUD мира/города
-        showReview, closeReview, reviewOpen, activeModel, reviewState,
+        showReview, closeReview, reviewOpen, activeModel, activeModels,
+        reviewState,
         // инфоокно «поручение выполнено» (W54, юзер)
         showComplete, closeComplete, completeState,
         // имя монстра стихии и имя города по ключу (тосты после принятия)
