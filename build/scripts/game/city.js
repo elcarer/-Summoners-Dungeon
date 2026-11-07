@@ -119,6 +119,18 @@
         const treeCells = (d.trees || []).map((c) => [c[0], c[1]]);
         for (let y = 0; y < CH; y++) for (let x = 0; x < CW; x++)
             if (g[y][x] === "F") treeCells.push([x, y]);
+        // ручные варианты стен (W69, редактор): «x,y» → имя тайла —
+        // addWalls рисует их вместо авто-подбора по соседям. Битые ключи
+        // (не стена/вне карты) и неизвестные имена молча пропускаются
+        const walls = {};
+        for (const k of Object.keys(d.walls || {})) {
+            const m = /^(\d+),(\d+)$/.exec(k);
+            const x = m ? +m[1] : -1, y = m ? +m[2] : -1;
+            if (x < 0 || y < 0 || x >= CW || y >= CH || g[y][x] !== "#")
+                continue;
+            if (/^wall_(h1|v1|cor[1-4]|end[1-4])$/.test(d.walls[k]))
+                walls[k] = d.walls[k];
+        }
         const st = {
             city: true, isCapital: !!capital,
             elem, cave: caveId, floor: 1,
@@ -130,6 +142,7 @@
             roomRects: [], // [x0,y0,x1,y1] кварталов — только для проб
             feat,
             treeCells, // явные деревья + рощи «F»
+            walls, // ручные варианты стен дизайна (пусто — авто-подбор)
             glom: house ? {
                 state: "hidden", // hidden → walking → talking → idle
                 x: glomHome.x, y: glomHome.y,

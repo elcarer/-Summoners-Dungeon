@@ -285,6 +285,9 @@
         }
         function addWalls(layer) {
             const lair = tileSetOf(myState && myState.cave); // набор тайлов данжа
+            // ручные варианты стен из дизайна города (W69, редактор):
+            // "x,y" → имя тайла — рисуем именно им вместо авто-подбора
+            const wallOv = myState && myState.walls;
             // для ВЫБОРА ТАЙЛА сосед за краем карты — не стена: крайние
             // клетки получают конечные/угловые спрайты и карта «цельная»
             // (просил юзер); коллизию это не трогает — blocked() выше.
@@ -295,10 +298,12 @@
                 if (!wallDrawn(i, j)) continue;
                 const isW = (x, y) => x >= 0 && y >= 0 && x < W && y < H && MAPROWS[y][x] === "#";
                 const isF = (x, y) => !isW(x, y); // «за краем карты» — как пол
-                const sp = new PIXI.Sprite(uiTex(`dungeon_tiles/${lair}/walls/${
-                    wallTexName(isW(i - 1, j), isW(i + 1, j), isW(i, j - 1), isW(i, j + 1),
-                        isF(i + 1, j + 1), isF(i - 1, j + 1), isF(i - 1, j - 1), isF(i + 1, j - 1))
-                }.png`));
+                const nm = (wallOv && typeof wallOv[i + "," + j] === "string"
+                    && wallOv[i + "," + j]) || wallTexName(
+                    isW(i - 1, j), isW(i + 1, j), isW(i, j - 1), isW(i, j + 1),
+                    isF(i + 1, j + 1), isF(i - 1, j + 1), isF(i - 1, j - 1), isF(i + 1, j - 1));
+                const sp = new PIXI.Sprite(uiTex(`dungeon_tiles/${lair}/walls/${nm}.png`));
+                sp.label = "wall:" + nm; // имя тайла — для проб/тестов
                 sp.anchor.set(0, 1); // левый-низ: низ спрайта — низ своей клетки
                 sp.position.set(i * TS, (j + 1) * TS);
                 sp.zIndex = (j + 1) * TS - 1;

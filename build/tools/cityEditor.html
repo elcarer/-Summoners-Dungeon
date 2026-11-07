@@ -87,6 +87,21 @@
     .bld span { font-size: 12px; color: var(--dim); }
     .bld.on span { color: var(--gold); }
 
+    /* палитра вариантов стен: раскрывается под кнопкой «Стена» */
+    #wallPalette {
+        grid-column: 1 / -1; display: none; flex-wrap: wrap; gap: 3px;
+        padding: 5px; background: #1a140d;
+        border: 1px solid var(--line); border-radius: 6px;
+    }
+    #wallPalette.show { display: flex; }
+    #wallPalette .wv { padding: 2px; display: flex; flex-direction: column;
+        align-items: center; gap: 1px; width: 34px; }
+    #wallPalette .wv img { width: 26px; height: 52px; object-fit: contain; }
+    #wallPalette .wv .auto { width: 26px; height: 52px; display: flex;
+        align-items: center; justify-content: center;
+        font-size: 12px; color: var(--dim); }
+    #wallPalette .wv.on { border-color: var(--gold); background: #3d2f1a; }
+
     #center { flex: 1 1 auto; position: relative; min-width: 0;
         background: #0b0806; }
     #canvasHost { position: absolute; inset: 0; }
@@ -163,7 +178,9 @@
         <div class="h">Клетки (кисть)</div>
         <div class="tgrid" id="cellTools"></div>
         <div class="hint">ПКМ — всегда стена. Shift+протяжка — прямоугольник.
-            ЛКМ-протяжка — рисование.</div>
+            ЛКМ-протяжка — рисование. У кисти «Стена» снизу палитра:
+            «Авто» — соединение подбирается по соседям (как в игре),
+            квадратики — рисовать точным вариантом тайла.</div>
         <div class="h">Здания</div>
         <div class="bldList" id="bldTools"></div>
         <div class="hint">Клик — поставить, клик по зданию — схватить и
@@ -259,7 +276,10 @@
 
 <b>2.</b> Рисуй инструментами слева: клетки (пол/стена/роща/вода/мост/горы),
 здания из каталога, болота, деревья, проход-выход и спавн. ПКМ всегда рисует
-стену, Shift+протяжка — прямоугольник, Ctrl+Z отменяет.
+стену, Shift+протяжка — прямоугольник, Ctrl+Z отменяет. У кисти «Стена»
+раскрывается палитра вариантов: «Авто» подбирает соединение по соседям
+(как в игре), а квадратики-тайлы рисуют именно выбранным вариантом —
+углы, торцы, горизонтали и вертикали ставятся вручную.
 
 <b>3.</b> Кнопка «Из игры» кладёт в слот текущую процедурную планировку этой
 стихии — удобно править готовый город, а не рисовать с нуля.
@@ -363,6 +383,7 @@ function setExit(d, cx, cy) {
     const rows = d.rows.map((r) => r.split(""));
     for (let x = x0; x <= x1; x++) rows[y][x] = ".";
     d.rows = rows.map((r) => r.join(""));
+    syncWalls(d); // клетки прохода стали полом — ручных вариантов там нет
 }
 // планировка из игры (процедурная генерация) как отправная точка:
 // + восстановление разброса деревьев (тот же хэш, что в addCityDeco)
@@ -408,6 +429,13 @@ function fromGame(elem, kind) {
 /* ═══════════════════ ТЕКСТУРЫ (как в main.js) ═══════════════════ */
 const tex = { sheets: {}, moats: [], trees: [], mounts: [], blds: {}, walls: {} };
 const dual = globalThis.createDualGrid();
+// источник арта: file:// — base64-снимок (data-URL «свой» origin), HTTP — файл
+function artSrc(url) {
+    const emb = location.protocol === "file:"
+        && globalThis.CITY_ED_ASSETS
+        && globalThis.CITY_ED_ASSETS[url.replace(/^(\.\.\/)+/, "")];
+    return emb || url;
+}
 function loadTex(url) {
     return new Promise((res, rej) => {
         const img = new Image();
@@ -418,10 +446,7 @@ function loadTex(url) {
         // texImage2D и канвас остаётся чёрным. На file:// берём base64-снимок
         // арта из cityEditorAssets.js (генератор cityEditorAssets.gen.mjs),
         // по HTTP — живые файлы build/images.
-        const emb = location.protocol === "file:"
-            && globalThis.CITY_ED_ASSETS
-            && globalThis.CITY_ED_ASSETS[url.replace(/^(\.\.\/)+/, "")];
-        img.src = emb || url;
+        img.src = artSrc(url);
     });
 }
 const WALL_NAMES = ["wall_h1", "wall_v1", "wall_cor1", "wall_cor2",
@@ -490,6 +515,15 @@ function wallTexName(L, R, U, D, dSE, dSW, dNW, dNE) {
     if (U) return "wall_end3";
     if (D) return "wall_end4";
     return "wall_v1";
+}
+// тайл стены клетки: ручной вариант из палитры (d.walls) или авто-подбор
+// по соседям — единый выбор для превью, валидации и тест-хука
+function wallTexAt(d, rows, W, H, i, j, isW, isF) {
+    const m = d && d.walls && d.walls[i + "," + j];
+    if (m) return m;
+    return wallTexName(isW(i - 1, j), isW(i + 1, j), isW(i, j - 1),
+        isW(i, j + 1), isF(i + 1, j + 1), isF(i - 1, j + 1),
+        isF(i - 1, j - 1), isF(i + 1, j - 1));
 }
 // фичи дизайна → вид st.feat, какой ждут рендеры city.js (копия
 // designToState: рощи — rect на всю карту, болота — клетки-оверлеи)
@@ -641,10 +675,8 @@ function rebuild() {
     const isF = (x, y) => !isW(x, y); // «за краем карты» — как пол
     for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
         if (!wallDrawn(rows, W, H, i, j)) continue;
-        const sp = new PIXI.Sprite(lair[wallTexName(
-            isW(i - 1, j), isW(i + 1, j), isW(i, j - 1), isW(i, j + 1),
-            isF(i + 1, j + 1), isF(i - 1, j + 1), isF(i - 1, j - 1),
-            isF(i + 1, j + 1))]);
+        const sp = new PIXI.Sprite(lair[wallTexAt(d, rows, W, H, i, j,
+            isW, isF)]);
         sp.anchor.set(0, 1);
         sp.position.set(i * TS, (j + 1) * TS);
         sp.zIndex = (j + 1) * TS - 1;
@@ -879,11 +911,25 @@ function validate(d) {
         `Деревьев не на полу: ${badTree} (в игру не попадут)` });
     if (badSwamp) probs.push({ lvl: "info", msg:
         `Болот не на полу: ${badSwamp} (в игру не попадут)` });
+    // ручные варианты стен, которые не рисуются (толща/периметр): игра
+    // рисует только стены у пола — вариант в толще виден не будет
+    let hiddenWalls = 0;
+    for (const k of Object.keys(d.walls || {})) {
+        const m = /^(\d+),(\d+)$/.exec(k);
+        if (!m) continue;
+        const x = +m[1], y = +m[2];
+        if (rows[y][x] === "#" && !wallDrawn(rows, W, H, x, y)) hiddenWalls++;
+    }
+    if (hiddenWalls) probs.push({ lvl: "warn", msg:
+        `Ручных вариантов стен в толще: ${hiddenWalls} — толща не ` +
+        `рисуется, вариант виден только у пола (сотри соседние стены)` });
     return { probs, unreachable, ok: !probs.some((p) => p.lvl === "err") };
 }
 
 /* ═══════════════════ ПРАВКИ МОДЕЛИ / ИНСТРУМЕНТЫ ═══════════════════ */
-const tool = { mode: "cell", cell: "wall", bld: "shop" };
+// wallVar — выбранный в палитре вариант стены: "auto" (тайл подбирается
+// по соседям, как в игре) или имя из WALL_NAMES (рисуем именно им)
+const tool = { mode: "cell", cell: "wall", bld: "shop", wallVar: "auto" };
 // у кого из зданий это пятно (для стирания/переноса)
 function bldAt(d, x, y) {
     for (const b of d.buildings || []) {
@@ -910,6 +956,24 @@ function setCells(d, cells, ch) {
         if (y >= 0 && y < rows.length && x >= 0 && x < rows[0].length)
             rows[y][x] = ch;
     d.rows = rows.map((r) => r.join(""));
+    // под пятном здания/полом ручной вариант стены не имеет смысла
+    if (d.walls) {
+        for (const [x, y] of cells) delete d.walls[x + "," + y];
+        if (!Object.keys(d.walls).length) delete d.walls;
+    }
+}
+// ручные варианты держим только на стенах («#») в границах карты —
+// ключи-сироты (клетка перестала быть стеной, усечение размера) чистим
+function syncWalls(d) {
+    if (!d.walls) return;
+    const W = d.rows[0].length, H = d.rows.length;
+    for (const k of Object.keys(d.walls)) {
+        const m = /^(\d+),(\d+)$/.exec(k);
+        const x = m ? +m[1] : -1, y = m ? +m[2] : -1;
+        if (x < 0 || y < 0 || x >= W || y >= H || d.rows[y][x] !== "#")
+            delete d.walls[k];
+    }
+    if (!Object.keys(d.walls).length) delete d.walls;
 }
 function removeBld(d, b) {
     const cat = CATALOG[b.type];
@@ -939,7 +1003,7 @@ function placeBld(d, type, x, y) {
     if (d.spawn && d.spawn.x >= x && d.spawn.x < x + cat.w
         && d.spawn.y >= y && d.spawn.y < y + cat.h) d.spawn = null;
 }
-function paintCell(d, x, y, ch) {
+function paintCell(d, x, y, ch, wv) {
     const W = d.rows[0].length, H = d.rows.length;
     if (x < 0 || y < 0 || x >= W || y >= H) return;
     const b = bldAt(d, x, y);
@@ -947,6 +1011,16 @@ function paintCell(d, x, y, ch) {
     const rows = d.rows.map((r) => r.split(""));
     rows[y][x] = ch;
     d.rows = rows.map((r) => r.join(""));
+    // ручной вариант стены (wv — выбранное в палитре имя): на стене —
+    // запомнить/стереть, на не-стене — ключ не имеет смысла
+    if (d.walls || (ch === "#" && wv && wv !== "auto")) {
+        d.walls = d.walls || {};
+        if (ch === "#" && wv && wv !== "auto") d.walls[x + "," + y] = wv;
+        else {
+            delete d.walls[x + "," + y];
+            if (!Object.keys(d.walls).length) delete d.walls;
+        }
+    }
     // проход, накрытый не-полом, распадается
     if (d.exit) {
         const e = d.exit;
@@ -960,28 +1034,28 @@ function paintCell(d, x, y, ch) {
     if (ch !== ".") d.swamp = (d.swamp || []).filter(
         ([tx, ty]) => tx !== x || ty !== y);
 }
-function paintLine(d, x0, y0, x1, y1, ch) {
+function paintLine(d, x0, y0, x1, y1, ch, wv) {
     // Брезенхэм — протяжка без разрывов
     let dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
     let sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy;
     for (;;) {
-        paintCell(d, x0, y0, ch);
+        paintCell(d, x0, y0, ch, wv);
         if (x0 === x1 && y0 === y1) break;
         const e2 = 2 * err;
         if (e2 >= dy) { err += dy; x0 += sx; }
         if (e2 <= dx) { err += dx; y0 += sy; }
     }
 }
-function paintRect(d, x0, y0, x1, y1, ch) {
+function paintRect(d, x0, y0, x1, y1, ch, wv) {
     for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++)
         for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++)
-            paintCell(d, x, y, ch);
+            paintCell(d, x, y, ch, wv);
 }
 function applyTool(d, x, y, rightBtn) {
-    // ПКМ — всегда стена
+    // ПКМ — всегда стена (выбранным в палитре вариантом, как и «Стена»)
     const mode = rightBtn ? "cell" : tool.mode;
     const ch = rightBtn ? "#" : tool.cell;
-    if (mode === "cell") { paintCell(d, x, y, ch); return; }
+    if (mode === "cell") { paintCell(d, x, y, ch, tool.wallVar); return; }
     if (mode === "bld") {
         const b = bldAt(d, x, y);
         if (b) { // схватить/удалить
@@ -1089,7 +1163,7 @@ function wireInput() {
                 && (Math.abs(lastCell.x - c.x) > 1
                     || Math.abs(lastCell.y - c.y) > 1)) {
                 paintLine(d, lastCell.x, lastCell.y, c.x, c.y,
-                    right ? "#" : tool.cell);
+                    right ? "#" : tool.cell, tool.wallVar);
             } else {
                 applyTool(d, c.x, c.y, right);
             }
@@ -1108,7 +1182,8 @@ function wireInput() {
             const y0 = Math.min(rectDrag.y, hoverCell.y),
                 y1 = Math.max(rectDrag.y, hoverCell.y);
             if (tool.mode === "cell") {
-                paintRect(d, x0, y0, x1, y1, right ? "#" : tool.cell);
+                paintRect(d, x0, y0, x1, y1, right ? "#" : tool.cell,
+                    tool.wallVar);
             } else if (tool.mode === "tree" || tool.mode === "swamp") {
                 // прямоугольник дерева/болота: ЛКМ — посадить (не «туду-
                 // сюду»-тоггл), ПКМ — снять
@@ -1271,6 +1346,20 @@ function normalizeDesign(inp) {
         if (p && (rows[p[1]][p[0]] === "." || rows[p[1]][p[0]] === "F"))
             d.trees.push(p);
     }
+    // ручные варианты стен: только стены («#») в границах, имена —
+    // из набора WALL_NAMES (битые ключи/значения молча пропускаем)
+    if (inp.walls && typeof inp.walls === "object"
+        && !Array.isArray(inp.walls)) {
+        for (const k of Object.keys(inp.walls)) {
+            const m = /^(\d+),(\d+)$/.exec(k);
+            if (!m) continue;
+            const x = +m[1], y = +m[2];
+            if (x < 0 || y < 0 || x >= W || y >= H || rows[y][x] !== "#")
+                continue;
+            if (WALL_NAMES.includes(inp.walls[k]))
+                (d.walls = d.walls || {})[k] = inp.walls[k];
+        }
+    }
     return d;
 }
 function importAll(obj) {
@@ -1303,6 +1392,7 @@ function refreshAll() {
     refreshSlots();
     refreshProbs();
     refreshSizeInputs();
+    refreshWallPalette();
     refreshToolButtons();
 }
 function refreshHeader() {
@@ -1413,6 +1503,14 @@ function buildToolbars() {
         };
         ct.appendChild(b);
         toolBtns.push(b);
+        // палитра вариантов стен раскрывается под кнопкой «Стена»:
+        // «Авто» (подбор по соседям, как в игре) или точный тайл —
+        // им и рисуем (юзер: «рисовать именно ими»)
+        if (k === "wall") {
+            const pal = document.createElement("div");
+            pal.id = "wallPalette";
+            ct.appendChild(pal);
+        }
     }
     // здания
     const bt = $("bldTools");
@@ -1472,6 +1570,51 @@ function refreshToolButtons() {
         else if (b.dataset.mode !== undefined)
             b.classList.toggle("on", tool.mode === b.dataset.mode);
     }
+    // палитра стен: видна только у активной кисти «Стена», выбранный
+    // квадратик подсвечен (клики по квадратам тоже идут через сюда)
+    const pal = $("wallPalette");
+    if (pal) {
+        pal.classList.toggle("show",
+            tool.mode === "cell" && tool.cell === "#");
+        pal.querySelectorAll(".wv").forEach((b) =>
+            b.classList.toggle("on", b.dataset.v === tool.wallVar));
+    }
+}
+// содержимое палитры — тайлы стен ТЕКУЩЕЙ стихии (перестроить при смене
+// слота); выбор подсвечивается, рисование красит выбранным вариантом
+const WALL_RU = {
+    wall_h1: "Горизонт.", wall_v1: "Вертикал.",
+    wall_cor1: "Угол ↓→", wall_cor2: "Угол ↓←",
+    wall_cor3: "Угол ↑←", wall_cor4: "Угол ↑→",
+    wall_end1: "Торец →", wall_end2: "Торец ←",
+    wall_end3: "Торец ↓", wall_end4: "Торец ↑",
+};
+function refreshWallPalette() {
+    const host = $("wallPalette");
+    if (!host) return;
+    host.innerHTML = "";
+    const lair = LAIR_OF[CAVE_OF[store.cur.elem] || "gob"];
+    const mk = (v, html, title) => {
+        const b = document.createElement("button");
+        b.className = "wv" + (tool.wallVar === v ? " on" : "");
+        b.innerHTML = html;
+        b.title = title;
+        b.dataset.v = v;
+        b.onpointerdown = () => {
+            tool.wallVar = v;
+            refreshToolButtons();
+        };
+        host.appendChild(b);
+    };
+    mk("auto", `<span class="auto">Авто</span>`,
+        "Авто — тайл подбирается по соседям, как в игре");
+    for (const nm of WALL_NAMES) {
+        mk(nm,
+            `<img alt="" src="${artSrc(
+                `../images/dungeon_tiles/${lair}/walls/${nm}.png`)}"` +
+            `><span style="font-size:10px;color:var(--dim)">${WALL_RU[nm]}</span>`,
+            nm + " — «" + (WALL_RU[nm] || nm) + "»: рисовать этим тайлом");
+    }
 }
 
 /* ═══════════════════ СТАРТ / КНОПКИ ═══════════════════ */
@@ -1501,6 +1644,7 @@ function applySize(w, h) {
         && rows[y][x] === ".");
     d.trees = (d.trees || []).filter(([x, y]) => x < w && y < h
         && (rows[y][x] === "." || rows[y][x] === "F"));
+    syncWalls(d); // варианты за новым краем и на не-стенах больше не нужны
     if (!d.exit) setExit(d, w >> 1, h - 1);
     if (!d.spawn) d.spawn = { x: d.exit ? (d.exit.x0 + d.exit.x1) >> 1
         : w >> 1, y: h - 2 };
@@ -1622,9 +1766,11 @@ window.__CITYED = {
     validate: () => { const d = curDesign();
         return d ? validate(d) : null; },
     setCell: (x, y, ch) => { const d = curDesign(); if (!d) return;
-        pushUndo(); paintCell(d, x, y, ch); touch(); refreshAll(); rebuild(); },
+        pushUndo(); paintCell(d, x, y, ch, tool.wallVar);
+        touch(); refreshAll(); rebuild(); },
     setCells: (list, ch) => { const d = curDesign(); if (!d) return;
-        pushUndo(); for (const [x, y] of list) paintCell(d, x, y, ch);
+        pushUndo();
+        for (const [x, y] of list) paintCell(d, x, y, ch, tool.wallVar);
         touch(); refreshAll(); rebuild(); },
     setExit: (x, y) => { const d = curDesign(); if (!d) return;
         pushUndo(); setExit(d, x, y); touch(); refreshAll(); rebuild(); },
@@ -1641,6 +1787,25 @@ window.__CITYED = {
         touch(); refreshAll(); rebuild(); return true; },
     switchTo: (elem, kind) => switchSlot(elem, kind),
     slots: () => allDesigns(),
+    // вариант стены (палитра): задать/прочитать; wallTexAt — тайл, каким
+    // клетка рисуется (ручной вариант или авто-подбор), null — не рисуется
+    wallVar: (nm) => {
+        if (nm) { tool.wallVar = nm; refreshToolButtons(); }
+        return tool.wallVar;
+    },
+    wallTexAt: (x, y) => {
+        const d = curDesign();
+        if (!d) return null;
+        const W = d.rows[0].length, H = d.rows.length;
+        if (x < 0 || y < 0 || x >= W || y >= H) return null;
+        if (d.rows[y][x] !== "#") return null;
+        if (!wallDrawn(d.rows, W, H, x, y)) return null; // толща/периметр
+        const rows = d.rows.map((r) => r.split(""));
+        const isW = (a, b) => a >= 0 && b >= 0 && a < W && b < H
+            && rows[b][a] === "#";
+        const isF = (a, b) => !isW(a, b);
+        return wallTexAt(d, rows, W, H, x, y, isW, isF);
+    },
     exportText,
     importAll: (t) => { const n = importAll(parseDesigns(t));
         touch(); refreshAll(); rebuild(); return n; },
