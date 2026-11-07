@@ -227,6 +227,11 @@
             <button id="btnTown" style="flex:1">20×16 город</button>
         </div>
         <div class="h">Проверка</div>
+        <div class="row">
+            <button id="btnRed" style="flex:1"
+                title="Красные квадраты на карте — клетки пола, куда герой не дойдёт. Список проблем ниже работает и без подсветки.">Красная
+                подсветка: вкл</button>
+        </div>
         <div id="probs"></div>
         <div class="h">Файл</div>
         <div class="hint">Экспорт собирает ВСЕ заполненные слоты в один
@@ -296,9 +301,16 @@
 стихии — удобно править готовый город, а не рисовать с нуля.
 
 <b>4.</b> Панель «Проверка» подсвечивает проблемы: недостижимые клетки пола
-(красным на карте), двери без пола, оборванный проход. Кнопка «Экспорт»
-собирает все заполненные слоты в cityDesigns.js — замени им файл
-build/scripts/game/cityDesigns.js, и игра построит города по твоим планам.
+(красным на карте — подсветка отключается кнопкой в этой панели), двери без
+пола, оборванный проход. Кнопка «Экспорт» собирает все заполненные слоты
+в cityDesigns.js — замени им файл build/scripts/game/cityDesigns.js, и игра
+построит города по твоим планам.
+
+<b>5.</b> Если перерисовал тайлы (стены, пол, местность, здания) в
+build/images — запусти build/tools/update_editor_art.bat (двойной клик):
+он пересобирает спрайты для редактора, и город, открытый двойным кликом,
+покажет новые тайлы. Если играешь/редактируешь через dev_server.py (по
+HTTP), арт всегда свежий — скрипт не нужен.
 
 <b>Символы карты</b> (они же в экспорте): «.» пол, «#» стена, «%» пятно
 здания, «F» роща (непроходимо), «~» вода, «=» мост, «M» горы (непроходимо).
@@ -310,7 +322,8 @@ build/scripts/game/cityDesigns.js, и игра построит города п�
 <script src="../dll/pixi.min.js"></script>
 <!-- base64-снимок арта для запуска двойным кликом (file://): WebGL
      отвергает картинки с file://-origin (SecurityError, чёрный экран).
-     Перегенерация после смены арта: node build/tools/cityEditorAssets.gen.mjs -->
+     Перегенерация после смены арта: build/tools/update_editor_art.bat
+     (двойной клик) или node build/tools/cityEditorAssets.gen.mjs -->
 <script src="cityEditorAssets.js"></script>
 <script src="../scripts/engine/modules/dualgrid.js"></script>
 <script src="../scripts/game/cardsStrength.js"></script>
@@ -350,6 +363,23 @@ const BLD_RU = { townHall: "Ратуша", shop: "Магазин", armory: "Ку
     collect: "Коллекционер", glomHouse: "Дом Глома" };
 const CAP_SIZE = [24, 19], TOWN_SIZE = [20, 16];
 const LS_KEY = "sd_city_editor_v1";
+// красная подсветка недостижимых клеток (W71, юзер — «сделай отключаемой»):
+// кнопка в панели «Проверка», настройка живёт в браузере отдельно от дизайна
+const RED_KEY = "sd_city_editor_red";
+let showRed = true;
+try { showRed = localStorage.getItem(RED_KEY) !== "0"; } catch (e) {}
+function applyRedBtn() {
+    const b = document.getElementById("btnRed");
+    b.textContent = "Красная подсветка: " + (showRed ? "вкл" : "выкл");
+    b.classList.toggle("on", showRed);
+}
+function toggleRed() {
+    showRed = !showRed;
+    try { localStorage.setItem(RED_KEY, showRed ? "1" : "0"); } catch (e) {}
+    applyRedBtn();
+    refreshProbs(); // в сообщении о недостижимых есть «(красные на карте)»
+    buildMarks();   // и перерисовать слой маркеров
+}
 const hsh = (i, j, k) => ((i * 73856093 ^ j * 19349663
     ^ (k || 0) * 83492791) >>> 0) % 1000; // копия dungeon.js
 
@@ -755,9 +785,11 @@ function buildMarks() {
     }
     g.stroke({ width: 1, color: 0xffffff, alpha: 0.07 });
     markC.addChild(g);
-    // недостижимые клетки пола — красным
-    if (val.unreachable.length) {
+    // недостижимые клетки пола — красным (выключатель — кнопка в панели
+    // «Проверка»)
+    if (showRed && val.unreachable.length) {
         const r = new PIXI.Graphics();
+        r.label = "unreach"; // метка для пробы
         for (const [x, y] of val.unreachable)
             r.rect(x * TS + 3, y * TS + 3, TS - 6, TS - 6)
                 .fill({ color: 0xff3020, alpha: 0.33 });
@@ -885,8 +917,8 @@ function validate(d) {
     for (let j = 0; j < H; j++) for (let i = 0; i < W; i++)
         if (walk(i, j) && !seen[j * W + i]) unreachable.push([i, j]);
     if (unreachable.length) probs.push({ lvl: "err", msg:
-        `Недостижимых клеток пола: ${unreachable.length} ` +
-        `(красные на карте) — герой туда не пройдёт` });
+        `Недостижимых клеток пола: ${unreachable.length} — герой туда не ` +
+        `пройдёт` + (showRed ? " (красные на карте)" : "") });
     // здания: дверь на полу
     const bTypes = {};
     for (const b of d.buildings || []) {
@@ -1777,6 +1809,7 @@ function applySize(w, h) {
     rebuild();
 }
 function wireButtons() {
+    $("btnRed").onpointerdown = toggleRed;
     $("btnEmpty").onpointerdown = () => {
         pushUndo();
         const [w, h] = store.cur.kind === "capital" ? CAP_SIZE : TOWN_SIZE;
@@ -1948,6 +1981,7 @@ window.__CITYED = {
 (async function boot() {
     loadLocal();
     buildToolbars();
+    applyRedBtn();
     refreshAll();
     await initApp();
     wireInput();

@@ -6,6 +6,7 @@
 //
 // Запуск после изменения арта в build/images:
 //   node build/tools/cityEditorAssets.gen.mjs
+// (или двойным кликом: build/tools/update_editor_art.bat)
 //
 // Списки файлов синхронизированы с loadAssets() в cityEditor.html
 // (sheets/WALL_NAMES/LAIR_OF/CATALOG парсятся отсюда же, деревья 1..10 и
@@ -71,7 +72,8 @@ const js = `// СГЕНЕРИРОВАНО скриптом build/tools/cityEdito
 // руками. base64-снимок арта редактора городов для запуска с file://
 // (двойной клик): WebGL отвергает картинки с file://-origin (SecurityError
 // на texImage2D). После изменения арта в build/images перегенерируй:
-//   node build/tools/cityEditorAssets.gen.mjs
+//   build/tools/update_editor_art.bat (двойной клик)
+//   или node build/tools/cityEditorAssets.gen.mjs
 globalThis.CITY_ED_ASSETS = {
 ${out.join("\n")}
 };
