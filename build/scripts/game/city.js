@@ -128,8 +128,20 @@
             const x = m ? +m[1] : -1, y = m ? +m[2] : -1;
             if (x < 0 || y < 0 || x >= CW || y >= CH || g[y][x] !== "#")
                 continue;
-            if (/^wall_(h1|v1|cor[1-4]|end[1-4])$/.test(d.walls[k]))
+            if (/^wall_(h1|v1|cor[1-4]|end[1-4]|h1_tu|h1_td|v1_tl|v1_tr|cross)$/.test(d.walls[k]))
                 walls[k] = d.walls[k];
+        }
+        // ручные плитки пола (W69): «x,y» → номер плиты данжа 0..9 —
+        // городская ветка buildMapGfx рисует её вместо квадрантов листа
+        const floors = {};
+        for (const k of Object.keys(d.floors || {})) {
+            const m = /^(\d+),(\d+)$/.exec(k);
+            const x = m ? +m[1] : -1, y = m ? +m[2] : -1;
+            if (x < 0 || y < 0 || x >= CW || y >= CH || g[y][x] !== ".")
+                continue;
+            if (Number.isInteger(d.floors[k]) && d.floors[k] >= 0
+                && d.floors[k] <= 9)
+                floors[k] = d.floors[k];
         }
         const st = {
             city: true, isCapital: !!capital,
@@ -143,6 +155,7 @@
             feat,
             treeCells, // явные деревья + рощи «F»
             walls, // ручные варианты стен дизайна (пусто — авто-подбор)
+            floors, // ручные плитки пола (пусто — квадранты листа стихии)
             glom: house ? {
                 state: "hidden", // hidden → walking → talking → idle
                 x: glomHome.x, y: glomHome.y,

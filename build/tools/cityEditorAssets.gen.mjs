@@ -48,9 +48,13 @@ files.push("images/tiles/moats_64.png");
 for (let n = 1; n <= 10; n++) files.push(`images/tiles/trees/${n}.png`);
 for (let n = 1; n <= 6; n++) files.push(`images/tiles/montain/${n}.png`);
 for (const f of bldFiles) files.push(`images/buildings/${f}`);
-for (const lair of lairs)
+for (const lair of lairs) {
     for (const nm of wallNames)
         files.push(`images/dungeon_tiles/${lair}/walls/${nm}.png`);
+    // плиты пола 0..9 — палитра кисти «Пол» + ручная плитка превью
+    for (let n = 0; n <= 9; n++)
+        files.push(`images/dungeon_tiles/${lair}/floor/${n}.png`);
+}
 
 const out = [];
 let total = 0, missing = 0;

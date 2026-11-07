@@ -256,6 +256,18 @@
             for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
                 const ch = MAPROWS[j][i];
                 if (ch === "#" && !wallDrawn(i, j)) continue;
+                // ручная плитка пола из дизайна города (W69, редактор):
+                // плита данжа 0..9 на всю клетку вместо квадрантов листа
+                const fo = city && myState.floors
+                    ? myState.floors[i + "," + j] : undefined;
+                if (Number.isInteger(fo) && fo >= 0 && fo <= 9) {
+                    const sp = new PIXI.Sprite(
+                        uiTex(`dungeon_tiles/${lair}/floor/${fo}.png`));
+                    sp.label = "floor:" + fo; // имя — для проб/тестов
+                    sp.position.set(i * TS, j * TS);
+                    c.addChild(sp);
+                    continue;
+                }
                 const sheet = (ch === "~" || ch === "=") ? wsheet : vsheet;
                 if (sheet && sheet.textures.length) {
                     const texs = sheet.textures;
