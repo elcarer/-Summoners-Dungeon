@@ -2097,3 +2097,20 @@ probe_wander.
    возвращает undefined для IIFE с НЕЯВНЫМ хвостом-литералом
    (`(function(){ …; true })()` — undefined!), явный `return true;`
    — работает. Программный уровень (`выражение; true`) — работает.
+
+   **Дополнение (тот же день, отчёт юзера): file://-запуск давал чёрный
+   экран** — «Uncaught SecurityError: texImage2D… image element contains
+   cross-origin data». Headed-Chrome считает картинки с file://-origin
+   кросс-доменными: PIXI.Texture.from(new Image()) грузит их, но WebGL
+   отвергает на выгрузке (headless=new тот же файл рисует нормально —
+   харнесс ловушку маскировал, волна проверялась только по HTTP).
+   Лечение: base64-снимок всех 92 файлов арта редактора →
+   `build/tools/cityEditorAssets.js` (генератор
+   `build/tools/cityEditorAssets.gen.mjs`; sheets/WALL_NAMES/LAIR_OF
+   парсятся из cityEditor.html, каталог зданий — из city.js), loadTex
+   берёт снимок только при `location.protocol === "file:"`, по HTTP —
+   живые файлы build/images. Заодно loadNote при ошибке загрузки больше
+   не прячется. Проба дополнена file://-блоком: probe_cityed 39/0
+   (36 + 3 новых), скрин file://-превью сверён. Правило: после смены
+   арта в build/images перегенерировать снимок
+   (`node build/tools/cityEditorAssets.gen.mjs`).

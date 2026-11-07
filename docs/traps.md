@@ -1166,3 +1166,17 @@
   но лучше ставить здание фасадом внутрь). Для столицы помни: у NW-комнаты
   строка 6 — стеновая (комната 1..5), здание с низом y=5 имеет мёртвую
   дверь — низ здания ≤ y=4.
+- **file://-запуск страницы с WebGL: картинки с file://-origin не выгружаются
+  в текстуры** — headed-Chrome на texImage2D бросает SecurityError («image
+  element contains cross-origin data»), канвас остаётся чёрным при том, что
+  img.onload отработал. Headless=new ту же страницу рисует нормально —
+  проверка харнессом ловушку МАСКИРУЕТ (W68: редактор городов по HTTP
+  проходил, двойной клик у юзера — чёрный экран). Лечение: base64-снимок
+  арта data-URL'ами (всегда «свой» origin) — tools/cityEditorAssets.js,
+  генератор tools/cityEditorAssets.gen.mjs; loadTex берёт его только при
+  location.protocol === "file:" (по HTTP — живые файлы, снимок не протухает).
+  После смены арта в build/images — перегенерировать.
+- **Чтение пикселей WebGL-канваса через 2D-canvas drawImage всегда даёт
+  чёрное** (preserveDrawingBuffer=false: drawing buffer очищен после кадра)
+  — «litPct: 0» в таком сэмпле НЕ доказательство чёрного экрана. Верить
+  скриншоту страницы (Page.captureScreenshot) или глазам.

@@ -273,6 +273,10 @@ build/scripts/game/cityDesigns.js, и игра построит города п�
 </div>
 
 <script src="../dll/pixi.min.js"></script>
+<!-- base64-снимок арта для запуска двойным кликом (file://): WebGL
+     отвергает картинки с file://-origin (SecurityError, чёрный экран).
+     Перегенерация после смены арта: node build/tools/cityEditorAssets.gen.mjs -->
+<script src="cityEditorAssets.js"></script>
 <script src="../scripts/engine/modules/dualgrid.js"></script>
 <script src="../scripts/game/cardsStrength.js"></script>
 <script src="../scripts/game/cardsGrowth.js"></script>
@@ -405,7 +409,15 @@ function loadTex(url) {
         const img = new Image();
         img.onload = () => res(PIXI.Texture.from(img));
         img.onerror = () => rej(new Error("нет файла " + url));
-        img.src = url;
+        // Запуск двойным кликом (file://): headed-Chrome считает картинки
+        // с file://-origin кросс-доменными, WebGL бросает SecurityError на
+        // texImage2D и канвас остаётся чёрным. На file:// берём base64-снимок
+        // арта из cityEditorAssets.js (генератор cityEditorAssets.gen.mjs),
+        // по HTTP — живые файлы build/images.
+        const emb = location.protocol === "file:"
+            && globalThis.CITY_ED_ASSETS
+            && globalThis.CITY_ED_ASSETS[url.replace(/^(\.\.\/)+/, "")];
+        img.src = emb || url;
     });
 }
 const WALL_NAMES = ["wall_h1", "wall_v1", "wall_cor1", "wall_cor2",
@@ -1616,13 +1628,15 @@ window.__CITYED = {
     wireInput();
     wireButtons();
     updUndoBtn();
+    let assetErr = null;
     try {
         await loadAssets();
     } catch (e) {
+        assetErr = e;
         $("loadNote").textContent = "Не все тайлы загрузились: "
             + e.message + " (открой страницу через dev-сервер или из папки build)";
     }
-    $("loadNote").style.display = "none";
+    if (!assetErr) $("loadNote").style.display = "none";
     // стартовый слот: если пуст — положим процедурный город как основу
     if (!curDesign()) {
         try {

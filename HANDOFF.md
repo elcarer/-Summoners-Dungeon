@@ -488,6 +488,9 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
   экспортируются файлом `cityDesigns.js` — юзер заменяет им
   `build/scripts/game/cityDesigns.js`, игра строит города по ним
   (city.js designToState; нет/бит дизайн — процедурная генерация).
+  Двойной клик (file://) работает: арт редактора зашит base64-снимком
+  `build/tools/cityEditorAssets.js` — после смены арта в build/images
+  перегенерировать (`node build/tools/cityEditorAssets.gen.mjs`).
   Формат и правила — шапка cityDesigns.js + docs/journal.md (W68);
   поведение города (магазин/кузница/ратуша/коллекционер/Глом/выход)
   не зависит от того, откуда взялась планировка.
