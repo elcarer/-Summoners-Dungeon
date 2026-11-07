@@ -50,7 +50,112 @@
     // check_city по всем стихиям.
     // (W52 — выход-проход в нижней стене вместо таблички-«лестницы»)
 
+    // ── ДИЗАЙНЫ ГОРОДОВ (W68, юзер) ─────────────────────────────────────
+    // Каталог зданий редактора городов: type → арт и пятно (в клетках).
+    // Арт юзера images/buildings (384×256 → 3×2, ратуша 384×384 → 3×3,
+    // рисуются в полразмера — W36). Дверь выводится снизу-центра пятна
+    // (как put() процедурной генерации).
+    const CITY_BLD_CATALOG = {
+        townHall: { file: "town_hall.png", w: 3, h: 3 },
+        shop: { file: "shop.png", w: 3, h: 2 },
+        armory: { file: "armory.png", w: 3, h: 2 },
+        collect: { file: "collect.png", w: 3, h: 2 },
+        glomHouse: { file: "glom_house.png", w: 3, h: 2 },
+    };
+
+    // Состояние города из дизайна редактора (GAME_CITY_DESIGNS, W68):
+    // rows/здания/проход-выход/спавн/болота/деревья — как нарисовал юзер.
+    // Витринное довешивается как в процедурной генерации: товар магазина
+    // (rollLootCard — на новый забег), якорь Глома (по дому Глома).
+    function designToState(d, elem, capital) {
+        const D = globalThis.GAME_DATA;
+        const caveId = Object.keys(D.CAVES).find(
+            (k) => D.CAVES[k].elem === elem) || "gob";
+        const g = d.rows.map((r) => r.split(""));
+        const CW = g[0].length, CH = g.length;
+        const blds = [];
+        for (const b of d.buildings || []) {
+            const cat = CITY_BLD_CATALOG[b.type];
+            if (!cat) continue;
+            blds.push({ type: b.type, build: cat.file,
+                gx: b.x, gy: b.y, w: cat.w, h: cat.h,
+                col: b.x + (cat.w >> 1) - 1, row: b.y + cat.h });
+        }
+        const objects = blds.map((b) => {
+            const o = { ...b, taken: false };
+            if (o.type === "shop") { // торговец картами живёт в магазине
+                o.stock = Array.from({ length: 6 }, () => D.rollLootCard(elem));
+                o.sold = [false, false, false, false, false, false];
+            }
+            return o;
+        });
+        // проход-выход (W52): из дизайна; не задан — 3 клетки по центру
+        // нижнего ряда (как процедурная генерация)
+        const pg = d.exit && Number.isInteger(d.exit.y)
+            ? { x0: d.exit.x0, x1: d.exit.x1, y: d.exit.y }
+            : { x0: (CW >> 1) - 1, x1: (CW >> 1) + 1, y: CH - 1 };
+        // спавн: клетка из дизайна или над центром прохода
+        const sp = d.spawn || { x: (pg.x0 + pg.x1) >> 1, y: pg.y - 1 };
+        const house = blds.find((b) => b.type === "glomHouse");
+        const glomHome = house ? {
+            x: (house.col + 1) * TS + TS / 2, // появляется у двери дома
+            y: house.row * TS + TS / 2,
+        } : null;
+        // особенности стихии из дизайна: рощи «F» и вода/мосты читаются
+        // рендерами прямо из rows (rect — на всю карту, оверлей рисует
+        // только свои клетки); болота — клетки оверлея; деревья — явный
+        // список (addCityDeco рисует без разброса-хэша)
+        const feat = { trees: 0, forest: [], swamp: [], mounts: [],
+            maze: [], water: [], bridges: [] };
+        for (let y = 0; y < CH; y++) for (let x = 0; x < CW; x++) {
+            if (g[y][x] === "~") feat.water.push([x, y]);
+            else if (g[y][x] === "=") feat.bridges.push([x, y]);
+        }
+        if (g.some((row) => row.includes("F")))
+            feat.forest = [[0, 0, CW - 1, CH - 1]];
+        for (const c of d.swamp || []) feat.swamp.push([c[0], c[1], c[0], c[1]]);
+        // деревья: явный список + клетки рощ «F» (роща всегда с деревьями,
+        // как в процедурных городах — рисует addCityDeco)
+        const treeCells = (d.trees || []).map((c) => [c[0], c[1]]);
+        for (let y = 0; y < CH; y++) for (let x = 0; x < CW; x++)
+            if (g[y][x] === "F") treeCells.push([x, y]);
+        const st = {
+            city: true, isCapital: !!capital,
+            elem, cave: caveId, floor: 1,
+            enemies: [], exit: null, exitCool: false, bossDead: true,
+            toast: null, toastT: 0, win: null,
+            rows: g.map((r) => r.join("")),
+            roomCenters: [], lootCenters: [], objects,
+            districts: 0, // процедурных кварталов нет — планировка юзера
+            roomRects: [], // [x0,y0,x1,y1] кварталов — только для проб
+            feat,
+            treeCells, // явные деревья + рощи «F»
+            glom: house ? {
+                state: "hidden", // hidden → walking → talking → idle
+                x: glomHome.x, y: glomHome.y,
+            } : null,
+            glomHome,
+            exitPassage: pg,
+            spawn: { x: sp.x * TS + TS / 2, y: sp.y * TS + TS / 2 },
+        };
+        return st;
+    }
+
     function newCityState(elem, capital) {
+        // Дизайн юзера (W68): GAME_CITY_DESIGNS[стихия].capital/town —
+        // планировка из редактора; нет (или файл пуст) — генерация ниже
+        const DS = globalThis.GAME_CITY_DESIGNS;
+        const rec = DS && DS[elem];
+        const dsg = rec && (capital ? rec.capital : rec.town);
+        if (dsg && dsg.rows && dsg.rows.length) {
+            try {
+                return designToState(dsg, elem, capital);
+            } catch (e) {
+                // битый дизайн не роняет игру — откат к генерации
+                console.warn("cityDesigns: дизайн «" + elem + (capital
+                    ? "/capital" : "/town") + "» повреждён, генерирую город", e);
+            }
+        }
         const D = globalThis.GAME_DATA;
         const caveId = Object.keys(D.CAVES).find(
             (k) => D.CAVES[k].elem === elem) || "gob";
@@ -290,17 +395,10 @@
         for (const o of st.objects) keep1(o.col, o.row);
         const strengthSet = [10]; // юзер: деревья города Силы — 10.png
         const groveSet = (GEN && GEN.TREE_SETS && GEN.TREE_SETS.growth) || [10];
-        for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
-            const ch = MAPROWS[j][i];
-            if (ch !== "." && ch !== "F") continue;
-            const grove = ch === "F";
-            const scatter = (f.trees && hsh(i, j, 11) < 130) // ~13% пола
-                || (st.elem === "growth" && hsh(i, j, 11) < 70); // ~7%
-            if (!grove && !scatter) continue;
-            if (!grove && keep.has(j * 1000 + i)) continue;
+        const putTree = (i, j) => {
             const pool = st.elem === "strength" ? strengthSet : groveSet;
             const tex = trees[pool[hsh(i, j, 12) % pool.length] - 1];
-            if (!tex) continue;
+            if (!tex) return;
             const sp = new PIXI.Sprite(tex);
             sp.anchor.set(0.5, 1); // низ ствола на кромке клетки
             sp.scale.x = hsh(i, j, 13) < 500 ? -1 : 1;
@@ -311,9 +409,33 @@
             sp.eventMode = "none"; // декорация — клики уходят в пол
             sp.__cityTree = 1; // тест-хук: подсчёт деревьев (как __tree мира)
             layer.addChild(sp);
+        };
+        // (W68, юзер) дизайн из редактора: деревья — ЯВНЫЙ список
+        // st.treeCells, без разброса-хэша (расставлены в редакторе;
+        // зона отчуждения keep на них не действует — как поставил,
+        // так и стоит)
+        if (st.treeCells && st.treeCells.length) {
+            for (const [i, j] of st.treeCells) {
+                if (i < 0 || j < 0 || i >= W || j >= H) continue;
+                const ch = MAPROWS[j][i];
+                if (ch !== "." && ch !== "F") continue; // дерево — на полу
+                putTree(i, j);
+            }
+        } else for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+            const ch = MAPROWS[j][i];
+            if (ch !== "." && ch !== "F") continue;
+            const grove = ch === "F";
+            const scatter = (f.trees && hsh(i, j, 11) < 130) // ~13% пола
+                || (st.elem === "growth" && hsh(i, j, 11) < 70); // ~7%
+            if (!grove && !scatter) continue;
+            if (!grove && keep.has(j * 1000 + i)) continue;
+            putTree(i, j);
         }
         const mtns = ctx.mountainTex || [];
-        if (st.elem === "honor" && mtns.length) {
+        // (W68) спрайты гор — по клеткам «M» независимо от стихии: в
+        // процедурных городах «M» пишет только Честь (поведение то же),
+        // в дизайнах редактора горы может ставить юзер где угодно
+        if (mtns.length) {
             for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
                 if (MAPROWS[j][i] !== "M") continue;
                 const sp = new PIXI.Sprite(mtns[hsh(i, j, 15) % mtns.length]);
@@ -1154,7 +1276,8 @@
     }
 
     globalThis.GAME_CITY = {
-        CITY_VARIANTS, newCityState, addCityDeco,
+        CITY_VARIANTS, newCityState, designToState, CITY_BLD_CATALOG,
+        addCityDeco,
         addCityGroundOverlays, addCityWaterBanks, buildForgeWin,
         buildQuestWin, addCityFires,
     };

@@ -1,0 +1,1646 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Редактор городов — Развернутый Мир</title>
+<link rel="icon" href="data:,">
+<!-- РЕДАКТОР ГОРОДОВ (W68, юзер): отдельная от игры программка (открывается
+     двойным кликом или через dev-сервер /tools/cityEditor.html). Юзер рисует
+     планировки городов и столиц по стихиям; превью — теми же тайлами и теми
+     же рендерами, что в игре (city.js addCityDeco/addCityGroundOverlays/
+     addCityWaterBanks + копии wallDrawn/wallTexName из dungeon.js), поэтому
+     «что нарисовано — то и в игре». Экспорт — файл cityDesigns.js, который
+     вставляется в игру (build/scripts/game/cityDesigns.js); игра строит
+     города по нему (city.js designToState). Никаких fetch — только <script>. -->
+<style>
+    @font-face {
+        font-family: "Kereru";
+        src: url("../font/Kereru.otf") format("opentype");
+    }
+    :root {
+        --bg: #16110c; --panel: #221b12; --panel2: #2b2216; --line: #453723;
+        --text: #d8c79d; --dim: #8a7c5e; --gold: #f0c96a; --red: #ff8f6e;
+        --green: #9ec46a;
+    }
+    * { box-sizing: border-box; user-select: none; }
+    html, body { height: 100%; }
+    body {
+        margin: 0; background: var(--bg); color: var(--text); overflow: hidden;
+        font: 15px/1.45 "Kereru", "Segoe UI", serif;
+        display: flex; flex-direction: column;
+    }
+    button {
+        font: inherit; color: var(--text); background: var(--panel2);
+        border: 1px solid var(--line); border-radius: 6px;
+        padding: 4px 10px; cursor: pointer;
+    }
+    button:hover { border-color: var(--gold); color: var(--gold); }
+    button.on { background: #3d2f1a; border-color: var(--gold); color: var(--gold); }
+    button:disabled { opacity: .45; cursor: default; }
+    input {
+        font: inherit; color: var(--text); background: #1a140d;
+        border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px;
+        width: 58px; user-select: text;
+    }
+    input:focus { outline: none; border-color: var(--gold); }
+
+    header {
+        display: flex; align-items: center; gap: 12px;
+        padding: 8px 14px; border-bottom: 1px solid var(--line);
+        flex: 0 0 auto;
+    }
+    header h1 { margin: 0; font-size: 22px; color: var(--gold); letter-spacing: 1px; }
+    header .sub { color: var(--dim); font-size: 14px; }
+    header .spacer { flex: 1; }
+    .badge { font-size: 13px; padding: 2px 10px; border-radius: 10px; border: 1px solid var(--line); }
+    .badge.ok { color: var(--green); border-color: var(--green); }
+    .badge.err { color: var(--red); border-color: var(--red); }
+    .badge.warn { color: var(--gold); border-color: var(--gold); }
+
+    #main { flex: 1 1 auto; display: flex; min-height: 0; }
+    aside {
+        flex: 0 0 auto; background: var(--panel); overflow-y: auto;
+        padding: 10px 12px 30px;
+    }
+    #tools { width: 236px; border-right: 1px solid var(--line); }
+    #side { width: 284px; border-left: 1px solid var(--line); }
+    .h { color: var(--gold); font-size: 14px; letter-spacing: 1px;
+         margin: 14px 0 6px; border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+    .h:first-child { margin-top: 0; }
+    .hint { color: var(--dim); font-size: 12px; line-height: 1.4; margin: 6px 0; }
+
+    .tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+    .tgrid.three { grid-template-columns: 1fr 1fr 1fr; }
+    .tool {
+        display: flex; align-items: center; gap: 7px; padding: 5px 7px;
+        text-align: left; width: 100%;
+    }
+    .tool .sw { width: 16px; height: 16px; border-radius: 4px;
+        border: 1px solid #00000066; flex: 0 0 auto; }
+    .tool img { width: 30px; height: 20px; object-fit: contain; flex: 0 0 auto; }
+    .bldList { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+    .bld { display: flex; flex-direction: column; align-items: center; gap: 2px;
+        padding: 5px 3px; width: 100%; }
+    .bld img { width: 78px; height: 52px; object-fit: contain;
+        image-rendering: auto; }
+    .bld span { font-size: 12px; color: var(--dim); }
+    .bld.on span { color: var(--gold); }
+
+    #center { flex: 1 1 auto; position: relative; min-width: 0;
+        background: #0b0806; }
+    #canvasHost { position: absolute; inset: 0; }
+    #canvasHost canvas { display: block; }
+    #zoomCtl {
+        position: absolute; left: 10px; bottom: 10px; display: flex; gap: 6px;
+        background: #16110ccc; border: 1px solid var(--line); border-radius: 8px;
+        padding: 5px 8px; z-index: 5;
+    }
+    #coords {
+        position: absolute; right: 10px; bottom: 10px; color: var(--dim);
+        font-size: 12px; background: #16110ccc; border: 1px solid var(--line);
+        border-radius: 8px; padding: 5px 9px; z-index: 5;
+    }
+
+    .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+    .slot { display: flex; align-items: center; justify-content: space-between;
+        padding: 4px 8px; width: 100%; font-size: 13px; }
+    .slot b { color: var(--gold); font-weight: normal; }
+    .slot .dot { width: 9px; height: 9px; border-radius: 50%;
+        border: 1px solid var(--line); flex: 0 0 auto; }
+    .slot.filled .dot { background: var(--green); border-color: var(--green); }
+
+    .prob { font-size: 13px; line-height: 1.35; margin: 4px 0;
+        padding-left: 14px; position: relative; }
+    .prob::before { content: "•"; position: absolute; left: 2px; }
+    .prob.err { color: var(--red); }
+    .prob.warn { color: var(--gold); }
+    .prob.info { color: var(--dim); }
+
+    .row { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+
+    /* модальные окна */
+    .modal {
+        position: fixed; inset: 0; background: #000000a8; z-index: 50;
+        display: none; align-items: center; justify-content: center;
+    }
+    .modal.open { display: flex; }
+    .mbox {
+        width: min(920px, 92vw); max-height: 88vh; overflow: auto;
+        background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+        padding: 16px 20px;
+    }
+    .mbox h2 { margin: 0 0 10px; color: var(--gold); font-size: 20px; }
+    .mbox textarea {
+        width: 100%; height: 300px; background: #14100a; color: #cdbf98;
+        border: 1px solid var(--line); border-radius: 6px; padding: 8px;
+        font: 12px/1.4 Consolas, monospace; user-select: text;
+    }
+    .mbox .mrow { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .mbox p.help { white-space: pre-line; }
+    .mbox p.help b { color: var(--gold); }
+    #loadNote {
+        position: absolute; inset: 0; display: flex; align-items: center;
+        justify-content: center; color: var(--dim); font-size: 16px; z-index: 9;
+        background: #0b0806;
+    }
+</style>
+</head>
+<body>
+<header>
+    <h1>Редактор городов</h1>
+    <span class="sub" id="curSlot"></span>
+    <span class="badge" id="badge"></span>
+    <span class="spacer"></span>
+    <button id="btnUndo">↶ Отменить</button>
+    <button id="btnFromGame">Из игры</button>
+    <button id="btnExport">Экспорт</button>
+    <button id="btnImport">Импорт</button>
+    <button id="btnHelp">Справка</button>
+</header>
+<div id="main">
+    <aside id="tools">
+        <div class="h">Клетки (кисть)</div>
+        <div class="tgrid" id="cellTools"></div>
+        <div class="hint">ПКМ — всегда стена. Shift+протяжка — прямоугольник.
+            ЛКМ-протяжка — рисование.</div>
+        <div class="h">Здания</div>
+        <div class="bldList" id="bldTools"></div>
+        <div class="hint">Клик — поставить, клик по зданию — схватить и
+            перенести, ПКМ по зданию — убрать. Дверь выводится снизу-центра.</div>
+        <div class="h">Особое</div>
+        <div class="tgrid" id="specTools"></div>
+        <div class="hint">Болото — проходимый оверлей на полу. Дерево —
+            проходимый декор. Проход — 3 клетки выхода в мире (клетка и её
+            соседи слева/справа). Спавн — где появляется герой.</div>
+    </aside>
+    <div id="center">
+        <div id="canvasHost"></div>
+        <div id="loadNote">Загрузка тайлов…</div>
+        <div id="zoomCtl">
+            <button id="zIn">+</button><button id="zOut">−</button>
+            <button id="zFit">Вписать</button>
+        </div>
+        <div id="coords"></div>
+    </div>
+    <aside id="side">
+        <div class="h">Города</div>
+        <div class="slots" id="slots"></div>
+        <div class="hint">● — слот заполнен, он попадёт в экспорт.
+            «Стереть» — убрать дизайн текущего слота.</div>
+        <div class="row">
+            <button id="btnClearSlot" style="flex:1">Стереть слот</button>
+            <button id="btnEmpty" style="flex:1">Пустой город</button>
+        </div>
+        <div class="h">Размер карты</div>
+        <div class="row">
+            <input id="szW" type="number" min="10" max="48" step="1">×
+            <input id="szH" type="number" min="8" max="40" step="1">
+            <button id="btnSize">Применить</button>
+        </div>
+        <div class="row">
+            <button id="btnCap" style="flex:1">24×19 столица</button>
+            <button id="btnTown" style="flex:1">20×16 город</button>
+        </div>
+        <div class="h">Проверка</div>
+        <div id="probs"></div>
+        <div class="h">Файл</div>
+        <div class="hint">Экспорт собирает ВСЕ заполненные слоты в один
+            cityDesigns.js. Вставь его в игру: замени содержимое
+            <b>build/scripts/game/cityDesigns.js</b> — игра сама начнёт
+            строить эти города (для столицы Силы — дизайн «Сила · столица»,
+            для обычных городов Силы — «Сила · город», и так по всем
+            стихиям). Черновик автосохраняется в браузере.</div>
+        <div class="row">
+            <button id="btnLsClear">Сбросить черновики</button>
+        </div>
+    </aside>
+</div>
+
+<div class="modal" id="mExport">
+    <div class="mbox">
+        <h2>Экспорт дизайнов</h2>
+        <div class="hint">Скопируй текст и вставь в build/scripts/game/cityDesigns.js
+            (целиком замени содержимое файла) — или скачай файл и положи его
+            на место старого.</div>
+        <textarea id="expText" spellcheck="false"></textarea>
+        <div class="mrow">
+            <button id="btnExpCopy">Копировать</button>
+            <button id="btnExpDl">Скачать cityDesigns.js</button>
+            <button id="btnExpClose" style="margin-left:auto">Закрыть</button>
+        </div>
+    </div>
+</div>
+<div class="modal" id="mImport">
+    <div class="mbox">
+        <h2>Импорт дизайнов</h2>
+        <div class="hint">Вставь содержимое cityDesigns.js (или экспортную
+            выгрузку целиком) — заполненные слоты перезапишутся. Можно выбрать
+            файл.</div>
+        <textarea id="impText" spellcheck="false"></textarea>
+        <div class="mrow">
+            <input type="file" id="impFile" accept=".js,.json,.txt"
+                style="width:auto; padding:2px">
+            <button id="btnImpApply">Импортировать</button>
+            <button id="btnImpClose" style="margin-left:auto">Закрыть</button>
+        </div>
+    </div>
+</div>
+<div class="modal" id="mHelp">
+    <div class="mbox">
+        <h2>Как пользоваться</h2>
+        <p class="help"><b>1.</b> Выбери слот справа: стихия × «столица/город».
+Столица — стартовый город героя этой стихии (8 районов, дом Глома), «город» —
+обычные города зоны (5 районов). Размеры — традиционные, но можно любые.
+
+<b>2.</b> Рисуй инструментами слева: клетки (пол/стена/роща/вода/мост/горы),
+здания из каталога, болота, деревья, проход-выход и спавн. ПКМ всегда рисует
+стену, Shift+протяжка — прямоугольник, Ctrl+Z отменяет.
+
+<b>3.</b> Кнопка «Из игры» кладёт в слот текущую процедурную планировку этой
+стихии — удобно править готовый город, а не рисовать с нуля.
+
+<b>4.</b> Панель «Проверка» подсвечивает проблемы: недостижимые клетки пола
+(красным на карте), двери без пола, оборванный проход. Кнопка «Экспорт»
+собирает все заполненные слоты в cityDesigns.js — замени им файл
+build/scripts/game/cityDesigns.js, и игра построит города по твоим планам.
+
+<b>Символы карты</b> (они же в экспорте): «.» пол, «#» стена, «%» пятно
+здания, «F» роща (непроходимо), «~» вода, «=» мост, «M» горы (непроходимо).
+Болота и деревья в символы не входят — это оверлей и декор, списками клеток.</p>
+        <div class="mrow"><button id="btnHelpClose" style="margin-left:auto">Закрыть</button></div>
+    </div>
+</div>
+
+<script src="../dll/pixi.min.js"></script>
+<script src="../scripts/engine/modules/dualgrid.js"></script>
+<script src="../scripts/game/cardsStrength.js"></script>
+<script src="../scripts/game/cardsGrowth.js"></script>
+<script src="../scripts/game/cardsWisdom.js"></script>
+<script src="../scripts/game/cardsDecay.js"></script>
+<script src="../scripts/game/cardsHonor.js"></script>
+<script src="../scripts/game/cardsTime.js"></script>
+<script src="../scripts/game/cardsMulti.js"></script>
+<script src="../scripts/game/heroesData.js"></script>
+<script src="../scripts/game/cardsData.js"></script>
+<script src="../scripts/game/dataEncounters.js"></script>
+<script src="../scripts/game/dataCards.js"></script>
+<script src="../scripts/game/worldGen.js"></script>
+<script src="../scripts/game/worldTiles.js"></script>
+<script src="../scripts/game/city.js"></script>
+<script>
+"use strict";
+/* ═══════════════════════════ КОНСТАНТЫ ═══════════════════════════ */
+const TS = 64; // клетка города — те же тайлы данжа (64px)
+const ELEMS = ["strength", "growth", "wisdom", "decay", "honor", "time"];
+const ELEM_RU = { strength: "Сила", growth: "Рост", wisdom: "Мудрость",
+    decay: "Тлен", honor: "Честь", time: "Время" };
+const ELEM_COLOR = { strength: "#c9705a", growth: "#79b356",
+    wisdom: "#5a9bd0", decay: "#9b7fb8", honor: "#d8b25c", time: "#63b0b8" };
+const KIND_RU = { capital: "столица", town: "город" };
+// стихия → данж (тайлы стен/кромок) — как в city.js newCityState
+const CAVE_OF = { strength: "gob", growth: "grw", wisdom: "wis",
+    decay: "dec", honor: "hon", time: "tim" };
+const LAIR_OF = { gob: "goblins_lair", grw: "growth_lair", wis: "water_lair",
+    dec: "necro_lair", hon: "honor_lair", tim: "time_lair" };
+// лист заливки пола по стихии — копия CITY_VARIANTS (city.js)
+const VARIANT = { strength: "dirt", growth: "grass", wisdom: "magic",
+    decay: "waste", honor: "sand", time: "snow" };
+const CATALOG = globalThis.GAME_CITY.CITY_BLD_CATALOG;
+const BLD_RU = { townHall: "Ратуша", shop: "Магазин", armory: "Кузница",
+    collect: "Коллекционер", glomHouse: "Дом Глома" };
+const CAP_SIZE = [24, 19], TOWN_SIZE = [20, 16];
+const LS_KEY = "sd_city_editor_v1";
+const hsh = (i, j, k) => ((i * 73856093 ^ j * 19349663
+    ^ (k || 0) * 83492791) >>> 0) % 1000; // копия dungeon.js
+
+/* ═══════════════════════ МОДЕЛЬ / ХРАНИЛИЩЕ ═══════════════════════ */
+const store = { designs: {}, cur: { elem: "strength", kind: "capital" } };
+let undoStack = [];
+
+function slotRec(elem) {
+    if (!store.designs[elem]) store.designs[elem] = {};
+    return store.designs[elem];
+}
+function curDesign() { return slotRec(store.cur.elem)[store.cur.kind] || null; }
+function isWalkableCh(ch) { return ch === "." || ch === "="; }
+
+// пустой город: стены по периметру, пол внутри, проход и спавн по центру юга
+function emptyDesign(w, h) {
+    const rows = [];
+    for (let j = 0; j < h; j++) {
+        let r = "";
+        for (let i = 0; i < w; i++)
+            r += (i === 0 || j === 0 || i === w - 1 || j === h - 1) ? "#" : ".";
+        rows.push(r);
+    }
+    const d = { v: 1, rows, buildings: [], exit: null, spawn: null,
+        swamp: [], trees: [] };
+    setExit(d, w >> 1, h - 1);
+    d.spawn = { x: w >> 1, y: h - 2 };
+    return d;
+}
+// клетки прохода: центр (cx, cy) + соседи, клетки становятся полом
+// (здания, попавшие под проход, сносятся)
+function setExit(d, cx, cy) {
+    const W = d.rows[0].length, H = d.rows.length;
+    const x0 = Math.max(0, Math.min(W - 1, cx - 1));
+    const x1 = Math.max(0, Math.min(W - 1, cx + 1));
+    const y = Math.max(0, Math.min(H - 1, cy));
+    for (let x = x0; x <= x1; x++) {
+        const b = bldAt(d, x, y);
+        if (b) removeBld(d, b);
+    }
+    d.exit = { x0, x1, y };
+    const rows = d.rows.map((r) => r.split(""));
+    for (let x = x0; x <= x1; x++) rows[y][x] = ".";
+    d.rows = rows.map((r) => r.join(""));
+}
+// планировка из игры (процедурная генерация) как отправная точка:
+// + восстановление разброса деревьев (тот же хэш, что в addCityDeco)
+function fromGame(elem, kind) {
+    const st = globalThis.GAME_CITY.newCityState(elem, kind === "capital");
+    const W = st.rows[0].length, H = st.rows.length;
+    const keep = new Set();
+    const keep1 = (x, y) => {
+        for (let dy = -1; dy <= 1; dy++)
+            for (let dx = -1; dx <= 1; dx++)
+                keep.add((y + dy) * 1000 + x + dx);
+    };
+    const pg = st.exitPassage;
+    if (pg) for (let x = pg.x0; x <= pg.x1; x++) keep1(x, pg.y);
+    keep1(Math.floor(st.spawn.x / TS), Math.floor(st.spawn.y / TS));
+    for (const o of st.objects) keep1(o.col, o.row);
+    const trees = [];
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+        const ch = st.rows[j][i];
+        if (ch !== "." && ch !== "F") continue;
+        const grove = ch === "F";
+        const scatter = ((st.feat.trees && hsh(i, j, 11) < 130)
+            || (st.elem === "growth" && hsh(i, j, 11) < 70));
+        if (!grove && !scatter) continue;
+        if (!grove && keep.has(j * 1000 + i)) continue;
+        trees.push([i, j]);
+    }
+    const swamp = [];
+    for (const [x0, y0, x1, y1] of st.feat.swamp)
+        for (let y = y0; y <= y1; y++)
+            for (let x = x0; x <= x1; x++) swamp.push([x, y]);
+    return {
+        v: 1, rows: [...st.rows],
+        buildings: st.objects.filter((o) => o.build)
+            .map((o) => ({ type: o.type, x: o.gx, y: o.gy })),
+        exit: { x0: pg.x0, x1: pg.x1, y: pg.y },
+        spawn: { x: Math.floor(st.spawn.x / TS),
+                 y: Math.floor(st.spawn.y / TS) },
+        swamp, trees,
+    };
+}
+
+/* ═══════════════════ ТЕКСТУРЫ (как в main.js) ═══════════════════ */
+const tex = { sheets: {}, moats: [], trees: [], mounts: [], blds: {}, walls: {} };
+const dual = globalThis.createDualGrid();
+function loadTex(url) {
+    return new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => res(PIXI.Texture.from(img));
+        img.onerror = () => rej(new Error("нет файла " + url));
+        img.src = url;
+    });
+}
+const WALL_NAMES = ["wall_h1", "wall_v1", "wall_cor1", "wall_cor2",
+    "wall_cor3", "wall_cor4", "wall_end1", "wall_end2", "wall_end3",
+    "wall_end4"];
+async function loadAssets() {
+    const sheets = ["dirt", "grass", "magic", "waste", "sand", "snow",
+        "water", "magic_water", "swamp", "wood"];
+    for (const name of sheets)
+        tex.sheets[name] = dual.sliceTileset(
+            await loadTex(`../images/tiles/${name}.png`));
+    // мосты городов: moats_64.png — 11 видов сеткой 4×3 по 64px (main.js)
+    const msrc = await loadTex("../images/tiles/moats_64.png");
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++)
+        tex.moats.push(new PIXI.Texture({ source: msrc.source,
+            frame: new PIXI.Rectangle(c * 64, r * 64, 64, 64) }));
+    for (let n = 1; n <= 10; n++)
+        tex.trees.push(await loadTex(`../images/tiles/trees/${n}.png`));
+    for (let n = 1; n <= 6; n++)
+        tex.mounts.push(await loadTex(`../images/tiles/montain/${n}.png`));
+    for (const type of Object.keys(CATALOG))
+        tex.blds[type] = await loadTex(
+            `../images/buildings/${CATALOG[type].file}`);
+    for (const cave of Object.keys(LAIR_OF)) {
+        const w = {};
+        for (const nm of WALL_NAMES)
+            w[nm] = await loadTex(
+                `../images/dungeon_tiles/${LAIR_OF[cave]}/walls/${nm}.png`);
+        tex.walls[cave] = w;
+    }
+}
+
+/* ═════════════ КОПИИ ЛОГИКИ РЕНДЕРА (dungeon.js, W52) ═════════════
+   Маленькие чистые функции сцены данжа не экспортируются — для превью
+   они скопированы дословно (меняются редко; см. комментарий в шапке). */
+function wallInterior(rows, W, H, x, y) {
+    const w = (a, b) => a >= 0 && b >= 0 && a < W && b < H && rows[b][a] === "#";
+    if (!(w(x - 1, y) && w(x + 1, y) && w(x, y - 1) && w(x, y + 1))) return false;
+    return w(x - 1, y - 1) && w(x + 1, y - 1) && w(x - 1, y + 1) && w(x + 1, y + 1);
+}
+function wallDrawn(rows, W, H, x, y) {
+    if (rows[y][x] !== "#" || wallInterior(rows, W, H, x, y)) return false;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const a = x + dx, b = y + dy;
+        if (a >= 0 && b >= 0 && a < W && b < H && rows[b][a] !== "#") return true;
+    }
+    return false;
+}
+function wallTexName(L, R, U, D, dSE, dSW, dNW, dNE) {
+    if (L && R && U && D) {
+        if (dSE) return "wall_cor1";
+        if (dSW) return "wall_cor2";
+        if (dNW) return "wall_cor3";
+        if (dNE) return "wall_cor4";
+        return "wall_h1";
+    }
+    if (L && R) return "wall_h1";
+    if (U && D) return "wall_v1";
+    if (D && R) return "wall_cor1";
+    if (D && L) return "wall_cor2";
+    if (U && L) return "wall_cor3";
+    if (U && R) return "wall_cor4";
+    if (L) return "wall_end1";
+    if (R) return "wall_end2";
+    if (U) return "wall_end3";
+    if (D) return "wall_end4";
+    return "wall_v1";
+}
+// фичи дизайна → вид st.feat, какой ждут рендеры city.js (копия
+// designToState: рощи — rect на всю карту, болота — клетки-оверлеи)
+function mockState(d, elem) {
+    const W = d.rows[0].length, H = d.rows.length;
+    const rows = d.rows.map((r) => r.split(""));
+    const feat = { trees: 0, forest: [], swamp: [], mounts: [],
+        maze: [], water: [], bridges: [] };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        if (rows[y][x] === "~") feat.water.push([x, y]);
+        else if (rows[y][x] === "=") feat.bridges.push([x, y]);
+    }
+    if (d.rows.some((r) => r.includes("F")))
+        feat.forest = [[0, 0, W - 1, H - 1]];
+    for (const c of d.swamp || []) feat.swamp.push([c[0], c[1], c[0], c[1]]);
+    // объекты-здания с дверями (для зоны отчуждения декора)
+    const objects = (d.buildings || []).map((b) => {
+        const cat = CATALOG[b.type];
+        return { type: b.type, gx: b.x, gy: b.y, w: cat.w, h: cat.h,
+            col: b.x + (cat.w >> 1) - 1, row: b.y + cat.h };
+    });
+    const pg = d.exit || { x0: (W >> 1) - 1, x1: (W >> 1) + 1, y: H - 1 };
+    const sp = d.spawn || { x: (pg.x0 + pg.x1) >> 1, y: pg.y - 1 };
+    return {
+        city: true, isCapital: store.cur.kind === "capital", elem, feat,
+        treeCells: [...(d.trees || []).map((c) => [c[0], c[1]]),
+            ...(() => { // рощи «F» всегда с деревьями (как в игре)
+                const out = [];
+                for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
+                    if (rows[y][x] === "F") out.push([x, y]);
+                return out;
+            })()],
+        objects, exitPassage: pg,
+        spawn: { x: sp.x * TS + TS / 2, y: sp.y * TS + TS / 2 },
+    };
+}
+
+/* ═══════════════════════ ПРЕВЮ (PIXI) ═══════════════════════ */
+let app = null, world = null;
+let view = { zoom: 1, fit: 1, panX: 0, panY: 0 };
+let hoverCell = null, ghost = null, rectDrag = null;
+const dirty = { full: true, marks: true };
+
+async function initApp() {
+    app = new PIXI.Application();
+    await app.init({ background: 0x0b0806, antialias: true,
+        resolution: window.devicePixelRatio || 1, autoDensity: true,
+        width: 100, height: 100 });
+    document.getElementById("canvasHost").appendChild(app.canvas);
+    world = new PIXI.Container();
+    app.stage.addChild(world);
+    const host = document.getElementById("canvasHost");
+    const fitCanvas = () => {
+        app.renderer.resize(host.clientWidth, host.clientHeight);
+        dirty.marks = true;
+    };
+    new ResizeObserver(fitCanvas).observe(host);
+    fitCanvas();
+}
+
+function computeFit() {
+    const d = curDesign();
+    if (!d) return 1;
+    const Wp = d.rows[0].length * TS, Hp = d.rows.length * TS;
+    const host = document.getElementById("canvasHost");
+    return Math.min(host.clientWidth / (Wp + 40),
+        host.clientHeight / (Hp + 40), 1.4);
+}
+function applyView() {
+    if (!world) return;
+    const d = curDesign();
+    if (!d) return;
+    const Wp = d.rows[0].length * TS, Hp = d.rows.length * TS;
+    const host = document.getElementById("canvasHost");
+    view.fit = computeFit();
+    const z = view.zoom * view.fit;
+    world.scale.set(z);
+    world.position.set(
+        (host.clientWidth - Wp * z) / 2 + view.panX,
+        (host.clientHeight - Hp * z) / 2 + view.panY);
+}
+
+// полная пересборка превью: тем же конвейером, что сцена города
+function rebuild() {
+    if (!world) return;
+    world.removeChildren().forEach((c) => c.destroy({ children: true }));
+    const d = curDesign();
+    if (!d) { applyView(); return; }
+    const elem = store.cur.elem;
+    const W = d.rows[0].length, H = d.rows.length;
+    const rows = d.rows.map((r) => r.split(""));
+    const st = mockState(d, elem);
+    const ctxF = { worldSheets: tex.sheets, treeTex: tex.trees,
+        mountainTex: tex.mounts, moatsTex: [], moatsCityTex: tex.moats };
+    const env = { ctx: ctxF, st, MAPROWS: rows, W, H, hsh };
+    // 1) фон + пол (копия buildMapGfx, городская ветка)
+    const floorC = new PIXI.Container();
+    world.addChild(floorC);
+    const base = new PIXI.Graphics();
+    base.rect(0, 0, W * TS, H * TS).fill(0x000000);
+    floorC.addChild(base);
+    const vsheet = tex.sheets[VARIANT[elem] || "dirt"];
+    const wsheet = tex.sheets.water || null;
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+        const ch = rows[j][i];
+        if (ch === "#" && !wallDrawn(rows, W, H, i, j)) continue;
+        const sheet = (ch === "~" || ch === "=") ? wsheet : vsheet;
+        if (sheet && sheet.textures.length) {
+            const texs = sheet.textures;
+            for (let sy = 0; sy < 2; sy++) for (let sx = 0; sx < 2; sx++) {
+                const sp = new PIXI.Sprite(
+                    texs[hsh(i * 2 + sx, j * 2 + sy) % texs.length]);
+                sp.position.set(i * TS + sx * 32, j * TS + sy * 32);
+                floorC.addChild(sp);
+            }
+            continue;
+        }
+        const sp = new PIXI.Sprite(PIXI.Texture.WHITE);
+        sp.tint = 0x6b5b45;
+        sp.position.set(i * TS, j * TS);
+        sp.width = TS; sp.height = TS;
+        floorC.addChild(sp); // фолбэк без листов (не бывает — листы грузятся)
+    }
+    // 2) наземные оверлеи: берега реки/болота/чаща/мосты — city.js
+    if (st.feat) {
+        globalThis.GAME_CITY.addCityWaterBanks(
+            { ctx: ctxF, st, MAPROWS: rows, W, H }, floorC);
+        globalThis.GAME_CITY.addCityGroundOverlays(
+            { ctx: ctxF, st, MAPROWS: rows, W, H }, floorC);
+    }
+    // 3) y-sort слой: стены + здания + деревья/горы (как сцена)
+    const layer = new PIXI.Container();
+    layer.sortableChildren = true;
+    world.addChild(layer);
+    const lair = tex.walls[CAVE_OF[elem] || "gob"] || tex.walls.gob;
+    const isW = (x, y) => x >= 0 && y >= 0 && x < W && y < H
+        && rows[y][x] === "#";
+    const isF = (x, y) => !isW(x, y); // «за краем карты» — как пол
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+        if (!wallDrawn(rows, W, H, i, j)) continue;
+        const sp = new PIXI.Sprite(lair[wallTexName(
+            isW(i - 1, j), isW(i + 1, j), isW(i, j - 1), isW(i, j + 1),
+            isF(i + 1, j + 1), isF(i - 1, j + 1), isF(i - 1, j - 1),
+            isF(i + 1, j + 1))]);
+        sp.anchor.set(0, 1);
+        sp.position.set(i * TS, (j + 1) * TS);
+        sp.zIndex = (j + 1) * TS - 1;
+        layer.addChild(sp);
+    }
+    for (const o of st.objects) {
+        const c = new PIXI.Container();
+        const sp = new PIXI.Sprite(tex.blds[o.type]);
+        sp.anchor.set(0.5, 1);
+        sp.scale.set(0.5); // здание вдвое меньше арта (W36)
+        sp.position.set((o.gx + o.w / 2) * TS, (o.gy + o.h) * TS);
+        c.addChild(sp);
+        c.zIndex = (o.gy + o.h) * TS - 0.5;
+        layer.addChild(c);
+    }
+    // 4) деревья/горы — тот же addCityDeco, что в игре
+    globalThis.GAME_CITY.addCityDeco(
+        { ctx: ctxF, st, MAPROWS: rows, W, H, hsh }, layer);
+    // 5) слой редактора: сетка, маркеры, призраки, подсветка проблем
+    buildMarks();
+    applyView();
+}
+
+// слой маркеров редактора (сетка/двери/проход/спавн/ошибки/призрак)
+let markC = null;
+function buildMarks() {
+    if (markC && !markC.destroyed) markC.destroy({ children: true });
+    markC = null;
+    const d = curDesign();
+    if (!d) return;
+    const W = d.rows[0].length, H = d.rows.length;
+    markC = new PIXI.Container();
+    markC.eventMode = "none";
+    world.addChild(markC);
+    const val = validate(d);
+    const g = new PIXI.Graphics();
+    // сетка
+    for (let i = 0; i <= W; i++) {
+        g.moveTo(i * TS, 0); g.lineTo(i * TS, H * TS);
+    }
+    for (let j = 0; j <= H; j++) {
+        g.moveTo(0, j * TS); g.lineTo(W * TS, j * TS);
+    }
+    g.stroke({ width: 1, color: 0xffffff, alpha: 0.07 });
+    markC.addChild(g);
+    // недостижимые клетки пола — красным
+    if (val.unreachable.length) {
+        const r = new PIXI.Graphics();
+        for (const [x, y] of val.unreachable)
+            r.rect(x * TS + 3, y * TS + 3, TS - 6, TS - 6)
+                .fill({ color: 0xff3020, alpha: 0.33 });
+        markC.addChild(r);
+    }
+    // проход-выход — зелёная полоса
+    if (d.exit) {
+        const e = new PIXI.Graphics();
+        e.rect(d.exit.x0 * TS, d.exit.y * TS,
+            (d.exit.x1 - d.exit.x0 + 1) * TS, TS)
+            .fill({ color: 0x37e05a, alpha: 0.26 });
+        e.rect(d.exit.x0 * TS, d.exit.y * TS,
+            (d.exit.x1 - d.exit.x0 + 1) * TS, TS).stroke(
+            { width: 2, color: 0x37e05a, alpha: 0.9 });
+        markC.addChild(e);
+        const t = new PIXI.Text({ text: "выход в мир",
+            style: { fontFamily: "Kereru", fontSize: 13,
+                fill: 0x9dffb0, stroke: { color: 0x06220c, width: 4 } } });
+        t.anchor.set(0.5, 1);
+        t.position.set((d.exit.x0 + d.exit.x1 + 1) / 2 * TS,
+            d.exit.y * TS - 3);
+        markC.addChild(t);
+    }
+    // спавн — золотая метка
+    if (d.spawn) {
+        const s = new PIXI.Graphics();
+        s.circle(d.spawn.x * TS + TS / 2, d.spawn.y * TS + TS / 2, 12)
+            .fill({ color: 0xf0c96a, alpha: 0.35 });
+        s.circle(d.spawn.x * TS + TS / 2, d.spawn.y * TS + TS / 2, 12)
+            .stroke({ width: 2.5, color: 0xf0c96a });
+        markC.addChild(s);
+        const t = new PIXI.Text({ text: "старт",
+            style: { fontFamily: "Kereru", fontSize: 12,
+                fill: 0xffe9b0, stroke: { color: 0x241505, width: 4 } } });
+        t.anchor.set(0.5, 0);
+        t.position.set(d.spawn.x * TS + TS / 2,
+            d.spawn.y * TS + TS / 2 + 14);
+        markC.addChild(t);
+    }
+    // двери зданий — янтарные точки
+    const dr = new PIXI.Graphics();
+    for (const o of st2objects(d)) {
+        dr.circle((o.col + 0.5) * TS, o.row * TS + TS / 2, 5)
+            .fill({ color: 0xffb35c, alpha: 0.85 });
+    }
+    markC.addChild(dr);
+    // призрак здания при переносе/установке
+    if (ghost && hoverCell) {
+        const cat = CATALOG[ghost];
+        const okG = ghostFits(d, hoverCell.x, hoverCell.y, cat, ghost.owner);
+        const gh = new PIXI.Graphics();
+        for (let y = hoverCell.y; y < hoverCell.y + cat.h; y++)
+            for (let x = hoverCell.x; x < hoverCell.x + cat.w; x++)
+                gh.rect(x * TS + 2, y * TS + 2, TS - 4, TS - 4)
+                    .fill({ color: okG ? 0x37e05a : 0xff3020, alpha: 0.3 });
+        markC.addChild(gh);
+        const sp = new PIXI.Sprite(tex.blds[ghost]);
+        sp.anchor.set(0.5, 1);
+        sp.scale.set(0.5);
+        sp.alpha = 0.65;
+        sp.position.set((hoverCell.x + cat.w / 2) * TS,
+            (hoverCell.y + cat.h) * TS);
+        markC.addChild(sp);
+    }
+    // прямоугольник Shift-заливки
+    if (rectDrag && hoverCell) {
+        const rr = new PIXI.Graphics();
+        const x0 = Math.min(rectDrag.x, hoverCell.x),
+            x1 = Math.max(rectDrag.x, hoverCell.x);
+        const y0 = Math.min(rectDrag.y, hoverCell.y),
+            y1 = Math.max(rectDrag.y, hoverCell.y);
+        rr.rect(x0 * TS, y0 * TS, (x1 - x0 + 1) * TS, (y1 - y0 + 1) * TS)
+            .stroke({ width: 2, color: 0xf0c96a, alpha: 0.9 });
+        markC.addChild(rr);
+    }
+    // подсветка клетки под курсором
+    if (hoverCell) {
+        const hv = new PIXI.Graphics();
+        hv.rect(hoverCell.x * TS, hoverCell.y * TS, TS, TS)
+            .stroke({ width: 2, color: 0xffffff, alpha: 0.5 });
+        markC.addChild(hv);
+    }
+}
+function st2objects(d) {
+    return (d.buildings || []).map((b) => {
+        const cat = CATALOG[b.type];
+        return { col: b.x + (cat.w >> 1) - 1, row: b.y + cat.h };
+    });
+}
+
+/* ═══════════════════════ ВАЛИДАЦИЯ ═══════════════════════ */
+function validate(d) {
+    const probs = [];
+    const W = d.rows[0].length, H = d.rows.length;
+    const rows = d.rows.map((r) => r.split(""));
+    const walk = (x, y) => x >= 0 && y >= 0 && x < W && y < H
+        && isWalkableCh(rows[y][x]);
+    // BFS достижимости от спавна (или от прохода)
+    const seeds = [];
+    if (d.spawn && walk(d.spawn.x, d.spawn.y))
+        seeds.push([d.spawn.x, d.spawn.y]);
+    if (!seeds.length && d.exit)
+        for (let x = d.exit.x0; x <= d.exit.x1; x++)
+            if (walk(x, d.exit.y)) seeds.push([x, d.exit.y]);
+    if (!seeds.length)
+        for (let j = 0; j < H && !seeds.length; j++)
+            for (let i = 0; i < W && !seeds.length; i++)
+                if (walk(i, j)) seeds.push([i, j]);
+    const seen = new Uint8Array(W * H);
+    for (const [sx, sy] of seeds) {
+        const q = [[sx, sy]];
+        seen[sy * W + sx] = 1;
+        while (q.length) {
+            const [cx, cy] = q.pop();
+            for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                const nx = cx + dx, ny = cy + dy;
+                if (walk(nx, ny) && !seen[ny * W + nx]) {
+                    seen[ny * W + nx] = 1;
+                    q.push([nx, ny]);
+                }
+            }
+        }
+    }
+    const unreachable = [];
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++)
+        if (walk(i, j) && !seen[j * W + i]) unreachable.push([i, j]);
+    if (unreachable.length) probs.push({ lvl: "err", msg:
+        `Недостижимых клеток пола: ${unreachable.length} ` +
+        `(красные на карте) — герой туда не пройдёт` });
+    // здания: дверь на полу
+    const bTypes = {};
+    for (const b of d.buildings || []) {
+        bTypes[b.type] = (bTypes[b.type] || 0) + 1;
+        const cat = CATALOG[b.type];
+        const dx = b.x + (cat.w >> 1) - 1, dy = b.y + cat.h;
+        if (!walk(dx, dy)) probs.push({ lvl: "err", msg:
+            `Дверь «${BLD_RU[b.type]}» (${dx}, ${dy}) не на полу — ` +
+            `к ней не подойти` });
+    }
+    if (!(d.buildings || []).length)
+        probs.push({ lvl: "warn", msg: "В городе нет ни одного здания" });
+    if (!bTypes.townHall)
+        probs.push({ lvl: "warn", msg: "Нет ратуши — побочных квестов " +
+            "и коллекционера не будет" });
+    if (!bTypes.shop)
+        probs.push({ lvl: "warn", msg: "Нет магазина — торговца картами " +
+            "не будет" });
+    if (!bTypes.armory)
+        probs.push({ lvl: "warn", msg: "Нет кузницы — бустеров не сковать" });
+    if (bTypes.glomHouse && store.cur.kind !== "capital")
+        probs.push({ lvl: "info", msg: "Дом Глома в обычном городе: Глом " +
+            "оживает только в столице (в городе дом — декорация)" });
+    if (!bTypes.glomHouse && store.cur.kind === "capital")
+        probs.push({ lvl: "info", msg: "В столице нет дома Глома — " +
+            "сюжетный диалог Глома не случится" });
+    // проход
+    if (!d.exit) {
+        probs.push({ lvl: "err", msg: "Нет прохода-выхода — из города не " +
+            "выйти в мир" });
+    } else {
+        let okF = true, okR = false;
+        for (let x = d.exit.x0; x <= d.exit.x1; x++) {
+            if (!walk(x, d.exit.y)) okF = false;
+            if (seen[d.exit.y * W + x]) okR = true;
+        }
+        if (!okF) probs.push({ lvl: "err", msg:
+            "Клетки прохода-выхода не пол — выход не сработает" });
+        else if (!okR) probs.push({ lvl: "err", msg:
+            "Проход-выход не соединён с городом" });
+        if (d.exit.y !== 0 && d.exit.y !== H - 1)
+            probs.push({ lvl: "info", msg: "Проход не в верхней/нижней " +
+                "стене — так тоже работает, но непривычно" });
+    }
+    // спавн
+    if (d.spawn && !walk(d.spawn.x, d.spawn.y))
+        probs.push({ lvl: "err", msg: "Спавн не на полу — герой появится " +
+            "в стене и будет выкинут на дефолтную клетку" });
+    // деревья/болота на полу
+    let badTree = 0, badSwamp = 0;
+    for (const [x, y] of d.trees || [])
+        if (!walk(x, y) && rows[y][x] !== "F") badTree++;
+    for (const [x, y] of d.swamp || []) if (!walk(x, y)) badSwamp++;
+    if (badTree) probs.push({ lvl: "info", msg:
+        `Деревьев не на полу: ${badTree} (в игру не попадут)` });
+    if (badSwamp) probs.push({ lvl: "info", msg:
+        `Болот не на полу: ${badSwamp} (в игру не попадут)` });
+    return { probs, unreachable, ok: !probs.some((p) => p.lvl === "err") };
+}
+
+/* ═══════════════════ ПРАВКИ МОДЕЛИ / ИНСТРУМЕНТЫ ═══════════════════ */
+const tool = { mode: "cell", cell: "wall", bld: "shop" };
+// у кого из зданий это пятно (для стирания/переноса)
+function bldAt(d, x, y) {
+    for (const b of d.buildings || []) {
+        const cat = CATALOG[b.type];
+        if (x >= b.x && x < b.x + cat.w && y >= b.y && y < b.y + cat.h)
+            return b;
+    }
+    return null;
+}
+function ghostFits(d, x, y, cat, owner) {
+    const W = d.rows[0].length, H = d.rows.length;
+    if (x < 0 || y < 0 || x + cat.w > W || y + cat.h > H) return false;
+    for (const b of d.buildings || []) {
+        if (b === owner) continue;
+        const c2 = CATALOG[b.type];
+        if (x < b.x + c2.w && b.x < x + cat.w
+            && y < b.y + c2.h && b.y < y + cat.h) return false;
+    }
+    return true;
+}
+function setCells(d, cells, ch) {
+    const rows = d.rows.map((r) => r.split(""));
+    for (const [x, y] of cells)
+        if (y >= 0 && y < rows.length && x >= 0 && x < rows[0].length)
+            rows[y][x] = ch;
+    d.rows = rows.map((r) => r.join(""));
+}
+function removeBld(d, b) {
+    const cat = CATALOG[b.type];
+    const cells = [];
+    for (let y = b.y; y < b.y + cat.h; y++)
+        for (let x = b.x; x < b.x + cat.w; x++) cells.push([x, y]);
+    setCells(d, cells, ".");
+    d.buildings = d.buildings.filter((z) => z !== b);
+    if (d.spawn && cells.some(([x, y]) =>
+        x === d.spawn.x && y === d.spawn.y)) d.spawn = null;
+}
+function placeBld(d, type, x, y) {
+    const cat = CATALOG[type];
+    const cells = [];
+    for (let j = y; j < y + cat.h; j++)
+        for (let i = x; i < x + cat.w; i++) cells.push([i, j]);
+    setCells(d, cells, "%");
+    // дерево/болото под пятном не имеют смысла — чистим
+    const inSpot = ([tx, ty]) => tx >= x && tx < x + cat.w
+        && ty >= y && ty < y + cat.h;
+    d.trees = (d.trees || []).filter((c) => !inSpot(c));
+    d.swamp = (d.swamp || []).filter((c) => !inSpot(c));
+    d.buildings.push({ type, x, y });
+    // проход/спавн, накрытые пятном, больше не имеют смысла
+    if (d.exit && d.exit.y >= y && d.exit.y < y + cat.h
+        && d.exit.x1 >= x && d.exit.x0 < x + cat.w) d.exit = null;
+    if (d.spawn && d.spawn.x >= x && d.spawn.x < x + cat.w
+        && d.spawn.y >= y && d.spawn.y < y + cat.h) d.spawn = null;
+}
+function paintCell(d, x, y, ch) {
+    const W = d.rows[0].length, H = d.rows.length;
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const b = bldAt(d, x, y);
+    if (b) removeBld(d, b); // красим поверх здания — здание уходит
+    const rows = d.rows.map((r) => r.split(""));
+    rows[y][x] = ch;
+    d.rows = rows.map((r) => r.join(""));
+    // проход, накрытый не-полом, распадается
+    if (d.exit) {
+        const e = d.exit;
+        if (y === e.y && x >= e.x0 && x <= e.x1 && ch !== ".") d.exit = null;
+    }
+    if (d.spawn && d.spawn.x === x && d.spawn.y === y && !isWalkableCh(ch))
+        d.spawn = null;
+    // деревья/болота держим только на полу
+    if (ch !== "." && ch !== "F") d.trees = (d.trees || []).filter(
+        ([tx, ty]) => tx !== x || ty !== y);
+    if (ch !== ".") d.swamp = (d.swamp || []).filter(
+        ([tx, ty]) => tx !== x || ty !== y);
+}
+function paintLine(d, x0, y0, x1, y1, ch) {
+    // Брезенхэм — протяжка без разрывов
+    let dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
+    let sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy;
+    for (;;) {
+        paintCell(d, x0, y0, ch);
+        if (x0 === x1 && y0 === y1) break;
+        const e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+}
+function paintRect(d, x0, y0, x1, y1, ch) {
+    for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++)
+        for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++)
+            paintCell(d, x, y, ch);
+}
+function applyTool(d, x, y, rightBtn) {
+    // ПКМ — всегда стена
+    const mode = rightBtn ? "cell" : tool.mode;
+    const ch = rightBtn ? "#" : tool.cell;
+    if (mode === "cell") { paintCell(d, x, y, ch); return; }
+    if (mode === "bld") {
+        const b = bldAt(d, x, y);
+        if (b) { // схватить/удалить
+            if (rightBtn) { removeBld(d, b); }
+            else {
+                removeBld(d, b);
+                ghost = b.type;
+            }
+            return;
+        }
+        if (rightBtn) return;
+        if (ghost) { // поставить призрак
+            const cat = CATALOG[ghost];
+            if (ghostFits(d, x, y, cat)) {
+                placeBld(d, ghost, x, y);
+                ghost = null;
+            }
+            return;
+        }
+        const cat = CATALOG[tool.bld];
+        if (ghostFits(d, x, y, cat)) placeBld(d, tool.bld, x, y);
+        return;
+    }
+    if (rightBtn) return;
+    if (mode === "exit") { setExit(d, x, y); return; }
+    if (mode === "spawn") {
+        if (isWalkableCh(d.rows[y][x])) d.spawn = { x, y };
+        return;
+    }
+    if (mode === "tree") {
+        const has = (d.trees || []).some(([tx, ty]) => tx === x && ty === y);
+        if (isWalkableCh(d.rows[y][x]) && !has) d.trees.push([x, y]);
+        else d.trees = (d.trees || []).filter(
+            ([tx, ty]) => tx !== x || ty !== y);
+        return;
+    }
+    if (mode === "swamp") {
+        const has = (d.swamp || []).some(([tx, ty]) => tx === x && ty === y);
+        if (isWalkableCh(d.rows[y][x]) && !has) d.swamp.push([x, y]);
+        else d.swamp = (d.swamp || []).filter(
+            ([tx, ty]) => tx !== x || ty !== y);
+        return;
+    }
+}
+
+/* ═══════════════════ ВВОД (мышь/клавиши) ═══════════════════ */
+let painting = false, panning = false, lastCell = null,
+    panStart = null, shiftDown = false, paintBtn = 0;
+function evtCell(e) {
+    const host = document.getElementById("canvasHost");
+    const r = app.canvas.getBoundingClientRect();
+    const z = view.zoom * view.fit;
+    const lx = (e.clientX - r.left - world.position.x) / z;
+    const ly = (e.clientY - r.top - world.position.y) / z;
+    const d = curDesign();
+    if (!d) return null;
+    const x = Math.floor(lx / TS), y = Math.floor(ly / TS);
+    if (x < 0 || y < 0 || x >= d.rows[0].length || y >= d.rows.length)
+        return null;
+    return { x, y };
+}
+function wireInput() {
+    const cv = app.canvas;
+    cv.addEventListener("contextmenu", (e) => e.preventDefault());
+    cv.addEventListener("pointerdown", (e) => {
+        const d = curDesign();
+        if (!d) return;
+        if (e.button === 1 || e.button === 2 && e.altKey) {
+            panning = true; panStart = { x: e.clientX, y: e.clientY,
+                px: view.panX, py: view.panY };
+            cv.setPointerCapture(e.pointerId);
+            return;
+        }
+        const c = evtCell(e);
+        if (!c) return;
+        if (e.button === 0 || e.button === 2) {
+            pushUndo();
+            painting = true;
+            paintBtn = e.button;
+            if (e.button === 0 && shiftDown && tool.mode === "cell") {
+                rectDrag = { ...c }; // прямоугольник — на pointerup
+            } else {
+                applyTool(d, c.x, c.y, e.button === 2);
+                lastCell = c;
+                dirty.full = true;
+            }
+        }
+    });
+    cv.addEventListener("pointermove", (e) => {
+        const c = evtCell(e);
+        const prev = hoverCell;
+        hoverCell = c;
+        document.getElementById("coords").textContent = c
+            ? `клетка ${c.x}, ${c.y}` : "";
+        if (panning) {
+            view.panX = panStart.px + e.clientX - panStart.x;
+            view.panY = panStart.py + e.clientY - panStart.y;
+            applyView();
+            return;
+        }
+        const d = curDesign();
+        if (painting && !rectDrag && c && d && tool.mode !== "bld") {
+            const right = paintBtn === 2;
+            if (lastCell
+                && (Math.abs(lastCell.x - c.x) > 1
+                    || Math.abs(lastCell.y - c.y) > 1)) {
+                paintLine(d, lastCell.x, lastCell.y, c.x, c.y,
+                    right ? "#" : tool.cell);
+            } else {
+                applyTool(d, c.x, c.y, right);
+            }
+            lastCell = c;
+            dirty.full = true;
+        }
+        if (c || prev) dirty.marks = true;
+    });
+    window.addEventListener("pointerup", (e) => {
+        if (panning) { panning = false; return; }
+        if (painting && rectDrag && hoverCell) {
+            const d = curDesign();
+            const right = paintBtn === 2;
+            const x0 = Math.min(rectDrag.x, hoverCell.x),
+                x1 = Math.max(rectDrag.x, hoverCell.x);
+            const y0 = Math.min(rectDrag.y, hoverCell.y),
+                y1 = Math.max(rectDrag.y, hoverCell.y);
+            if (tool.mode === "cell") {
+                paintRect(d, x0, y0, x1, y1, right ? "#" : tool.cell);
+            } else if (tool.mode === "tree" || tool.mode === "swamp") {
+                // прямоугольник дерева/болота: ЛКМ — посадить (не «туду-
+                // сюду»-тоггл), ПКМ — снять
+                const listName = tool.mode === "tree" ? "trees" : "swamp";
+                const list = d[listName] || [];
+                d[listName] = list; // мутируем один массив
+                for (let y = y0; y <= y1; y++)
+                    for (let x = x0; x <= x1; x++) {
+                        const idx = list.findIndex(([tx, ty]) =>
+                            tx === x && ty === y);
+                        if (right) {
+                            if (idx >= 0) list.splice(idx, 1);
+                        } else if (idx < 0 && isWalkableCh(d.rows[y][x])) {
+                            list.push([x, y]);
+                        }
+                    }
+            }
+            dirty.full = true;
+        }
+        painting = false; rectDrag = null; lastCell = null;
+        dirty.marks = true;
+    });
+    cv.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        view.zoom = Math.min(2.5, Math.max(0.35,
+            view.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+        applyView();
+    }, { passive: false });
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "Shift") shiftDown = true;
+        if (e.key === "Escape") { ghost = null; dirty.marks = true; }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+            e.preventDefault();
+            doUndo();
+        }
+    });
+    window.addEventListener("keyup", (e) => {
+        if (e.key === "Shift") shiftDown = false;
+    });
+}
+
+/* ═══════════════════ UNDO / АВТОСОХРАНЕНИЕ ═══════════════════ */
+function pushUndo() {
+    const d = curDesign();
+    if (!d) return;
+    undoStack.push(JSON.stringify(d));
+    if (undoStack.length > 60) undoStack.shift();
+    updUndoBtn();
+}
+function doUndo() {
+    const d = curDesign();
+    if (!d || !undoStack.length) return;
+    slotRec(store.cur.elem)[store.cur.kind] =
+        JSON.parse(undoStack.pop());
+    touch(); // перерисовать + автосохранение
+    updUndoBtn();
+}
+function updUndoBtn() {
+    document.getElementById("btnUndo").disabled = !undoStack.length;
+}
+let saveT = 0;
+function touch() {
+    dirty.full = true;
+    clearTimeout(saveT);
+    saveT = setTimeout(saveLocal, 250);
+}
+function saveLocal() {
+    try {
+        localStorage.setItem(LS_KEY, JSON.stringify({
+            designs: store.designs, cur: store.cur }));
+    } catch (e) { /* приватный режим — черновик не сохранить, не беда */ }
+}
+function loadLocal() {
+    try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return;
+        const s = JSON.parse(raw);
+        if (s && s.designs) {
+            store.designs = s.designs;
+            if (s.cur && ELEMS.includes(s.cur.elem)
+                && ["capital", "town"].includes(s.cur.kind))
+                store.cur = s.cur;
+        }
+    } catch (e) { /* битый черновик — начинаем с пустого */ }
+}
+
+/* ═══════════════════ ЭКСПОРТ / ИМПОРТ ═══════════════════ */
+function allDesigns() {
+    const out = {};
+    for (const e of ELEMS) {
+        const rec = store.designs[e];
+        if (!rec) continue;
+        const r = {};
+        if (rec.capital) r.capital = rec.capital;
+        if (rec.town) r.town = rec.town;
+        if (Object.keys(r).length) out[e] = r;
+    }
+    return out;
+}
+function exportText() {
+    const obj = allDesigns();
+    return "// ДИЗАЙНЫ ГОРОДОВ — экспорт редактора городов " +
+        "(build/tools/cityEditor.html).\n" +
+        "// Замените этим содержимым файл build/scripts/game/cityDesigns.js\n" +
+        "// (или сохраните файл целиком на его место).\n" +
+        "globalThis.GAME_CITY_DESIGNS = " +
+        JSON.stringify(obj, null, 1) + ";\n";
+}
+function parseDesigns(text) {
+    let s = String(text).trim();
+    s = s.replace(/^[ \t]*\/\/.*$/gm, ""); // строковые комментарии
+    let obj = null;
+    try { obj = JSON.parse(s); } catch (e) { /* не JSON — попробуем JS */ }
+    if (!obj) {
+        const m = s.match(/=\s*([\s\S]+)$/);
+        const body = m ? m[1] : s;
+        try { obj = (new Function("return (" +
+            body.replace(/;\s*$/, "") + ")"))(); } catch (e) {}
+    }
+    if (!obj || typeof obj !== "object")
+        throw new Error("Не удалось разобрать данные — нужен объект " +
+            "дизайнов или его JS/JSON");
+    return obj;
+}
+function normalizeDesign(inp) {
+    const W = inp.w || (inp.rows && inp.rows[0] ? inp.rows[0].length : 0)
+        || 0;
+    const H = inp.h || (inp.rows ? inp.rows.length : 0) || 0;
+    if (!W || !H || !Array.isArray(inp.rows)) return null;
+    const rows = inp.rows.slice(0, H).map((r) =>
+        String(r).padEnd(W, "#").slice(0, W)
+            .replace(/[^.#%F~=M]/g, "."));
+    const d = { v: 1, rows, buildings: [], exit: null, spawn: null,
+        swamp: [], trees: [] };
+    for (const b of Array.isArray(inp.buildings) ? inp.buildings : []) {
+        if (CATALOG[b && b.type] && Number.isInteger(b.x)
+            && Number.isInteger(b.y) && b.x >= 0 && b.y >= 0
+            && b.x + CATALOG[b.type].w <= W && b.y + CATALOG[b.type].h <= H)
+            d.buildings.push({ type: b.type, x: b.x, y: b.y });
+    }
+    if (inp.exit && Number.isInteger(inp.exit.y)
+        && inp.exit.y >= 0 && inp.exit.y < H
+        && Number.isInteger(inp.exit.x0) && Number.isInteger(inp.exit.x1)
+        && inp.exit.x0 >= 0 && inp.exit.x1 < W)
+        d.exit = { x0: inp.exit.x0, x1: inp.exit.x1, y: inp.exit.y };
+    if (inp.spawn && Number.isInteger(inp.spawn.x)
+        && Number.isInteger(inp.spawn.y)
+        && inp.spawn.x >= 0 && inp.spawn.x < W
+        && inp.spawn.y >= 0 && inp.spawn.y < H)
+        d.spawn = { x: inp.spawn.x, y: inp.spawn.y };
+    const cell = (c) => Array.isArray(c) && Number.isInteger(c[0])
+        && Number.isInteger(c[1]) && c[0] >= 0 && c[0] < W
+        && c[1] >= 0 && c[1] < H ? [c[0], c[1]] : null;
+    for (const c of Array.isArray(inp.swamp) ? inp.swamp : []) {
+        const p = cell(c);
+        if (p && rows[p[1]][p[0]] === ".") d.swamp.push(p);
+    }
+    for (const c of Array.isArray(inp.trees) ? inp.trees : []) {
+        const p = cell(c);
+        if (p && (rows[p[1]][p[0]] === "." || rows[p[1]][p[0]] === "F"))
+            d.trees.push(p);
+    }
+    return d;
+}
+function importAll(obj) {
+    let n = 0;
+    const put = (elem, kind, dsg) => {
+        const d = normalizeDesign(dsg);
+        if (!d) return;
+        slotRec(elem)[kind] = d;
+        n++;
+    };
+    if (obj && Array.isArray(obj.rows)) { // одиночный дизайн — в текущий слот
+        put(store.cur.elem, store.cur.kind, obj);
+    } else if (obj && obj.designs) {
+        for (const e of Object.keys(obj.designs))
+            for (const k of ["capital", "town"])
+                if (obj.designs[e] && obj.designs[e][k])
+                    put(e, k, obj.designs[e][k]);
+    } else {
+        for (const e of Object.keys(obj))
+            for (const k of ["capital", "town"])
+                if (obj[e] && obj[e][k]) put(e, k, obj[e][k]);
+    }
+    return n;
+}
+
+/* ═══════════════════ UI: ПАНЕЛИ/КНОПКИ/СЛОТЫ ═══════════════════ */
+const $ = (id) => document.getElementById(id);
+function refreshAll() {
+    refreshHeader();
+    refreshSlots();
+    refreshProbs();
+    refreshSizeInputs();
+    refreshToolButtons();
+}
+function refreshHeader() {
+    const d = curDesign();
+    $("curSlot").textContent =
+        `${ELEM_RU[store.cur.elem]} · ${KIND_RU[store.cur.kind]}` +
+        (d ? ` — ${d.rows[0].length}×${d.rows.length}` : " — пусто");
+    const badge = $("badge");
+    if (!d) { badge.textContent = "слот пуст"; badge.className = "badge"; }
+    else {
+        const v = validate(d);
+        if (v.ok) { badge.textContent = "готов к экспорту";
+            badge.className = "badge ok"; }
+        else { badge.textContent = "есть ошибки";
+            badge.className = "badge err"; }
+    }
+}
+function refreshSlots() {
+    const host = $("slots");
+    host.innerHTML = "";
+    for (const e of ELEMS) for (const k of ["capital", "town"]) {
+        const b = document.createElement("button");
+        b.className = "slot" + (curDesign() && store.cur.elem === e
+            && store.cur.kind === k ? " on" : "")
+            + (store.designs[e] && store.designs[e][k] ? " filled" : "");
+        b.innerHTML = `<b>${ELEM_RU[e]}</b>` +
+            `<span>${k === "capital" ? "столица" : "город"}</span>` +
+            `<span class="dot"></span>`;
+        b.style.borderLeft = `3px solid ${ELEM_COLOR[e]}`;
+        b.onpointerdown = () => {
+            store.cur = { elem: e, kind: k };
+            undoStack = [];
+            updUndoBtn();
+            ghost = null;
+            view.zoom = 1;
+            view.panX = view.panY = 0;
+            touch();
+            refreshAll();
+            rebuild();
+        };
+        host.appendChild(b);
+    }
+}
+function refreshProbs() {
+    const host = $("probs");
+    host.innerHTML = "";
+    const d = curDesign();
+    if (!d) {
+        host.innerHTML = `<div class="prob info">Слот пуст — нажми «Пустой
+            город» или «Из игры».</div>`;
+        return;
+    }
+    const v = validate(d);
+    if (!v.probs.length)
+        host.innerHTML = `<div class="prob" style="color:var(--green)">
+            Проблем нет — можно экспортировать.</div>`;
+    for (const p of v.probs) {
+        const div = document.createElement("div");
+        div.className = "prob " + p.lvl;
+        div.textContent = p.msg;
+        host.appendChild(div);
+    }
+}
+function refreshSizeInputs() {
+    const d = curDesign();
+    $("szW").value = d ? d.rows[0].length : "";
+    $("szH").value = d ? d.rows.length : "";
+}
+let toolBtns = [];
+function buildToolbars() {
+    // клетки
+    const kinds = [
+        ["floor", "Пол", "#b7a17a"], ["wall", "Стена", "#5d503c"],
+        ["forest", "Роща", "#3f7d3a"], ["water", "Вода", "#3f6fd0"],
+        ["bridge", "Мост", "#a97b48"], ["mount", "Горы", "#8d8d95"],
+    ];
+    const ct = $("cellTools");
+    ct.innerHTML = "";
+    toolBtns = [];
+    for (const [k, ru, col] of kinds) {
+        const b = document.createElement("button");
+        b.className = "tool";
+        b.innerHTML = `<span class="sw" style="background:${col}"></span>` +
+            `<span>${ru}</span>`;
+        b.dataset.kind = k;
+        b.onpointerdown = () => {
+            tool.mode = "cell";
+            tool.cell = k === "floor" ? "." : k === "wall" ? "#"
+                : k === "forest" ? "F" : k === "water" ? "~"
+                : k === "bridge" ? "=" : "M";
+            ghost = null;
+            refreshToolButtons();
+        };
+        ct.appendChild(b);
+        toolBtns.push(b);
+    }
+    // здания
+    const bt = $("bldTools");
+    bt.innerHTML = "";
+    for (const type of Object.keys(CATALOG)) {
+        const b = document.createElement("button");
+        b.className = "bld";
+        b.innerHTML = `<img src="../images/buildings/${CATALOG[type].file}"
+            alt=""><span>${BLD_RU[type]}<br>${CATALOG[type].w}×${CATALOG[type].h}</span>`;
+        b.dataset.bld = type;
+        b.onpointerdown = () => {
+            tool.mode = "bld";
+            tool.bld = type;
+            ghost = null;
+            refreshToolButtons();
+        };
+        bt.appendChild(b);
+        toolBtns.push(b);
+    }
+    // особое
+    const specs = [
+        ["exit", "Проход"], ["spawn", "Спавн"],
+        ["tree", "Дерево"], ["swamp", "Болото"],
+    ];
+    const st2 = $("specTools");
+    st2.innerHTML = "";
+    for (const [m, ru] of specs) {
+        const b = document.createElement("button");
+        b.className = "tool";
+        b.innerHTML = `<span class="sw" style="background:${m === "exit"
+            ? "#37e05a" : m === "spawn" ? "#f0c96a" : m === "tree"
+            ? "#2f6b2f" : "#5d7a4a"}"></span><span>${ru}</span>`;
+        b.dataset.mode = m;
+        b.onpointerdown = () => {
+            tool.mode = m;
+            ghost = null;
+            refreshToolButtons();
+        };
+        st2.appendChild(b);
+        toolBtns.push(b);
+    }
+    refreshToolButtons();
+}
+function refreshToolButtons() {
+    for (const b of toolBtns) {
+        if (b.dataset.kind !== undefined)
+            b.classList.toggle("on", tool.mode === "cell"
+                && (b.dataset.kind === "floor" && tool.cell === "."
+                    || b.dataset.kind === "wall" && tool.cell === "#"
+                    || b.dataset.kind === "forest" && tool.cell === "F"
+                    || b.dataset.kind === "water" && tool.cell === "~"
+                    || b.dataset.kind === "bridge" && tool.cell === "="
+                    || b.dataset.kind === "mount" && tool.cell === "M"));
+        else if (b.dataset.bld !== undefined)
+            b.classList.toggle("on", tool.mode === "bld"
+                && tool.bld === b.dataset.bld);
+        else if (b.dataset.mode !== undefined)
+            b.classList.toggle("on", tool.mode === b.dataset.mode);
+    }
+}
+
+/* ═══════════════════ СТАРТ / КНОПКИ ═══════════════════ */
+function applySize(w, h) {
+    const d = curDesign();
+    if (!d) return;
+    pushUndo();
+    const old = d.rows.map((r) => r.split(""));
+    const rows = [];
+    for (let y = 0; y < h; y++) {
+        let r = "";
+        for (let x = 0; x < w; x++)
+            r += (y < old.length && x < old[0].length)
+                ? old[y][x] : "#";
+        rows.push(r);
+    }
+    d.rows = rows;
+    const inMap = (x, y, w2, h2) => x >= 0 && y >= 0
+        && x + w2 <= w && y + h2 <= h;
+    d.buildings = (d.buildings || []).filter((b) => {
+        const cat = CATALOG[b.type];
+        return inMap(b.x, b.y, cat.w, cat.h);
+    });
+    if (d.exit && (d.exit.y >= h || d.exit.x1 >= w)) d.exit = null;
+    if (d.spawn && (d.spawn.x >= w || d.spawn.y >= h)) d.spawn = null;
+    d.swamp = (d.swamp || []).filter(([x, y]) => x < w && y < h
+        && rows[y][x] === ".");
+    d.trees = (d.trees || []).filter(([x, y]) => x < w && y < h
+        && (rows[y][x] === "." || rows[y][x] === "F"));
+    if (!d.exit) setExit(d, w >> 1, h - 1);
+    if (!d.spawn) d.spawn = { x: d.exit ? (d.exit.x0 + d.exit.x1) >> 1
+        : w >> 1, y: h - 2 };
+    touch();
+    refreshAll();
+    rebuild();
+}
+function wireButtons() {
+    $("btnEmpty").onpointerdown = () => {
+        pushUndo();
+        const [w, h] = store.cur.kind === "capital" ? CAP_SIZE : TOWN_SIZE;
+        slotRec(store.cur.elem)[store.cur.kind] = emptyDesign(w, h);
+        touch(); refreshAll(); rebuild();
+    };
+    $("btnFromGame").onpointerdown = () => {
+        pushUndo();
+        try {
+            slotRec(store.cur.elem)[store.cur.kind] =
+                fromGame(store.cur.elem, store.cur.kind);
+        } catch (e) {
+            alert("Не удалось взять планировку из игры: " + e.message);
+        }
+        touch(); refreshAll(); rebuild();
+    };
+    $("btnClearSlot").onpointerdown = () => {
+        const d = curDesign();
+        if (!d) return;
+        if (!confirm("Стереть дизайн «" + ELEM_RU[store.cur.elem] + " · "
+            + KIND_RU[store.cur.kind] + "»?")) return;
+        pushUndo();
+        delete slotRec(store.cur.elem)[store.cur.kind];
+        touch(); refreshAll(); rebuild();
+    };
+    $("btnSize").onpointerdown = () => {
+        const w = parseInt($("szW").value, 10),
+            h = parseInt($("szH").value, 10);
+        if (w >= 10 && w <= 48 && h >= 8 && h <= 40) applySize(w, h);
+    };
+    $("btnCap").onpointerdown = () => applySize(...CAP_SIZE);
+    $("btnTown").onpointerdown = () => applySize(...TOWN_SIZE);
+    $("btnUndo").onpointerdown = doUndo;
+    $("zIn").onpointerdown = () => { view.zoom = Math.min(2.5,
+        view.zoom * 1.15); applyView(); };
+    $("zOut").onpointerdown = () => { view.zoom = Math.max(0.35,
+        view.zoom * 0.87); applyView(); };
+    $("zFit").onpointerdown = () => { view.zoom = 1;
+        view.panX = view.panY = 0; applyView(); };
+    // экспорт
+    $("btnExport").onpointerdown = () => {
+        const t = exportText();
+        if (!allDesignsObjectHasSlots()) {
+            if (!confirm("Ни один слот не заполнен — экспортировать " +
+                "пустой файл?")) return;
+        }
+        $("expText").value = t;
+        $("mExport").classList.add("open");
+    };
+    $("btnExpCopy").onpointerdown = async () => {
+        $("expText").select();
+        try { await navigator.clipboard.writeText($("expText").value); }
+        catch (e) { document.execCommand("copy"); }
+    };
+    $("btnExpDl").onpointerdown = () => {
+        const blob = new Blob([$("expText").value],
+            { type: "text/javascript;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "cityDesigns.js";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    };
+    $("btnExpClose").onpointerdown = () =>
+        $("mExport").classList.remove("open");
+    // импорт
+    $("btnImport").onpointerdown = () => {
+        $("impText").value = "";
+        $("mImport").classList.add("open");
+    };
+    $("impFile").onchange = () => {
+        const f = $("impFile").files[0];
+        if (!f) return;
+        f.text().then((t) => { $("impText").value = t; });
+    };
+    $("btnImpApply").onpointerdown = () => {
+        try {
+            const n = importAll(parseDesigns($("impText").value));
+            if (!n) alert("Годные дизайны не найдены");
+        } catch (e) { alert("Ошибка импорта: " + e.message); }
+        $("mImport").classList.remove("open");
+        undoStack = [];
+        updUndoBtn();
+        touch(); refreshAll(); rebuild();
+    };
+    $("btnImpClose").onpointerdown = () =>
+        $("mImport").classList.remove("open");
+    // справка/сброс
+    $("btnHelp").onpointerdown = () => $("mHelp").classList.add("open");
+    $("btnHelpClose").onpointerdown = () =>
+        $("mHelp").classList.remove("open");
+    $("btnLsClear").onpointerdown = () => {
+        if (!confirm("Удалить все черновики из памяти браузера? " +
+            "Слоты в этой сессии останутся.")) return;
+        localStorage.removeItem(LS_KEY);
+    };
+    for (const id of ["mExport", "mImport", "mHelp"])
+        $(id).addEventListener("pointerdown", (e) => {
+            if (e.target === $(id)) $(id).classList.remove("open");
+        });
+}
+function allDesignsObjectHasSlots() {
+    return Object.keys(allDesigns()).length > 0;
+}
+
+/* тест-хуки для пробы (probe_cityed.mjs) */
+window.__CITYED = {
+    cur: () => ({ ...store.cur }),
+    design: () => (curDesign() ? JSON.parse(JSON.stringify(curDesign()))
+        : null),
+    validate: () => { const d = curDesign();
+        return d ? validate(d) : null; },
+    setCell: (x, y, ch) => { const d = curDesign(); if (!d) return;
+        pushUndo(); paintCell(d, x, y, ch); touch(); refreshAll(); rebuild(); },
+    setCells: (list, ch) => { const d = curDesign(); if (!d) return;
+        pushUndo(); for (const [x, y] of list) paintCell(d, x, y, ch);
+        touch(); refreshAll(); rebuild(); },
+    setExit: (x, y) => { const d = curDesign(); if (!d) return;
+        pushUndo(); setExit(d, x, y); touch(); refreshAll(); rebuild(); },
+    placeBld: (type, x, y) => { const d = curDesign(); if (!d) return;
+        pushUndo(); placeBld(d, type, x, y); touch(); refreshAll(); rebuild(); },
+    fromGame: () => { pushUndo();
+        slotRec(store.cur.elem)[store.cur.kind] =
+            fromGame(store.cur.elem, store.cur.kind);
+        touch(); refreshAll(); rebuild();
+        return true; },
+    empty: () => { pushUndo();
+        const [w, h] = store.cur.kind === "capital" ? CAP_SIZE : TOWN_SIZE;
+        slotRec(store.cur.elem)[store.cur.kind] = emptyDesign(w, h);
+        touch(); refreshAll(); rebuild(); return true; },
+    switchTo: (elem, kind) => { store.cur = { elem, kind };
+        undoStack = []; updUndoBtn(); view.zoom = 1;
+        view.panX = view.panY = 0;
+        touch(); refreshAll(); rebuild(); },
+    slots: () => allDesigns(),
+    exportText,
+    importAll: (t) => { const n = importAll(parseDesigns(t));
+        touch(); refreshAll(); rebuild(); return n; },
+    ready: () => !!(app && app.renderer),
+};
+
+(async function boot() {
+    loadLocal();
+    buildToolbars();
+    refreshAll();
+    await initApp();
+    wireInput();
+    wireButtons();
+    updUndoBtn();
+    try {
+        await loadAssets();
+    } catch (e) {
+        $("loadNote").textContent = "Не все тайлы загрузились: "
+            + e.message + " (открой страницу через dev-сервер или из папки build)";
+    }
+    $("loadNote").style.display = "none";
+    // стартовый слот: если пуст — положим процедурный город как основу
+    if (!curDesign()) {
+        try {
+            slotRec(store.cur.elem)[store.cur.kind] =
+                fromGame(store.cur.elem, store.cur.kind);
+        } catch (e) {
+            slotRec(store.cur.elem)[store.cur.kind] = emptyDesign(
+                ...TOWN_SIZE);
+        }
+        refreshAll();
+    }
+    rebuild();
+    // перерисовка маркеров/полную пересборку — по грязи, общим тикером
+    PIXI.Ticker.shared.add(() => {
+        if (dirty.full) { rebuild(); dirty.full = false; dirty.marks = false; }
+        else if (dirty.marks) { buildMarks(); dirty.marks = false; }
+    });
+})();
+</script>
+</body>
+</html>
