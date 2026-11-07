@@ -214,5 +214,35 @@
                  rarity: "epic", elem: "groHon",
                  multi: ["growth", "honor"],
                  color: 0x6ea08e, img: "growth_honor/256" },
+        // ── W72 (спека юзера): карты 257–259, тоже только «Белая пуща» ────
+        // «Элитный лучник» (gh257): Человек 5/5 с «Выстрелом 3» —
+        // archer/shotDmg, как у Арбалетчика hon172; стреляет после
+        // перемещения (afterMoved → performShot)
+        gh257: { type: "unit", cost: 6, atk: 5, hp: 5, speed: 1,
+                 creature: "human", sheet: "knight", ability: "archer",
+                 shotDmg: 3,
+                 subtype: "human", // подтип — по спеке юзера (Человек)
+                 rarity: "rare", elem: "groHon",
+                 multi: ["growth", "honor"],
+                 color: 0x7fa576, img: "growth_honor/257" },
+        // «Небо в стрелах» (gh258): все СВОИ существа применяют свой
+        // «Выстрел», как будто они переместились; у не-стрелков —
+        // виртуальный «Выстрел 1» (volley — volleyAct в arenaSpells;
+        // полный путь выстрела: релей героя-Чести и откат Баллисты)
+        gh258: { type: "spell", cost: 5,
+                 spell: { target: "none", volley: true },
+                 kind: "damage", // тип эффекта — по спеке юзера
+                 rarity: "epic", elem: "groHon",
+                 multi: ["growth", "honor"],
+                 color: 0x6e8e9e, img: "growth_honor/258" },
+        // «Полные колчаны» (gh259): выбранное существо получает
+        // «Выстрел 1», а у стрелка выстрел растёт на 1 (quiver —
+        // u.quiverBonus читают performShot/archerShot в arenaCombat)
+        gh259: { type: "spell", cost: 1,
+                 spell: { target: "anyUnit", quiver: true },
+                 kind: "buff", // тип эффекта — по спеке юзера
+                 rarity: "rare", elem: "groHon",
+                 multi: ["growth", "honor"],
+                 color: 0x9eae6e, img: "growth_honor/259" },
     };
 })();

@@ -144,6 +144,29 @@
                 checkEnd();
             };
 
+            // «Небо в стрелах» (gh258, W72, спека юзера): все СВОИ существа
+            // применяют свой «Выстрел», как будто они переместились; у
+            // не-стрелков — виртуальный «Выстрел 1», как будто он у него
+            // есть. Стрелки (archer/steamShot/колчанные) стреляют СВОИМ
+            // выстрелом полным путём (performShot: релей героя-Чести,
+            // откат Баллисты), не-стрелкам залп даёт forced=1 без релея.
+            // Порядок залпа — от передних рядов к задним (снапшот поля):
+            // передний убивает блокирующего, стрела заднего летит дальше.
+            // Гибель стрелка от контр-эффектов не снимает залп с остальных
+            A.volleyAct = function volleyAct(side) {
+                const own = B.units.filter((u) => u.side === side
+                    && u.def.type === "unit");
+                own.sort((a, b) => side === "p" ? a.row - b.row : b.row - a.row);
+                for (const u of own) {
+                    if (!B.units.includes(u)) continue;
+                    const hasShot = u.def.ability === "archer"
+                        || u.def.steamShot || (u.quiverBonus || 0) > 0;
+                    performShot(u, hasShot ? undefined : 1);
+                }
+                refreshHud();
+                checkEnd();
+            };
+
             // Эффекты заклинаний игрока, валидация цели внутри (false — цель не
             // годится, тогда и оплаты/сброса/панелей не будет). Отделено от
             // оплаты карты, чтобы «Горящие руны» могли повторить эффект
@@ -230,12 +253,27 @@
                     cycloneAct();
                     return true;
                 }
+                if (def.spell.volley) { // «Небо в стрелах» (gh258, W72): без цели
+                    volleyAct("p");
+                    return true;
+                }
                 if (tg === "anyUnit") { // усиление/Смыв/Слабость
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
                     // тип карты проверяем здесь; защиту уже отсеял вход
                     if (!u || u.def.type !== "unit") return false;
                     const p = cellXY(u.col, u.row);
+                    if (def.spell.quiver) { // «Полные колчаны» (gh259, W72):
+                        // «Выстрел 1» цели; у стрелка выстрел растёт на 1
+                        // (u.quiverBonus читают performShot/archerShot).
+                        // Складывается: второй колчан — ещё +1
+                        u.quiverBonus = (u.quiverBonus || 0) + 1;
+                        floatText(p.x, p.y - 66, `🏹 ${u.quiverBonus}`, 0xffd98c);
+                        fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
+                        punch(u.node);
+                        sfx("chpoc");
+                        return true;
+                    }
                     if (def.spell.crushEnergy) { // «Древомощь» (sg243): вся
                         // оставшаяся энергия → «Сокрушение» и +N⚔/+N♥ цели.
                         // Эффект идёт ДО списания цены карты (см. castSpell)

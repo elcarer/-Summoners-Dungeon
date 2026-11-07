@@ -873,6 +873,14 @@
                     if (s.laySummon) v += 1.2; // hon166: тело 2/2 за 1⚡
                     if (s.summonPoints) v += 1.5; // sg249/250: Животное 4/4–5/4
                     if (s.wolfSummon) v += 1.4; // gh252 (W61): Животное 2/3 с аурой усиления
+                    // gh258/gh259 (W72): залп ценнее с бОльшим числом своих
+                    // существ; колчан — при своём стрелке на поле
+                    if (s.volley) v += 0.8 + 0.45 * B.units.filter((u) =>
+                        u.side === "e" && u.def.type === "unit").length;
+                    if (s.quiver && B.units.some((u) => u.side === "e"
+                        && u.def.type === "unit"
+                        && (u.def.ability === "archer" || u.def.steamShot
+                            || (u.quiverBonus || 0) > 0))) v += 1.6;
                     if (s.captivate) v += 1.6; // hon197: удаление карты призыва из руки
                     if (s.resurrect) v += 1.8; // hon200: бесплатный призыв из сброса
                     if (s.lightAura) v += 1.0; // hon199: −1♥ соседям каждый ход

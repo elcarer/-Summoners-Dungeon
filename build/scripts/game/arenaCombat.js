@@ -362,12 +362,12 @@
                 moatAct(u); // «Крепостной ров» (Честь): подошёл к постройке — 1 урона
                 roadPushAct(u); // «Тракт» (Честь): соседняя постройка гонит вперёд
                 edgeStoneAct(u); // «Краевой камень» (Честь): ряд камня — вынос вперёд
-                if (u.def.ability === "archer") {
-                    // «Выстрел N» — способность существа: герой-релей
-                    // («Отряд соседа») может разрешить её дважды
-                    honorRelayAct(u, () => { archerShot(u); return true; });
-                    if (u.def.shotRetreat) shotRetreatAct(u); // Баллиста: откат после выстрела(-ов)
-                }
+                // «Выстрел N» — способность существа: герой-релей
+                // («Отряд соседа») может разрешить её дважды. Стреляют
+                // и не-стрелки с «Выстрелом» от «Полных колчанов»
+                // (quiverBonus, W72) — performShot сам разбирает, чей путь
+                if (u.def.ability === "archer" || (u.quiverBonus || 0) > 0)
+                    performShot(u);
                 trapOnMoveAct(u); // «Выросшие духи»: ловушка из руки на соседнюю клетку
                 labyrinthAct(u); // «Мистический лабиринт»: дошёл до базы — перенос к постройке
                 honorRelayAct(u, () => chaplainHeal(u)); // «Капеллан» (Честь): после перемещения лечит соседа
@@ -882,18 +882,27 @@
             // после перемещения — N урона ближайшему существу или строению
             // впереди по вертикали (любой стороны); если вертикаль перед ним
             // пуста — N урона базе противника. «Паровой стрелятель» (tim214)
-            // стреляет тем же выстрелом при прибытии из «Сдвига» (def.steamShot)
-            A.archerShot = function archerShot(u) {
-                if (!B.units.includes(u)
-                    || (u.def.ability !== "archer" && !u.def.steamShot)) return;
-                const dmg = u.def.shotDmg || 1;
+            // стреляет тем же выстрелом при прибытии из «Сдвига» (def.steamShot).
+            // W72 (спека юзера): урон выстрела растёт от «Полных колчанов»
+            // (u.quiverBonus — Выстрел N становится N+1, не-стрелку даёт
+            // «Выстрел 1»), а «Небо в стрелах» (gh258) зовёт выстрел ПРИНУДИ-
+            // ТЕЛЬНО (forced — виртуальный «Выстрел 1» не-стрелков). Урон
+            // способности существа бустит герой «Отряд стрелков» (ghShoot,
+            // abilDmgBump) — одна точка на обе ветки (существо и база)
+            A.archerShot = function archerShot(u, forced) {
+                if (!B.units.includes(u)) return;
+                const hasShot = u.def.ability === "archer" || u.def.steamShot
+                    || (u.quiverBonus || 0) > 0;
+                if (!hasShot && forced == null) return;
+                const dmg = forced != null ? forced
+                    : (u.def.shotDmg || 0) + (u.quiverBonus || 0);
                 const dir = u.side === "p" ? -1 : 1;
                 for (let r = u.row + dir; r >= 0 && r < GRID; r += dir) {
                     const o = unitAt(u.col, r);
                     if (o) {
                         // W59 (юзер): стрела летит по клеткам до цели
                         flyArrow(cellXY(u.col, u.row), cellXY(o.col, o.row));
-                        damageUnit(o, dmg, u, "dam");
+                        damageUnit(o, abilDmgBump(u, dmg), u, "dam");
                         refreshHud();
                         checkEnd();
                         return;
@@ -904,12 +913,32 @@
                 flyArrow(cellXY(u.col, u.row), { x: cellXY(u.col, 0).x,
                     y: cellXY(u.col, u.side === "p" ? 0 : GRID - 1).y
                         + (u.side === "p" ? -15 : 15) });
-                damageBase(u.side === "p" ? "e" : "p", dmg,
+                damageBase(u.side === "p" ? "e" : "p", abilDmgBump(u, dmg),
                     u.side === "p"
                         ? { x: cellXY(u.col, 0).x, y: cellXY(u.col, 0).y - 15, fill: 0xff8f6e }
                         : { x: cellXY(u.col, GRID - 1).x, y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff5f4e });
                 refreshHud();
                 checkEnd();
+            };
+
+            // Полный путь выстрела (W72, вынесен из afterMoved): «Выстрел N» —
+            // способность существа, герой-релей («Отряд соседа») может
+            // разрешить её дважды, после выстрела Баллиста откатывается
+            // (shotRetreat — часть «Выстрела», откат после него один).
+            // afterMoved зовёт БЕЗ forced — стреляют археры и не-стрелки
+            // с «Выстрелом» от «Полных колчанов»; «Небо в стрелах» зовёт
+            // с forced=1 для не-стрелков (виртуальный «Выстрел 1») — им ни
+            // релей, ни откат не нужны: это не их способность. «Паровой
+            // стрелятель» (steamShot) стреляет выстрелом только при прибытии
+            // из «Сдвига» (arenaBoard) — здесь его не дублируем
+            A.performShot = function performShot(u, forced) {
+                if (!B.units.includes(u) || u.def.type !== "unit") return;
+                if (u.def.ability === "archer") {
+                    honorRelayAct(u, () => { archerShot(u, forced); return true; });
+                    if (u.def.shotRetreat) shotRetreatAct(u); // Баллиста: откат после выстрела(-ов)
+                } else {
+                    archerShot(u, forced); // колчанный стрелок / виртуальный выстрел
+                }
             };
 
             // «Осадная башня» (hon188): «Выстрел 1» после перемещения

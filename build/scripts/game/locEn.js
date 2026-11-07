@@ -645,6 +645,16 @@
             "card.gh255.desc": "Ability: \"Speed 2\"",
             "card.gh256.name": "Cyclone",
             "card.gh256.desc": "Move every unit to an adjacent empty cell; if there is none, return that unit to its owner's hand",
+            // W72: карты 257–259 «Белой пущи» (спека юзера)
+            "card.gh257.name": "Elite Archer",
+            "card.gh257.desc": "Human 5/5 with \"Shot 3\": after moving, deals 3 damage to the nearest unit or building ahead in its column; if the column ahead is empty — 3 damage to the enemy base",
+            "card.gh258.name": "Sky of Arrows",
+            "card.gh258.desc": "All your units perform their \"Shot\", as if they had moved. If a unit has no shot, it performs \"Shot 1\", as if it had one",
+            "card.gh259.name": "Full Quivers",
+            "card.gh259.desc": "The chosen unit gains \"Shot 1\" (if it already has a \"Shot\", it increases by 1)",
+            // W72: враг 3-го этажа «Белой пущи»
+            "enc.ghShoot.title": "Squad of Archers",
+            "hero.ghShoot.ability": "Whenever your unit's ability deals damage, it deals 1 more damage instead",
             // W65: враг 2-го этажа «Белой пущи»
             "enc.ghWalk.title": "Long Stroll",
             "hero.ghWalk.ability": "Whenever any unit moves (other than its regular move at the start of the turn), heal 1 health to your base",

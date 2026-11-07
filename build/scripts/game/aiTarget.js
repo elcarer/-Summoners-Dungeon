@@ -479,6 +479,10 @@
                 // «Циклон» (gh256, W65): существ на поле нет — карту переводить зря
                 if (s.cyclone && !B.units.some((v) => v.def.type === "unit"))
                     return false;
+                // «Небо в стрелах» (gh258, W72): своих существ нет —
+                // залп не в кого, карту переводить зря
+                if (s.volley && !B.units.some((v) => v.side === "e"
+                    && v.def.type === "unit")) return false;
                 if (s.sacrifice && !aiSacrificePick()) return false;
                 // «Взрыв твари» (dec150) — есть своё существо с суммой ⚔+♥ 3+
                 // (иначе карта переводится зря)

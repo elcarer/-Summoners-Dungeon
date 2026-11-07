@@ -96,7 +96,37 @@
                     cycloneAct();
                     return;
                 }
+                if (s.volley) { // «Небо в стрелах» (gh258, W72): залп всех
+                    // своих существ — выстрелы полного пути (archerShot
+                    // сам бустит урон способностью героя «Отряд стрелков»)
+                    volleyAct("e");
+                    return;
+                }
                 if (s.target === "anyUnit" && !s.nova) { // усиление/очарование — лучшему
+                    // «Полные колчаны» (gh259, W72): лучшему СТРЕЛКУ
+                    // (выстрел станет на 1 больше); стрелков нет —
+                    // сильнейшему своему (выстрел 1 всё равно полезен)
+                    if (s.quiver) {
+                        const own = spellTargets(B.units.filter((v) => v.side === "e"
+                            && v.def.type === "unit"));
+                        const shotScore = (v) => (v.def.ability === "archer"
+                            || v.def.steamShot ? 100 + (v.def.shotDmg || 0)
+                                : (v.quiverBonus || 0) > 0 ? 100 + (v.quiverBonus || 0)
+                                : (v.curAtk || 0) + (v.hp || 0));
+                        let best = own.slice()
+                            .sort((a, b) => shotScore(b) - shotScore(a)
+                                || a.row - b.row)[0];
+                        if (focus && own.includes(focus)) best = focus;
+                        if (!best) return;
+                        aimOff(best);
+                        best.quiverBonus = (best.quiverBonus || 0) + 1;
+                        const p = cellXY(best.col, best.row);
+                        floatText(p.x, p.y - 66, `🏹 ${best.quiverBonus}`, 0xffd98c);
+                        fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
+                        punch(best.node);
+                        sfx("chpoc");
+                        return;
+                    }
                     // «Древомощь» (sg243): вся оставшаяся энергия →
                     // «Сокрушение» и +N⚔/+N♥ лучшему своему существу.
                     // Эффект до списания цены — пул = энергия минус цена

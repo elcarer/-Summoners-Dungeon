@@ -139,6 +139,15 @@
         ghWalk: { id: "ghWalk", rarity: "rare", baseHp: 18,
                   elems: ["growth", "honor"], starter: "groHon",
                   img: "71", ability: "walkHeal", abilityVal: 1 },
+        // «Отряд стрелков» (арт heroes/72.png): враг 3-го этажа (W72,
+        // спека юзера). ДВУХЦВЕТНЫЙ герой Рост+Честь. 20♥, редкая;
+        // способность abilDmg: когда СПОСОБНОСТЬ существа стороны наносит
+        // урон — на 1 больше (abilDmgBump в arenaCards; применяет «Выстрел»
+        // существ — archerShot: марш, паровой выстрел, залп «Неба в
+        // стрелах». Урон заклинаний и выстрелы построек не бустит)
+        ghShoot: { id: "ghShoot", rarity: "rare", baseHp: 20,
+                   elems: ["growth", "honor"], starter: "groHon",
+                   img: "72", ability: "abilDmg", abilityVal: 1 },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -475,6 +484,7 @@
         "sgrApostate", // «Эльф-отступник»: босс «Рыжего леса» (W57)
         "ghKnight", // «Зелёные рыцари»: враг 1-го этажа «Белой пущи» (W61)
         "ghWalk", // «Долгая прогулка»: враг 2-го этажа «Белой пущи» (W65)
+        "ghShoot", // «Отряд стрелков»: враг 3-го этажа «Белой пущи» (W72)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

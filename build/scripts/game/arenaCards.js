@@ -145,6 +145,23 @@
                     && toUnit) b += hd.abilityVal || 1;
                 return b;
             };
+            // «Отряд стрелков» (ghShoot, heroes/72, W72, спека юзера):
+            // когда СПОСОБНОСТЬ СУЩЕСТВА стороны наносит урон — на 1 больше.
+            // Точка применения — уронные ветки «Выстрела» существа
+            // (archerShot в arenaCombat: марш, паровой выстрел, залп
+            // «Неба в стрелах»): выстрел — способность существа. Урон
+            // заклинаний (в т.ч. «Атака духов волков», где волк-выстрел —
+            // эффект заклинания) и выстрелы ПОСТРОЕК («Осадная башня»)
+            // способность не бустит — по тексту спеки. killer — наноситель
+            A.abilDmgBump = function abilDmgBump(killer, amt) {
+                if (amt > 0 && killer && killer.def
+                    && killer.def.type === "unit") {
+                    const hd = heroDefOf(killer.side);
+                    if (hd && hd.ability === "abilDmg")
+                        return amt + (hd.abilityVal || 1);
+                }
+                return amt;
+            };
             A.spellDmg = function spellDmg(def, side = "p", toUnit = true, consume = false) {
                 return (def.spell.dmg || 0) + (def.spell.brew ? (B.brewCasts || 0) : 0)
                     + altarBonus(side) + heroSpellBonus(def, side, toUnit, consume);
