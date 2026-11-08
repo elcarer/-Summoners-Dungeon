@@ -257,7 +257,8 @@
                             || e === "massRet" // «В гуще боя»: существам «Возврат 1»
                             || e === "magmaPool" // «Лужи магмы» — только существа
                             || e === "dandelionPath" // «Путь одуванчиков» — только существа (W65)
-                            || e === "sporeCurse") // «Призрачные споры» — только существа (W60)
+                            || e === "sporeCurse" // «Призрачные споры» — только существа (W60)
+                            || e === "bldVolley") // «Засека» — только существа (W73)
                             return u.def.type === "unit";
                         return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
                             || e === "confuse" || e === "cellDebuff"
@@ -272,13 +273,17 @@
                     // ловушки («Котлы со смолой» — на любое СУЩЕСТВО:
                     // перемещение/призыв, спека hon191). «Путь одуванчиков»
                     // (gh253, W65) — тоже нейтральная: «перемещение ЛЮБОГО
-                    // существа» (своё — продолжит движение, чужое — развернётся)
+                    // существа» (своё — продолжит движение, чужое — развернётся).
+                    // «Засека» (gh260, W73) — нейтральная: «перемещение/призыв
+                    // ЛЮБОГО существа» на клетку — залп построек владельца
                     side = u.side;
                     i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                         && (t.def.trap.effect === "cellDmgAll" || t.def.trap.effect === "cellDebuff"
                             || t.def.trap.effect === "entangle"
                             || t.def.trap.effect === "timeTrap"
                             || t.def.trap.effect === "dandelionPath"
+                            || (t.def.trap.effect === "bldVolley"
+                                && u.def.type === "unit")
                             || (t.def.trap.effect === "tarKettles"
                                 && u.def.type === "unit")));
                 }
@@ -428,6 +433,30 @@
                 afterMoved(u); // доехал: ловушки новой клетки и хуки перемещения
             };
 
+            // «Засека» (gh260, W73, спека юзера): залп ПОСТРОЕК владельца
+            // ловушки — все его постройки применяют свой «Выстрел», как
+            // будто они переместились; у постройки без выстрела —
+            // виртуальный «Выстрел 1». Зеркало «Неба в стрелах» (gh258)
+            // для построек: «Осадная башня» стреляет своим siegeShot
+            // (уничтожение вражеской постройки в колонке), остальным
+            // archerShot с forced=1 (колчанная — своим усиленным выстрелом).
+            // Порядок залпа — от передних рядов к задним (снапшот поля):
+            // передняя башня убивает блокирующего, стрела задней летит
+            // дальше; гибель постройки от контр-эффектов не снимает залп
+            // с остальных
+            A.bldVolleyAct = function bldVolleyAct(side) {
+                const own = B.units.filter((u) => u.side === side
+                    && u.def.type === "building");
+                own.sort((a, b) => side === "p" ? a.row - b.row : b.row - a.row);
+                for (const b of own) {
+                    if (!B.units.includes(b)) continue;
+                    if (b.def.siegeShot) { siegeShot(b); continue; } // «Осадная башня»: свой выстрел
+                    archerShot(b, (b.quiverBonus || 0) > 0 ? undefined : 1);
+                }
+                refreshHud();
+                checkEnd();
+            };
+
             // Эффект сработавшей ловушки на клетке (отделён от поиска ловушки —
             // «Роща лоз» применяет его дважды); u — существо, наступившее на неё.
             // W59 (юзер): срабатывание ловушки на существе — Blunt hit.
@@ -441,6 +470,15 @@
                 } finally { A.fxHint = null; }
             };
             A.applyCellTrapRaw = function applyCellTrapRaw(trap, side, u) {
+                if (trap.def.trap.effect === "bldVolley") {
+                    // «Засека» (gh260, W73, спека юзера): все ПОСТРОЙКИ
+                    // владельца применяют свой «Выстрел», как будто они
+                    // переместились; у постройки без выстрела — виртуальный
+                    // «Выстрел 1» (bldVolleyAct — зеркало «Неба в стрелах»
+                    // для построек)
+                    bldVolleyAct(side);
+                    return;
+                }
                 if (trap.def.trap.effect === "dandelionPath") {
                     // «Путь одуванчиков» (gh253, W65, спека юзера): вошедшее
                     // существо едет последовательными шагами до препятствия —
@@ -716,11 +754,12 @@
                     // базой ВЛАДЕЛЬЦА ловушки (ряд у базы: игрок — последний
                     // ряд, противник — первый; обе стороны) получают 4 урона
                     // (+ аура алтаря, как у клеточных уронных ловушек);
-                    // постройки — не существа, урона не получают
+                    // постройки — не существа (W73: под «Лесным оплотом»
+                    // считаются — effCreature)
                     const baseRow = side === "p" ? GRID - 1 : 0;
                     const dmg = (trap.def.trap.amount || 4) + altarBonus(side);
                     for (const v of B.units.slice()) {
-                        if (v.row !== baseRow || v.def.type !== "unit"
+                        if (v.row !== baseRow || !effCreature(v)
                             || !B.units.includes(v)) continue;
                         damageUnit(v, dmg, null, "acid");
                     }

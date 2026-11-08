@@ -472,11 +472,13 @@
                         && (tg === "anyUnitDmg"
                             ? (u.def.type === "unit"
                                 || (u.def.type === "building" && !sdef.spell.noBuildings))
-                            : tg === "anyUnitOrFoe" ? u.def.type === "unit" // «Негативный поток»: существо или база врага
-                            : tg === "enemyUnit" ? u.def.type === "unit" // «Тёмный контроль»: только существо врага
+                            : tg === "anyUnitOrFoe" ? effCreature(u) // «Негативный поток»: существо или база врага
+                            : tg === "enemyUnit" ? effCreature(u) // «Тёмный контроль»: только существо врага
                             : tg === "ownBuilding" ? u.def.type === "building"
                             : tg === "anyObj" ? true // «Силовой купол»: любое существо или постройка
-                            : u.def.type === "unit");
+                            // прочие («Укрепление», колчаны…): существо —
+                            // W73: под «Лесным оплотом» и постройка
+                            : effCreature(u));
                     const sideOk = !u
                         || ((tg === "ownUnit" || tg === "ownBuilding") ? u.side === "p"
                         : tg === "enemyUnit" ? u.side !== "p" : true);

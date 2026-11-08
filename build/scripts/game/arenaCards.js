@@ -165,6 +165,26 @@
                 }
                 return amt;
             };
+            // «Лесной оплот» (ghBastion, heroes/73, W73, спека юзера):
+            // все ПОСТРОЙКИ стороны считаются ДОПОЛНИТЕЛЬНО существами
+            // для ЭФФЕКТОВ — баффы/ауры/лечение/уронные эффекты, счётчики
+            // существ и цели заклинаний видят их наравне с существами
+            // (примеры юзера: «Эльфийский друид» — призыв постройки даёт
+            // +1⚡, «Корона леса» — повторяет усиление постройки). Боевые
+            // правила не меняются: постройка не марширует и не атакует,
+            // не двигается эффектами перемещения (Циклон, «Снежный ком»,
+            // толчки), остаётся целью уничтожающего «Выстрела» «Осадной
+            // башни»; статусы (яд/заморозка/запутанность/опутывание/
+            // возврат) на постройки по-прежнему не вешаются. Уронные
+            // дебаффы атаки (−N⚔) на постройку не начисляются — у неё
+            // нет урона
+            A.effCreature = function effCreature(u) {
+                if (!u || !u.def) return false;
+                if (u.def.type === "unit") return true;
+                if (u.def.type !== "building") return false;
+                const hd = heroDefOf(u.side);
+                return !!(hd && hd.ability === "bldUnits");
+            };
             A.spellDmg = function spellDmg(def, side = "p", toUnit = true, consume = false) {
                 return (def.spell.dmg || 0) + (def.spell.brew ? (B.brewCasts || 0) : 0)
                     + altarBonus(side) + heroSpellBonus(def, side, toUnit, consume);
@@ -288,7 +308,9 @@
             // стихией» (grw32) — числу карт Роста в руке, у прочих — spellDmg
             A.spellHitDmg = function spellHitDmg(def, side = "p", toUnit = true, consume = false) {
                 if (def.spell.fireflies)
-                    return B.units.filter((v) => v.side === side && v.def.type === "unit").length
+                    // «Рой светлячков» (grw30): урон = числу СВОИХ существ
+                    // (W73: под «Лесным оплотом» постройки тоже считаются)
+                    return B.units.filter((v) => v.side === side && effCreature(v)).length
                         + altarBonus(side) + heroSpellBonus(def, side, toUnit, consume);
                 if (def.spell.growthHand) {
                     const hand = side === "p" ? B.hand : B.eHand;
@@ -328,7 +350,10 @@
                 }
                 for (const u of B.units.slice()) {
                     if (!u.def.spellBuffAura || !B.units.includes(u)) continue;
-                    const near = B.units.filter((v) => v !== u && v.def.type === "unit"
+                    // «Заклинатель клинков»: +1⚔ себе и соседним СУЩЕСТВАМ
+                    // (строения не считаются; W73: под «Лесным оплотом»
+                    // постройка — тоже существо)
+                    const near = B.units.filter((v) => v !== u && effCreature(v)
                         && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
                     for (const v of [u, ...near]) {
                         v.bonusAtk = (v.bonusAtk || 0) + 1;

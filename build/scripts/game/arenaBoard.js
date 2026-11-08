@@ -263,12 +263,13 @@
                         return;
                     }
                     if (tg === "anyUnit" || tg === "anyUnitDmg") {
-                        // усиление — любые существа; дротик — существа и строения
-                        // (варево строения не берёт — только существа)
+                        // усиление — любые существа (W73: под «Лесным оплотом»
+                        // и постройки — effCreature); дротик — существа и
+                        // строения (варево строения не берёт — только существа)
                         root.board.userData.baseZone.eventMode = "none";
                         for (const u of B.units) {
                             if (!spellAimable(u)) continue; // ward-цель не подсвечиваем
-                            const ok = u.def.type === "unit"
+                            const ok = effCreature(u)
                                 || (tg === "anyUnitDmg" && u.def.type === "building"
                                     && !def.spell.noBuildings);
                             if (!ok) continue;
@@ -281,7 +282,7 @@
                     }
                     if (tg === "ownUnit") { // жертва — только своё существо
                         root.board.userData.baseZone.eventMode = "none";
-                        for (const u of B.units) if (u.side === "p" && u.def.type === "unit"
+                        for (const u of B.units) if (u.side === "p" && effCreature(u)
                             && spellAimable(u)) {
                             const rc = cellRect(u.col, u.row);
                             hi.rect(rc.x, rc.y, rc.w, rc.h);
@@ -293,7 +294,7 @@
                     if (tg === "anyUnitOrFoe") { // «Негативный поток»: любое существо + база врага
                         root.board.userData.baseZone.eventMode = "static";
                         for (const u of B.units) {
-                            if (u.def.type !== "unit" || !spellAimable(u)) continue;
+                            if (!effCreature(u) || !spellAimable(u)) continue;
                             const rc = cellRect(u.col, u.row);
                             hi.rect(rc.x, rc.y, rc.w, rc.h);
                             hi.fill({ color: u.side === "p" ? 0x7dc95e : 0xd05a3c, alpha: 0.4 });
@@ -307,7 +308,7 @@
                     if (tg === "enemyUnit") { // «Тёмный контроль» — только существа врага
                         root.board.userData.baseZone.eventMode = "none";
                         for (const u of B.units) if (u.side === "e"
-                            && u.def.type === "unit" && spellAimable(u)) {
+                            && effCreature(u) && spellAimable(u)) {
                             const rc = cellRect(u.col, u.row);
                             hi.rect(rc.x, rc.y, rc.w, rc.h);
                             hi.fill({ color: 0xd05a3c, alpha: 0.4 });
@@ -792,7 +793,16 @@
                     recalcAuras();
                     floatText(sp.x, sp.y - 60, `+${B.forge[side].amt}⚔`, 0x9fd489);
                 }
-                if (def.type === "unit") {
+                if (def.type === "unit"
+                    // W73 («Лесной оплот»): призыв ПОСТРОЙКИ под боссом —
+                    // тоже призыв существа для прибытийных эффектов:
+                    // «Эльфийский друид» даёт +1⚡, «Три монолита» ищут
+                    // карту, аура-баффы (лагерь/монолит/болото) ложатся
+                    // на постройку. Внутри всё остальное отсечено
+                    // собственными def-гейтами (скорость/скелеты/жетоны)
+                    || (def.type === "building"
+                        && heroDefOf(side)
+                        && heroDefOf(side).ability === "bldUnits")) {
                     // «Отряд эльфов» (grw27): при призыве потратить ВСЮ
                     // оставшуюся энергию — существо получает столько урона и
                     // жизней. bonusAtk — его снимает «Извлечение духа», как
@@ -988,8 +998,11 @@
                     // ходов после призыва существо вернётся в руку (тик — в
                     // начале хода владельца, returnTick). «В прошлом»
                     // (firstReturnPlus): первый за бой призыв стороны со
-                    // «Возвратом» приходит с счётчиком на 2 больше
-                    if (def.returnN && !u.token) {
+                    // «Возвратом» приходит с счётчиком на 2 больше.
+                    // Только СУЩЕСТВА: у построек «Возврат» ставится своим
+                    // блоком выше (W73 — постройка-босса сюда не доходит,
+                    // счётчик не задвоится)
+                    if (def.returnN && !u.token && def.type === "unit") {
                         let rv = def.returnN;
                         if (!B.heroFlags.returnPlus[side]) {
                             const hdR = heroDefOf(side);
@@ -1034,10 +1047,11 @@
                     }
                     // «Секироносец царства» (tim220): при появлении наносит 1
                     // урон случайному соседнему (верт/гориз) существу ВРАГА
-                    // (постройки не существа)
+                    // (постройки не существа; W73: под «Лесным оплотом»
+                    // считаются — effCreature)
                     if (def.axeArrive) {
                         const foes = B.units.filter((v) => v.side !== side
-                            && v.def.type === "unit"
+                            && effCreature(v)
                             && Math.abs(v.col - col) + Math.abs(v.row - row) === 1);
                         if (foes.length) {
                             // «Отряд стрелков» (W72): урон способности — на 1 больше

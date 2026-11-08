@@ -996,8 +996,10 @@
                 if (!cd || !cd.valor) return;
                 floatText(960, side === "p" ? 758 : 318,
                     GAME_LOC.t("dungeon.valorShort"), 0x9fd489);
+                // случайное существо ИГРАЮЩЕГО (W73: под «Лесным оплотом»
+                // постройки тоже в пуле — Корона леса повторит усиление)
                 const own = B.units.filter((v) => v.side === side
-                    && v.def.type === "unit" && B.units.includes(v));
+                    && effCreature(v) && B.units.includes(v));
                 if (own.length) {
                     const u = own[(Math.random() * own.length) | 0];
                     u.bonusAtk = (u.bonusAtk || 0) + 1;

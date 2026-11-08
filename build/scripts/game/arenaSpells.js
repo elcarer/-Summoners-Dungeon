@@ -261,7 +261,8 @@
                     if (!target || target.col === undefined) return false;
                     const u = unitAt(target.col, target.row);
                     // тип карты проверяем здесь; защиту уже отсеял вход
-                    if (!u || u.def.type !== "unit") return false;
+                    // (W73: под «Лесным оплотом» и постройка — effCreature)
+                    if (!u || !effCreature(u)) return false;
                     const p = cellXY(u.col, u.row);
                     if (def.spell.quiver) { // «Полные колчаны» (gh259, W72):
                         // «Выстрел 1» цели; у стрелка выстрел растёт на 1
@@ -437,16 +438,18 @@
                     // «Испепеляющий луч»: все существа вертикального ряда клетки
                     if (!target || target.col === undefined) return false;
                     if (def.spell.columnDmg) { // hon180: СУЩЕСТВА (обе стороны)
-                        // в колонке выбранной клетки; урон как у массовых —
-                        // алтарь и геройский бонус добавляются к каждому удару
-                        // (первое уронное — на всю серию, по образцу aoeDmg)
+                        // в колонке выбранной клетки (W73: под «Лесным
+                        // оплотом» и постройки — effCreature); урон как у
+                        // массовых — алтарь и геройский бонус добавляются
+                        // к каждому удару (первое уронное — на всю серию,
+                        // по образцу aoeDmg)
                         const dmg = def.spell.columnDmg + altarBonus("p");
                         const fs = heroSpellBonus(def, "p", false, true);
                         A.fxHint = "mass"; // массовый урон — Impact frame
                         try {
                             for (const v of B.units.slice()) {
                                 if (v.col !== target.col
-                                    || v.def.type !== "unit") continue;
+                                    || !effCreature(v)) continue;
                                 damageUnit(v, dmg + fs
                                     + heroSpellBonus(def, "p", true), null, "rocket");
                             }

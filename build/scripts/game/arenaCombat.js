@@ -240,12 +240,17 @@
             // (keeperScale, energyToStats, forge при призыве и т.п.) — НЕ
             // усиления, onBuff из addUnit не зовётся.
             A.onBuff = function onBuff(u, atk, hp, opts = {}) {
-                if (!u || u.def.type !== "unit" || !B.units.includes(u)) return;
+                // W73 («Лесной оплот»): усиление ПОСТРОЙКИ под боссом —
+                // тоже усиление существа (эхо Короны, волк лечат/усиливают
+                // её как существо); без героя 73 — только существа
+                if (!u || !effCreature(u) || !B.units.includes(u)) return;
                 if (opts.fromTrigger || (!atk && !hp)) return;
                 const side = u.side;
                 // «Корона леса» (gh251): когда СВОЁ существо получает
                 // усиление, оно получает это усиление ещё 1 раз. Каждая
                 // Корона на поле владельца — по одному повтору дельты.
+                // W73: усиленной может быть и ПОСТРОЙКА (босс) —Корона
+                // повторяет и ей
                 const crowns = B.units.filter((b) => b !== u && b.side === side
                     && b.def.type === "building" && b.def.buffEcho
                     && B.units.includes(b));
@@ -265,11 +270,12 @@
                 }
                 // «Белый волк» (жетон gh252): когда волк получает усиление,
                 // все соседние (верт/гориз) СВОИ существа получают
-                // +1 к урону и +1 к жизням.
+                // +1 к урону и +1 к жизням (W73: и постройки босса —
+                // «существами для эффектов»)
                 if (u.def.wolfPack) {
                     for (const v of B.units.slice()) {
                         if (v === u || v.side !== side
-                            || v.def.type !== "unit" || !B.units.includes(v))
+                            || !effCreature(v) || !B.units.includes(v))
                             continue;
                         if (Math.abs(v.col - u.col) + Math.abs(v.row - u.row) !== 1)
                             continue;
@@ -835,20 +841,21 @@
             // «Отражение» (wis120): заклинание противника, выбранное целью
             // в СУЩЕСТВО владельца ловушки, летит в случайное существо
             // противника (спека юзера). Постройки не ловятся («вашего
-            // существа»); у противника нет существ — ловушка не тратится,
+            // существа»; W73: под «Лесным оплотом» считаются — effCreature);
+            // у противника нет существ — ловушка не тратится,
             // заклинание идёт по исходной цели. Возвращает новую цель
             // (или исходный u). Зовётся ДО применения эффекта: у игрока —
             // на входе applySpellPInner, у ИИ — в ветках
             // enemyCastSpellEffectInner после выбора best-цели.
             A.reflectAim = function reflectAim(defenderSide, u) {
                 if (!u || !B.units.includes(u) || u.side !== defenderSide
-                    || u.def.type !== "unit") return u;
+                    || !effCreature(u)) return u;
                 const i = B.traps[defenderSide].findIndex((t) =>
                     t.def.trap && t.def.trap.effect === "reflectSpell");
                 if (i < 0) return u;
                 const caster = defenderSide === "p" ? "e" : "p";
                 const pool = B.units.filter((v) => v.side === caster
-                    && v.def.type === "unit" && spellAimable(v));
+                    && effCreature(v) && spellAimable(v));
                 if (!pool.length) return u;
                 B.traps[defenderSide].splice(i, 1);
                 redrawTraps();

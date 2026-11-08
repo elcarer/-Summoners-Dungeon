@@ -148,6 +148,17 @@
         ghShoot: { id: "ghShoot", rarity: "rare", baseHp: 20,
                    elems: ["growth", "honor"], starter: "groHon",
                    img: "72", ability: "abilDmg", abilityVal: 1 },
+        // «Лесной оплот» (арт heroes/73.png): БОСС «Белой пущи» — последняя
+        // комната 4-го (последнего) этажа (CAVES.gh.boss →
+        // ENCOUNTERS.ghBastion; W73, спека юзера, по аналогии с боссом
+        // «Рыжего леса»). ДВУХЦВЕТНЫЙ герой Рост+Честь. 22♥, эпическая;
+        // способность bldUnits: все постройки стороны считаются
+        // ДОПОЛНИТЕЛЬНО существами для эффектов (effCreature в arenaCards;
+        // примеры юзера: «Эльфийский друид» — призыв постройки даёт +1⚡,
+        // «Корона леса» — повторяет усиление постройки)
+        ghBastion: { id: "ghBastion", rarity: "epic", baseHp: 22,
+                     elems: ["growth", "honor"], starter: "groHon",
+                     img: "73", ability: "bldUnits", abilityVal: 1 },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -485,6 +496,7 @@
         "ghKnight", // «Зелёные рыцари»: враг 1-го этажа «Белой пущи» (W61)
         "ghWalk", // «Долгая прогулка»: враг 2-го этажа «Белой пущи» (W65)
         "ghShoot", // «Отряд стрелков»: враг 3-го этажа «Белой пущи» (W72)
+        "ghBastion", // «Лесной оплот»: босс «Белой пущи», 4-й этаж (W73)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

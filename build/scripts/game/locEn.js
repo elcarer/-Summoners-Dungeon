@@ -652,6 +652,12 @@
             "card.gh258.desc": "All your units perform their \"Shot\", as if they had moved. If a unit has no shot, it performs \"Shot 1\", as if it had one",
             "card.gh259.name": "Full Quivers",
             "card.gh259.desc": "The chosen unit gains \"Shot 1\" (if it already has a \"Shot\", it increases by 1)",
+            // W73: карта 260 и босс 4-го этажа «Белой пущи»
+            "card.gh260.name": "Thicket Ambush",
+            "card.gh260.desc": "Trap on an empty cell. Whenever any unit moves or is summoned onto the chosen cell, all your buildings perform their \"Shot\", as if they had moved. If a building has no shot, it performs \"Shot 1\", as if it had one",
+            // W73: босс «Белой пущи» (4-й этаж)
+            "enc.ghBastion.title": "Forest Bulwark",
+            "hero.ghBastion.ability": "All your buildings are additionally treated as units for effects",
             // W72: враг 3-го этажа «Белой пущи»
             "enc.ghShoot.title": "Squad of Archers",
             "hero.ghShoot.ability": "Whenever your unit's ability deals damage, it deals 1 more damage instead",

@@ -169,8 +169,10 @@
                         damageUnit(b, 1, null, "dam");
                     }
                     if (b.def.campfire) {
+                        // «Походный костёр»: лечит соседей-существ (W73: под
+                        // «Лесным оплотом» и постройки — effCreature)
                         for (const v of B.units.slice()) {
-                            if (v.def.type !== "unit") continue;
+                            if (!effCreature(v)) continue;
                             if (Math.abs(v.col - b.col) + Math.abs(v.row - b.row) !== 1) continue;
                             healUnit(v, 1);
                         }
@@ -186,8 +188,10 @@
                         if (side === "p") B.hand.push(id); else B.eHand.push(id);
                         const heals = 1 + (b.def.plant ? plantEcho(b.side) : 0);
                         for (let t = 0; t < heals; t++) {
+                            // соседнее СВОЁ существо (W73: под «Лесным
+                            // оплотом» и постройка — effCreature)
                             const near = B.units.filter((v) => v.side === b.side
-                                && v.def.type === "unit"
+                                && effCreature(v)
                                 && Math.abs(v.col - b.col) + Math.abs(v.row - b.row) === 1);
                             if (near.length) healUnit(near[(Math.random() * near.length) | 0], 3);
                         }
@@ -214,8 +218,11 @@
                     // духа»); на 0♥ жертва погибает. Алтарь с 2♥ мог погибнуть
                     // от самоповреждения построек выше — тогда не тикает
                     if (b.def.darkAltar && B.units.includes(b)) {
+                        // «Тёмный алтарь»: случайное существо противника
+                        // (W73: под «Лесным оплотом» и постройка противника
+                        // — жертва)
                         const foes = B.units.filter((v) => v.side !== side
-                            && v.def.type === "unit");
+                            && effCreature(v));
                         if (foes.length) {
                             const victim = foes[(Math.random() * foes.length) | 0];
                             victim.hp -= 1;
@@ -346,8 +353,10 @@
             A.medicHealTick = function medicHealTick(u) {
                 if (!u || !B.units.includes(u)) return false;
                 const side = u.side;
+                // пул «все его существа + база» (W73: под «Лесным оплотом»
+                // постройки тоже в пуле)
                 const pool = B.units.filter((v) => v.side === side
-                    && v.def.type === "unit");
+                    && effCreature(v));
                 const pick = (Math.random() * (pool.length + 1)) | 0; // база — последний билет
                 if (pick >= pool.length) {
                     healBase(side, 1);
@@ -459,8 +468,10 @@
             A.auraLightTick = function auraLightTick(side) {
                 for (const u of B.units.slice()) {
                     if (u.side !== side || !u.lightAura || !B.units.includes(u)) continue;
+                    // бьёт соседних СУЩЕСТВ противника (W73: под «Лесным
+                    // оплотом» и постройки — effCreature)
                     const foes = B.units.filter((v) => v.side !== side
-                        && v.def.type === "unit"
+                        && effCreature(v)
                         && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
                     for (const v of foes) {
                         if (!B.units.includes(v)) continue;

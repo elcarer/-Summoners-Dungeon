@@ -170,7 +170,10 @@
             // не срабатывают, как у «Песчаного духа»). На 0♥ сосед погибает.
             A.summonSulfur = function summonSulfur(u) {
                 if (!B.units.includes(u)) return false; // мог умереть от мины при призыве
-                const near = B.units.filter((v) => v !== u && v.def.type === "unit"
+                // соседние существа ОБЕИХ сторон (W73: под «Лесным оплотом»
+                // и постройки — effCreature; −2⚔ на постройке инертен,
+                // −1♥ работает)
+                const near = B.units.filter((v) => v !== u && effCreature(v)
                     && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
                 if (!near.length) return false;
                 for (const v of near) {
@@ -202,8 +205,10 @@
                 if (!B.units.includes(u)) return false;
                 for (let n = 0; n < (u.def.fireSnipe || 2); n++) {
                     if (!B.units.includes(u)) return false; // сам погиб при призыве
+                    // соседние существа ПРОТИВНИКА (W73: под «Лесным
+                    // оплотом» и постройки противника — цели)
                     const near = B.units.filter((v) => v.side !== u.side
-                        && v.def.type === "unit"
+                        && effCreature(v)
                         && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
                     if (!near.length) return false;
                     const v = near[(Math.random() * near.length) | 0];
