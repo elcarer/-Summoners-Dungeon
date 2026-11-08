@@ -297,5 +297,19 @@
                  rarity: "common", elem: "honWis",
                  multi: ["honor", "wisdom"],
                  color: 0x9ecbe8, img: "honor_wisdom/263" },
+        // ── W76 (спека юзера): карта 264 — тоже только «Небесный дворец» ──
+        // «Страж крепости» (hw264): Человек 1/3 с ДВУМЯ равноправными
+        // способностями — «Ответ 1» (counterSpike, как у «Алебардщика»)
+        // и «Защита 1» (def.protect, врождённая, как у «Защитника»).
+        // Обе — именные флаги на равных (просил юзер W75.1): слот
+        // def.ability пуст — диспетчеру способностей призыва здесь
+        // запускать нечего
+        hw264: { type: "unit", cost: 2, atk: 1, hp: 3, speed: 1,
+                 creature: "human", sheet: "knight", counterSpike: 1,
+                 protect: 1, // «Защита 1» — врождённая (def.protect)
+                 subtype: "human", // подтип — по спеке юзера (Человек)
+                 rarity: "rare", elem: "honWis",
+                 multi: ["honor", "wisdom"],
+                 color: 0x7fa8c8, img: "honor_wisdom/264" },
     };
 })();

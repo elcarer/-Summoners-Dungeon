@@ -17,6 +17,7 @@
             A.playerTurnStart = async function playerTurnStart() {
                 B.turnNo += 1; // шкала подросла: сфер теперь на одну больше
                 B.phase = "anim";
+                B.turnSide = "p"; // чей ход — честный маркер (reactShotPing)
                 B.selected = null;
                 B.spellTarget = false;
                 tokenPanelClose(); // панель «Управления временем» не переживает смену хода

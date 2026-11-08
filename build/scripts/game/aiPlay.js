@@ -8,6 +8,7 @@
 
             A.enemyTurn = async function enemyTurn() {
                 B.phase = "enemy";
+                B.turnSide = "e"; // чей ход — честный маркер (reactShotPing)
                 B.selected = null;
                 B.spellTarget = false;
                 tokenPanelClose(); // панель «Управления временем» не переживает смену хода

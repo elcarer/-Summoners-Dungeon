@@ -172,6 +172,18 @@
         hwSwarm: { id: "hwSwarm", rarity: "rare", baseHp: 16,
                    elems: ["honor", "wisdom"], starter: "honWis",
                    img: "74", ability: "flyCurse", abilityVal: 1 },
+        // «Ответный разряд» (арт heroes/75.png): враг 2-го этажа (W76
+        // спека юзера). 18♥, редкая; способность reactShot: когда
+        // способность СУЩЕСТВА или ПОСТРОЙКИ владельца срабатывает
+        // ВО ВРЕМЯ ХОДА ПРОТИВНИКА — 1 урон случайному врагу (существо/
+        // постройка/база противника). Точки вызова reactShotPing
+        // (arenaCombat) — места фактического срабатывания способностей,
+        // возможных на чужом ходу: «Ответ» (damageUnit), «Крепостной
+        // ров»/«Краевой камень» (afterMoved существа противника),
+        // «Нищий» (способность на смерть)
+        hwDischarge: { id: "hwDischarge", rarity: "rare", baseHp: 18,
+                       elems: ["honor", "wisdom"], starter: "honWis",
+                       img: "75", ability: "reactShot", abilityVal: 1 },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -511,6 +523,7 @@
         "ghShoot", // «Отряд стрелков»: враг 3-го этажа «Белой пущи» (W72)
         "ghBastion", // «Лесной оплот»: босс «Белой пущи», 3-й (последний) этаж (W73)
         "hwSwarm", // «Кружащая стая»: враг 1-го этажа «Небесного дворца» (W75)
+        "hwDischarge", // «Ответный разряд»: враг 2-го этажа «Небесного дворца» (W76)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

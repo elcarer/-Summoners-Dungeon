@@ -164,11 +164,17 @@
                 if (u.def.type === "unit" && u.def.dyingDiscard) {
                     const foe = u.side === "p" ? "e" : "p";
                     const np = cellXY(u.col, u.row);
+                    let resolved = false; // способность реально сбросила карту
                     honorRelayAct(u, () => {
                         const n = randomDiscard(foe, u.def.dyingDiscard);
                         if (n) floatText(np.x, np.y - 66, "⤓", 0xc9b98c);
+                        resolved = resolved || n > 0;
                         return n > 0;
                     }, { dead: true });
+                    // «Ответный разряд» (W76): способность на смерть
+                    // сработала (чужой ход проверит пинг сам); opts.dead —
+                    // носитель удалён с поля
+                    if (resolved) reactShotPing(u, { dead: true });
                 }
                 // «Рунный монолит»: на смерть существа постройка теряет 1 жизнь,
                 // а владелец берёт карту (просил юзер). Добор до урона — как у
@@ -761,6 +767,9 @@
                         damageUnit(killer, spike, null, "dam");
                         return true;
                     });
+                    // атака всегда на ходу атакующего — для владельца «Ответа»
+                    // это чужой ход: «Ответный разряд» (W76) пингует
+                    reactShotPing(target);
                 }
                 // ── «Разбойники» (W40, просил юзер): «первый раз за бой» по
                 // урону существам. Атака — урон существом (марш, «Скорость»,

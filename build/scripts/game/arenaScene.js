@@ -49,6 +49,12 @@
                 const pDeck = G.draftBattle && G.draft ? G.draft.picks : G.deck;
                 B = {
                     encId, phase: "player", stopped: false, turnNo: 1,
+                    // чей ход (p/e): ставят playerTurnStart/enemyTurn.
+                    // Отдельное поле, потому что phase в окнах анимаций
+                    // («anim») свою сторону не называет — а способности
+                    // «во время хода противника» (reactShotPing, W76)
+                    // должны знать ход честно
+                    turnSide: "p",
                     energy: 1, eEnergy: 1,
                     split: 1, // положение ползунка «карты↔энергия» (1 карта / 2 энергии)
                     playerBase: heroDef.baseHp, playerBaseMax: heroDef.baseHp,

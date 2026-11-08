@@ -252,6 +252,47 @@
                 sfx("chpoc");
             };
 
+            // «Ответный разряд» (hwDischarge — враг 2-го этажа «Небесного
+            // дворца», W76 спека юзера): когда способность СУЩЕСТВА или
+            // ПОСТРОЙКИ владельца срабатывает ВО ВРЕМЯ ХОДА ПРОТИВНИКА —
+            // 1 урон случайному врагу: существо, постройка или база
+            // противника (все наравне, цель честно случайная). Работает
+            // у обеих сторон. Вызовы — в точках фактического срабатывания
+            // способностей, возможных на чужом ходу: «Ответ» (damageUnit —
+            // атака всегда на ходу атакующего), «Крепостной ров»/
+            // «Краевой камень» (afterMoved существа противника), «Нищий»
+            // (способность на смерть). Ход читает B.turnSide — его ставят
+            // playerTurnStart/enemyTurn (phase в окнах «anim» сторону не
+            // называет). Способности «своего» хода (Торговец, Полевой
+            // медик, Деревня, тик «Ауры света») условие не проходят.
+            // opts.dead — носитель уже удалён с поля («Нищий»); урон
+            // пинга — не обычная атака (snd "dam", killer нет): «Защиту»
+            // режет, «Воздушный щит» гасит
+            A.reactShotPing = function reactShotPing(u, opts = {}) {
+                if (!u || !u.def) return;
+                if (!opts.dead && !B.units.includes(u)) return;
+                const hd = heroDefOf(u.side);
+                if (!hd || hd.ability !== "reactShot") return;
+                if (B.turnSide === u.side) return; // сработало на своём ходу
+                const op = u.side === "p" ? "e" : "p";
+                const foes = B.units.filter((v) => v.side === op);
+                const k = (Math.random() * (foes.length + 1)) | 0; // + база
+                if (k < foes.length) {
+                    const v = foes[k];
+                    const p = cellXY(v.col, v.row);
+                    floatText(p.x, p.y - 66, String(hd.abilityVal || 1), 0xff8f6e);
+                    damageUnit(v, hd.abilityVal || 1, null, "dam");
+                } else {
+                    damageBase(op, hd.abilityVal || 1,
+                        op === "p"
+                            ? { x: cellXY(u.col, GRID - 1).x,
+                                y: cellXY(u.col, GRID - 1).y + 15, fill: 0xff8f6e }
+                            : { x: cellXY(u.col, 0).x,
+                                y: cellXY(u.col, 0).y - 15, fill: 0xff8f6e });
+                }
+                sfx("chpoc");
+            };
+
             // ── «Белая пуща» (W61, спека юзера): единый хук УСИЛЕНИЯ ────────
             // Вызывается ПОСЛЕ фактического применения баффа существу из
             // всех точек усиления: заклинания игрока (applySpellPInner) и
@@ -440,12 +481,15 @@
             // штатный damageUnit: «Защита» существа его режет.
             A.moatAct = function moatAct(u) {
                 if (!B.units.includes(u) || u.def.type !== "unit") return;
-                const near = B.units.some((b) => b.side !== u.side && b.def.moat
+                const src = B.units.find((b) => b.side !== u.side && b.def.moat
                     && Math.abs(b.col - u.col) + Math.abs(b.row - u.row) === 1);
-                if (!near) return;
+                if (!src) return;
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 66, "−1♥", 0xef9f8c);
                 damageUnit(u, 1, null, "dam");
+                // способность постройки сработала на ходу её противника —
+                // «Ответный разряд» (W76) пингует (ход проверит сам)
+                reactShotPing(src);
             };
 
             // «Краевой камень» (hon174, просил юзер): существо противника,
@@ -470,6 +514,9 @@
                     glide(u, p.x, p.y);
                     fxEvent("cast", { x: p.x, y: p.y - 24, color: 0xcfc7b0 });
                     sfx("chpoc");
+                    // способность камня сработала на ходу его противника —
+                    // «Ответный разряд» (W76) пингует (ход проверит сам)
+                    reactShotPing(b);
                     triggerCellTraps(u); // перенесли на ловушку — она срабатывает
                     return; // один камень за перемещение
                 }
