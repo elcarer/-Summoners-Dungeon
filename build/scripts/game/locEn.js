@@ -670,12 +670,20 @@
             // W76: карта 264 «Небесного дворца» (спека юзера)
             "card.hw264.name": "Fortress Guard",
             "card.hw264.desc": "Human 1/3. \"Retaliate 1\": after an attack on this object, the attacker takes 1 damage. \"Protection 1\": any damage dealt to this creature is reduced by 1",
+            // W77: карты 265–266 «Небесного дворца» (спека юзера)
+            "card.hw265.name": "Double Casting",
+            "card.hw265.desc": "Play 2 random spells or traps from your hand (without spending energy)",
+            "card.hw266.name": "Lightning Elemental",
+            "card.hw266.desc": "Elemental 2/2. Whenever you play a spell or trap, deal 1 damage to a random enemy (unit, building, or base of the opponent)",
             // W75: враг 1-го этажа «Небесного дворца»
             "enc.hwSwarm.title": "Circling Swarm",
             "hero.hwSwarm.ability": "When your unit with \"Flight\" flies over an enemy unit, that unit gets −1 attack and −1 health",
             // W76: враг 2-го этажа «Небесного дворца»
             "enc.hwDischarge.title": "Return Fire",
             "hero.hwDischarge.ability": "When an ability of your unit or building triggers during the opponent's turn, deal 1 damage to a random enemy (unit, building, or base of the opponent)",
+            // W77: враг 3-го этажа «Небесного дворца»
+            "enc.hwMagebonds.title": "Spellbinders",
+            "hero.hwMagebonds.ability": "The first card the opponent plays in this battle is countered",
             // W73: босс «Белой пущи» (3-й, последний этаж)
             "enc.ghBastion.title": "Forest Bulwark",
             "hero.ghBastion.ability": "All your buildings are additionally treated as units for effects",

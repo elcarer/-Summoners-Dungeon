@@ -293,6 +293,35 @@
                 sfx("chpoc");
             };
 
+            // «Элементаль молнии» (hw266, W77 спека юзера): бьёт dmg урона
+            // (по спеке 1) СЛУЧАЙНОМУ врагу — существа и постройки плюс база
+            // наравне (тот же пул, что у «Ответного разряда»). Зовётся из
+            // afterSpellPlayed/afterTrapPlaced (arenaCards) — места розыгрыша
+            // заклинаний/ловушек владельцем. Урон — НЕ обычная атака (killer
+            // нет, snd "dam"): «Защита» режет, «Воздушный щит» гасит
+            A.zapRandomFoe = function zapRandomFoe(u, dmg = 1) {
+                if (!u || !u.def || !B.units.includes(u)) return;
+                const op = u.side === "p" ? "e" : "p";
+                const foes = B.units.filter((v) => v.side === op);
+                const k = (Math.random() * (foes.length + 1)) | 0; // + база
+                const p0 = cellXY(u.col, u.row);
+                floatText(p0.x, p0.y - 96, "⚡", 0xffe08c);
+                if (k < foes.length) {
+                    const v = foes[k];
+                    const p = cellXY(v.col, v.row);
+                    floatText(p.x, p.y - 66, String(dmg), 0xffe08c);
+                    damageUnit(v, dmg, null, "dam");
+                } else {
+                    damageBase(op, dmg,
+                        op === "p"
+                            ? { x: cellXY(u.col, GRID - 1).x,
+                                y: cellXY(u.col, GRID - 1).y + 15, fill: 0xffe08c }
+                            : { x: cellXY(u.col, 0).x,
+                                y: cellXY(u.col, 0).y - 15, fill: 0xffe08c });
+                }
+                sfx("chpoc");
+            };
+
             // ── «Белая пуща» (W61, спека юзера): единый хук УСИЛЕНИЯ ────────
             // Вызывается ПОСЛЕ фактического применения баффа существу из
             // всех точек усиления: заклинания игрока (applySpellPInner) и
@@ -775,6 +804,92 @@
                     }
                 }
                 return false;
+            };
+            // «Двойная магия» (hw265, W77 спека юзера): разыгрывает до 2
+            // случайных заклинаний/ловушек ИЗ РУКИ владельца БЕСПЛАТНО
+            // (без траты энергии). Кандидаты — все заклинания и ловушки
+            // руки, кроме самой «Двойной магии» (иначе она разыгрывала бы
+            // саму себя — бесконечная цепочка). Разыгранная карта уходит в
+            // сброс, как любой розыгрыш; Паладин света/Заклинатель клинков
+            // и «Элементаль молнии» реагируют (afterSpellPlayed). Заклинание
+            // с недостижимой целью пропускается (как у «Послушника»),
+            // непоставившаяся ловушка («Битва умов» врага) — тоже. Возвращает
+            // число фактически разыгранных (0 — розыгрыш не состоялся)
+            A.doubleCastAct = function doubleCastAct(side) {
+                const hand = side === "p" ? B.hand : B.eHand;
+                const cands = hand.filter((id) => {
+                    if (id === "hw265") return false;
+                    const d = CARDS[id];
+                    return d && (d.type === "spell" || d.type === "trap");
+                });
+                if (!cands.length) return 0;
+                for (let i = cands.length - 1; i > 0; i--) { // случайный порядок
+                    const j = (Math.random() * (i + 1)) | 0;
+                    [cands[i], cands[j]] = [cands[j], cands[i]];
+                }
+                let played = 0;
+                for (const id of cands) {
+                    if (played >= 2) break;
+                    const hi = hand.indexOf(id);
+                    if (hi < 0) continue; // ушла из руки эффектом соседа-каста
+                    if (CARDS[id].type === "spell") {
+                        if (side === "p") {
+                            const t = acolyteTargetFor(id);
+                            if (t === null && CARDS[id].spell.target !== "none")
+                                continue;
+                            if (!applySpellP(id, t, true)) continue;
+                            fxSpellCast(id, t, "p");
+                        } else {
+                            if (!aiSpellPlayable(CARDS[id])) continue;
+                            enemyCastSpellEffect(CARDS[id], true); // авто-цели ИИ
+                        }
+                    } else { // ловушка — авто-постановка (клетку выбирает код)
+                        const spot = doubleCastTrapSpot(side, id);
+                        if (!spot) continue;
+                        if (!armTrap(side, id, spot.col, spot.row, spot.unit || null))
+                            continue; // «Битва умов» врага
+                        afterTrapPlaced(side);
+                    }
+                    hand.splice(hand.indexOf(id), 1);
+                    if (side === "p") B.discard.push(id);
+                    else B.eDiscard.push(id);
+                    noteDiscard(1, side, [id]);
+                    if (CARDS[id].type === "spell") afterSpellPlayed(side);
+                    played++;
+                    floatText(960, side === "p" ? 640 : 300,
+                        `✦ ${GAME_LOC.t(`card.${id}.name`)}`, 0x9ecbe8);
+                    sfx("chpoc");
+                }
+                layoutHand();
+                return played;
+            };
+            // Клетка для авто-постановки ловушки «Двойной магией»: руна —
+            // на своё сильнейшее существо, засада — на свою переднюю
+            // постройку, клеточные — свой передний ряд (враг ступнёт раньше;
+            // нет пустых — ряды глубже), как выбирает игрок кликом
+            A.doubleCastTrapSpot = function doubleCastTrapSpot(side, cardId) {
+                const e = CARDS[cardId].trap.effect;
+                if (e === "castRandom") {
+                    const own = B.units.filter((v) => v.side === side
+                        && v.def.type === "unit")
+                        .sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row));
+                    return own[0]
+                        ? { col: own[0].col, row: own[0].row, unit: own[0] } : null;
+                }
+                if (e === "ambushRise") {
+                    const own = B.units.filter((v) => v.side === side
+                        && v.def.type === "building")
+                        .sort((a, b) => side === "p" ? a.row - b.row : b.row - a.row);
+                    return own[0]
+                        ? { col: own[0].col, row: own[0].row, unit: own[0] } : null;
+                }
+                for (const row of deployRows(side)) {
+                    const free = [];
+                    for (let c = 0; c < GRID; c++) if (!unitAt(c, row)) free.push(c);
+                    if (free.length)
+                        return { col: free[(Math.random() * free.length) | 0], row };
+                }
+                return null;
             };
             // «Взрыв твари» (dec150): своё существо погибает, затем 1 урона
             // столько раз, какова была сумма его ⚔+♥; каждый удар — случайному

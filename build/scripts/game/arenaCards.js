@@ -408,6 +408,43 @@
                         return true;
                     });
                 }
+                // «Элементаль молнии» (hw266, W77 спека юзера): когда ВЛАДЕЛЕЦ
+                // разыгрывает ЗАКЛИНАНИЕ, бьёт 1 урон случайному врагу
+                // (существо/постройка/база наравне; zapRandomFoe — arenaCombat).
+                // side не задан у кастов РУН (руна кастует сама, не владелец)
+                // — те молчат. Релей героя-Чести может разрешить дважды.
+                for (const u of B.units.slice()) {
+                    if (!u.def.castZap || u.side !== side
+                        || !B.units.includes(u)) continue;
+                    honorRelayAct(u, () => { zapRandomFoe(u); return true; });
+                }
+            };
+            // Тот же триггер «Элементаля молнии» для ЛОВУШЕК: послеTrapPlaced
+            // зовут места фактической постановки ловушки владельцем из руки
+            // (arenaActions — 3 ветки игрока; aiPlay — 3 пути ИИ). Отменённая
+            // «Битвой умов» ловушка не ставится — её место вызова не зовёт.
+            A.afterTrapPlaced = function afterTrapPlaced(side) {
+                for (const u of B.units.slice()) {
+                    if (!u.def.castZap || u.side !== side
+                        || !B.units.includes(u)) continue;
+                    honorRelayAct(u, () => { zapRandomFoe(u); return true; });
+                }
+            };
+            // «Магопуты» (hwMagebonds, firstCardVoid, W77 спека юзера):
+            // ПЕРВАЯ за бой карта, которую противник РАЗЫГРЫВАЕТ (юнит/
+            // постройка, заклинание, ловушка — все розыгрыши ИЗ РУКИ),
+            // отменяется: карта и энергия потрачены, эффекта нет (семантика —
+            // как у ловушек «Отмена призыва»/«Отмена заклинания»). Зовут места
+            // розыгрыша карт: arenaActions/aiPlay (юнит и 3 ветки ловушек),
+            // arenaSpells.castSpell и aiPlay (заклинание). Флаг firstCard
+            // ставится при КАЖДОМ розыгрыше стороны — способность срабатывает
+            // ровно один раз, на первой карте, независимо от героя
+            A.heroVoidFirstCancel = function heroVoidFirstCancel(side) {
+                if (!B || B.heroFlags.firstCard[side]) return false; // не первая
+                B.heroFlags.firstCard[side] = true;
+                const hd = heroDefOf(side === "p" ? "e" : "p");
+                if (!hd || hd.ability !== "firstCardVoid") return false;
+                return true;
             };
         }
     };

@@ -184,6 +184,17 @@
         hwDischarge: { id: "hwDischarge", rarity: "rare", baseHp: 18,
                        elems: ["honor", "wisdom"], starter: "honWis",
                        img: "75", ability: "reactShot", abilityVal: 1 },
+        // «Магопуты» (арт heroes/76.png): враг 3-го этажа (W77 спека
+        // юзера). 20♥, редкая; способность firstCardVoid: ПЕРВАЯ за бой
+        // карта, которую противник РАЗЫГРЫВАЕТ (юнит/постройка, заклинание,
+        // ловушка — из руки), отменяется: карта и энергия потрачены, эффекта
+        // нет (семантика — как у ловушек «Отмена призыва»/«Отмена
+        // заклинания»). Перехват heroVoidFirstCancel (arenaCards) в точках
+        // розыгрыша карт: arenaActions/aiPlay (юнит, 3 ловушки) и
+        // arenaSpells.castSpell/aiPlay (заклинание)
+        hwMagebonds: { id: "hwMagebonds", rarity: "rare", baseHp: 20,
+                       elems: ["honor", "wisdom"], starter: "honWis",
+                       img: "76", ability: "firstCardVoid" },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -524,6 +535,7 @@
         "ghBastion", // «Лесной оплот»: босс «Белой пущи», 3-й (последний) этаж (W73)
         "hwSwarm", // «Кружащая стая»: враг 1-го этажа «Небесного дворца» (W75)
         "hwDischarge", // «Ответный разряд»: враг 2-го этажа «Небесного дворца» (W76)
+        "hwMagebonds", // «Магопуты»: враг 3-го этажа «Небесного дворца» (W77)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

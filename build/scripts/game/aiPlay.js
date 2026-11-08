@@ -263,11 +263,15 @@
                             const cardId = B.eHand[pick.i];
                             // «Отмена призыва» (wis84) игрока: существо не
                             // появляется, карта и энергия врага потрачены;
-                            // «Иссушение почвы» (dec133) — то же для ПОСТРОЕК
+                            // «Иссушение почвы» (dec133) — то же для ПОСТРОЕК.
+                            // «Магопуты»-герой игрока (W77): первая карта
+                            // врага за бой отменяется — то же самое
                             if ((def.type === "unit"
-                                    && counterTrapConsume("p", "counterSummon"))
+                                    && (heroVoidFirstCancel("e")
+                                        || counterTrapConsume("p", "counterSummon")))
                                 || (def.type === "building"
-                                    && counterTrapConsume("p", "counterBuilding"))) {
+                                    && (heroVoidFirstCancel("e")
+                                        || counterTrapConsume("p", "counterBuilding")))) {
                                 B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eEnergy -= effCost(cardId, "e");
                                 notePlay("e"); // «Конвейер» (tim225)
@@ -321,7 +325,18 @@
                                 multiValor(cardId, "e"); // «Растущая доблесть» (Белая пуща, W62)
                                 multiWeave(cardId, "e"); // «Переплетение сил» (Небесный дворец, W75)
                                 cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
+                                // «Магопуты»-герой игрока (W77): первая карта
+                                // врага — отменена (энергия потрачена)
+                                if (heroVoidFirstCancel("e")) {
+                                    floatText(cellXY(pu.col, pu.row).x,
+                                        cellXY(pu.col, pu.row).y - 60,
+                                        "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                                    hideEnemyCard();
+                                    played = true;
+                                    break;
+                                }
                                 armTrap("e", cardId, 0, 0, pu);
+                                afterTrapPlaced("e"); // «Элементаль молнии» (W77)
                                 hideEnemyCard();
                                 played = true;
                                 break;
@@ -349,7 +364,18 @@
                                 notePlay("e"); // «Конвейер» (tim225)
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
+                                // «Магопуты»-герой игрока (W77): первая карта
+                                // врага — отменена (энергия потрачена)
+                                if (heroVoidFirstCancel("e")) {
+                                    floatText(cellXY(blds[0].col, blds[0].row).x,
+                                        cellXY(blds[0].col, blds[0].row).y - 60,
+                                        "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                                    hideEnemyCard();
+                                    played = true;
+                                    break;
+                                }
                                 armTrap("e", cardId, 0, 0, blds[0]);
+                                afterTrapPlaced("e"); // «Элементаль молнии» (W77)
                                 hideEnemyCard();
                                 played = true;
                                 break;
@@ -375,7 +401,17 @@
                             multiFury(cardId, "e"); // «Ярость природы» (Рыжий лес, W60)
                             multiValor(cardId, "e"); // «Растущая доблесть» (W62)
                             multiWeave(cardId, "e"); // «Переплетение сил» (Небесный дворец, W75)
+                            // «Магопуты»-герой игрока (W77): первая карта
+                            // врага — отменена (энергия потрачена)
+                            if (heroVoidFirstCancel("e")) {
+                                floatText(cellXY(col, row).x, cellXY(col, row).y - 60,
+                                    "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                                hideEnemyCard();
+                                played = true;
+                                break;
+                            }
                             armTrap("e", cardId, col, row);
+                            afterTrapPlaced("e"); // «Элементаль молнии» (W77)
                             hideEnemyCard();
                             played = true;
                             break;
@@ -390,8 +426,11 @@
                                 { s: 0.42, a1: 0 }); // к центру поля и растворяется
                             const cardId = B.eHand[pick.i];
                             // «Отмена заклинания» (wis83) игрока: эффект не
-                            // срабатывает, карта и энергия врага потрачены
-                            if (counterTrapConsume("p", "counterSpell")) {
+                            // срабатывает, карта и энергия врага потрачены.
+                            // «Магопуты»-герой игрока (W77): первая карта
+                            // врага за бой отменяется — то же самое
+                            if (heroVoidFirstCancel("e")
+                                || counterTrapConsume("p", "counterSpell")) {
                                 B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eDiscard.push(cardId);
                                 noteDiscard(1, "e", [cardId]);

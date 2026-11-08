@@ -96,6 +96,7 @@
                         honorGuard: { p: false, e: false },
                         honorDash: { p: false, e: false },
                         honorRelay: { p: false, e: false },
+                        firstCard: { p: false, e: false }, // чья сторона уже разыгрывала карту («Магопуты», W77)
                         speedAtk: { p: false, e: false },
                         epicDiscount: { p: false, e: false },
                         baseReflect: { p: false, e: false }, // «Тёмный владыка»: первый урон базе отражён

@@ -32,7 +32,8 @@
                 "lab", "treeHomes", "trapCancel", "elementalCircle",
                 "animalCost", "monolith", "altarSword", "campfire",
                 "campAura", "groveAura", "starTower", "cloudSpire",
-                "pillarEnergy", "aura"];
+                "pillarEnergy", "aura",
+                "castZap"]; // «Элементаль молнии» (W77) — эффект для «Вихрей магии»
             A.hwEffectCount = function hwEffectCount(u) {
                 if (!u || !u.def) return 0;
                 let n = 0;
@@ -286,6 +287,14 @@
                 }
                 if (def.spell.cyclone) { // «Циклон» (gh256, W65): без цели
                     cycloneAct();
+                    return true;
+                }
+                // «Двойная магия» (hw265, W77): разыгрывает до 2 случайных
+                // заклинаний/ловушек из руки бесплатно; некого — карта и
+                // энергия целы (как у «Пытки разума»)
+                if (def.spell.hwSpellPlay) {
+                    const n = doubleCastAct("p");
+                    if (!n) return false;
                     return true;
                 }
                 if (def.spell.volley) { // «Небо в стрелах» (gh258, W72): без цели
@@ -1011,6 +1020,20 @@
                 // без позиции цели рождается на карте; считаем ДО эффектов —
                 // сбросы/доборы могли бы пересобрать руку и сдвинуть индексы
                 const origin = handCardCenter(handIdx);
+                // «Магопуты» (firstCardVoid, W77): первая карта игрока за
+                // бой отменяется героем врага — карта и энергия потрачены
+                if (heroVoidFirstCancel("p")) {
+                    B.energy -= effCost(cardId, "p", target);
+                    spendCard(handIdx);
+                    consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
+                    floatText(960, 640, "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
+                    sfx("mine");
+                    layoutHand();
+                    redrawHighlight();
+                    refreshHud();
+                    checkEnd();
+                    return true;
+                }
                 // «Отмена заклинания» (wis83) врага: заклинание отменяется —
                 // карта и энергия потрачены, эффект не срабатывает (спека юзера)
                 const cTrap = counterTrapConsume("e", "counterSpell");

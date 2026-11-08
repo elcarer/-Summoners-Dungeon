@@ -311,5 +311,27 @@
                  rarity: "rare", elem: "honWis",
                  multi: ["honor", "wisdom"],
                  color: 0x7fa8c8, img: "honor_wisdom/264" },
+        // ── W77 (спека юзера): карты 265–266 — тоже только «Небесный дворец» ──
+        // «Двойная магия» (hw265): заклинание «Розыгрыш заклинаний» —
+        // разыгрывает 2 случайных заклинания/ловушки ИЗ РУКИ владельца
+        // бесплатно (hwSpellPlay → doubleCastAct в arenaCombat; ветки
+        // розыгрыша — applySpellPInner/aiSpells)
+        hw265: { type: "spell", cost: 4,
+                 spell: { target: "none", hwSpellPlay: true },
+                 kind: "play", // тип эффекта — по спеке юзера («Розыгрыш заклинаний»)
+                 rarity: "epic", elem: "honWis",
+                 multi: ["honor", "wisdom"],
+                 color: 0x9ecbe8, img: "honor_wisdom/265" },
+        // «Элементаль молнии» (hw266): Элементаль 2/2 — когда ВЛАДЕЛЕЦ
+        // разыгрывает заклинание или ловушку, бьёт 1 урон случайного врага
+        // (существа/постройки/базы наравне; castZap — хуки afterSpellPlayed/
+        // afterTrapPlaced в arenaCards, пинг zapRandomFoe в arenaCombat;
+        // ключ в HW_EFFECT_KEYS — «Вихри магии» считают его эффектом)
+        hw266: { type: "unit", cost: 5, atk: 2, hp: 2, speed: 1,
+                 creature: "goblin", sheet: "air_el", castZap: 1,
+                 subtype: "elemental", // подтип — по спеке юзера (Элементаль)
+                 rarity: "epic", elem: "honWis",
+                 multi: ["honor", "wisdom"],
+                 color: 0x7fa8c8, img: "honor_wisdom/266" },
     };
 })();

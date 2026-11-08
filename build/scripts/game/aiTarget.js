@@ -439,6 +439,13 @@
             A.aiSpellPlayable = function aiSpellPlayable(def, forReplay = false) {
                 const s = def.spell;
                 if (s.copyLast) return aiReplayOk();
+                // «Двойная магия» (hw265, W77): в руке нет другого заклинания
+                // или ловушки — карту переводить зря (эффекта не будет)
+                if (s.hwSpellPlay && !B.eHand.some((id) => {
+                    if (id === "hw265") return false;
+                    const d = CARDS[id];
+                    return d && (d.type === "spell" || d.type === "trap");
+                })) return false;
                 // «Эльф корней» (sg247): на 5×5 поле нет пустой клетки —
                 // карту переводить зря (призыв некуда)
                 if (s.rootSummon && B.units.length >= 25) return false;
