@@ -318,6 +318,7 @@
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 multiFury(cardId, "e"); // «Ярость природы» (Рыжий лес)
                                 multiValor(cardId, "e"); // «Растущая доблесть» (Белая пуща, W62)
+                                multiWeave(cardId, "e"); // «Переплетение сил» (Небесный дворец, W75)
                                 cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                                 armTrap("e", cardId, 0, 0, pu);
                                 hideEnemyCard();
@@ -372,6 +373,7 @@
                             cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                             multiFury(cardId, "e"); // «Ярость природы» (Рыжий лес, W60)
                             multiValor(cardId, "e"); // «Растущая доблесть» (W62)
+                            multiWeave(cardId, "e"); // «Переплетение сил» (Небесный дворец, W75)
                             armTrap("e", cardId, col, row);
                             hideEnemyCard();
                             played = true;
@@ -411,6 +413,7 @@
                             // заклинания врага (sg243–247) молча не били базу
                             multiFury(cardId, "e");
                             multiValor(cardId, "e"); // «Растущая доблесть» (W62)
+                            multiWeave(cardId, "e"); // «Переплетение сил» (Небесный дворец, W75)
                             if (def.spell.copyLast) {
                                 // «Горящие руны»: повтор ПОСЛЕДНЕГО заклинания тем
                                 // же кодом эффектов (бесплатно для его цены)

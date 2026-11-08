@@ -127,6 +127,61 @@
                         sfx("chpoc");
                         return;
                     }
+                    // «Воздушный щит» (hw263, W75): самому ценному своему
+                    // существу без щита (щит повторно ничего не меняет)
+                    if (s.airShield) {
+                        const own = spellTargets(B.units.filter((v) => v.side === "e"
+                            && effCreature(v) && !v.airShield));
+                        let best = own.slice()
+                            .sort((a, b) => ((b.curAtk || 0) + (b.hp || 0))
+                                - ((a.curAtk || 0) + (a.hp || 0))
+                                || a.row - b.row)[0];
+                        if (focus && own.includes(focus)) best = focus;
+                        if (!best) return;
+                        aimOff(best);
+                        best.airShield = true;
+                        const p = cellXY(best.col, best.row);
+                        floatText(p.x, p.y - 66,
+                            "✦ " + GAME_LOC.t("spell.airShield.name"), 0x9ecbe8);
+                        fxEvent("ward", { x: p.x, y: p.y - 14, scale: 0.9 });
+                        punch(best.node);
+                        sfx("chpoc");
+                        return;
+                    }
+                    // «Вихри магии» (hw261, W75): своему существу с БОЛЬШИМ
+                    // числом своих эффектов (+N/+N за каждый)
+                    if (s.vortexBuff) {
+                        const own = spellTargets(B.units.filter((v) => v.side === "e"
+                            && effCreature(v)));
+                        let best = own.slice()
+                            .sort((a, b) => hwEffectCount(b) - hwEffectCount(a)
+                                || ((b.curAtk || 0) + (b.hp || 0))
+                                - ((a.curAtk || 0) + (a.hp || 0))
+                                || a.row - b.row)[0];
+                        if (focus && own.includes(focus)) best = focus;
+                        if (!best) return;
+                        const n = hwEffectCount(best);
+                        aimOff(best);
+                        if (n > 0) {
+                            best.bonusAtk = (best.bonusAtk || 0) + n;
+                            best.hp += n;
+                            recalcAuras();
+                            const an = best.node.getChildByName("atk");
+                            if (an) an.text = String(best.curAtk);
+                            const hn = best.node.getChildByName("hp");
+                            if (hn) hn.text = String(best.hp);
+                            const p = cellXY(best.col, best.row);
+                            floatText(p.x, p.y - 39, `+${n}⚔ +${n}♥`, 0x9ecbe8);
+                            fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
+                            punch(best.node);
+                            onBuff(best, n, n); // «Белая пуща» (W61)
+                        } else {
+                            const p = cellXY(best.col, best.row);
+                            floatText(p.x, p.y - 66, "±0", 0xc9b98c);
+                        }
+                        sfx("chpoc");
+                        return;
+                    }
                     // «Древомощь» (sg243): вся оставшаяся энергия →
                     // «Сокрушение» и +N⚔/+N♥ лучшему своему существу.
                     // Эффект до списания цены — пул = энергия минус цена

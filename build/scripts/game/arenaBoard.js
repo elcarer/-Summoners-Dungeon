@@ -726,6 +726,7 @@
                 };
                 multiFury(cardId, side); // «Ярость природы» (Рыжий лес, W54)
                 multiValor(cardId, side); // «Растущая доблесть» (Белая пуща, W62)
+                multiWeave(cardId, side); // «Переплетение сил» (Небесный дворец, W75)
                 sfx("aqua"); // призыв (обе стороны)
                 B.units.push(u);
                 recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда
@@ -1066,6 +1067,10 @@
                     else if (def.ability === "dashN") // «Скорость N» (Колесница hon187)
                         afterArrive(() =>
                             honorRelayAct(u, () => summonDashN(u, def.abilityVal || 2)));
+                    else if (def.dashVal) // «Скорость N» флагом (hw262 «Наездник
+                        // грифона», W75: ability занят «Полётом»)
+                        afterArrive(() =>
+                            honorRelayAct(u, () => summonDashN(u, def.dashVal)));
                     else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
                     else if (def.ability === "spiritSummoner") summonSpiritCaller(u); // призыватель духов
                     else if (def.ability === "bombling") summonBombling(u); // бомблинг
@@ -1082,6 +1087,7 @@
                     // срабатывание = факт призыва (условия хуков — соседи
                     // и т.п. — почти всегда выполнены в реальном бою)
                     if (def.ability === "dash1" || def.ability === "dashN"
+                        || def.dashVal // «Скорость» флагом (hw262, W75)
                         || def.ability === "shaman" || def.ability === "spiritSummoner"
                         || def.ability === "bombling" || def.waterMage
                         || def.illusion || def.lakeMaid || def.sulfurBurst

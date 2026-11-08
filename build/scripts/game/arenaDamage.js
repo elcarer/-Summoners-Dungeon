@@ -628,6 +628,24 @@
                     sfx("chpoc");
                     return;
                 }
+                // «Воздушный щит» (hw263, W75 — спека юзера): существо не
+                // получает урона, кроме ОБЫЧНЫХ атак — ударов существом
+                // врукопашную (snd "sword" от юнита противника без массовой
+                // метки: марш, рывок «Скорости», удар двойника-ловушки
+                // «Тёмные цепи»). Всё прочее — заклинания, ловушки,
+                // выстрелы, Ответ, яд, всплески способностей (fxHint
+                // "mass") — гасится целиком
+                if (amount > 0 && target.airShield
+                    && !(killer && killer.def && killer.def.type === "unit"
+                        && killer.side !== target.side
+                        && snd === "sword" && A.fxHint !== "mass")) {
+                    const ap = cellXY(target.col, target.row);
+                    floatText(ap.x, ap.y - 66,
+                        "✦ " + GAME_LOC.t("spell.airShield.name"), 0x9ecbe8);
+                    fxEvent("ward", { x: ap.x, y: ap.y - 14, scale: 0.72 });
+                    sfx("chpoc");
+                    return;
+                }
                 // «Защита N» («Защитный кокон») режет входящий урон до нуля;
                 // споры/огненное дыхание реагируют на ФАКТИЧЕСКИ прошедший урон
                 let amt = amount;
@@ -1013,6 +1031,71 @@
                     floatText(p.x, p.y - 39, "+1⚔ +1♥", 0x9fd489);
                     fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.7 });
                     onBuff(u, 1, 1);
+                }
+                sfx("chpoc");
+            };
+
+            // «Переплетение сил» (Небесный дворец, W75 — спека юзера; текст
+            // в HUD данжа): БЕЛО-СИНЯЯ (двухцветная Честь+Мудрость) карта
+            // при розыгрыше даёт случайному существу ИГРАЮЩЕГО случайный
+            // положительный эффект. Особенность данжа — читаем CAVES[weave]
+            // по данжу забега. Хуки — как у «Растущей доблести»: addUnit
+            // (юниты/постройки, обе стороны), castSpell игрока ДО эффекта,
+            // ловушки игрока — в spendCard, заклинания/ловушки ИИ — в
+            // aiPlay перед эффектом
+            A.multiWeave = function multiWeave(cardId, side) {
+                const def = CARDS[cardId];
+                if (!def || !def.multi
+                    || !def.multi.includes("honor")
+                    || !def.multi.includes("wisdom")) return;
+                const cd = G.dungeon
+                    && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
+                if (!cd || !cd.weave) return;
+                floatText(960, side === "p" ? 758 : 318,
+                    GAME_LOC.t("dungeon.weaveShort"), 0x8cd0ef);
+                // случайное существо ИГРАЮЩЕГО (как в «Растущей доблести»:
+                // под «Лесным оплотом» постройки тоже в пуле — effCreature)
+                const own = B.units.filter((v) => v.side === side
+                    && effCreature(v) && B.units.includes(v));
+                if (own.length) {
+                    const u = own[(Math.random() * own.length) | 0];
+                    // пул положительных эффектов — на примитивах движка:
+                    // усиления через onBuff (эхо «Короны леса», волк),
+                    // «Защита» — режется в damageUnit (как у Леона)
+                    const p = cellXY(u.col, u.row);
+                    const roll = (Math.random() * 4) | 0;
+                    if (roll === 0) { // +1/+1
+                        u.bonusAtk = (u.bonusAtk || 0) + 1;
+                        u.hp += 1;
+                        recalcAuras();
+                        const an = u.node.getChildByName("atk");
+                        if (an) an.text = String(u.curAtk);
+                        const hn = u.node.getChildByName("hp");
+                        if (hn) hn.text = String(u.hp);
+                        floatText(p.x, p.y - 39, "+1⚔ +1♥", 0x9fd489);
+                        onBuff(u, 1, 1);
+                    } else if (roll === 1) { // +2 к урону
+                        u.bonusAtk = (u.bonusAtk || 0) + 2;
+                        recalcAuras();
+                        const an = u.node.getChildByName("atk");
+                        if (an) an.text = String(u.curAtk);
+                        floatText(p.x, p.y - 39, "+2⚔", 0x9fd489);
+                        onBuff(u, 2, 0);
+                    } else if (roll === 2) { // +2 к жизням
+                        u.hp += 2;
+                        recalcAuras();
+                        const hn = u.node.getChildByName("hp");
+                        if (hn) hn.text = String(u.hp);
+                        floatText(p.x, p.y - 39, "+2♥", 0x9fd489);
+                        onBuff(u, 0, 2);
+                    } else { // «Защита 1»
+                        u.protect = (u.protect || 0) + 1;
+                        if (A.refreshProtectMark) A.refreshProtectMark(u);
+                        floatText(p.x, p.y - 72,
+                            "✦ " + GAME_LOC.t("status.protect.name"), 0x8cd0ef);
+                        fxEvent("ward", { x: p.x, y: p.y - 12, scale: 0.66 });
+                    }
+                    fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.7 });
                 }
                 sfx("chpoc");
             };

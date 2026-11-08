@@ -483,6 +483,14 @@
                 // залп не в кого, карту переводить зря
                 if (s.volley && !B.units.some((v) => v.side === "e"
                     && v.def.type === "unit")) return false;
+                // «Вихри магии» (hw261, W75): своего существа хотя бы с
+                // одним своим эффектом нет — карта переводится зря (+0/+0)
+                if (s.vortexBuff && !B.units.some((v) => v.side === "e"
+                    && effCreature(v) && hwEffectCount(v) > 0)) return false;
+                // «Воздушный щит» (hw263, W75): всем своим уже стоит —
+                // повторный ничего не меняет
+                if (s.airShield && !B.units.some((v) => v.side === "e"
+                    && effCreature(v) && !v.airShield)) return false;
                 if (s.sacrifice && !aiSacrificePick()) return false;
                 // «Взрыв твари» (dec150) — есть своё существо с суммой ⚔+♥ 3+
                 // (иначе карта переводится зря)

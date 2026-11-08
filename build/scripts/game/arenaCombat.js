@@ -134,6 +134,30 @@
                 heroElementalDraw(attacker); // «Сонм духов»: способность элементаля
             };
 
+            // «Кружащая стая» (hwSwarm, W75 — спека юзера): когда существо
+            // владельца с «Полётом» перелетает через существо противника,
+            // существо противника получает −1/−1. Вызов — в точке перелёта
+            // (марш, arenaFlow: прыжок unitHasFly за блокера). Ноль жизней
+            // убивает — killUnit, как обычная гибель (checkEnd зовёт марш)
+            A.flyCurse = function flyCurse(flyer, victim) {
+                if (!flyer || !B.units.includes(flyer)) return;
+                const hd = heroDefOf(flyer.side);
+                if (!hd || hd.ability !== "flyCurse") return;
+                if (!victim || victim.def.type !== "unit"
+                    || !B.units.includes(victim)) return;
+                victim.bonusAtk = (victim.bonusAtk || 0) - 1;
+                victim.hp -= 1;
+                recalcAuras(); // подпись урона обновляет сама
+                const vp = cellXY(victim.col, victim.row);
+                const hn = victim.node.getChildByName("hp");
+                if (hn) hn.text = String(Math.max(0, victim.hp));
+                floatText(vp.x, vp.y - 39, "−1⚔ −1♥", 0x8cd0ef);
+                fxEvent("ice", { x: vp.x, y: vp.y - 12, scale: 0.72 });
+                punch(victim.node);
+                sfx("chpoc");
+                if (victim.hp <= 0) killUnit(victim, flyer);
+            };
+
             // «Старший ледовик» (wis95): после атаки — «Заморожен 1» существам
             // СЛЕВА И СПРАВА от САМОГО ЛЕДОВИКА (только клетки его ряда).
             // Позиция цели роли не играет. Замораживаются любые существа —

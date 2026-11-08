@@ -159,6 +159,19 @@
         ghBastion: { id: "ghBastion", rarity: "epic", baseHp: 22,
                      elems: ["growth", "honor"], starter: "groHon",
                      img: "73", ability: "bldUnits", abilityVal: 1 },
+        // ── «Небесный дворец» (мультицвет Честь+Мудрость, W75, спека
+        // юзера) ─────────────────────────────────────────────────────────────
+        // «Кружащая стая» (арт heroes/74.png): враг 1-го этажа. ДВУХЦВЕТНЫЙ
+        // герой — elems из двух стихий. 16♥, редкая; способность flyCurse:
+        // когда существо владельца с «Полётом» перелетает через существо
+        // противника, существо противника получает −1/−1 (перелёт —
+        // unitHasFly в arenaFlow). В спеке поле «Стихия: Рост, Честь» —
+        // опечатка (противник «для 1 этажа подземелья "Небесный дворец":
+        // Честь - Мудрость (двухцветный)», ядро колоды целиком
+        // Честь+Мудрость) — элемент honWis
+        hwSwarm: { id: "hwSwarm", rarity: "rare", baseHp: 16,
+                   elems: ["honor", "wisdom"], starter: "honWis",
+                   img: "74", ability: "flyCurse", abilityVal: 1 },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -497,6 +510,7 @@
         "ghWalk", // «Долгая прогулка»: враг 2-го этажа «Белой пущи» (W65)
         "ghShoot", // «Отряд стрелков»: враг 3-го этажа «Белой пущи» (W72)
         "ghBastion", // «Лесной оплот»: босс «Белой пущи», 3-й (последний) этаж (W73)
+        "hwSwarm", // «Кружащая стая»: враг 1-го этажа «Небесного дворца» (W75)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
@@ -537,6 +551,7 @@
     const MULTI_LOGO = {
         strGro: "logo/strength_growth_logo.png", // Сила + Рост («Рыжий лес»)
         groHon: "logo/growth_honor_logo.png", // Рост + Честь («Белая пуща»)
+        honWis: "logo/honor_wisdom_logo.png", // Честь + Мудрость («Небесный дворец», W75)
     };
     // Часть каталога для cardsData.js (его читают игра и tools/cards.html).
     globalThis.GAME_HEROES_DATA = { HEROES, HERO_ORDER, HERO_FOE_ORDER,

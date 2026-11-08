@@ -881,6 +881,22 @@
                         && u.def.type === "unit"
                         && (u.def.ability === "archer" || u.def.steamShot
                             || (u.quiverBonus || 0) > 0))) v += 1.6;
+                    // hw261/hw263 (W75): вихри ценнее существу со
+                    // способностями (+N/+N за каждый свой эффект); щит —
+                    // крупному своему существу без щита
+                    if (s.vortexBuff) {
+                        const bestN = Math.max(0, ...B.units
+                            .filter((u) => u.side === "e" && effCreature(u))
+                            .map((u) => hwEffectCount(u)));
+                        v += bestN > 0 ? 0.5 + 0.45 * bestN : -1; // без эффектов — зря
+                    }
+                    if (s.airShield) {
+                        const best = Math.max(0, ...B.units
+                            .filter((u) => u.side === "e" && effCreature(u)
+                                && !u.airShield)
+                            .map((u) => (u.curAtk || 0) + (u.hp || 0)));
+                        v += best >= 4 ? 1.4 : best > 0 ? 0.7 : -1;
+                    }
                     if (s.captivate) v += 1.6; // hon197: удаление карты призыва из руки
                     if (s.resurrect) v += 1.8; // hon200: бесплатный призыв из сброса
                     if (s.lightAura) v += 1.0; // hon199: −1♥ соседям каждый ход

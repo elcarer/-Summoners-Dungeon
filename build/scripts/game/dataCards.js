@@ -33,6 +33,9 @@
         strBoss: starterCollection(STARTER_DECKS.strBoss),
         // W61: ядро врага «Зелёные рыцари» («Белая пуща») — та же симметрия
         groHon: starterCollection(STARTER_DECKS.groHon),
+        // W75: ядро врага «Кружащая стая» («Небесный дворец») — та же
+        // симметрия
+        honWis: starterCollection(STARTER_DECKS.honWis),
     };
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N
@@ -343,6 +346,13 @@
                "tim239",
                "tim240"], // 237–240 эпические ×1 (просил юзер)
     };
+    // W75 (спека юзера): сундуки/магазин «Небесного дворца» — смесь
+    // Чести, Мудрости и мультицветных (встречаются только в этом данже).
+    // Веса — пулы самих стихий (об./редкие ×3, эпик ×1); новые hw-карты
+    // — обычные ×3
+    REWARD_POOLS.honWis = [...REWARD_POOLS.honor, ...REWARD_POOLS.wisdom,
+        "hw261", "hw261", "hw261", "hw262", "hw262", "hw262",
+        "hw263", "hw263", "hw263"];
 
     const { ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM,
         FLOOR_MOBS_DECAY, FLOOR_MOBS_HONOR, FLOOR_MOBS_TIME, MOB_TABLES,
@@ -381,6 +391,17 @@
         // dungeon.js)
         gh: { elem: "groHon", elems: ["growth", "honor"], maxFloor: 3,
               boss: "ghBastion", bossLast: true, valor: true },
+        // W75 (спека юзера): «Небесный дворец» — МУЛЬТИЦВЕТНЫЙ данж
+        // Честь+Мудрость (по образцу «Рыжего леса»/«Белой пущи»). Пока
+        // 1 ЭТАЖ без босса (1-й этаж — «Кружащая стая», герой 74, 16♥;
+        // floors 2+ и босс — со спекой юзера). elems — стихии ДРАФТА
+        // «Карты сокровищ» (Честь, Мудрость, двухцветные honWis); elem —
+        // мульти-стихия (рубашки card_multi_back.png). Особенность weave —
+        // «Переплетение сил»: при розыгрыше Бело-Синей (двухцветной) карты
+        // случайное существо ИГРАЮЩЕГО получает случайный положительный
+        // эффект (текст в HUD — dungeon.js; multiWeave в arenaDamage)
+        hw: { elem: "honWis", elems: ["honor", "wisdom"], maxFloor: 1,
+              weave: true },
     };
     // Колода врага: ядро архетипа; весь добор — только боссу (просил
     // юзер): с глубиной (floor ≥ 1) +2 карты из grow за этаж и 3..8 карт

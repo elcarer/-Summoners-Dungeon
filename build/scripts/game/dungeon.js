@@ -1429,12 +1429,14 @@
                     : GAME_LOC.t("dungeon.floor", { n: st.floor });
                 // особенность подземелья в инфоокне сверху (W54, юзер):
                 // «Ярость природы» — «Рыжий лес»; «Растущая доблесть» —
-                // «Белая пуща» (W62, юзер)
+                // «Белая пуща» (W62, юзер); «Переплетение сил» — «Небесный
+                // дворец» (W75, юзер)
                 {
                     const cd = globalThis.GAME_DATA.CAVES[st.cave];
                     uiHud.userData.featT.text = !st.city && cd
                         ? (cd.fury ? GAME_LOC.t("dungeon.fury")
-                            : cd.valor ? GAME_LOC.t("dungeon.valor") : "")
+                            : cd.valor ? GAME_LOC.t("dungeon.valor")
+                            : cd.weave ? GAME_LOC.t("dungeon.weave") : "")
                         : "";
                 }
                 uiHud.userData.goldT.text = String(G.gold);

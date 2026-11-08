@@ -552,6 +552,7 @@
                                 const flyFromCol = u.col, flyFromRow = u.row;
                                 u.lastMoveDir = [0, over - flyFromRow]; // W65: вход
                                 u.row = over;
+                                flyCurse(u, occ); // «Кружащая стая» (hwSwarm, W75): перелёт — −1/−1
                                 heroElementalDraw(u); // «Сонм духов»: способность элементаля (Полёт)
                                 const p = cellXY(u.col, u.row);
                                 // W59 (юзер): полёт существа — Leaf storm

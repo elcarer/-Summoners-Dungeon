@@ -259,5 +259,40 @@
                  rarity: "epic", elem: "groHon",
                  multi: ["growth", "honor"],
                  color: 0x7e9e6e, img: "growth_honor/260" },
+        // ── W75 (спека юзера): карты 261–263 — МУЛЬТИЦВЕТ «Честь +
+        // Мудрость», встречаются только в «Небесном дворце» (cave "hw").
+        // elem "honWis" — собственная мульти-стихия (рубашка
+        // card_multi_back.png); multi — обе родные стихии
+        // «Вихри магии» (hw261): заклинание — цель получает +1/+1 за
+        // каждый СВОЙ эффект (способности/особости карты; список —
+        // HW_EFFECT_KEYS в arenaSpells; vortexBuff — arenaSpells/aiSpells)
+        hw261: { type: "spell", cost: 1,
+                 spell: { target: "anyUnit", vortexBuff: true },
+                 kind: "buff", // тип эффекта — по спеке юзера
+                 rarity: "common", elem: "honWis",
+                 multi: ["honor", "wisdom"],
+                 color: 0x6e9ec4, img: "honor_wisdom/261" },
+        // «Наездник грифона» (hw262): Человек 2/3 — «Полёт» (flyOver,
+        // как у мини-феи) и «Скорость 1» (рывок после призыва). У существа
+        // одна ключевая способность (def.ability), поэтому «Скорость» —
+        // флагом dashVal (= N): триггер рядом с dash1/dashN в arenaBoard
+        hw262: { type: "unit", cost: 3, atk: 2, hp: 3, speed: 1,
+                 creature: "human", sheet: "knight", ability: "flyOver",
+                 dashVal: 1,
+                 subtype: "human", // подтип — по спеке юзера (Человек)
+                 rarity: "common", elem: "honWis",
+                 multi: ["honor", "wisdom"],
+                 color: 0x8ab4d8, img: "honor_wisdom/262" },
+        // «Воздушный щит» (hw263): заклинание — цель не получает урона,
+        // кроме ОБЫЧНЫХ атак (удар существом врукопашную: марш, рывок,
+        // выпад). Всё прочее (заклинания, ловушки, выстрелы, Ответ, яд,
+        // всплески способностей) гасится целиком (u.airShield читает
+        // damageUnit в arenaDamage; airShieldAct — arenaSpells/aiSpells)
+        hw263: { type: "spell", cost: 1,
+                 spell: { target: "anyUnit", airShield: true },
+                 kind: "buff", // тип эффекта — по спеке юзера
+                 rarity: "common", elem: "honWis",
+                 multi: ["honor", "wisdom"],
+                 color: 0x9ecbe8, img: "honor_wisdom/263" },
     };
 })();

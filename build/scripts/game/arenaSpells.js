@@ -7,6 +7,40 @@
     globalThis.GAME_ARENA.installSpells = function installSpells(A) {
         with (A) {
 
+            // «Вихри магии» (hw261, W75 — спека юзера): «свои эффекты»
+            // существа — ключевая способность (def.ability: Полёт, Скорость,
+            // Выстрел, Ответ-подобные, Сдвиг, Возврат, …) плюс именные
+            // особости карт (флаги, которые читает боевая логика) и
+            // выданные ключевые статусы (u.protect «Защита», u.venom
+            // «Ядовитость»). Параметры-значения (shotDmg у «Выстрела»,
+            // abilityVal у «Скорости») отдельно НЕ считаются — это та же
+            // способность. Реестр — известные движку флаги эффектов
+            const HW_EFFECT_KEYS = ["ability", "dashVal", "fireSnipe",
+                "growOnAttack", "rootGrab", "wolfPack", "buffEcho",
+                "trapOnMove", "undying", "siegeDouble", "portalLeap",
+                "crush", "frostAttack", "frostNeighbors", "vampHeal",
+                "illusion", "sisterDraw", "berserkSummon", "stormer",
+                "energyToStats", "lakeMaid", "lichRaise", "plantEcho",
+                "riteStump", "sandDecay", "spellBuffAura", "spellGrow",
+                "sprout", "targetDiscount", "thicket", "trapGrow",
+                "waterMage", "wolfSummon", "medicHeal", "protect",
+                "healArrive", "axeArrive", "nearSpeed", "skelKing",
+                "tradeDraw", "trebuchet", "fortress", "returnN", "delay",
+                "steamShot", "siegeShot", "siegeFollow", "exhuming",
+                "discardAtk", "roadPush", "sulfurBurst", "relicVault",
+                "lab", "treeHomes", "trapCancel", "elementalCircle",
+                "animalCost", "monolith", "altarSword", "campfire",
+                "campAura", "groveAura", "starTower", "cloudSpire",
+                "pillarEnergy", "aura"];
+            A.hwEffectCount = function hwEffectCount(u) {
+                if (!u || !u.def) return 0;
+                let n = 0;
+                for (const k of HW_EFFECT_KEYS) if (u.def[k]) n++;
+                if (u.protect) n++; // выданная «Защита» — тоже эффект
+                if (u.venom) n++; // выданная «Ядовитость» — тоже эффект
+                return n;
+            };
+
             // «Силовой купол» (tim234, просил юзер): установка метки купола
             // на существо/постройку — любой урон по ней режется до 1
             // (гейт в damageUnit). Общая для игрока (applySpellPInner) и
@@ -272,6 +306,39 @@
                         floatText(p.x, p.y - 66, `🏹 ${u.quiverBonus}`, 0xffd98c);
                         fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
                         punch(u.node);
+                        sfx("chpoc");
+                        return true;
+                    }
+                    if (def.spell.airShield) { // «Воздушный щит» (hw263, W75):
+                        // цель не получает урона, кроме обычных атак —
+                        // читает damageUnit (arenaDamage); держится до
+                        // гибели цели, повторный щит ничего не меняет
+                        u.airShield = true;
+                        floatText(p.x, p.y - 66,
+                            "✦ " + GAME_LOC.t("spell.airShield.name"), 0x9ecbe8);
+                        fxEvent("ward", { x: p.x, y: p.y - 14, scale: 0.9 });
+                        punch(u.node);
+                        sfx("chpoc");
+                        return true;
+                    }
+                    if (def.spell.vortexBuff) { // «Вихри магии» (hw261, W75):
+                        // +1/+1 за каждый СВОЙ эффект цели (способности/
+                        // особости карты — HW_EFFECT_KEYS). Ноль эффектов —
+                        // заклинание ничего не даёт (текст по спеке юзера)
+                        const n = hwEffectCount(u);
+                        if (n > 0) {
+                            u.bonusAtk = (u.bonusAtk || 0) + n;
+                            u.hp += n;
+                            recalcAuras();
+                            const an = u.node.getChildByName("atk");
+                            if (an) an.text = String(u.curAtk);
+                            const hn = u.node.getChildByName("hp");
+                            if (hn) hn.text = String(u.hp);
+                            floatText(p.x, p.y - 39, `+${n}⚔ +${n}♥`, 0x9ecbe8);
+                            fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
+                            punch(u.node);
+                            onBuff(u, n, n); // «Белая пуща» (W61): волк/Корона
+                        } else floatText(p.x, p.y - 66, "±0", 0xc9b98c);
                         sfx("chpoc");
                         return true;
                     }
@@ -983,8 +1050,10 @@
                 // «Растущая доблесть» (Белая пуща, W62): ДО эффекта —
                 // случайное существо из стоящих на поле (призванное этой
                 // картой в пул не попадает); отменённое «Отменой
-                // заклинания» выше по ветке не доходит сюда
+                // заклинания» выше по ветке не доходит сюда. «Переплетение
+                // сил» (Небесный дворец, W75) — туда же
                 multiValor(cardId, "p");
+                multiWeave(cardId, "p");
                 if (!applySpellP(cardId, target, false,
                     (resetHand || brainstorm) ? { skipHandReset: true } : null)) {
                     B.playCtx = null;

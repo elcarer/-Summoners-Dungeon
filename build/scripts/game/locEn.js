@@ -18,6 +18,9 @@
             "dungeon.furyShort": "Nature's Fury",
             "dungeon.valor": "Growing Valor: when a Green-White (two-color) card is played, your random creature gets +1/+1",
             "dungeon.valorShort": "Growing Valor",
+            // W75 (юзер): особенность «Небесного дворца» — текст в HUD данжа
+            "dungeon.weave": "Weaving of Powers: when a White-Blue (two-color) card is played, your random creature gains a random positive effect",
+            "dungeon.weaveShort": "Weaving of Powers",
             "dungeon.deckLow": "Deck is below the minimum ({min}) — build your deck",
             "dungeon.hp": "HP {hp}/{max}",
             "dungeon.exitLabel": "DESCEND",
@@ -37,6 +40,8 @@
             "world.caveStrGro": "Rusty Forest",
             // W61: мультицветный данж у границы Роста и Чести
             "world.caveGh": "White Thicket",
+            // W75: мультицветный данж у границы Чести и Мудрости
+            "world.caveHw": "Celestial Palace",
             "world.soon": "Coming soon…",
             "world.deckLow": "Not enough cards: at least {min} required to enter",
             "world.resLow": "To enter you need: 1 Power Charm and 1 Life Sprout",
@@ -655,6 +660,16 @@
             // W73: карта 260 и босс «Белой пущи» (3-й, последний этаж)
             "card.gh260.name": "Thicket Ambush",
             "card.gh260.desc": "Trap on an empty cell. Whenever any unit moves or is summoned onto the chosen cell, all your buildings perform their \"Shot\", as if they had moved. If a building has no shot, it performs \"Shot 1\", as if it had one",
+            // W75: карты 261–263 «Небесного дворца» (спека юзера)
+            "card.hw261.name": "Magic Vortexes",
+            "card.hw261.desc": "The chosen unit gets +1 attack and +1 health for each of its own effects (abilities or traits)",
+            "card.hw262.name": "Griffin Rider",
+            "card.hw262.desc": "Human 2/3. \"Flight\": if the cell behind the attacked unit is empty, the rider leaps there instead of attacking. \"Speed 1\": immediately after being summoned, moves 1 cell forward or attacks the enemy in front",
+            "card.hw263.name": "Air Shield",
+            "card.hw263.desc": "The chosen unit takes no damage except normal attacks (melee unit strikes)",
+            // W75: враг 1-го этажа «Небесного дворца»
+            "enc.hwSwarm.title": "Circling Swarm",
+            "hero.hwSwarm.ability": "When your unit with \"Flight\" flies over an enemy unit, that unit gets −1 attack and −1 health",
             // W73: босс «Белой пущи» (3-й, последний этаж)
             "enc.ghBastion.title": "Forest Bulwark",
             "hero.ghBastion.ability": "All your buildings are additionally treated as units for effects",
@@ -744,6 +759,8 @@
             "card.ghost.name": "Ghost",
             "card.ghost.desc": "Appears from the Lich when it kills a creature: a Ghost 2/1",
             "spell.ward.name": "Spell Ward",
+            // W75: метка «Воздушного щита» (hw263) над существом
+            "spell.airShield.name": "Air Shield",
             "spell.ward.desc": "This creature cannot be chosen as a spell target and takes no damage from spells",
             "status.frozen.name": "Frozen",
             "status.frozen.desc": "Skips moving and attacking; the counter thaws by 1 at the start of each of its turns",
@@ -818,6 +835,9 @@
             "elem.strGro.short": "S+G",
             "elem.groHon": "Growth + Honor",
             "elem.groHon.short": "G+H",
+            // W75: мульти-стихия «Небесного дворца»
+            "elem.honWis": "Honor + Wisdom",
+            "elem.honWis.short": "H+W",
             "menu.pickHero": "CHOOSE YOUR HERO",
             "menu.pickHeroSub": "The hero defines your base health, deck elements and special ability",
             "menu.pickHeroSoon": "Coming soon…",
