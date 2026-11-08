@@ -700,6 +700,7 @@
                     root.cardsLayer.addChild(drag.node); // карта поверх остальных
                     B.selected = drag.idx; // подсветить зону призыва
                     B.spellTarget = false;
+                    B.islandPick = false; // прицел «Летучего острова» снят (W78)
                     redrawHighlight();
                 }
                 drag.node.x = p.x;

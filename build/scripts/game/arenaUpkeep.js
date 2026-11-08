@@ -125,6 +125,27 @@
                 return true;
             };
 
+            // «Летучий остров» (hw270, W78 — спека юзера): активная постройка
+            // — 1 раз в ход возвращает СВОЁ существо с поля боя в руку
+            // (штатный bounceUnit — карта призыва в руку владельца, без
+            // каскадов) и даёт 2 энергии. Игрок — клик по острову открывает
+            // прицел islandPick, клик по своему существу активирует; ИИ —
+            // раз в свой ход (случайное своё существо). Сброс islandUsed —
+            // в начале upkeep
+            A.islandActivate = function islandActivate(side, b, t) {
+                if (!b || !B.units.includes(b) || b.islandUsed) return false;
+                if (!t || !B.units.includes(t) || t.side !== side) return false;
+                b.islandUsed = true;
+                B.islandPick = false; // прицел игрока закрыт
+                redrawHighlight();
+                bounceUnit(t);
+                if (side === "p") B.energy += 2; else B.eEnergy += 2;
+                floatText(960, side === "p" ? 640 : 300, "+2⚡", 0xffd98c);
+                sfx("chpoc");
+                refreshHud();
+                return true;
+            };
+
             A.stormerTick = function stormerTick(u) {
                 if (!u || !B.units.includes(u)) return false;
                 const decks = ["p", "e"].filter((side) => {
@@ -159,6 +180,23 @@
                 // снимает ВСЕ руки обеих сторон и ВСЮ энергию (до тиков
                 // построек — «начало вашего хода», спека юзера)
                 parleyTick(side);
+                // «Медитация» (hw268, W78): в начале СЛЕДУЮЩЕГО хода владельца
+                // тот получает 3⚡ (заклинание положило в nextTurnEnergy) —
+                // как у «Грибницы», до тиков построек. Энергия начисляется
+                // даже если «Переговоры» уже обнулили её
+                const mn = B.nextTurnEnergy ? B.nextTurnEnergy[side] : 0;
+                if (mn > 0) {
+                    B.nextTurnEnergy[side] = 0;
+                    if (side === "p") B.energy += mn; else B.eEnergy += mn;
+                    floatText(960, side === "p" ? 700 : 380, `+${mn}⚡`, 0xffd98c);
+                    punch(root.hud);
+                    sfx("chpoc");
+                }
+                // «Летучий остров» (hw270, W78): счётчик «1 раз в ход» —
+                // в начале хода владельца остров снова может активироваться
+                for (const b of B.units) {
+                    if (b.side === side && b.def.islandAct) b.islandUsed = false;
+                }
                 for (const b of B.units.slice()) {
                     if (b.side !== side || b.def.type !== "building") continue;
                     if (b.def.mycelium) {

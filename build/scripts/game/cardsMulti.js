@@ -333,5 +333,47 @@
                  rarity: "epic", elem: "honWis",
                  multi: ["honor", "wisdom"],
                  color: 0x7fa8c8, img: "honor_wisdom/266" },
+        // ── W78 (спека юзера): карты 267–270 — тоже только «Небесный дворец» ──
+        // «Абсолютная защита» (hw267): клеточная ловушка — когда в ход
+        // ПРОТИВНИКА наносится урон (урон-активатор проходит), дальнейшие
+        // уроны ЭТОГО хода не наносятся (dmgHalt-гейт в damageUnit/
+        // damageBase, активация — absGuardCheck в arenaTraps; сброс
+        // флага — в начале каждого хода)
+        hw267: { type: "trap", cost: 3,
+                 trap: { event: "onEnemyTurnDamage", effect: "absGuard" },
+                 kind: "control", // тип эффекта — по спеке юзера (cards.txt)
+                 rarity: "epic", elem: "honWis",
+                 multi: ["honor", "wisdom"],
+                 color: 0x9ecbe8, img: "honor_wisdom/267" },
+        // «Медитация» (hw268): заклинание «Получение ресурсов» — в начале
+        // СЛЕДУЮЩЕГО хода владельца тот получает 3 энергии (nextEnergy →
+        // B.nextTurnEnergy[side], начисление — в начале upkeep, как у
+        // «Грибницы»; ветки розыгрыша — applySpellPInner/aiSpells)
+        hw268: { type: "spell", cost: 1,
+                 spell: { target: "none", nextEnergy: 3 },
+                 kind: "resource", // тип эффекта — по спеке юзера (cards.txt)
+                 rarity: "common", elem: "honWis",
+                 multi: ["honor", "wisdom"],
+                 color: 0x9ecbe8, img: "honor_wisdom/268" },
+        // «Небесный портал» (hw269): постройка — когда СУЩЕСТВО наносит
+        // ей урон (атака/выстрел/спецудар — killer-существа), то
+        // существо возвращается в руку СВОЕГО владельца (portalBounce —
+        // bounceUnit в damageUnit; заклинания/ловушки бьют без killer —
+        // не «существо», не триггерят)
+        hw269: { type: "building", cost: 2, atk: 0, hp: 3,
+                 portalBounce: true,
+                 rarity: "rare", elem: "honWis",
+                 multi: ["honor", "wisdom"],
+                 color: 0x9ecbe8, img: "honor_wisdom/269" },
+        // «Летучий остров» (hw270): постройка с активной способностью —
+        // 1 раз в ход возвращает СВОЁ существо с поля боя в руку и даёт
+        // 2 энергии (islandAct → islandActivate в arenaUpkeep; игрок —
+        // клик по острову, потом по существу — прицел islandPick;
+        // сброс islandUsed — в начале upkeep, как у «Лаборатории»)
+        hw270: { type: "building", cost: 6, atk: 0, hp: 6,
+                 islandAct: true,
+                 rarity: "rare", elem: "honWis",
+                 multi: ["honor", "wisdom"],
+                 color: 0x9ecbe8, img: "honor_wisdom/270" },
     };
 })();

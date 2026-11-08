@@ -195,6 +195,16 @@
         hwMagebonds: { id: "hwMagebonds", rarity: "rare", baseHp: 20,
                        elems: ["honor", "wisdom"], starter: "honWis",
                        img: "76", ability: "firstCardVoid" },
+        // «Сгусток магии» (арт heroes/77.png): БОСС «Небесного дворца» —
+        // дальней комната 3-го (последнего) этажа (CAVES.hw.boss →
+        // ENCOUNTERS.hwMagicBlob; W78, спека юзера, по аналогии с боссом
+        // «Рыжего леса»/«Белой пущи»). ДВУХЦВЕТНЫЙ герой Честь+Мудрость.
+        // 22♥, эпическая; способность openTutor (механика «Поиска
+        // ответов», arenaScene): в начале боя добирает 2 карты и
+        // сбрасывает 2 случайные с руки (авто — случайные)
+        hwMagicBlob: { id: "hwMagicBlob", rarity: "epic", baseHp: 22,
+                       elems: ["honor", "wisdom"], starter: "honWis",
+                       img: "77", ability: "openTutor", abilityVal: 2 },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -536,6 +546,7 @@
         "hwSwarm", // «Кружащая стая»: враг 1-го этажа «Небесного дворца» (W75)
         "hwDischarge", // «Ответный разряд»: враг 2-го этажа «Небесного дворца» (W76)
         "hwMagebonds", // «Магопуты»: враг 3-го этажа «Небесного дворца» (W77)
+        "hwMagicBlob", // «Сгусток магии»: БОСС «Небесного дворца», 3-й этаж (W78)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

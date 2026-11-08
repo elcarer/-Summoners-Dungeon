@@ -276,7 +276,7 @@
                     // разыгрывается первым, чтобы хватило и на остальные карты;
                     // «Извлечение тьмы» (dec153) — тоже энергодвижок
                     if (s.energyPerHand || s.energyPerTrap || s.darkExtract
-                        || s.bloodMoon) return 1;
+                        || s.bloodMoon || s.nextEnergy) return 1;
                     if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
                         || s.sacrifice || s.copyLast || s.stormAll
                         || s.purge || s.stealEnergy || s.fireflies
@@ -848,6 +848,8 @@
                     if (s.stealEnergy) v += 1.2;
                     if (s.energyPerHand) v += 0.8;
                     if (s.energyPerTrap) v += 0.6 + Math.min(4, B.traps.e.length) * 0.15;
+                    // «Медитация» (hw268, W78): 3⚡ в начале следующего хода
+                    if (s.nextEnergy) v += 1.1;
                     if (s.debuffEnemyAtkAll) v += 0.7 + Math.min(4, B.units.filter(
                         (u) => u.side === "p" && u.def.type === "unit" && u.curAtk > 0).length) * 0.25;
                     if (s.search || s.searchUnit || s.journey || s.discardPick) v += 0.5;

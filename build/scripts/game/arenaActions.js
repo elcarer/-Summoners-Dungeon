@@ -20,6 +20,8 @@
                 B.turnSide = "p"; // чей ход — честный маркер (reactShotPing)
                 B.selected = null;
                 B.spellTarget = false;
+                B.islandPick = false; // прицел «Летучего острова» не переживает смену хода
+                B.dmgHalt = { p: false, e: false }; // новый ход — урон снова наносится (hw267)
                 tokenPanelClose(); // панель «Управления временем» не переживает смену хода
                 refreshHud();
                 firewallTick("e"); // стена костров врага — конец хода врага
@@ -408,6 +410,20 @@
                     return;
                 }
                 if (B.selected === null) {
+                    // «Летучий остров» (hw270, W78): прицел активной
+                    // способности — клик по СВОЕМУ существу возвращает его
+                    // в руку владельца и даёт 2 энергии (1 раз в ход);
+                    // клик мимо — прицел снимается
+                    if (B.islandPick) {
+                        const t = unitAt(col, row);
+                        if (t && t.side === "p" && effCreature(t)) {
+                            islandActivate("p", B.islandPick, t);
+                        } else {
+                            B.islandPick = false;
+                            redrawHighlight();
+                        }
+                        return;
+                    }
                     // «Склеп» (dec157): клик по своей постройке СРАЗУ
                     // разыгрывает верхнюю карту сброса (с оплатой) —
                     // просил юзер: не ждать, пока игрок сыграет её сам.
@@ -423,6 +439,19 @@
                     if (cb && cb.side === "p" && cb.def.type === "building"
                         && cb.def.lab) {
                         labActivate("p", cb);
+                        return;
+                    }
+                    // «Летучий остров» (hw270): клик по острову открывает
+                    // прицел (подсветка своих существ) — есть своё существо
+                    // и ход ещё не активировал остров
+                    if (cb && cb.side === "p" && cb.def.type === "building"
+                        && cb.def.islandAct && !cb.islandUsed
+                        && B.units.some((v) => v.side === "p" && effCreature(v))) {
+                        B.islandPick = cb;
+                        const ip = cellXY(cb.col, cb.row);
+                        floatText(ip.x, ip.y - 96,
+                            GAME_LOC.t("card.hw270.name"), 0x9ecbe8);
+                        redrawHighlight();
                     }
                     return;
                 }

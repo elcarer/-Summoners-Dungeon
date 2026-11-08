@@ -671,6 +671,13 @@
                     if (got) punch(root.hud);
                     sfx("chpoc");
                 }
+                if (def.spell.target === "none" && def.spell.nextEnergy) { // «Медитация» (hw268, W78): +3⚡ в начале следующего хода (upkeep)
+                    const n = def.spell.nextEnergy;
+                    B.nextTurnEnergy.p += n;
+                    floatText(960, 840, `⏳ +${n}⚡`, 0xffd98c);
+                    punch(root.hud);
+                    sfx("chpoc");
+                }
                 if (def.spell.debuffEnemyAtkAll) { // «Нехватка воздуха»: −N урона всем существам врага
                     const n = def.spell.debuffEnemyAtkAll;
                     for (const v of B.units) if (v.side !== "p" && v.def.type === "unit") {

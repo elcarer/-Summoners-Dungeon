@@ -209,6 +209,20 @@
             A.redrawHighlight = function redrawHighlight() {
                 const hi = root.board.userData.hi;
                 hi.clear();
+                // «Летучий остров» (hw270, W78): прицел активной способности
+                // без карты — подсветка СВОИХ существ (клик по ним возвращает
+                // в руку и даёт 2⚡). B.islandPick хранит сам остров
+                if (B.phase === "player" && B.islandPick) {
+                    root.board.userData.baseZone.eventMode = "none";
+                    for (const u of B.units) {
+                        if (u.side !== "p" || !effCreature(u)) continue;
+                        const rc = cellRect(u.col, u.row);
+                        hi.rect(rc.x, rc.y, rc.w, rc.h);
+                        hi.fill({ color: 0x7dc95e, alpha: 0.4 });
+                        hi.stroke({ width: 2, color: 0xa8e890 });
+                    }
+                    return;
+                }
                 if (B.phase !== "player" || B.selected === null) {
                     root.board.userData.baseZone.eventMode = "none";
                     if (B.phase !== "player" || !B.journeySummon) return;

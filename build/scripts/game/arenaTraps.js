@@ -234,6 +234,35 @@
                 return trap;
             };
 
+            // «Абсолютная защита» (hw267, W78 — спека юзера): когда в ход
+            // ПРОТИВНИКА наносится урон, клеточная ловушка изымается и
+            // дальнейшие уроны ЭТОГО хода не наносятся (урон-активатор
+            // проходит — он и есть условие). Владелец ловушки — сторона,
+            // противоположная текущему ходу. Гейт B.dmgHalt[B.turnSide]
+            // стоит ПЕРВЫМ в damageUnit/damageBase (перекрывает щиты,
+            // броню и услуги — урон вообще не наносится); флаг сбрасывается
+            // в начале каждого хода. Ловушек несколько — вторая ждёт
+            // следующего хода противника (после первой ход уже глухой)
+            A.absGuardCheck = function absGuardCheck() {
+                if (!B || !B.traps || !B.turnSide) return false;
+                const tSide = B.turnSide === "p" ? "e" : "p";
+                const i = B.traps[tSide].findIndex((t) =>
+                    t.def.trap && t.def.trap.effect === "absGuard");
+                if (i < 0) return false;
+                const trap = B.traps[tSide].splice(i, 1)[0];
+                redrawTraps();
+                trapTriggered(tSide); // «Зимние духи»/«Путь воды»: сработала защита
+                const p = cellXY(trap.col, trap.row);
+                floatText(p.x, p.y - 60, "?!", 0xe08cd0);
+                fxEvent("trap", { x: p.x, y: p.y - 8, scale: 0.9 });
+                sfx("mine");
+                trapEchoOnce(tSide); // «Роща лоз»: флаг первого срабатывания
+                B.dmgHalt[B.turnSide] = true; // ход противника теперь глухой
+                floatText(960, B.turnSide === "p" ? 560 : 520,
+                    GAME_LOC.t("card.hw267.name"), 0x9ecbe8);
+                return true;
+            };
+
 
             A.triggerCellTraps = function triggerCellTraps(u) {
                 if (!B.units.includes(u)) return; // умер раньше (рывок+мина на шаге)

@@ -11,6 +11,8 @@
                 B.turnSide = "e"; // чей ход — честный маркер (reactShotPing)
                 B.selected = null;
                 B.spellTarget = false;
+                B.islandPick = false; // прицел «Летучего острова» не переживает смену хода
+                B.dmgHalt = { p: false, e: false }; // новый ход — урон снова наносится (hw267)
                 tokenPanelClose(); // панель «Управления временем» не переживает смену хода
                 cryptRefund("p"); // «Склеп»: не разыгранная игроком карта — назад в сброс
                 portalRefund("p"); // «Мастер порталов»: не разыгранная карта — на верх колоды
@@ -197,6 +199,19 @@
                     const lab = B.units.find((v) => v.side === "e"
                         && v.def.type === "building" && v.def.lab);
                     if (lab) labActivate("e", lab);
+                }
+                // «Летучий остров» (hw270, W78): раз в свой ход — вернуть
+                // своё существо в руку и получить 2⚡. Цель — случайное своё
+                // существо (перезаявка ценного позже — бонус поверх энергии)
+                {
+                    const isle = B.units.find((v) => v.side === "e"
+                        && v.def.type === "building" && v.def.islandAct
+                        && !v.islandUsed);
+                    const pool = B.units.filter((v) =>
+                        v.side === "e" && effCreature(v));
+                    if (isle && pool.length)
+                        islandActivate("e", isle,
+                            pool[(Math.random() * pool.length) | 0]);
                 }
                 // ИИ тратит энергию, пока есть чем. Если играть нечем (в руке всё
                 // слишком дорого или неприменимо — поле забито, целей нет), а

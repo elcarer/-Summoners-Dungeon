@@ -684,6 +684,18 @@
             // W77: враг 3-го этажа «Небесного дворца»
             "enc.hwMagebonds.title": "Spellbinders",
             "hero.hwMagebonds.ability": "The first card the opponent plays in this battle is countered",
+            // W78: карты 267–270 «Небесного дворца» (спека юзера)
+            "card.hw267.name": "Absolute Defense",
+            "card.hw267.desc": "Trap on an empty cell. Trigger: damage is dealt during the opponent's turn. Effect: after that (the trap's trigger), no more damage is dealt this turn",
+            "card.hw268.name": "Meditation",
+            "card.hw268.desc": "At the start of your next turn, gain 3 energy",
+            "card.hw269.name": "Sky Portal",
+            "card.hw269.desc": "Whenever a creature deals damage to this building, return that creature to its owner's hand",
+            "card.hw270.name": "Floating Isle",
+            "card.hw270.desc": "Once per turn you may return one of your creatures from the battlefield to your hand and gain 2 energy for it (click the isle, then a creature)",
+            // W78: босс «Небесного дворца» (3-й, последний этаж)
+            "enc.hwMagicBlob.title": "Magic Clump",
+            "hero.hwMagicBlob.ability": "At the start of the battle, draw any 2 cards from the deck, then discard 2 cards from your hand",
             // W73: босс «Белой пущи» (3-й, последний этаж)
             "enc.ghBastion.title": "Forest Bulwark",
             "hero.ghBastion.ability": "All your buildings are additionally treated as units for effects",
