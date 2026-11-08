@@ -276,6 +276,56 @@
                         }
                         A.recalcAuras(); // «Каток»: сброс уже влияет на урон
                     }
+                    // «Сгусток магии» (tutorPick, W78 — спека юзера, поправка:
+                    // НЕ случайный добор openTutor): в начале боя сторона
+                    // НАХОДИТ в колоде n ЛЮБЫХ карт (выбор владельца — для ИИ
+                    // самые ценные: стоимость + редкость) и берёт их в руку,
+                    // после этого сбрасывает n ХУДШИХ карт с руки — «найдите
+                    // ценные, избавьтесь от мусора», а не «добор и лотерея»
+                    if (hd && hd.ability === "tutorPick" && hd.abilityVal) {
+                        const n = hd.abilityVal;
+                        const deck = sd === "p" ? B.deck : B.eDeck;
+                        const hand = sd === "p" ? B.hand : B.eHand;
+                        const score = (id) => {
+                            const d = CARDS[id];
+                            return (d.cost || 0)
+                                + (d.rarity === "epic" ? 3
+                                    : d.rarity === "rare" ? 1 : 0);
+                        };
+                        // «найти» — n лучших из ВСЕЙ колоды, карты РАЗНЫЕ
+                        // (комплект сильнейших, а не 2 копии одной; индексы
+                        // изымаем с конца, чтобы не плыли)
+                        const uniq = [], seenIds = new Set();
+                        deck.forEach((id, i) => {
+                            if (!seenIds.has(id)) {
+                                seenIds.add(id);
+                                uniq.push({ id, i, s: score(id) });
+                            }
+                        });
+                        const picks = uniq.sort((a, b) => b.s - a.s).slice(0, n);
+                        picks.sort((a, b) => b.i - a.i)
+                            .forEach((p) => deck.splice(p.i, 1));
+                        for (const p of picks) hand.push(p.id);
+                        if (picks.length) {
+                            sfx("chpoc");
+                            floatText(960, sd === "p" ? 840 : 240,
+                                "⧉ " + picks.map((p) =>
+                                    GAME_LOC.t(`card.${p.id}.name`)).join(", "),
+                                0xffd98c);
+                        }
+                        // «сбросьте n карт с руки» — худшие (при равенстве
+                        // случайно); найденные (дорогие) не потеряются
+                        const worst = hand.map((id, i) => ({ id, i, s: score(id) }))
+                            .sort((a, b) => a.s - b.s || Math.random() - 0.5)
+                            .slice(0, Math.min(n, hand.length));
+                        worst.sort((a, b) => b.i - a.i)
+                            .forEach((w) => hand.splice(w.i, 1));
+                        if (worst.length) {
+                            for (const w of worst)
+                                (sd === "p" ? B.discard : B.eDiscard).push(w.id);
+                            noteDiscard(worst.length, sd, worst.map((w) => w.id));
+                        }
+                    }
                 }
                 // «Великая битва» (honGreatBattle): способность героя хотя бы
                 // у одной из сторон — в начале боя призываются ОБА
