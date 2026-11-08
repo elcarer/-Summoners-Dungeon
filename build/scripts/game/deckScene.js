@@ -11,8 +11,8 @@
 (function () {
     function createDeckScene(ctx) {
         const { scenes, G, ui, uiTex } = ctx;
-        const { CARDS, DECK_MAX, DECK_MIN, DECK_COPIES, ELEM_LOGO, HEROES,
-            HERO_ORDER, HERO_FOE_ORDER } = globalThis.GAME_DATA;
+        const { CARDS, DECK_MAX, DECK_MIN, DECK_COPIES, ELEM_LOGO, MULTI_LOGO,
+            HEROES, HERO_ORDER, HERO_FOE_ORDER } = globalThis.GAME_DATA;
         const { T, fit, button, chip, cardFace, dimBg, scrollPane } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
         // минимум колоды: открытый мир и ГОРОД живут по DECK_MIN = 12
@@ -38,10 +38,15 @@
             return true;
         }
         function clearFilter(key) { if (filters[key]) filters[key].clear(); }
-        const ELEM_KEYS = Object.keys(ELEM_LOGO);
+        // кнопки фильтра стихий: 6 одноцветных + 2 ДВУХЦВЕТНЫЕ (арт юзера
+        // W74, MULTI_LOGO) — мульти-карты фильтруются по def.elem
+        const ELEM_KEYS = [...Object.keys(ELEM_LOGO), ...Object.keys(MULTI_LOGO)];
         const PANE_POS = { left: { x: 90, y: 222 }, right: { x: 780, y: 279 } };
-        // ряд лого стихий (общие константы: использует и rebuildChips, и api)
-        const ELEM_Y = 144, ELEM_X0 = 1449, STEP = 66; // лого 57px, ряд до x=1836
+        // ряд лого стихий (общие константы: использует и rebuildChips, и api).
+        // 8 кнопок: шаг 50, круг 48px (лого 38px), ряд до x≈1847 — правая
+        // панель до 1848 (раньше 6 кнопок шагом 66, лого 57px)
+        const ELEM_Y = 144, ELEM_X0 = 1449, STEP = 50;
+        const ELEM_R = 24, ELEM_ICON = 38; // круг 2*ELEM_R, лого ELEM_ICON px
         const paneCards = { left: [], right: [] }; // для тестов: {id, node, cx, cy, labelY}
         const elemBtns = []; // круги-логотипы (эмитят pointertap в тестах)
         const elemSprites = []; // спрайты лого (тесты: позиция = центр круга)
@@ -577,16 +582,17 @@
                     cx += ch.userData.w + 9;
                 }
             }
-            // ── фильтр стихий: ряд из 6 лого в ПРАВОЙ части экрана, на
-            // свободном месте над панелью коллекции (просил юзер). Лого —
-            // такие же переключатели, как чипы: клик добавляет стихию к
-            // выбору, повторный — убирает; ни одной выбранной = «Все».
+            // ── фильтр стихий: ряд из 6 одноцветных + 2 двухцветных лого в
+            // ПРАВОЙ части экрана, на свободном месте над панелью коллекции
+            // (просил юзер). Лого — такие же переключатели, как чипы: клик
+            // добавляет стихию к выбору, повторный — убирает; ни одной
+            // выбранной = «Все».
             for (let i = 0; i < ELEM_KEYS.length; i++) {
                 const value = ELEM_KEYS[i];
                 const active = filterOn("elem", value);
                 const c2 = new PIXI.Container();
                 const g = new PIXI.Graphics();
-                g.circle(28.5, 28.5, 28.5);
+                g.circle(ELEM_R, ELEM_R, ELEM_R);
                 g.fill(active ? 0x3a4a2e : 0x2e2822);
                 g.stroke({ width: 3, color: active ? 0xa8e890 : 0x6b5c40 });
                 g.eventMode = "static";
@@ -595,10 +601,10 @@
                     toggleFilterOpt("elem", value);
                     rebuildPanes();
                 });
-                const sp = new PIXI.Sprite(uiTex(ELEM_LOGO[value]));
+                const sp = new PIXI.Sprite(uiTex(ELEM_LOGO[value] || MULTI_LOGO[value]));
                 sp.anchor.set(0.5);
-                sp.scale.set(45 / sp.texture.width);
-                sp.position.set(28.5, 28.5); // центр круга, не угол контейнера
+                sp.scale.set(ELEM_ICON / sp.texture.width);
+                sp.position.set(ELEM_R, ELEM_R); // центр круга, не угол контейнера
                 sp.eventMode = "none";
                 if (!active) sp.alpha = 0.6;
                 c2.addChild(g, sp);
@@ -610,7 +616,8 @@
             }
             const cap = T(t("filter.elem"), 19, 0xcfc4a6);
             cap.anchor.set(0.5, 0);
-            cap.position.set(ELEM_X0 + (ELEM_KEYS.length - 1) * STEP / 2 + 28.5, ELEM_Y + 66);
+            cap.position.set(ELEM_X0 + (ELEM_KEYS.length - 1) * STEP / 2 + ELEM_R,
+                ELEM_Y + 2 * ELEM_R + 14);
             cap.eventMode = "none";
             root.addChild(cap);
         }

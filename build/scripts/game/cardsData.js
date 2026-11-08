@@ -115,13 +115,13 @@
     const DECK_MAX = 60, DECK_MIN = 12, TRAP_SLOTS = Infinity;
     const DECK_COPIES = 3; // максимум одинаковых карт в колоде
 
-    const { HEROES, HERO_ORDER, HERO_FOE_ORDER, ELEM_LOGO } =
+    const { HEROES, HERO_ORDER, HERO_FOE_ORDER, ELEM_LOGO, MULTI_LOGO } =
         globalThis.GAME_HEROES_DATA;
 
     // Единая точка данных для инструментов: каталог без логики.
     globalThis.GAME_CARD_DATA = {
         CARDS, RARITY_COLORS, DEFAULT_DECK, STARTER_DECKS,
         DECK_MAX, DECK_MIN, DECK_COPIES, TRAP_SLOTS,
-        HEROES, HERO_ORDER, HERO_FOE_ORDER, ELEM_LOGO,
+        HEROES, HERO_ORDER, HERO_FOE_ORDER, ELEM_LOGO, MULTI_LOGO,
     };
 })();

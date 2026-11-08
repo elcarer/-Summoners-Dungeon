@@ -6,7 +6,7 @@
 (function () {
     const { CARDS, RARITY_COLORS, DEFAULT_DECK, STARTER_DECKS,
             DECK_MAX, DECK_MIN, DECK_COPIES, TRAP_SLOTS,
-            ELEM_LOGO, HEROES, HERO_ORDER, HERO_FOE_ORDER } =
+            ELEM_LOGO, MULTI_LOGO, HEROES, HERO_ORDER, HERO_FOE_ORDER } =
         globalThis.GAME_CARD_DATA;
 
     // Стартовый реестр коллекции: все карты игры по нулям + копии стартера
@@ -566,7 +566,7 @@
         MOB_TABLES, ENEMY_FILL, ENEMY_FILLS, CAVES,
         STARTER_DECKS, STARTER_COLLECTIONS, HEROES, HERO_ORDER, HERO_FOE_ORDER,
         caveDeckFor,
-        enemyDeck, mobForFloor, ELEM_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,
+        enemyDeck, mobForFloor, ELEM_LOGO, MULTI_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,
         wildPool, wildPick, wildDeck, wildRareCard, WILD_WEIGHT,
         raiderDeck, boosterCards,
     };

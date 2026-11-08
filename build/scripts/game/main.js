@@ -182,6 +182,12 @@
         for (const file of Object.values(GAME_DATA.ELEM_LOGO)) {
             if (!uiTextures[file]) uiTextures[file] = await assets.loadTexture(`./images/ui/${file}`);
         }
+        // логотипы ДВУХЦВЕТНЫХ стихий (арт юзера W74): тот же путь
+        // images/ui/logo/, отдельный словарь — под ELEM_LOGO завязаны
+        // города/ресурсы, которых для мульти-стихий нет
+        for (const file of Object.values(GAME_DATA.MULTI_LOGO)) {
+            if (!uiTextures[file]) uiTextures[file] = await assets.loadTexture(`./images/ui/${file}`);
+        }
         // карточки героев (выбор при «Новой игре» + HUD): images/heroes/<…>.png
         say("герои…");
         await frame();

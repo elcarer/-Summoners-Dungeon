@@ -149,7 +149,7 @@
                    elems: ["growth", "honor"], starter: "groHon",
                    img: "72", ability: "abilDmg", abilityVal: 1 },
         // «Лесной оплот» (арт heroes/73.png): БОСС «Белой пущи» — последняя
-        // комната 4-го (последнего) этажа (CAVES.gh.boss →
+        // комната 3-го (последнего) этажа (CAVES.gh.boss →
         // ENCOUNTERS.ghBastion; W73, спека юзера, по аналогии с боссом
         // «Рыжего леса»). ДВУХЦВЕТНЫЙ герой Рост+Честь. 22♥, эпическая;
         // способность bldUnits: все постройки стороны считаются
@@ -496,7 +496,7 @@
         "ghKnight", // «Зелёные рыцари»: враг 1-го этажа «Белой пущи» (W61)
         "ghWalk", // «Долгая прогулка»: враг 2-го этажа «Белой пущи» (W65)
         "ghShoot", // «Отряд стрелков»: враг 3-го этажа «Белой пущи» (W72)
-        "ghBastion", // «Лесной оплот»: босс «Белой пущи», 4-й этаж (W73)
+        "ghBastion", // «Лесной оплот»: босс «Белой пущи», 3-й (последний) этаж (W73)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
@@ -530,6 +530,15 @@
         time: "logo/time_logo.png",
         wisdom: "logo/wisdom_logo.png",
     };
+    // Логотипы ДВУХЦВЕТНЫХ стихий (images/ui/logo/, арт юзера W74): кнопки
+    // фильтров и пр. Отдельно от ELEM_LOGO: под его ключи завязаны города
+    // (images/sities/<e>/) и ресурсы (res_<e>.png) — для мульти-стихий
+    // таких файлов нет.
+    const MULTI_LOGO = {
+        strGro: "logo/strength_growth_logo.png", // Сила + Рост («Рыжий лес»)
+        groHon: "logo/growth_honor_logo.png", // Рост + Честь («Белая пуща»)
+    };
     // Часть каталога для cardsData.js (его читают игра и tools/cards.html).
-    globalThis.GAME_HEROES_DATA = { HEROES, HERO_ORDER, HERO_FOE_ORDER, ELEM_LOGO };
+    globalThis.GAME_HEROES_DATA = { HEROES, HERO_ORDER, HERO_FOE_ORDER,
+        ELEM_LOGO, MULTI_LOGO };
 })();
