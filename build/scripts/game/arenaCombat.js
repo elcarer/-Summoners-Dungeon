@@ -18,9 +18,11 @@
                 const raw = dmg - hpBefore;
                 if (raw <= 0) return;
                 // «Пастух росянок»: Сокрушение — способность Растения, лишний
-                // урон списывается в базу дважды
+                // урон списывается в базу дважды; «Отряд стрелков» (W72):
+                // урон способности существа — на 1 больше
                 const excess = raw * (1 + (attacker.def.plant ? plantEcho(attacker.side) : 0));
-                damageBase(attacker.side === "p" ? "e" : "p", excess,
+                damageBase(attacker.side === "p" ? "e" : "p",
+                    abilDmgBump(attacker, excess),
                     attacker.side === "p"
                         ? { x: 960, y: 60, fill: 0xff8f6e }
                         : { x: 960, y: 840, fill: 0xff5f4e });
@@ -48,7 +50,9 @@
                                 || !B.units.includes(v)) continue;
                             if (Math.abs(v.col - attacker.col)
                                 + Math.abs(v.row - attacker.row) !== 1) continue;
-                            damageUnit(v, attacker.curAtk, attacker, "sword");
+                            // «Отряд стрелков» (W72): всплеск — способность
+                            damageUnit(v, abilDmgBump(attacker, attacker.curAtk),
+                                attacker, "sword");
                         }
                     }
                 } finally { A.fxHint = null; }
@@ -68,7 +72,9 @@
                             || !B.units.includes(v)) continue;
                         if (Math.abs(v.col - target.col)
                             + Math.abs(v.row - target.row) !== 1) continue;
-                        damageUnit(v, attacker.curAtk, attacker, "sword");
+                        // «Отряд стрелков» (W72): всплеск — способность
+                        damageUnit(v, abilDmgBump(attacker, attacker.curAtk),
+                            attacker, "sword");
                     }
                 } finally { A.fxHint = null; }
             };

@@ -207,7 +207,8 @@
                         && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
                     if (!near.length) return false;
                     const v = near[(Math.random() * near.length) | 0];
-                    damageUnit(v, 1, u, "dam"); // W59: урон сам покажет эффект
+                    // «Отряд стрелков» (W72): урон способности — на 1 больше
+                    damageUnit(v, abilDmgBump(u, 1), u, "dam"); // W59: эффект сам
                     sfx("chpoc");
                 }
                 return true;

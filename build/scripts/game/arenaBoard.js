@@ -1040,8 +1040,9 @@
                             && v.def.type === "unit"
                             && Math.abs(v.col - col) + Math.abs(v.row - row) === 1);
                         if (foes.length) {
+                            // «Отряд стрелков» (W72): урон способности — на 1 больше
                             damageUnit(foes[(Math.random() * foes.length) | 0],
-                                def.axeArrive, u, "sword");
+                                abilDmgBump(u, def.axeArrive), u, "sword");
                             const axA = cellXY(col, row);
                             floatText(axA.x, axA.y - 75, `−${def.axeArrive}♥`, 0xef9f8c);
                         }
