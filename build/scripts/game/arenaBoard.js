@@ -977,10 +977,11 @@
                     }
                     // «Конница» (firstSpeedAtk, просил юзер): первое за бой
                     // призванное стороной существо СО СВОЕЙ «Скоростью»
-                    // (dash1) получает при призыве +N к урону. Ставим ДО
+                    // (любой — unitDash: dash1/dashN/dashN-флаг «Наездника
+                    // грифона») получает при призыве +N к урону. Ставим ДО
                     // собственного рывка — удар рывком уже с бонусом.
                     // Тест-хук _spawn подстройку героя не триггерит.
-                    if (def.type === "unit" && def.ability === "dash1"
+                    if (def.type === "unit" && unitDash(def) > 0
                         && !opts.testSummon && !B.heroFlags.speedAtk[side]) {
                         const hdS = heroDefOf(side);
                         if (hdS && hdS.ability === "firstSpeedAtk") {
@@ -1062,15 +1063,12 @@
                             floatText(axA.x, axA.y - 75, `−${def.axeArrive}♥`, 0xef9f8c);
                         }
                     }
-                    if (def.ability === "dash1") // «Скорость 1» — после явления
-                        afterArrive(() => honorRelayAct(u, () => summonDash(u)));
-                    else if (def.ability === "dashN") // «Скорость N» (Колесница hon187)
+                    // «Скорость» — равноправная способность (unitDash в
+                    // arenaCards: dash1/dashN-ключи и dashN-флаг «Наездника
+                    // грифона» равнозначны): рывок после явления
+                    if (unitDash(def))
                         afterArrive(() =>
-                            honorRelayAct(u, () => summonDashN(u, def.abilityVal || 2)));
-                    else if (def.dashVal) // «Скорость N» флагом (hw262 «Наездник
-                        // грифона», W75: ability занят «Полётом»)
-                        afterArrive(() =>
-                            honorRelayAct(u, () => summonDashN(u, def.dashVal)));
+                            honorRelayAct(u, () => summonDashN(u, unitDash(def))));
                     else if (def.ability === "shaman") summonShaman(u); // шаман гоблинов
                     else if (def.ability === "spiritSummoner") summonSpiritCaller(u); // призыватель духов
                     else if (def.ability === "bombling") summonBombling(u); // бомблинг
@@ -1086,8 +1084,7 @@
                     // способностью «после призыва» из цепочки выше —
                     // срабатывание = факт призыва (условия хуков — соседи
                     // и т.п. — почти всегда выполнены в реальном бою)
-                    if (def.ability === "dash1" || def.ability === "dashN"
-                        || def.dashVal // «Скорость» флагом (hw262, W75)
+                    if (unitDash(def)
                         || def.ability === "shaman" || def.ability === "spiritSummoner"
                         || def.ability === "bombling" || def.waterMage
                         || def.illusion || def.lakeMaid || def.sulfurBurst

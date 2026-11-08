@@ -80,7 +80,7 @@
                 if (d.tradeDraw) v += 1.0; // «Торговец»: карта каждый ход
                 if (d.counterSpike) v += 0.4 * d.counterSpike; // «Ответ»
                 if (d.siegeFollow) v += 1.2; // «Осадная башня»: ездит и стреляет
-                if (d.ability === "dashN") v += 0.5 * (d.abilityVal || 2);
+                if (unitDash(d) > 1) v += 0.5 * unitDash(d); // «Скорость N»
                 if (d.undying) v += 2.0; // «Снизошедший»: переживает смертельный удар
                 if (d.medicHeal) v += 1.3; // «Полевой медик»: +1♥ случайному каждый ход
                 if (d.pillarEnergy) v += 1.0; // «Опорник»: +1⚡ за каждую атаку по нему
@@ -110,8 +110,8 @@
                 if (d.ability === "assassin") s += 0.8;
                 if (d.ability === "pushBack") s += 0.6;
                 if (unitHasFly(u)) s += 0.5;
-                if (d.ability === "dash1") s += 0.4;
-                if (d.ability === "dashN") s += 0.7;
+                if (unitDash(d) === 1) s += 0.4; // «Скорость 1»
+                if (unitDash(d) > 1) s += 0.7; // «Скорость N»
                 if (d.counterSpike) s += 0.5 * d.counterSpike; // «Ответ»: атаковать больно
                 if (d.undying) s += 1.8; // «Снизошедший»: урон в лоб его не убивает
                 if (d.medicHeal) s += 1.0; // «Полевой медик»: подлечивает сторону
@@ -417,17 +417,18 @@
                 score += aiSummonAuraScore(def, col, row);
                 const ahead = unitAt(col, row + 1);
                 const atk = def.atk || 0;
-                // собственные способности призыва/марша
-                if (def.ability === "dash1") {
+                // собственные способности призыва/марша: «Скорость» —
+                // unitDash (dash1/dashN-ключи и dashN-флаг равнозначны)
+                if (unitDash(def) === 1) {
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit" && atk >= ahead.hp)
                         score += 2.6 + aiThreat(ahead) * 0.35;
                     else if (ahead && ahead.side === "p") score += 0.9;
                     else if (!ahead) score += 0.7; // сразу шагнёт вперёд
                 }
-                if (def.ability === "dashN") {
+                if (unitDash(def) > 1) {
                     // «Скорость N» (Колесница): две попытки — убить дважды
                     // бьющего или пройти свободную колонку дальше
-                    const n = def.abilityVal || 2;
+                    const n = unitDash(def);
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit" && atk * n >= ahead.hp)
                         score += 2.6 + aiThreat(ahead) * 0.35;
                     else if (ahead && ahead.side === "p") score += 1.1;
@@ -759,9 +760,9 @@
                     if (d.ability === "archer" || d.ability === "assassin") s += 0.3;
                     // «Скелет-лучник» (dec135): «Выстрел 2» дороже обычного
                     if (d.ability === "archer") s += ((d.shotDmg || 1) - 1) * 0.55;
-                    if (d.ability === "dash1") s += 0.2;
+                    if (unitDash(d) === 1) s += 0.2; // «Скорость 1»
                     // «Скорость N» (Колесница) и «Торговец» (карта каждый ход)
-                    if (d.ability === "dashN") s += 0.5 * (d.abilityVal || 2);
+                    if (unitDash(d) > 1) s += 0.5 * unitDash(d);
                     if (d.tradeDraw) s += 1.0;
                     if (d.counterSpike) s += 0.4 * d.counterSpike; // «Ответ»
                     if (d.dyingDiscard) s += 0.4; // «Нищий»: бесплатная мелочь с эффектом
