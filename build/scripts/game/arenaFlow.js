@@ -441,6 +441,7 @@
                 vampireHeal(u); // «Вампир»: после атаки
                 ogrGrow(u); // «Проросший огр»: +2⚔/+2♥ после атаки
                 bigStomp(u); // «Большой размер»: 6+⚔ атакует — 1 урон базе
+                        axeStrike(u); // «Лабрис основателя» (wt279, W81)
             };
 
             A.marchSide = async function marchSide(side) {
@@ -492,6 +493,7 @@
                             vampireHeal(u); // «Вампир»: после атаки
                             ogrGrow(u); // «Проросший огр»: +2⚔/+2♥ после атаки
                             bigStomp(u); // «Большой размер»: 6+⚔ атакует — 1 урон базе
+                        axeStrike(u); // «Лабрис основателя» (wt279, W81)
                             refreshHud();
                             if (checkEnd()) return;
                         }
@@ -528,6 +530,7 @@
                             if (B.stopped || !B.units.includes(u)) break;
                             baseHit(side, u);
                             triggerAttackTraps(u); // удар по базе — тоже атака (руна)
+                            axeStrike(u); // «Лабрис основателя» (wt279, W81)
                             removeUnit(u);
                             refreshHud();
                             if (checkEnd()) return;
@@ -581,6 +584,7 @@
                                 vampireHeal(u); // «Вампир»: после атаки
                                 ogrGrow(u); // «Проросший огр»: +2⚔/+2♥ после атаки
                                 bigStomp(u); // «Большой размер»: 6+⚔ атакует — 1 урон базе
+                        axeStrike(u); // «Лабрис основателя» (wt279, W81)
                                 refreshHud();
                                 if (checkEnd()) return;
                             }
@@ -626,6 +630,7 @@
                             if (B.stopped || !B.units.includes(u)) break;
                             baseHit(side, u);
                             triggerAttackTraps(u);
+                            axeStrike(u); // «Лабрис основателя» (wt279, W81)
                         } else {
                             const occ = unitAt(u.col, ahead);
                             if (!occ || occ.side === u.side) break;

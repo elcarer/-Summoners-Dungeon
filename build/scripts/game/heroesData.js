@@ -223,6 +223,22 @@
         wtMagic: { id: "wtMagic", rarity: "rare", baseHp: 18,
                    elems: ["wisdom", "time"], starter: "wisTim",
                    img: "79", ability: "servitorOnSpell" },
+        // W81 (спека юзера): «Тёмный царь» — враг 3-го этажа «Магодрома».
+        // Герой 80 (20♥, редкая, способность summonPain — хук в addUnit
+        // (arenaBoard): когда существо владельца приходит в игру, оно
+        // наносит 1 урон себе и 1 урон случайному врагу (существу/
+        // постройке/базе противника))
+        wtDarkKing: { id: "wtDarkKing", rarity: "rare", baseHp: 20,
+                      elems: ["wisdom", "time"], starter: "wisTim",
+                      img: "80", ability: "summonPain" },
+        // W81 (спека юзера): «Искусственный маг» — БОСС последней комнаты
+        // 3-го этажа «Магодрома». Герой 81 (22♥, эпическая, способность
+        // chaosPlay — ветки в aiPlay: карта с руки разыгрывается с
+        // ОТМЕНЁННЫМ эффектом (энергия тратится), взамен бесплатно
+        // разыгрывается другая случайная карта руки — chaosFreePlay)
+        wtArtMage: { id: "wtArtMage", rarity: "epic", baseHp: 22,
+                     elems: ["wisdom", "time"], starter: "wisTim",
+                     img: "81", ability: "chaosPlay" },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -567,6 +583,8 @@
         "hwMagicBlob", // «Сгусток магии»: БОСС «Небесного дворца», 3-й этаж (W78)
         "wtGears", // «Бешеные шестерни»: враг 1-го этажа «Магодрома» (W79)
         "wtMagic", // «Техномагия»: враг 2-го этажа «Магодрома» (W80)
+        "wtDarkKing", // «Тёмный царь»: враг 3-го этажа «Магодрома» (W81)
+        "wtArtMage", // «Искусственный маг»: БОСС «Магодрома» (W81)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

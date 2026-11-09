@@ -541,6 +541,18 @@
             A.returnTick = function returnTick(side) {
                 for (const u of B.units.slice()) {
                     if (u.side !== side || !u.ret || !B.units.includes(u)) continue;
+                    // «Маг времени» (wt280, W81 — спека юзера): пока он на
+                    // поле боя, счётчики «Возврата» существ владельца НЕ
+                    // уменьшаются — тик сгорает целиком («Подгорное царство»
+                    // тоже не бьётся: его удар случается «когда уменьшается»,
+                    // а уменьшения при Маге нет)
+                    if (B.units.some((b) => b.side === side && b.def.retLock
+                        && B.units.includes(b))) {
+                        const lp = cellXY(u.col, u.row);
+                        floatText(lp.x, lp.y - 84,
+                            "⏱ " + GAME_LOC.t("status.return.name"), 0xc9a0ef);
+                        continue;
+                    }
                     const shield = B.units.find((b) => b.side === side
                         && b.def.retShield && B.units.includes(b));
                     if (shield) {

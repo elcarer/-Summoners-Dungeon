@@ -458,5 +458,59 @@
                     rarity: "common", elem: "wisTim",
                     multi: ["wisdom", "time"],
                     color: 0x9a8ce8 },
+
+        // ── W81 (спека юзера): карты 276–280 — Мудрость+Время, только
+        // «Магодром» (3-й этаж — «Тёмный царь», босс — «Искусственный маг») ─
+        // «Пролом реальности» (wt276): ловушка на пустую клетку — вошедшее
+        // на неё ЛЮБОЕ существо (нейтральная, как «Засека») умирает, а его
+        // карта призыва изымается из сброса/колоды владельца до конца боя
+        // (realityRift — triggerCellTraps/applyCellTrapRaw в arenaTraps)
+        wt276: { type: "trap", cost: 5,
+                 trap: { event: "onCell", effect: "realityRift" },
+                 kind: "control", // тип эффекта — по спеке юзера (Контроль)
+                 rarity: "rare", elem: "wisTim",
+                 multi: ["wisdom", "time"],
+                 color: 0x9a8ce8, img: "wisdom_time/276" },
+        // «Проекция прошлого» (wt277): заклинание 4⚡ — выбор (панелька):
+        // +1 или −1 к значению КАЖДОГО жетона эффекта на поле боя
+        // (Заморожен/Защита/Яд/Ядовитость/Опутывание/Берсерк/Запутанность/
+        // Возврат/Выстрел/Ответ у существ и построек, значки «Сдвига»;
+        // projectionAct в arenaCombat, панель по образцу «Управления
+        // временем»; жетонов нет — применяется вхолостую)
+        wt277: { type: "spell", cost: 4,
+                 spell: { target: "none", projection: true },
+                 kind: "control", // тип эффекта — по спеке юзера (Контроль)
+                 rarity: "common", elem: "wisTim",
+                 multi: ["wisdom", "time"],
+                 color: 0x9a8ce8, img: "wisdom_time/277" },
+        // «Визуализатор» (wt278): постройка 8⚡/3♥ — карты владельца
+        // играются БЕЗ траты энергии (гейт в effCost, arenaCards), но за
+        // каждый розыгрыш постройка теряет 1 жизнь (тик в notePlay —
+        // единая точка розыгрышей обеих сторон)
+        wt278: { type: "building", cost: 8, atk: 0, hp: 3,
+                 visualizer: true,
+                 rarity: "epic", elem: "wisTim",
+                 multi: ["wisdom", "time"],
+                 color: 0x9a8ce8, img: "wisdom_time/278" },
+        // «Лабрис основателя» (wt279): заклинание 3⚡ на ЛЮБОЕ существо —
+        // когда оно атакует, наносит 3 урона случайному врагу (существу/
+        // постройке/базе противника; метка u.axeGrant, снимается смертью
+        // вместе с существом; axeStrike зовётся во всех точках атаки)
+        wt279: { type: "spell", cost: 3,
+                 spell: { target: "anyUnit", axeAmp: true },
+                 kind: "buff", // тип эффекта — по спеке юзера (Усиление)
+                 rarity: "common", elem: "wisTim",
+                 multi: ["wisdom", "time"],
+                 color: 0x9a8ce8, img: "wisdom_time/279" },
+        // «Маг времени» (wt280): «Возврат 2» — пока он на поле боя,
+        // счётчики «Возврата» существ владельца НЕ уменьшаются (гейт
+        // retLock в returnTick, arenaUpkeep; тик Возврата сгорает)
+        wt280: { type: "unit", cost: 3, atk: 1, hp: 2, speed: 1,
+                 creature: "gnome", // плейсхолдер спрайт-листа (маг)
+                 subtype: "mage", // подтип — по спеке юзера (Маг)
+                 returnN: 2, retLock: true,
+                 rarity: "common", elem: "wisTim",
+                 multi: ["wisdom", "time"],
+                 color: 0x9a8ce8, img: "wisdom_time/280" },
     };
 })();

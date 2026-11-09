@@ -16,6 +16,7 @@
                 B.turnSummons = { p: 0, e: 0 }; // новый ход — счётчик «шестерён» с нуля (wtGears)
                 tokenPanelClose(); // панель «Управления временем» не переживает смену хода
                 tagPanelClose(); // панель «Экспериментов» не переживает смену хода (W79)
+                projPanelClose(); // панель «Проекции прошлого» — туда же (W81)
                 cryptRefund("p"); // «Склеп»: не разыгранная игроком карта — назад в сброс
                 portalRefund("p"); // «Мастер порталов»: не разыгранная карта — на верх колоды
                 layoutHand();
@@ -166,6 +167,130 @@
             // способности/ауры (сокрушение, чаща, вождь, алтарь…). Одна общая
             // метрика, чтобы пожар/жертва/грибы считали одинаково с целями.
 
+            // ── «Искусственный маг» (wtArtMage, W81 — спека юзера) ─────
+            // БЕСПЛАТНЫЙ розыгрыш случайной ДРУГОЙ карты руки (эффект
+            // сыгранной карты уже отменён ветками aiPlay ниже: карта
+            // ушла в сброс, энергия потрачена). Случайный порядок
+            // кандидатов, неприменимые (нет клетки/цели/поставиться)
+            // пропускаются; нечего разыгрывать — энергия потрачена зря.
+            // Розыгрыш полноценный: ловится «Битвой умов»/отменами,
+            // будит afterSpellPlayed-способности, мульти-особенности
+            // идут (trap-рука/заклинание), карта уходит в сброс
+            A.chaosFreePlay = async function chaosFreePlay(side) {
+                const hand = side === "p" ? B.hand : B.eHand;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const foe = side === "p" ? "e" : "p";
+                const picks = shuffle(hand.slice());
+                for (const id of picks) {
+                    const hi = hand.indexOf(id);
+                    if (hi < 0) continue; // ушла из руки эффектом соседа
+                    const d = CARDS[id];
+                    if (!d) continue;
+                    if (d.type === "unit" || d.type === "building") {
+                        if (d.type === "unit" && bubbleBlocked(side, id)) continue;
+                        if (counterTrapConsume(foe,
+                                d.type === "unit" ? "counterSummon" : "counterBuilding")) {
+                            hand.splice(hi, 1);
+                            discard.push(id);
+                            noteDiscard(1, side, [id]);
+                            floatText(960, 500,
+                                "✕ " + GAME_LOC.t(`card.${id}.name`), 0x8cd0ef);
+                            return true;
+                        }
+                        const spot = d.type === "building"
+                            ? aiBuildingSpot(d) : aiUnitSpot(d);
+                        if (!spot) continue;
+                        showEnemyCard(id);
+                        await delay(0.5 / animK());
+                        await enemyFlyCard(cellXY(spot[0], spot[1]));
+                        hand.splice(hand.indexOf(id), 1);
+                        notePlay(side); // «Конвейер» + платит «Визуализатор»
+                        B.playCtx = { side, cardId: id };
+                        addUnit(side, id, spot[0], spot[1]);
+                        B.playCtx = null;
+                        discard.push(id);
+                        noteDiscard(1, side, [id]);
+                        cryptSettle(side, id);
+                        const pp = cellXY(spot[0], spot[1]);
+                        floatText(pp.x, pp.y - 96,
+                            GAME_LOC.t(`card.${id}.name`), 0x9a8ce8);
+                        hideEnemyCard();
+                        refreshHud();
+                        if (checkEnd()) return true;
+                        return true;
+                    }
+                    if (d.type === "trap") {
+                        // руна — на сильнейшее существо игрока (как aiPlay),
+                        // клеточные — aiTrapSpot, без него случайная пустая
+                        let col = 0, row = 0, unit = null;
+                        if (d.trap.effect === "castRandom") {
+                            const pu = B.units.filter((v) => v.side === foe
+                                && v.def.type === "unit")
+                                .sort((a, b) => (b.curAtk - a.curAtk)
+                                    || (a.row - b.row))[0];
+                            if (!pu) continue;
+                            unit = pu;
+                        } else {
+                            const free = [];
+                            for (let r = 0; r < GRID; r++)
+                                for (let c = 0; c < GRID; c++)
+                                    if (!unitAt(c, r)) free.push([c, r]);
+                            const spot = aiTrapSpot(d)
+                                || free[(Math.random() * free.length) | 0];
+                            if (!spot) continue;
+                            [col, row] = spot;
+                        }
+                        showEnemyBack();
+                        await delay(0.5 / animK());
+                        await enemyFlyCard(
+                            cellXY(unit ? unit.col : col, unit ? unit.row : row),
+                            { s: 0.3 });
+                        hand.splice(hand.indexOf(id), 1);
+                        notePlay(side);
+                        multiFury(id, side);
+                        multiValor(id, side);
+                        multiWeave(id, side);
+                        multiStudy(id, side);
+                        cryptSettle(side, id);
+                        armTrap(side, id, col, row, unit);
+                        afterTrapPlaced(side);
+                        hideEnemyCard();
+                        return true;
+                    }
+                    if (d.type === "spell") {
+                        if (!aiSpellPlayable(d)) continue;
+                        showEnemyCard(id);
+                        await delay(0.5 / animK());
+                        await enemyFlyCard({ x: 960, y: 430 },
+                            { s: 0.42, a1: 0 });
+                        hand.splice(hand.indexOf(id), 1);
+                        notePlay(side);
+                        multiFury(id, side);
+                        multiValor(id, side);
+                        multiWeave(id, side);
+                        multiStudy(id, side);
+                        B.playCtx = { side, cardId: id };
+                        enemyCastSpellEffect(d, true); // авто-цели ИИ
+                        B.playCtx = null;
+                        // внутренние «Огнешар»/«Гроза»/«Древомощь»/«Высокая
+                        // мощность» жгут энергию и в бесплатном касте
+                        // (прецедент «Загадок»/«Высокой мощности» W80)
+                        if (d.spell.drainAll || d.spell.stormAll
+                            || d.spell.crushEnergy || d.spell.highPower) {
+                            if (side === "p") B.energy = 0;
+                            else B.eEnergy = 0;
+                        }
+                        B.lastSpell[side] = id;
+                        afterSpellPlayed(side); // розыгрыш — жетоны «Техномагии» и пр.
+                        hideEnemyCard();
+                        refreshHud();
+                        if (checkEnd()) return true;
+                        return true;
+                    }
+                }
+                return false;
+            };
+
             A.aiPlay = async function aiPlay() {
                 // «Склеп» (dec157): верхняя карта своего сброса играется
                 // СРАЗУ — тем же ходом (у игрока клик по постройке
@@ -302,6 +427,29 @@
                                 played = true;
                                 break;
                             }
+                            // «Искусственный маг» (wtArtMage, W81): эффект
+                            // карты ОТМЕНЁН (энергия потрачена), взамен
+                            // бесплатно разыгрывается другая случайная
+                            // карта его руки
+                            {
+                                const hdE = heroDefOf("e");
+                                if (hdE && hdE.ability === "chaosPlay") {
+                                    B.eHand.splice(B.eHand.indexOf(cardId), 1);
+                                    B.eEnergy -= effCost(cardId, "e");
+                                    notePlay("e"); // «Конвейер» (tim225)
+                                    consumeEpicDiscount(cardId, "e");
+                                    B.eDiscard.push(cardId);
+                                    cryptSettle("e", cardId);
+                                    noteDiscard(1, "e", [cardId]);
+                                    floatText(960, 500,
+                                        "✕ " + GAME_LOC.t(`card.${cardId}.name`),
+                                        0x9a8ce8);
+                                    hideEnemyCard();
+                                    await chaosFreePlay("e");
+                                    played = true;
+                                    break;
+                                }
+                            }
                             B.eHand.splice(pick.i, 1);
                             B.eEnergy -= effCost(cardId, "e");
                             notePlay("e"); // «Конвейер» (tim225)
@@ -411,6 +559,28 @@
                             const [col, row] = spot;
                             await enemyFlyCard(cellXY(col, row), { s: 0.3 });
                             const cardId = B.eHand[pick.i];
+                            // «Искусственный маг» (wtArtMage, W81): ловушка
+                            // НЕ ставится (энергия потрачена), взамен
+                            // бесплатно разыгрывается другая карта руки
+                            {
+                                const hdE = heroDefOf("e");
+                                if (hdE && hdE.ability === "chaosPlay") {
+                                    B.eHand.splice(B.eHand.indexOf(cardId), 1);
+                                    B.eEnergy -= effCost(cardId, "e");
+                                    notePlay("e"); // «Конвейер» (tim225)
+                                    consumeEpicDiscount(cardId, "e");
+                                    B.eDiscard.push(cardId);
+                                    cryptSettle("e", cardId);
+                                    noteDiscard(1, "e", [cardId]);
+                                    floatText(960, 500,
+                                        "✕ " + GAME_LOC.t(`card.${cardId}.name`),
+                                        0x9a8ce8);
+                                    hideEnemyCard();
+                                    await chaosFreePlay("e");
+                                    played = true;
+                                    break;
+                                }
+                            }
                             B.eHand.splice(pick.i, 1);
                             B.eEnergy -= effCost(cardId, "e");
                             notePlay("e"); // «Конвейер» (tim225)
@@ -462,6 +632,29 @@
                                 hideEnemyCard();
                                 played = true;
                                 break;
+                            }
+                            // «Искусственный маг» (wtArtMage, W81):
+                            // заклинание ОТМЕНЕНО (энергия потрачена),
+                            // взамен бесплатно разыгрывается другая
+                            // случайная карта его руки
+                            {
+                                const hdE = heroDefOf("e");
+                                if (hdE && hdE.ability === "chaosPlay") {
+                                    B.eHand.splice(B.eHand.indexOf(cardId), 1);
+                                    B.eDiscard.push(cardId);
+                                    noteDiscard(1, "e", [cardId]);
+                                    B.eEnergy -= effCost(cardId, "e");
+                                    notePlay("e"); // «Конвейер» (tim225)
+                                    consumeEpicDiscount(cardId, "e");
+                                    cryptSettle("e", cardId);
+                                    floatText(960, 500,
+                                        "✕ " + GAME_LOC.t(`card.${cardId}.name`),
+                                        0x9a8ce8);
+                                    hideEnemyCard();
+                                    await chaosFreePlay("e");
+                                    played = true;
+                                    break;
+                                }
                             }
                             // playCtx для «Сброса разума» (decMind): пометка
                             // ставится на эффекты карты; возврат — в noteDiscard

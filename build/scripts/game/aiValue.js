@@ -284,7 +284,8 @@
                         || s.growthHand || s.nova || s.debuffEnemyAtkAll
                         || s.mindTorture || s.iceStrike || s.mindControl) return 2;
                     if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk
-                        || s.enchantFire || s.cocoon || s.venom) return 4;
+                        || s.enchantFire || s.cocoon || s.venom
+                        || s.axeAmp) return 4; // wt279 «Лабрис» — как усиления
                     if (s.baseHit || s.wolfVolley) return 4.5; // бьёт СВОИМ существом
                     if (s.iceSwarm || s.skeletonCrowd) return 3; // тела — как обычный призыв
                     if (s.laySummon) return 3; // «Молебен»: тело 2/2 — как призыв
@@ -300,6 +301,9 @@
                     // ПОЗЖЕ остальных карт (после трат энергии остаток
                     // больше — и заклинание из колоды дороже)
                     if (s.highPower) return 5;
+                    // «Проекция прошлого» (wt277, W81): ±1 всем жетонам —
+                    // играется среди обычных контрольных эффектов
+                    if (s.projection) return 2;
                     // W60 (юзер): «Рождение феникса» — расчистка поля,
                     // играется РАНЬШЕ уже от 3 построек (гейт в aiSpellPlayable)
                     if (s.phoenix
@@ -309,7 +313,13 @@
                 }
                 // «Три монолита» — без спешки (просил юзер: не в приоритете):
                 // движок добора, играется, когда важное уже разыграно
-                if (def.type === "building") return def.monolith ? 5.5 : 1;
+                if (def.type === "building") {
+                    // «Визуализатор» (wt278, W81): движок бесплатных карт —
+                    // ставим ПЕРВЫМ делом (после постановки все карты стороны
+                    // бесплатны, пока постройка жива)
+                    if (def.visualizer) return 1;
+                    return def.monolith ? 5.5 : 1;
+                }
                 if (def.type === "trap") {
                     // «Отмена заклинания»/«Отмена призыва» (wis83/wis84) и
                     // «Отражение» (wis120): реактивные ловушки — чем раньше

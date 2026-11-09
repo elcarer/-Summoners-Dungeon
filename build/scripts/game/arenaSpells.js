@@ -322,6 +322,14 @@
                     if (!powerAct("p", cardId)) return false;
                     return true;
                 }
+                // «Проекция прошлого» (wt277, W81): выбор направления —
+                // панелькой (как у «Управления временем»); само применение
+                // ±1 ко всем жетонам случится по кнопке. Жетонов нет —
+                // применение вхолостую (энергия и карта потрачены)
+                if (def.spell.projection) {
+                    projPanelOpen();
+                    return true;
+                }
                 if (def.spell.volley) { // «Небо в стрелах» (gh258, W72): без цели
                     volleyAct("p");
                     return true;
@@ -339,6 +347,17 @@
                         // Складывается: второй колчан — ещё +1
                         u.quiverBonus = (u.quiverBonus || 0) + 1;
                         floatText(p.x, p.y - 66, `🏹 ${u.quiverBonus}`, 0xffd98c);
+                        fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
+                        punch(u.node);
+                        sfx("chpoc");
+                        return true;
+                    }
+                    if (def.spell.axeAmp) { // «Лабрис основателя» (wt279, W81):
+                        // цель атакует — бьёт 3 урона случайного врага
+                        // (axeStrike зовётся во всех точках атаки). Повторное
+                        // заклинание ничего не меняет (метка уже стоит)
+                        u.axeGrant = true;
+                        floatText(p.x, p.y - 66, "🪓", 0xc9a0ef);
                         fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
                         punch(u.node);
                         sfx("chpoc");

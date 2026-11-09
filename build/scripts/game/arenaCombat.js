@@ -901,6 +901,63 @@
                 }
                 return false;
             };
+            // «Проекция прошлого» (wt277, W81): ИИ выбирает направление ±1
+            // по суммарной пользе для владельцев жетонов: +1 усиливает
+            // «хорошие» метки владельца (Защита/Берсерк/Выстрел) и «плохие»
+            // у противника (Заморожен/Яд/Опутывание/Запутанность), тормозит
+            // его «Сдвиги»; «Возврат» +1 продлевает откладку (хуже владельцу).
+            // Ничья — +1 (проекция прошлого чаще накапливает)
+            A.projectionDir = function projectionDir(side) {
+                let score = 0;
+                const own = (u) => u.side === side;
+                for (const u of B.units) {
+                    if (!B.units.includes(u)) continue;
+                    const w = (v) => (own(u) ? v : -v); // польза +1 для владельца
+                    if (u.protect > 0) score += w(2);
+                    if (u.berserk > 0) score += w(2);
+                    if (tagVal(u, "shotDmg") > 0) score += w(2);
+                    if (u.venom > 0) score += w(1.5);
+                    if (u.frozen > 0) score += w(-2);
+                    if (u.poison > 0) score += w(-2);
+                    if (u.entangle > 0) score += w(-2);
+                    if (u.confused > 0) score += w(-2);
+                    // «Возврат»: и свой (мешает возврату карты в руку —
+                    // см. aiTokenPick), и чужой (существо дольше висит на
+                    // поле) выгоднее ТАЯТЬ — направление −1
+                    if (u.ret > 0) score -= 1;
+                }
+                for (const s of ["p", "e"]) {
+                    for (const e of (B.delayed[s] || [])) {
+                        if (!(e.left > 0)) continue; // нулевой значок не тикает
+                        score += s === side ? -1 : 1; // затянуть чужой сдвиг
+                    }
+                }
+                return score >= 0 ? 1 : -1;
+            };
+            // «Лабрис основателя» (wt279, W81 — спека юзера): существо с
+            // меткой u.axeGrant при КАЖДОЙ атаке наносит 3 урона случайному
+            // врагу (существу/постройке/базе противника; база — последний
+            // билет, как у «Полевого медика»). Зовётся во всех точках атаки
+            // (марш/опутанная ветка/база/берсерк/«Скорость»/«Ледяной удар»/
+            // «Тёмные цепи») — сразу после штатных хуков атаки
+            A.axeStrike = function axeStrike(u) {
+                if (!u || !u.axeGrant || !B.units.includes(u)) return;
+                const foes = B.units.filter((v) => v.side !== u.side
+                    && B.units.includes(v));
+                const ap = cellXY(u.col, u.row);
+                floatText(ap.x, ap.y - 84, "🪓", 0xc9a0ef);
+                punch(u.node);
+                sfx("crash");
+                // база — последний билет (спека: «существу/постройке/базе»)
+                const pick = (Math.random() * (foes.length + 1)) | 0;
+                if (pick >= foes.length) {
+                    damageBase(u.side === "p" ? "e" : "p", 3,
+                        u.side === "p" ? { x: 960, y: 60, fill: 0xff8f6e }
+                            : { x: 960, y: 840, fill: 0xff5f4e });
+                } else {
+                    damageUnit(foes[pick], 3, u, "sword");
+                }
+            };
             // «Двойная магия» (hw265, W77 спека юзера): разыгрывает до 2
             // случайных заклинаний/ловушек ИЗ РУКИ владельца БЕСПЛАТНО
             // (без траты энергии). Кандидаты — все заклинания и ловушки

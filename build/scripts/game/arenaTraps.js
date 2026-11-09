@@ -287,14 +287,15 @@
                             || e === "magmaPool" // «Лужи магмы» — только существа
                             || e === "dandelionPath" // «Путь одуванчиков» — только существа (W65)
                             || e === "sporeCurse" // «Призрачные споры» — только существа (W60)
-                            || e === "bldVolley") // «Засека» — только существа (W73)
+                            || e === "bldVolley" // «Засека» — только существа (W73)
+                            || e === "realityRift") // «Пролом реальности» — только существа (W81)
                             return u.def.type === "unit";
                         return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
                             || e === "confuse" || e === "cellDebuff"
                             || e === "ancestor" || e === "entangle";
                     };
-                let i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
-                    && cellEffect(t));
+                    let i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
+                        && cellEffect(t));
                 if (i < 0) {
                     // «Решётка с шипами», «Шипастые лозы», «Опутывание корней»
                     // и «Ловушка времени» нейтральны: срабатывают на ЛЮБОЕ
@@ -304,7 +305,9 @@
                     // (gh253, W65) — тоже нейтральная: «перемещение ЛЮБОГО
                     // существа» (своё — продолжит движение, чужое — развернётся).
                     // «Засека» (gh260, W73) — нейтральная: «перемещение/призыв
-                    // ЛЮБОГО существа» на клетку — залп построек владельца
+                    // ЛЮБОГО существа» на клетку — залп построек владельца.
+                    // «Пролом реальности» (wt276, W81) — нейтральная: на
+                    // ЛЮБОГО вошедшего СУЩЕСТВО (постройки — не существа)
                     side = u.side;
                     i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                         && (t.def.trap.effect === "cellDmgAll" || t.def.trap.effect === "cellDebuff"
@@ -314,6 +317,8 @@
                             || (t.def.trap.effect === "bldVolley"
                                 && u.def.type === "unit")
                             || (t.def.trap.effect === "tarKettles"
+                                && u.def.type === "unit")
+                            || (t.def.trap.effect === "realityRift"
                                 && u.def.type === "unit")));
                 }
                 if (i < 0) return;
@@ -591,6 +596,7 @@
                         afterAttackPush(a, u); // «Проросший кабан»
                         vampireHeal(a); // «Вампир»: после атаки
                         triggerAttackTraps(a); // руна: существо атаковало
+                        axeStrike(a); // «Лабрис основателя» (wt279, W81)
                     }
                     refreshHud();
                     checkEnd();
@@ -678,6 +684,38 @@
                     floatText(p2.x, p2.y - 108,
                         GAME_LOC.t("card.ghost.name"), 0xb7d0ef);
                     sfx("chpoc");
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
+                if (trap.def.trap.effect === "realityRift") {
+                    // «Пролом реальности» (wt276, W81 — спека юзера):
+                    // вошедшее ЛЮБОЕ существо умирает, а его карта призыва
+                    // ИЗЫМАЕТСЯ из игры до конца боя — из сброса владельца
+                    // (штатное место карты после розыгрыша), не хватило —
+                    // из колоды; в руку владельца не лезем (там могут быть
+                    // другие копии). «Ремонт» перехватил смерть — существо
+                    // вернулось живым, карту не изымаем. Жетоны (Сервитор
+                    // и пр.) карт призыва не имеют — изымать нечего
+                    const p2 = cellXY(u.col, u.row);
+                    const died = killUnit(u, null);
+                    floatText(p2.x, p2.y - 45, "☠", 0xef9f8c);
+                    if (died) {
+                        const id = cardIdOf(u.def);
+                        const sideU = u.side;
+                        const discard = sideU === "p" ? B.discard : B.eDiscard;
+                        const deck = sideU === "p" ? B.deck : B.eDeck;
+                        const di = discard.indexOf(id);
+                        if (di >= 0) discard.splice(di, 1);
+                        else {
+                            const ki = deck.indexOf(id);
+                            if (ki >= 0) deck.splice(ki, 1);
+                        }
+                        floatText(p2.x, p2.y - 108,
+                            "✂ " + GAME_LOC.t(`card.${id}.name`), 0x9a8ce8);
+                        refreshHud();
+                    }
+                    sfx("crash");
                     refreshHud();
                     checkEnd();
                     return;

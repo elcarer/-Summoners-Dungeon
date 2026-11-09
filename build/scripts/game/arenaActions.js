@@ -12,6 +12,18 @@
                 const cp = B.convey[side] || (B.convey[side] = { turn: 0, n: 0 });
                 if (cp.turn !== B.turnNo) { cp.turn = B.turnNo; cp.n = 0; }
                 cp.n += 1;
+                // «Визуализатор» (wt278, W81 — спека юзера): каждая сыгранная
+                // карта стоит постройке 1 жизни (карты стороны бесплатны —
+                // гейт в effCost). Постройка ещё не на поле в момент
+                // собственного розыгрыша — за себя не платит. Урон — штатный
+                // damageUnit («Ремонт» перехватывает)
+                for (const b of B.units.slice()) {
+                    if (b.side !== side || !b.def.visualizer
+                        || !B.units.includes(b)) continue;
+                    const p = cellXY(b.col, b.row);
+                    floatText(p.x, p.y - 60, "−1♥", 0xef9f8c);
+                    damageUnit(b, 1, null, "dam");
+                }
             };
 
             A.playerTurnStart = async function playerTurnStart() {
@@ -25,6 +37,7 @@
                 B.turnSummons = { p: 0, e: 0 }; // новый ход — счётчик «шестерён» с нуля (wtGears)
                 tokenPanelClose(); // панель «Управления временем» не переживает смену хода
                 tagPanelClose(); // панель «Экспериментов» не переживает смену хода (W79)
+                projPanelClose(); // панель «Проекции прошлого» — туда же (W81)
                 refreshHud();
                 firewallTick("e"); // стена костров врага — конец хода врага
                 sproutTick("e");   // ростки врага подросли — конец его хода
@@ -507,6 +520,136 @@
                 tagPanelClose();
                 if (sel !== null) castSpell(sel, target);
                 else deselect();
+            };
+
+            // ── «Проекция прошлого» (wt277, W81 — спека юзера) ──────────
+            // +1 или −1 к значению КАЖДОГО жетона эффекта на поле боя:
+            // числовые метки существ и построек (Заморожен/Защита/Яд/
+            // Ядовитость/Опутывание/Берсерк/Запутанность/Возврат) — поля
+            // юнитов, печатные «Выстрел»/«Ответ» — подменой u.tagOver
+            // (как у «Экспериментов»), значки «Сдвига» — e.left.
+            // Несуществующие жетоны не создаются; отнятый до нуля —
+            // снимается. Игрок выбирает направление панелькой (образец —
+            // «Управление временем»), ИИ — эвристикой projectionDir.
+            // Жетонов нет — применяется вхолостую (энергия и карта
+            // потрачены, как у заклинаний без целей)
+            A.applyProjection = function applyProjection(dir) {
+                for (const u of B.units.slice()) {
+                    if (!B.units.includes(u)) continue;
+                    const mkText = (name, txt) => {
+                        const mk = u.node.getChildByName(name);
+                        if (mk) mk.getChildAt(1).text = txt;
+                    };
+                    if (u.frozen > 0) {
+                        u.frozen = Math.max(0, u.frozen + dir);
+                        if (u.frozen === 0) removeFrozenMark(u);
+                        else updateFrozenMark(u);
+                    }
+                    if (u.protect > 0) {
+                        u.protect = Math.max(0, u.protect + dir);
+                        refreshProtectMark(u);
+                    }
+                    if (u.poison > 0) {
+                        u.poison = Math.max(0, u.poison + dir);
+                        if (u.poison === 0) {
+                            const mk = u.node.getChildByName("poisonMark");
+                            if (mk) mk.destroy({ children: true });
+                        } else mkText("poisonMark", String(u.poison));
+                    }
+                    if (u.venom > 0) {
+                        u.venom = Math.max(0, u.venom + dir);
+                        if (u.venom === 0) {
+                            const mk = u.node.getChildByName("venomMark");
+                            if (mk) mk.destroy({ children: true });
+                        } else mkText("venomMark", String(u.venom));
+                    }
+                    if (u.entangle > 0) {
+                        u.entangle = Math.max(0, u.entangle + dir);
+                        if (u.entangle === 0) removeEntangleMark(u);
+                        else mkText("entangleMark", String(u.entangle));
+                    }
+                    if (u.berserk > 0) {
+                        u.berserk = Math.max(0, u.berserk + dir);
+                        if (u.berserk === 0) {
+                            const mk = u.node.getChildByName("berserkMark");
+                            if (mk) mk.destroy({ children: true });
+                        } else mkText("berserkMark", `×${u.berserk + 1}`);
+                    }
+                    if (u.confused > 0) {
+                        u.confused = Math.max(0, u.confused + dir);
+                        if (u.confused === 0) removeConfuseMark(u);
+                        else mkText("confuseMark", String(u.confused));
+                    }
+                    if (u.ret > 0) {
+                        u.ret = Math.max(0, u.ret + dir);
+                        if (u.ret > 0) returnMarkDraw(u);
+                        else {
+                            const mk = u.node.getChildByName("returnMark");
+                            if (mk) mk.destroy({ children: true });
+                        }
+                    }
+                    // «Выстрел»/«Ответ» — печатные метки дефа: персональное
+                    // изменение только подменой tagOver (как «Эксперименты»)
+                    for (const key of ["shotDmg", "counterSpike"]) {
+                        const cur = tagVal(u, key);
+                        if (cur > 0) {
+                            u.tagOver = u.tagOver || {};
+                            u.tagOver[key] = Math.max(0, cur + dir);
+                        }
+                    }
+                }
+                for (const s of ["p", "e"]) {
+                    for (const e of (B.delayed[s] || [])) {
+                        e.left = Math.max(0, e.left + dir);
+                        A.delayDrawNode(e); // цифра на значке обновится
+                    }
+                }
+                floatText(960, 520,
+                    dir > 0 ? GAME_LOC.t("proj.up") : GAME_LOC.t("proj.down"),
+                    0x9a8ce8);
+                sfx("chpoc");
+                refreshHud();
+            };
+            // Панелька выбора направления (две кнопки над полем)
+            A.projPanelOpen = function projPanelOpen() {
+                projPanelClose();
+                B.projPick = true;
+                const panel = new PIXI.Container();
+                const bg = new PIXI.Graphics();
+                bg.roundRect(960 - 330, 196, 660, 132, 14);
+                bg.fill({ color: 0x1a1a2e, alpha: 0.92 });
+                bg.stroke({ width: 3, color: 0x9a8ce8 });
+                panel.addChild(bg);
+                const cap = T(GAME_LOC.t("proj.title"), 24, 0xf3e6c2,
+                    { stroke: { color: 0x1c1207, width: 4 } });
+                cap.anchor.set(0.5);
+                cap.position.set(960, 226);
+                cap.eventMode = "none";
+                panel.addChild(cap);
+                panel.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: GAME_LOC.t("proj.down"),
+                    x: 960 - 158, y: 288, scale: 0.9, fontSize: 38,
+                    onTap: () => projPanelCast(-1),
+                }));
+                panel.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: GAME_LOC.t("proj.up"),
+                    x: 960 + 158, y: 288, scale: 0.9, fontSize: 38,
+                    onTap: () => projPanelCast(1),
+                }));
+                root.projPanel = panel;
+                root.addChild(panel); // поверх поля; умрёт вместе с root (exit боя)
+            };
+            A.projPanelClose = function projPanelClose() {
+                B.projPick = null;
+                if (root && root.projPanel && !root.projPanel.destroyed) {
+                    root.projPanel.destroy({ children: true });
+                }
+                if (root) root.projPanel = null;
+            };
+            A.projPanelCast = function projPanelCast(dir) {
+                if (!B.projPick) return;
+                projPanelClose();
+                applyProjection(dir);
             };
 
             A.onCardTap = function onCardTap(idx) {

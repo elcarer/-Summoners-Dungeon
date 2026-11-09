@@ -105,6 +105,7 @@
                     }
                     triggerAttackTraps(attacker); // руна: существо атаковало
                     vampireHeal(attacker); // «Вампир»: после атаки
+                    axeStrike(attacker); // «Лабрис основателя» (wt279, W81)
                 } finally {
                     A.spellCasting = wasCasting;
                 }

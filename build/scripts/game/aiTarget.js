@@ -149,6 +149,12 @@
                         if (v.def.speed > 1) score += 1;
                         if (v.berserk) score += 1;
                         if (v.venom) score += 0.5; // яд складывается
+                    } else if (s.axeAmp) { // «Лабрис основателя» (wt279, W81):
+                        // метка атакующему — ценнее сильное и быстрое
+                        // (атакует чаще — чаще бьёт случайного врага)
+                        score = v.curAtk * 1.2 + v.hp * 0.4
+                            + (v.def.speed || 0) * 0.8
+                            + (v.berserk || 0) * 1.2 + rowBonus;
                     } else if (s.enchantFire) {
                         score = v.curAtk * 1.1 + v.hp * 0.8 + rowBonus;
                     } else {
@@ -348,6 +354,15 @@
                         && Math.abs(v.col - c2) + Math.abs(v.row - r2) === 1));
                     if (!pool.length) return null;
                 }
+                // «Пролом реальности» (wt276, W81): убивает ЛЮБОГО вошедшего
+                // — и своих ИИ тоже. Ставим ТОЛЬКО прямо перед существом
+                // игрока (оно само шагнёт или его туда толкнут); иных
+                // безопасных мест нет — карту держим
+                if (def.trap.effect === "realityRift") {
+                    pool = pool.filter(([c2, r2]) => front.some(([fc, fr]) =>
+                        fc === c2 && fr === r2));
+                    if (!pool.length) return null;
+                }
                 // «Гоблинская мина»: сплэш задевает соседей клетки — рядом не
                 // должно быть своих убиваемых; совсем небезопасно — держим мину.
                 if (def.trap.effect === "cellDmg" && def.trap.splash) {
@@ -458,6 +473,17 @@
                 // — эффекту нечего разыгрывать, карту переводить зря
                 if (s.highPower && !B.eDeck.some((id) => (CARDS[id].cost || 0)
                     === B.eEnergy - Math.max(0, effCost(cardIdOf(def), "e"))))
+                    return false;
+                // «Проекция прошлого» (wt277, W81): жетонов эффекта на
+                // поле боя нет ни у кого — применять нечего (вхолостую),
+                // карту переводить зря
+                if (s.projection
+                    && !B.units.some((u) => u.frozen > 0 || u.protect > 0
+                        || u.poison > 0 || u.venom > 0 || u.entangle > 0
+                        || u.berserk > 0 || u.confused > 0 || u.ret > 0
+                        || tagVal(u, "shotDmg") > 0
+                        || tagVal(u, "counterSpike") > 0)
+                    && !(B.delayed.p || []).length && !(B.delayed.e || []).length)
                     return false;
                 // «Эльф корней» (sg247): на 5×5 поле нет пустой клетки —
                 // карту переводить зря (призыв некуда)

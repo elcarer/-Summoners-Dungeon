@@ -767,6 +767,32 @@
                         }
                     }
                 }
+                // «Тёмный царь» (wtDarkKing, W81 — спека юзера): когда его
+                // существо приходит в игру (любой призыв — рука, эффекты,
+                // «Сдвиг»; постройки не считаются), оно наносит 1 урон СЕБЕ
+                // и 1 урон случайному врагу (существу/постройке; врагов на
+                // поле нет — удар уходит в базу, «последний билет»)
+                if (def.type === "unit") {
+                    const hdP = heroDefOf(side);
+                    if (hdP && hdP.ability === "summonPain" && B.units.includes(u)) {
+                        const pp = cellXY(u.col, u.row);
+                        floatText(pp.x, pp.y - 66, "−1♥", 0xef9f8c);
+                        punch(u.node);
+                        damageUnit(u, 1, null, "dam");
+                        const foes = B.units.filter((v) => v.side !== side
+                            && B.units.includes(v));
+                        const pick = (Math.random() * (foes.length + 1)) | 0;
+                        if (pick >= foes.length) {
+                            damageBase(side === "p" ? "e" : "p", 1,
+                                side === "p" ? { x: 960, y: 60, fill: 0xff8f6e }
+                                    : { x: 960, y: 840, fill: 0xff5f4e });
+                        } else {
+                            const fp = cellXY(foes[pick].col, foes[pick].row);
+                            floatText(fp.x, fp.y - 60, "1", 0xff8f6e);
+                            damageUnit(foes[pick], 1, u, "dam");
+                        }
+                    }
+                }
                 // «Возврат N» ПОСТРОЙКИ («Стык эпох» tim228, просил юзер):
                 // тот же тик returnTick в upkeep владельца, что у существ —
                 // блок «Возврата» ниже живёт только в ветке существ, поэтому
@@ -1384,6 +1410,7 @@
                         vampireHeal(u); // «Вампир»: после атаки
                         ogrGrow(u); // «Проросший огр»: +2⚔/+2♥ после атаки
                         bigStomp(u); // «Большой размер»: 6+⚔ атакует — 1 урон базе
+                        axeStrike(u); // «Лабрис основателя» (wt279, W81)
                         refreshHud();
                         checkEnd();
                         acted = true;

@@ -73,6 +73,12 @@
                     powerAct("e", cardIdOf(def));
                     return;
                 }
+                // «Проекция прошлого» (wt277, W81): направление выбирает
+                // эвристика projectionDir (польза ±1 по владельцам жетонов)
+                if (s.projection) {
+                    applyProjection(projectionDir("e"));
+                    return;
+                }
                 if (s.dome) { // «Силовой купол» (tim234): своё самое ценное
                     // существо/постройка без купола (сумма ⚔+♥)
                     const own = B.units.filter((v) => v.side === "e" && !v.dome
@@ -423,6 +429,12 @@
                             onBuff(best, s.buffAtk || 0, s.buffHp || 0);
                         if (s.berserk) addBerserk(best, s.berserk);
                         if (s.venom) addVenom(best, s.venom); // «Отравленные лезвия»
+                        if (s.axeAmp) { // «Лабрис основателя» (wt279, W81):
+                            // при атаках цель бьёт 3 урона случайного врага
+                            best.axeGrant = true;
+                            const p = cellXY(best.col, best.row);
+                            floatText(p.x, p.y - 66, "🪓", 0xc9a0ef);
+                        }
                         // «Метка некроманта» (dec137): «Выкапливание» на самое
                         // ценное своё существо (aiBuffPick уже выбрал лучшего;
                         // счётчик стакается с уже висящим)
