@@ -681,12 +681,24 @@
                             if (e) return { col: e.col, row: e.row,
                                 tagKey: "delay", mm: "min" };
                         }
-                        // свой живой значок «Возврата» выше минимума —
-                        // к минимуму (существо раньше вернётся в руку)
+                        // свой живой значок «Возврата» ниже максимума —
+                        // к МАКСИМУМУ (поправка юзера: существо должно
+                        // ОСТАВАТЬСЯ на поле — возврат в руку заставит
+                        // разыгрывать его заново; чем дольше, тем лучше)
                         const rPool = tagPool("e", "ret");
                         if (rPool.length > 1) {
-                            const mn = Math.min(...rPool);
+                            const mx = Math.max(...rPool);
                             const u = B.units.find((v) => v.side === "e"
+                                && B.units.includes(v)
+                                && v.ret > 0 && v.ret < mx);
+                            if (u) return { col: u.col, row: u.row,
+                                tagKey: "ret", mm: "max" };
+                        }
+                        // значок «Возврата» ИГРОКА — к минимуму своих
+                        // (его существо раньше уйдёт с поля в руку)
+                        if (rPool.length) {
+                            const mn = Math.min(...rPool);
+                            const u = B.units.find((v) => v.side === "p"
                                 && B.units.includes(v)
                                 && v.ret > 0 && v.ret > mn);
                             if (u) return { col: u.col, row: u.row,
