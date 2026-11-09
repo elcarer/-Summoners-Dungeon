@@ -805,6 +805,102 @@
                 }
                 return false;
             };
+            // «Общие загадки» (wt273, W80 спека юзера): применяет эффект
+            // другого СЛУЧАЙНОГО заклинания из руки владельца — бесплатно,
+            // карта-эффект ОСТАЁТСЯ в руке («примените эффект», не
+            // «разыграйте» — в отличие от «Двойной магии»). Кандидаты —
+            // все заклинания руки, кроме самих «Загадок» (по id: и вторая
+            // копия тоже — иначе цепочка копий). Порядок случайный, берём
+            // первое применимое (автоцели, как у «Послушника»); нечего
+            // применить — false (карта и энергия целы). Огнешар/Гроза,
+            // применённые эффектом, жгут энергию, как настоящий розыгрыш
+            A.riddlesAct = function riddlesAct(side, selfId) {
+                const hand = side === "p" ? B.hand : B.eHand;
+                const cands = hand.filter((id) => id !== selfId
+                    && CARDS[id] && CARDS[id].type === "spell");
+                if (!cands.length) return false;
+                for (let i = cands.length - 1; i > 0; i--) { // случайный порядок
+                    const j = (Math.random() * (i + 1)) | 0;
+                    [cands[i], cands[j]] = [cands[j], cands[i]];
+                }
+                for (const id of cands) {
+                    if (side === "e") {
+                        if (!aiSpellPlayable(CARDS[id])) continue;
+                        enemyCastSpellEffect(CARDS[id], true); // авто-цели ИИ
+                        if (CARDS[id].spell.drainAll || CARDS[id].spell.stormAll)
+                            B.eEnergy = 0;
+                        refreshHud();
+                        return true;
+                    }
+                    const t = acolyteTargetFor(id);
+                    if (t === null && CARDS[id].spell.target !== "none") continue;
+                    if (!applySpellP(id, t, true)) continue;
+                    fxSpellCast(id, t, "p");
+                    if (CARDS[id].spell.drainAll || CARDS[id].spell.stormAll)
+                        B.energy = 0;
+                    refreshHud();
+                    return true;
+                }
+                return false;
+            };
+            // «Высокая мощность» (wt274, W80 спека юзера): тратит ВСЮ
+            // оставшуюся энергию владельца и разыгрывает случайное
+            // заклинание из его КОЛОДЫ, цена которого равна потраченной.
+            // Своя цена (1⚡) ещё НЕ вычтена — эффект идёт ДО списания в
+            // castSpell/aiPlay, поэтому «потраченная» = остаток минус цена
+            // карты (списание до нуля берут на себя флаги highPower в
+            // castSpell/aiPlay/replaySpell/doubleCastAct). Разыгранная
+            // карта уходит из колоды в сброс, как любой розыгрыш;
+            // подходящего заклинания нет — false (карта и энергия целы).
+            // Энергия гасится ПОСЛЕ каста: «Огнешар»/«Гроза» внутри
+            // считают урон по текущему остатку
+            A.powerAct = function powerAct(side, selfId) {
+                const deck = side === "p" ? B.deck : B.eDeck;
+                const spent = (side === "p" ? B.energy : B.eEnergy)
+                    - Math.max(0, effCost(selfId, side));
+                // саму «Высокую мощность» из кандидатов исключаем (по id —
+                // и вторую копию тоже): она ещё в колоде, и без этого
+                // скользила бы рекурсия мощность → мощность → …
+                const cands = spent >= 0
+                    ? deck.filter((id) => id !== selfId
+                        && (CARDS[id].cost || 0) === spent) : [];
+                if (!cands.length) return false;
+                for (let i = cands.length - 1; i > 0; i--) { // случайный порядок
+                    const j = (Math.random() * (i + 1)) | 0;
+                    [cands[i], cands[j]] = [cands[j], cands[i]];
+                }
+                for (const id of cands) {
+                    if (side === "e") {
+                        if (!aiSpellPlayable(CARDS[id])) continue;
+                        enemyCastSpellEffect(CARDS[id], true); // авто-цели ИИ
+                        deck.splice(deck.indexOf(id), 1);
+                        B.eDiscard.push(id);
+                        B.eEnergy = 0;
+                        recalcAuras(); // «Каток» (tim236): сброс стал длиннее
+                        afterSpellPlayed(side); // разыграйте — Сервитор будится
+                        refreshHud();
+                        floatText(960, 300, `✦ ${GAME_LOC.t(`card.${id}.name`)}`,
+                            0x9ecbe8);
+                        sfx("chpoc");
+                        return true;
+                    }
+                    const t = acolyteTargetFor(id);
+                    if (t === null && CARDS[id].spell.target !== "none") continue;
+                    if (!applySpellP(id, t, true)) continue;
+                    fxSpellCast(id, t, "p");
+                    deck.splice(deck.indexOf(id), 1);
+                    B.discard.push(id);
+                    B.energy = 0;
+                    recalcAuras(); // «Каток» (tim236): сброс стал длиннее
+                    afterSpellPlayed(side); // разыграйте — Сервитор будится
+                    refreshHud();
+                    floatText(960, 640, `✦ ${GAME_LOC.t(`card.${id}.name`)}`,
+                        0x9ecbe8);
+                    sfx("chpoc");
+                    return true;
+                }
+                return false;
+            };
             // «Двойная магия» (hw265, W77 спека юзера): разыгрывает до 2
             // случайных заклинаний/ловушек ИЗ РУКИ владельца БЕСПЛАТНО
             // (без траты энергии). Кандидаты — все заклинания и ловушки
@@ -842,6 +938,12 @@
                         } else {
                             if (!aiSpellPlayable(CARDS[id])) continue;
                             enemyCastSpellEffect(CARDS[id], true); // авто-цели ИИ
+                        }
+                        // «Высокая мощность» (wt274, W80), сыгранная двойным
+                        // кастом: тоже гасит энергию (в powerAct своя часть)
+                        if (CARDS[id].spell.highPower) {
+                            if (side === "p") B.energy = 0;
+                            else B.eEnergy = 0;
                         }
                     } else { // ловушка — авто-постановка (клетку выбирает код)
                         const spot = doubleCastTrapSpot(side, id);

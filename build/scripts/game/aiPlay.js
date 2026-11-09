@@ -490,7 +490,8 @@
                             const tOff = def.spell.copyLast ? 0 : castTargetOff;
                             castTargetOff = 0;
                             B.eEnergy = (def.spell.drainAll || def.spell.stormAll
-                                || def.spell.crushEnergy) // «Древомощь» сливает всё (sg243)
+                                || def.spell.crushEnergy // «Древомощь» сливает всё (sg243)
+                                || def.spell.highPower) // «Высокая мощность» (wt274, W80): всю энергию потратил powerAct
                                 ? 0 : B.eEnergy - Math.max(0, effCost(cardId, "e") - tOff);
                             notePlay("e"); // «Конвейер» (tim225)
                             consumeEpicDiscount(cardId, "e"); // «Архилич»

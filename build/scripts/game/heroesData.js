@@ -215,6 +215,14 @@
         wtGears: { id: "wtGears", rarity: "rare", baseHp: 16,
                    elems: ["wisdom", "time"], starter: "wisTim",
                    img: "78", ability: "thirdSummonEnergy" },
+        // W80 (спека юзера): «Техномагия» — враг 2-го этажа «Магодрома».
+        // Герой 79 (18♥, редкая, способность servitorOnSpell — хук в
+        // afterSpellPlayed (arenaCards): когда владелец разыгрывает
+        // заклинание, призывается жетон «Сервитор» 1/1 (Механизм) на
+        // случайную из ближайших к базе владельца пустых клеток)
+        wtMagic: { id: "wtMagic", rarity: "rare", baseHp: 18,
+                   elems: ["wisdom", "time"], starter: "wisTim",
+                   img: "79", ability: "servitorOnSpell" },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -558,6 +566,7 @@
         "hwMagebonds", // «Магопуты»: враг 3-го этажа «Небесного дворца» (W77)
         "hwMagicBlob", // «Сгусток магии»: БОСС «Небесного дворца», 3-й этаж (W78)
         "wtGears", // «Бешеные шестерни»: враг 1-го этажа «Магодрома» (W79)
+        "wtMagic", // «Техномагия»: враг 2-го этажа «Магодрома» (W80)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

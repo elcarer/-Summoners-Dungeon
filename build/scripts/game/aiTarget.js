@@ -446,6 +446,19 @@
                     const d = CARDS[id];
                     return d && (d.type === "spell" || d.type === "trap");
                 })) return false;
+                // «Общие загадки» (wt273, W80): в руке нет другого
+                // заклинания — применить эффект нечего, карту переводить зря
+                if (s.riddles && !B.eHand.some((id) => {
+                    if (id === cardIdOf(def)) return false;
+                    const d = CARDS[id];
+                    return d && d.type === "spell";
+                })) return false;
+                // «Высокая мощность» (wt274, W80): в колоде нет заклинания
+                // с ценой, равной остатку энергии минус цена самой карты,
+                // — эффекту нечего разыгрывать, карту переводить зря
+                if (s.highPower && !B.eDeck.some((id) => (CARDS[id].cost || 0)
+                    === B.eEnergy - Math.max(0, effCost(cardIdOf(def), "e"))))
+                    return false;
                 // «Эльф корней» (sg247): на 5×5 поле нет пустой клетки —
                 // карту переводить зря (призыв некуда)
                 if (s.rootSummon && B.units.length >= 25) return false;

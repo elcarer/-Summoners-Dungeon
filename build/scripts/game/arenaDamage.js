@@ -748,6 +748,20 @@
                     if (refl > 0) damageBase(target.side === "p" ? "e" : "p", refl,
                         { x: 960, y: target.side === "p" ? 240 : 840, fill: 0xb07ad5 });
                 }
+                // «Техноруны» (wt275, W80 спека юзера): когда СУЩЕСТВО
+                // наносит урон этой постройке (атака/спецудар — у заклинаний
+                // и ловушек killer-существа нет, как у «Обелиска» выше),
+                // разыграйте случайное заклинание из сброса ВЛАДЕЛЬЦА
+                // постройки — acolyteCast, тот же движок, что у «Послушника»
+                // (игрок — автоцели acolyteTargetFor, враг — свой движок;
+                // карта из сброса не уходит; летающие руны стреляют и в
+                // чужой ход). Бесконечной цепочки нет: заклинания бьют без
+                // killer-существа и Техноруны сами не будят
+                if (amt > 0 && target.def.techRunes && killer && killer.def
+                    && killer.def.type === "unit" && acolyteCast(target.side, 99)) {
+                    const rp = cellXY(target.col, target.row);
+                    floatText(rp.x, rp.y - 96, "✦", 0x9a8ce8);
+                }
                 // «Строй» (hon165) + «Вымпел империи» (hon177): «Ответ» —
                 // после атаки существа на объект атакующее существо получает
                 // урон шипов — даже если цель от удара погибла (атака
@@ -1157,7 +1171,9 @@
             // spendCard, заклинания/ловушки ИИ — в aiPlay перед эффектом
             A.multiStudy = function multiStudy(cardId, side) {
                 const def = CARDS[cardId];
-                if (!def || def.elem !== "wisTim") return;
+                // Жетоны (Сервитор wtMagic) — не «розыгрыш двухцветной
+                // карты», особенность не будит (элемент у жетона wisTim)
+                if (!def || def.elem !== "wisTim" || def.token) return;
                 const cd = G.dungeon
                     && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
                 if (!cd || !cd.study) return;

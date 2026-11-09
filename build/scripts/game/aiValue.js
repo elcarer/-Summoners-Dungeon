@@ -293,6 +293,13 @@
                     if (s.captivate) return 2; // hon197: вынос карты призыва — контроль
                     if (s.resurrect) return 3; // hon200: бесплатное тело — как призыв
                     if (s.lightAura) return 4; // hon199: метка — как усиление
+                    // «Общие загадки» (wt273, W80): зеркало случайного
+                    // заклинания руки — по порядку обычных эффектов
+                    if (s.riddles) return 2;
+                    // «Высокая мощность» (wt274, W80): тратит ВСЁ, играется
+                    // ПОЗЖЕ остальных карт (после трат энергии остаток
+                    // больше — и заклинание из колоды дороже)
+                    if (s.highPower) return 5;
                     // W60 (юзер): «Рождение феникса» — расчистка поля,
                     // играется РАНЬШЕ уже от 3 построек (гейт в aiSpellPlayable)
                     if (s.phoenix
@@ -861,6 +868,17 @@
                                 && (tagVal(u, "shotDmg")
                                     || tagVal(u, "protect")
                                     || tagVal(u, "counterSpike"))).length)) * 0.2 : 0);
+                    // «Общие загадки» (wt273, W80): применяет случайное
+                    // заклинание руки — ценнее с бОльшей рукой заклинаний
+                    if (s.riddles) v += 0.6 + Math.min(3, B.eHand.filter((id) =>
+                        id !== "wt273" && CARDS[id]
+                        && CARDS[id].type === "spell").length) * 0.2;
+                    // «Высокая мощность» (wt274, W80): чем больше энергии
+                    // останется после цены карты — тем дороже заклинание
+                    // разыграет (гейт «есть подходящее» — в aiSpellPlayable)
+                    if (s.highPower) v += 0.8
+                        + Math.min(2.5, Math.max(0, B.eEnergy
+                            - Math.max(0, effCost("wt274", "e"))) * 0.35);
                     if (s.debuffEnemyAtkAll) v += 0.7 + Math.min(4, B.units.filter(
                         (u) => u.side === "p" && u.def.type === "unit" && u.curAtk > 0).length) * 0.25;
                     if (s.search || s.searchUnit || s.journey || s.discardPick) v += 0.5;

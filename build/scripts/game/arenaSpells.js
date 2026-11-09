@@ -305,6 +305,23 @@
                     if (!n) return false;
                     return true;
                 }
+                // «Общие загадки» (wt273, W80): применяет эффект другого
+                // случайного заклинания руки (riddlesAct в arenaCombat;
+                // карта-эффект остаётся в руке); нечего — карта и
+                // энергия целы (как у «Двойной магии»)
+                if (def.spell.riddles) {
+                    if (!riddlesAct("p", cardId)) return false;
+                    return true;
+                }
+                // «Высокая мощность» (wt274, W80): тратит ВСЮ оставшуюся
+                // энергию (своя цена учтётся флагом highPower ниже, в
+                // castSpell) и разыгрывает случайное заклинание из КОЛОДЫ
+                // с ценой, равной потраченной (powerAct в arenaCombat);
+                // подходящего нет — карта и энергия целы
+                if (def.spell.highPower) {
+                    if (!powerAct("p", cardId)) return false;
+                    return true;
+                }
                 if (def.spell.volley) { // «Небо в стрелах» (gh258, W72): без цели
                     volleyAct("p");
                     return true;
@@ -1006,7 +1023,8 @@
                 applySpellP(cardId, target, true);
                 fxSpellCast(cardId, target, "p", origin);
                 if (def.spell.drainAll || def.spell.stormAll
-                    || def.spell.crushEnergy) B.energy = 0; // огнешар/гроза/«Древомощь» и в повторе сжигают энергию
+                    || def.spell.crushEnergy || def.spell.highPower)
+                    B.energy = 0; // огнешар/гроза/«Древомощь»/«Высокая мощность» и в повторе сжигают энергию
                 const hi = B.hand.indexOf(cardId);
                 if (hi >= 0) B.hand.splice(hi, 1);
                 else {
@@ -1101,7 +1119,8 @@
                 }
                 fxSpellCast(cardId, target, "p", origin);
                 B.energy = (def.spell.drainAll || def.spell.stormAll
-                    || def.spell.crushEnergy) // «Древомощь» (sg243) сливает всё
+                    || def.spell.crushEnergy // «Древомощь» (sg243) сливает всё
+                    || def.spell.highPower) // «Высокая мощность» (wt274, W80): всю энергию потратил powerAct
                     ? 0 : B.energy - effCost(cardId, "p", target);
                 consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                 spendCard(handIdx); // при пометке «Сброса разума» вернёт карту в руку

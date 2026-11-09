@@ -407,5 +407,56 @@
                  rarity: "rare", elem: "wisTim",
                  multi: ["wisdom", "time"],
                  color: 0x9a8ce8, img: "wisdom_time/272" },
+
+        // ── W80 (спека юзера): карты 273–275 — Мудрость+Время, только
+        // «Магодром» (2-й этаж — враг «Техномагия») ────────────────────
+        // «Общие загадки» (wt273): заклинание 2⚡ — применяет эффект
+        // другого СЛУЧАЙНОГО заклинания из руки (riddlesAct в
+        // arenaCombat, по образцу «Двойной магии»: игрок — автоцели
+        // acolyteTargetFor/applySpellP, враг — его движок). Карта-эффект
+        // ОСТАЁТСЯ в руке («примените эффект», не «разыграйте»);
+        // применять нечего — карта и энергия целы (как у «Двойной магии»)
+        wt273: { type: "spell", cost: 2,
+                 spell: { target: "none", riddles: true },
+                 kind: "castSpell", // тип эффекта — по спеке юзера
+                 rarity: "rare", elem: "wisTim",
+                 multi: ["wisdom", "time"],
+                 color: 0x9a8ce8, img: "wisdom_time/273" },
+        // «Высокая мощность» (wt274): заклинание 1⚡ — тратит ВСЮ
+        // оставшуюся энергию (своя цена гасится флагом highPower в
+        // castSpell/aiPlay/replaySpell/двойном касте) и разыгрывает
+        // случайное заклинание из КОЛОДЫ, цена которого равна
+        // потраченной (powerAct в arenaCombat); подходящего нет —
+        // карта и энергия целы
+        wt274: { type: "spell", cost: 1,
+                 spell: { target: "none", highPower: true },
+                 kind: "castSpell", // тип эффекта — по спеке юзера
+                 rarity: "epic", elem: "wisTim",
+                 multi: ["wisdom", "time"],
+                 color: 0x9a8ce8, img: "wisdom_time/274" },
+        // «Техноруны» (wt275): постройка 3♥ — когда СУЩЕСТВО наносит ей
+        // урон (атака/спецудар — у заклинаний и ловушек killer-существа
+        // нет, как у «Проклятого обелиска»), разыгрывает случайное
+        // заклинание из сброса ВЛАДЕЛЬЦА (acolyteCast — движок
+        // «Послушника»: игрок — автоцели, враг — свой; карта из сброса
+        // не уходит). Хук в damageUnit (arenaDamage)
+        wt275: { type: "building", cost: 3, atk: 0, hp: 3,
+                 techRunes: true,
+                 rarity: "epic", elem: "wisTim",
+                 multi: ["wisdom", "time"],
+                 color: 0x9a8ce8, img: "wisdom_time/275" },
+        // «Сервитор» — служебный жетон «Техномагии» (wtMagic), Механизм
+        // 1/1 (сине-фиолетовый — по спеке юзера): призывается её
+        // способностью при розыгрыше заклинаний (servitorSummon в
+        // arenaCards); в пулах/энкаунтерах его нет, как skel/ghost.
+        // token: true — особенность «Глубокое изучение» жетон не считает
+        // розыгрышем двухцветной карты (гейт в multiStudy)
+        servitor: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
+                    token: true,
+                    creature: "gnome", sheet: "gnome", // лист gnome_256 (как у мехов; sheetOf не знает elem wisTim)
+                    subtype: "mech", // подтип — по спеке юзера
+                    rarity: "common", elem: "wisTim",
+                    multi: ["wisdom", "time"],
+                    color: 0x9a8ce8 },
     };
 })();

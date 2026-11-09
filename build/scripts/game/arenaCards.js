@@ -418,6 +418,44 @@
                         || !B.units.includes(u)) continue;
                     honorRelayAct(u, () => { zapRandomFoe(u); return true; });
                 }
+                // «Техномагия» (wtMagic, W80 спека юзера): когда ВЛАДЕЛЕЦ
+                // разыгрывает заклинание, призовите токен «Сервитор» 1/1
+                // (Механизм, сине-фиолетовый) в случайную клетку игрового
+                // поля, из клеток ближайших к его базе (servitorSummon
+                // ниже). Касты рун/«Послушника» (без стороны) не будят;
+                // хук зовут места розыгрыша заклинаний: castSpell (игрок),
+                // aiPlay (ИИ), doubleCastAct (обе стороны). «Общие
+                // загадки» применяют эффект БЕЗ розыгрыша — Сервитора не
+                // зовут; «Высокая мощность» разыгрывает — зовут её место
+                if (side) {
+                    const hd = heroDefOf(side);
+                    if (hd && hd.ability === "servitorOnSpell")
+                        servitorSummon(side);
+                }
+            };
+            // Жетон «Сервитор» (жетон «Техномагии», W80): случайная пустая
+            // клетка из БЛИЖАЙШИХ к базе стороны — манхэттен до якоря базы
+            // (центр своей крайней строки: у игрока ряд 4, у врага ряд 0).
+            // Все 25 клеток заняты — призыва нет
+            A.servitorSummon = function servitorSummon(side) {
+                const baseRow = side === "p" ? GRID - 1 : 0;
+                const best = [];
+                let bd = 99;
+                for (let r = 0; r < GRID; r++) {
+                    for (let c = 0; c < GRID; c++) {
+                        if (unitAt(c, r)) continue;
+                        const d = Math.abs(c - 2) + Math.abs(r - baseRow);
+                        if (d < bd) { bd = d; best.length = 0; best.push({ c, r }); }
+                        else if (d === bd) best.push({ c, r });
+                    }
+                }
+                if (!best.length) return;
+                const pick = best[(Math.random() * best.length) | 0];
+                addUnit(side, "servitor", pick.c, pick.r, { token: true });
+                const p = cellXY(pick.c, pick.r);
+                floatText(p.x, p.y - 108,
+                    GAME_LOC.t("card.servitor.name"), 0x9a8ce8);
+                sfx("chpoc");
             };
             // Тот же триггер «Элементаля молнии» для ЛОВУШЕК: послеTrapPlaced
             // зовут места фактической постановки ловушки владельцем из руки
