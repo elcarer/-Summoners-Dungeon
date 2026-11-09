@@ -681,6 +681,17 @@
                             if (e) return { col: e.col, row: e.row,
                                 tagKey: "delay", mm: "min" };
                         }
+                        // свой живой значок «Возврата» выше минимума —
+                        // к минимуму (существо раньше вернётся в руку)
+                        const rPool = tagPool("e", "ret");
+                        if (rPool.length > 1) {
+                            const mn = Math.min(...rPool);
+                            const u = B.units.find((v) => v.side === "e"
+                                && B.units.includes(v)
+                                && v.ret > 0 && v.ret > mn);
+                            if (u) return { col: u.col, row: u.row,
+                                tagKey: "ret", mm: "min" };
+                        }
                         const sPool = tagPool("e", "shotDmg");
                         if (sPool.length) {
                             const mx = Math.max(...sPool);

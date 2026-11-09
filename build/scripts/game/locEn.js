@@ -703,7 +703,7 @@
             "hero.hwMagicBlob.ability": "At the start of the battle, draw any 2 cards from the deck, then discard 2 cards from your hand",
             // W79: карты «Магодрома» (Мудрость+Время) и враг 1-го этажа
             "card.wt271.name": "Experiments",
-            "card.wt271.desc": "Choose any effect mark — a Shift counter on a cell or a unit with a Shot, Guard or Retaliation mark. The chosen mark's value becomes the minimum or maximum (your choice) value among all your marks of that effect type",
+            "card.wt271.desc": "Choose any effect mark — a Shift counter on a cell or a unit with a Shot, Guard, Retaliation mark or a live Return badge. The chosen mark's value becomes the minimum or maximum (your choice) value among all your marks of that effect type",
             "card.wt272.name": "Mecha-Illusion",
             "card.wt272.desc": "Elemental ?/?. Shift 1: appears on the chosen cell at the start of your next turn if it stays free. When it enters the battlefield it becomes a copy of a random adjacent creature (attack, health, abilities and look); with no neighbors it arrives with 0 health and dies",
             "enc.wtGears.title": "Mad Cogwheels",
@@ -715,6 +715,7 @@
             "tag.shotDmg": "Shot",
             "tag.protect": "Guard",
             "tag.counterSpike": "Retaliation",
+            "tag.ret": "Return",
             // W73: босс «Белой пущи» (3-й, последний этаж)
             "enc.ghBastion.title": "Forest Bulwark",
             "hero.ghBastion.ability": "All your buildings are additionally treated as units for effects",

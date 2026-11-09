@@ -1023,6 +1023,11 @@
                 const cd = G.dungeon
                     && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
                 if (!cd || !cd.fury) return;
+                // Поправка юзера (W79.2): «Особенность этого подземелья
+                // для всех врагов» — особенности ДВУХЦВЕТНЫХ данжей
+                // работают ТОЛЬКО у врагов; розыгрыш такой карты
+                // игроком в данже ничего не делает
+                if (side !== "e") return;
                 const op = side === "p" ? "e" : "p";
                 floatText(960, op === "p" ? 758 : 318,
                     GAME_LOC.t("dungeon.furyShort"), 0xc86a3e);
@@ -1049,6 +1054,9 @@
                 const cd = G.dungeon
                     && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
                 if (!cd || !cd.valor) return;
+                // Поправка юзера (W79.2): особенности данжей — только
+                // у врагов («для всех врагов»)
+                if (side !== "e") return;
                 floatText(960, side === "p" ? 758 : 318,
                     GAME_LOC.t("dungeon.valorShort"), 0x9fd489);
                 // случайное существо ИГРАЮЩЕГО (W73: под «Лесным оплотом»
@@ -1088,6 +1096,9 @@
                 const cd = G.dungeon
                     && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
                 if (!cd || !cd.weave) return;
+                // Поправка юзера (W79.2): особенности данжей — только
+                // у врагов («для всех врагов»)
+                if (side !== "e") return;
                 floatText(960, side === "p" ? 758 : 318,
                     GAME_LOC.t("dungeon.weaveShort"), 0x8cd0ef);
                 // случайное существо ИГРАЮЩЕГО (как в «Растущей доблести»:
@@ -1150,6 +1161,9 @@
                 const cd = G.dungeon
                     && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
                 if (!cd || !cd.study) return;
+                // Поправка юзера (W79.2): «Особенность этого подземелья
+                // для всех врагов» — только у врагов
+                if (side !== "e") return;
                 floatText(960, side === "p" ? 758 : 318,
                     GAME_LOC.t("dungeon.studyShort"), 0x9a8ce8);
                 if (side === "p") {

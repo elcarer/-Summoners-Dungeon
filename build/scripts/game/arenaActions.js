@@ -343,15 +343,18 @@
             // ── «Эксперименты» (wt271, W79 — спека юзера) ────────────────
             // Цель — ЛЮБАЯ метка эффекта: значок «Сдвига» на клетке (обе
             // стороны) или существо с числовой меткой («Выстрел» shotDmg /
-            // «Защита» protect / «Ответ» counterSpike). «Возврат» меткой
-            // цели не бывает: счётчик — снапшот при появлении (u.ret).
+            // «Защита» protect / «Ответ» counterSpike) или с ЖИВЫМ значком
+            // «Возврата» (u.ret > 0 — поправка юзера W79.1: «это же тоже
+            // эффект и значок»; у «Возврата» 0 существо уйдёт в руку в
+            // следующий тик владельца — как у «Управления временем»).
             // Значение выбранной метки становится минимальным или
             // максимальным (панелька) среди ВСЕХ меток ЭТОГО ТИПА
             // ИГРАЮЩЕГО (tagPool по стороне castSpell)
             A.tagPickAt = function tagPickAt(col, row) {
                 const u = unitAt(col, row);
                 if (u && (tagVal(u, "shotDmg") || tagVal(u, "protect")
-                    || tagVal(u, "counterSpike"))) return { kind: "unit", u };
+                    || tagVal(u, "counterSpike") || u.ret > 0))
+                    return { kind: "unit", u };
                 for (const s of ["p", "e"])
                     if (B.delayed[s] && B.delayed[s]
                         .some((e) => e.col === col && e.row === row))
@@ -362,14 +365,19 @@
             A.tagPool = function tagPool(side, key) {
                 if (key === "delay")
                     return (B.delayed[side] || []).map((e) => e.left);
+                if (key === "ret") // живые счётчики «Возврата» существ
+                    return B.units.filter((v) => v.side === side
+                        && B.units.includes(v) && v.ret > 0)
+                        .map((v) => v.ret);
                 const vals = [];
                 for (const v of B.units)
                     if (v.side === side && B.units.includes(v)
                         && tagVal(v, key)) vals.push(tagVal(v, key));
                 return vals;
             };
-            // применение: value = min/max пула → значок (e.left) или
-            // персональная подмена u.tagOver (читается через tagVal)
+            // применение: value = min/max пула → значок (e.left), живой
+            // счётчик «Возврата» (u.ret) или персональная подмена
+            // u.tagOver (читается через tagVal)
             A.applyTagPick = function applyTagPick(side, target) {
                 if (!target || target.col === undefined
                     || !target.tagKey) return false;
@@ -393,7 +401,20 @@
                     }
                 }
                 const u = unitAt(target.col, target.row);
-                if (!u || !tagVal(u, target.tagKey)) return false;
+                if (!u) return false;
+                if (target.tagKey === "ret") { // живой значок «Возврата»
+                    if (!(u.ret > 0)) return false;
+                    u.ret = val;
+                    if (u.ret > 0) A.returnMarkDraw(u); // метка с числом
+                    const p = cellXY(u.col, u.row);
+                    floatText(p.x, p.y - 84,
+                        `↩ ${GAME_LOC.t("status.return.name")} ${val}`,
+                        0xc9a0ef);
+                    punch(u.node);
+                    sfx("chpoc");
+                    return true;
+                }
+                if (!tagVal(u, target.tagKey)) return false;
                 u.tagOver = u.tagOver || {};
                 u.tagOver[target.tagKey] = val;
                 recalcAuras(); // бейдж «Защиты» синхронизируется
@@ -411,11 +432,16 @@
                 if (!pick) return;
                 const rows = [];
                 if (pick.kind === "delay" && tagPool("p", "delay").length)
-                    rows.push({ key: "delay" });
-                if (pick.kind === "unit")
+                    rows.push({ key: "delay", cur: ((B.delayed.p || [])
+                        .find((d) => d.col === col && d.row === row)
+                        || {}).left });
+                if (pick.kind === "unit") {
                     for (const key of ["shotDmg", "protect", "counterSpike"])
                         if (tagVal(pick.u, key) && tagPool("p", key).length)
-                            rows.push({ key });
+                            rows.push({ key, cur: tagVal(pick.u, key) });
+                    if (pick.u.ret > 0 && tagPool("p", "ret").length)
+                        rows.push({ key: "ret", cur: pick.u.ret });
+                }
                 if (!rows.length) { // меток с пулом нет — карта не тратится
                     floatText(cellXY(col, row).x, cellXY(col, row).y - 60,
                         GAME_LOC.t("tag.none"), 0x9a8ce8);
@@ -443,10 +469,7 @@
                 panel.addChild(hint);
                 rows.forEach((rw, i) => {
                     const y = 306 + i * 74;
-                    const cur = rw.key === "delay"
-                        ? ((B.delayed.p || []).find((d) =>
-                            d.col === col && d.row === row) || {}).left
-                        : tagVal(pick.u, rw.key);
+                    const cur = rw.cur; // текущее значение посчитано в rows
                     const lab = T(`${GAME_LOC.t(`tag.${rw.key}`)}: ${cur}`,
                         26, 0xf3e6c2,
                         { stroke: { color: 0x1c1207, width: 4 } });
