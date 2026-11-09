@@ -259,6 +259,14 @@
                     if (!target || target.col === undefined) return false;
                     return applyTokenShift("p", target);
                 }
+                // «Эксперименты» (wt271, W79): метка выбрана кликом,
+                // тип и мин/макс — панелька (target {col, row, tagKey, mm});
+                // значение — среди меток ИГРАЮЩЕГО (side "p")
+                if (tg === "tagPick") {
+                    if (!target || target.col === undefined
+                        || !target.tagKey) return false;
+                    return applyTagPick("p", target);
+                }
                 if (tg === "anyObj" && (def.spell.dome || def.spell.repair)) {
                     // «Силовой купол» / «Ремонт»: цель — любое существо
                     // или постройка (тип цели отсеян входом, клик/хук)
@@ -1085,6 +1093,7 @@
                 // сил» (Небесный дворец, W75) — туда же
                 multiValor(cardId, "p");
                 multiWeave(cardId, "p");
+                multiStudy(cardId, "p"); // «Глубокое изучение» (Магодром, W79)
                 if (!applySpellP(cardId, target, false,
                     (resetHand || brainstorm) ? { skipHandReset: true } : null)) {
                     B.playCtx = null;

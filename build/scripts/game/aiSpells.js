@@ -667,6 +667,41 @@
                     punch(root.hud);
                     sfx("chpoc");
                 }
+                if (s.target === "tagPick") { // «Эксперименты» (wt271, W79): метка цели →
+                    // мин/макс среди меток ИИ. Эвристика: свой «Сдвиг» к
+                    // минимуму (быстрее явится), свой «Выстрел» к максимуму,
+                    // значок противника — к максимуму своих «Сдвигов»
+                    const pick = (() => {
+                        const dPool = tagPool("e", "delay");
+                        if (dPool.length > 1) {
+                            const mn = Math.min(...dPool);
+                            const e = (B.delayed.e || [])
+                                .filter((d) => d.left > mn)
+                                .sort((a, b) => b.left - a.left)[0];
+                            if (e) return { col: e.col, row: e.row,
+                                tagKey: "delay", mm: "min" };
+                        }
+                        const sPool = tagPool("e", "shotDmg");
+                        if (sPool.length) {
+                            const mx = Math.max(...sPool);
+                            const u = B.units.find((v) => v.side === "e"
+                                && B.units.includes(v)
+                                && tagVal(v, "shotDmg")
+                                && tagVal(v, "shotDmg") < mx);
+                            if (u) return { col: u.col, row: u.row,
+                                tagKey: "shotDmg", mm: "max" };
+                        }
+                        if (dPool.length && (B.delayed.p || []).length) {
+                            const mx = Math.max(...dPool);
+                            const e = (B.delayed.p || [])
+                                .find((d) => d.left < mx);
+                            if (e) return { col: e.col, row: e.row,
+                                tagKey: "delay", mm: "max" };
+                        }
+                        return null;
+                    })();
+                    if (pick) applyTagPick("e", pick);
+                }
                 if (s.debuffEnemyAtkAll) { // «Нехватка воздуха»: −N урона всем существам игрока
                     const n = s.debuffEnemyAtkAll;
                     for (const v of B.units) if (v.side !== "e" && v.def.type === "unit") {

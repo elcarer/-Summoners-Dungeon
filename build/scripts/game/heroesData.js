@@ -207,6 +207,14 @@
         hwMagicBlob: { id: "hwMagicBlob", rarity: "epic", baseHp: 22,
                        elems: ["honor", "wisdom"], starter: "honWis",
                        img: "77", ability: "tutorPick", abilityVal: 2 },
+        // W79 (спека юзера): «Бешеные шестерни» — враг 1-го этажа
+        // «Магодрома» (данж Мудрость+Время). Герой 78 (16♥, редкая,
+        // способность thirdSummonEnergy — хук в addUnit (arenaBoard):
+        // когда на поле боя приходит ТРЕТЬЕ существо владельца на этом
+        // ходу (приход через «Сдвиг» считается тоже), +1 энергии)
+        wtGears: { id: "wtGears", rarity: "rare", baseHp: 16,
+                   elems: ["wisdom", "time"], starter: "wisTim",
+                   img: "78", ability: "thirdSummonEnergy" },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -549,6 +557,7 @@
         "hwDischarge", // «Ответный разряд»: враг 2-го этажа «Небесного дворца» (W76)
         "hwMagebonds", // «Магопуты»: враг 3-го этажа «Небесного дворца» (W77)
         "hwMagicBlob", // «Сгусток магии»: БОСС «Небесного дворца», 3-й этаж (W78)
+        "wtGears", // «Бешеные шестерни»: враг 1-го этажа «Магодрома» (W79)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
@@ -590,6 +599,7 @@
         strGro: "logo/strength_growth_logo.png", // Сила + Рост («Рыжий лес»)
         groHon: "logo/growth_honor_logo.png", // Рост + Честь («Белая пуща»)
         honWis: "logo/honor_wisdom_logo.png", // Честь + Мудрость («Небесный дворец», W75)
+        wisTim: "logo/wisdom_time_logo.png", // Мудрость + Время («Магодром», W79)
     };
     // Часть каталога для cardsData.js (его читают игра и tools/cards.html).
     globalThis.GAME_HEROES_DATA = { HEROES, HERO_ORDER, HERO_FOE_ORDER,

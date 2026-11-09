@@ -85,7 +85,8 @@
         str19: { type: "building", cost: 1, atk: 0, hp: 1, spellAura: 1,
                  rarity: "rare", elem: "strength",
                  color: 0x8a5a3e, img: "strength/19" },
-        str20: { type: "trap", cost: 2,
+        // Поправка юзера (W79): стоимость «Гоблинской засады» 3⚡ (было 2)
+        str20: { type: "trap", cost: 3,
                  trap: { event: "onEnemyCell", effect: "ambush", spawn: "gobA" },
                  subtype: "goblin", // «Гоблинская засада» — поправка спеки (Ловушка Гоблин)
                  kind: "summon", // тип эффекта — по спеке юзера (cards.txt)

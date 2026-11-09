@@ -568,8 +568,10 @@
             A.unitProtectTotal = function unitProtectTotal(u) {
                 if (!u || !u.def) return 0;
                 let n = u.protect || 0;
-                // врождённая «Защита N» карты («Защитник» tim201)
-                if (u.def.protect) n += u.def.protect;
+                // врождённая «Защита N» карты («Защитник» tim201);
+                // через tagVal — подмена «Экспериментов» (wt271, W79) видна
+                const pv = A.tagVal(u, "protect");
+                if (pv) n += pv;
                 if (u.def.type === "unit") {
                     n += A.cloudSpireCount(u.side);
                     // «Хирд» (tim222): «Защита 1» существам СЛЕВА И СПРАВА
@@ -741,9 +743,30 @@
                 multiFury(cardId, side); // «Ярость природы» (Рыжий лес, W54)
                 multiValor(cardId, side); // «Растущая доблесть» (Белая пуща, W62)
                 multiWeave(cardId, side); // «Переплетение сил» (Небесный дворец, W75)
+                multiStudy(cardId, side); // «Глубокое изучение» (Магодром, W79)
                 sfx("aqua"); // призыв (обе стороны)
                 B.units.push(u);
                 recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда
+                // «Бешеные шестерни» (wtGears, W79 — спека юзера): когда на
+                // поле боя приходит ТРЕТЬЕ существо владельца на этом ходу —
+                // +1 энергии. Считаются СУЩЕСТВА (постройки нет); приход
+                // через «Сдвиг» проходит через тот же addUnit — считается
+                // тоже. Точка общая для ОБОИХ сторон (heroDefOf смотрит
+                // героя своей стороны)
+                if (def.type === "unit") {
+                    B.turnSummons[side] = (B.turnSummons[side] || 0) + 1;
+                    if (B.turnSummons[side] === 3) {
+                        const hdS = heroDefOf(side);
+                        if (hdS && hdS.ability === "thirdSummonEnergy") {
+                            if (side === "p") B.energy += 1;
+                            else B.eEnergy += 1;
+                            floatText(960, side === "p" ? 700 : 380, "+1⚡",
+                                0xffd98c);
+                            punch(root.hud);
+                            sfx("chpoc");
+                        }
+                    }
+                }
                 // «Возврат N» ПОСТРОЙКИ («Стык эпох» tim228, просил юзер):
                 // тот же тик returnTick в upkeep владельца, что у существ —
                 // блок «Возврата» ниже живёт только в ветке существ, поэтому
@@ -1088,6 +1111,10 @@
                     else if (def.ability === "bombling") summonBombling(u); // бомблинг
                     else if (def.waterMage) heroMageDouble(u, () => summonWaterMage(u)); // водный маг
                     else if (def.illusion) heroMageDouble(u, () => summonIllusion(u)); // иллюзия
+                    // «Мехо-иллюзия» (wt272, W79): копия соседа — ПОСЛЕ
+                    // явления из портала (узел пересобирается по дефу цели)
+                    else if (def.copyNeighbor)
+                        afterArrive(() => summonCopyNeighbor(u));
                     else if (def.lakeMaid) heroMageDouble(u, () => summonLakeMaid(u)); // озёрная дева
                     else if (def.sulfurBurst) summonSulfur(u); // элементаль серы: −2⚔ −1♥ соседям
                     else if (def.fireSnipe) summonFireElf(u); // «Эльф огня»: 2×1 урон соседям противника
@@ -1101,7 +1128,8 @@
                     if (unitDash(def)
                         || def.ability === "shaman" || def.ability === "spiritSummoner"
                         || def.ability === "bombling" || def.waterMage
-                        || def.illusion || def.lakeMaid || def.sulfurBurst
+                        || def.illusion || def.copyNeighbor
+                        || def.lakeMaid || def.sulfurBurst
                         || def.fireSnipe || def.rootGrab
                         || def.healArrive || def.nearSpeed || def.axeArrive
                         || def.statPoints) // W57: «Огнелис/Огнемедведь» —

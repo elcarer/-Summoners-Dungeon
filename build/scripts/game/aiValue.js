@@ -276,7 +276,8 @@
                     // разыгрывается первым, чтобы хватило и на остальные карты;
                     // «Извлечение тьмы» (dec153) — тоже энергодвижок
                     if (s.energyPerHand || s.energyPerTrap || s.darkExtract
-                        || s.bloodMoon || s.nextEnergy) return 1;
+                        || s.bloodMoon || s.nextEnergy
+                        || s.target === "tagPick") return 1;
                     if (s.firewall || s.aoeDmg || s.dmg || s.drainAll || s.baseDmg
                         || s.sacrifice || s.copyLast || s.stormAll
                         || s.purge || s.stealEnergy || s.fireflies
@@ -754,6 +755,7 @@
                         return t && t.type === "trap" && t.cost <= 2;
                     }) ? 0.6 : 0);
                     if (d.illusion) s += 1.2; // X/X от соседа — ценность выше 0/0
+                    if (d.copyNeighbor) s += 1.2; // «Мехо-иллюзия» (wt272, W79): копия соседа — тоже
                     if (d.stormer) s += 0.9;
                     if (d.lakeMaid) s += 0.7;
                     if (d.sandDecay) s -= 1.0; // 9/9 за 7⚡, но тает каждый ход
@@ -850,6 +852,15 @@
                     if (s.energyPerTrap) v += 0.6 + Math.min(4, B.traps.e.length) * 0.15;
                     // «Медитация» (hw268, W78): 3⚡ в начале следующего хода
                     if (s.nextEnergy) v += 1.1;
+                    // «Эксперименты» (wt271, W79): метка к мин/макс — ценнее,
+                    // когда есть что улучшать (свой «Сдвиг»/«Выстрел»)
+                    if (s.target === "tagPick") v += 0.5 + (tagPool && B ? Math.min(2,
+                        ((B.delayed.e || []).length
+                            + B.units.filter((u) => u.side === "e"
+                                && B.units.includes(u)
+                                && (tagVal(u, "shotDmg")
+                                    || tagVal(u, "protect")
+                                    || tagVal(u, "counterSpike"))).length)) * 0.2 : 0);
                     if (s.debuffEnemyAtkAll) v += 0.7 + Math.min(4, B.units.filter(
                         (u) => u.side === "p" && u.def.type === "unit" && u.curAtk > 0).length) * 0.25;
                     if (s.search || s.searchUnit || s.journey || s.discardPick) v += 0.5;

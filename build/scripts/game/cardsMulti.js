@@ -375,5 +375,36 @@
                  rarity: "rare", elem: "honWis",
                  multi: ["honor", "wisdom"],
                  color: 0x9ecbe8, img: "honor_wisdom/270" },
+
+        // ── W79 (спека юзера): карты 271–272 — Мудрость+Время, только
+        // «Магодром» (данж wt, elem wisTim) ─────────────────────────────
+        // «Эксперименты» (wt271): заклинание 0⚡ — цель ЛЮБАЯ метка
+        // эффекта: значок «Сдвига» на клетке или существо с числовой
+        // меткой («Выстрел»/«Защита»/«Ответ»). Её значение становится
+        // минимальным или максимальным (выбор в панельке) среди ВСЕХ
+        // меток ЭТОГО ТИПА ИГРАЮЩЕГО (tagPick: tagPickAt/tagPanelOpen/
+        // applyTagPick в arenaActions; ИИ — aiSpells). «Возврат» в цели
+        // не бывает: счётчик — снапшот при появлении (u.ret), менять
+        // нечего
+        wt271: { type: "spell", cost: 0,
+                 spell: { target: "tagPick" },
+                 kind: "summon", // тип эффекта — по спеке юзера («Появление существ»)
+                 rarity: "common", elem: "wisTim",
+                 multi: ["wisdom", "time"],
+                 color: 0x9a8ce8, img: "wisdom_time/271" },
+        // «Мехо-иллюзия» (wt272): Элементаль ?/? — приходит через
+        // «Сдвиг 1», а когда ЯВЛЯЕТСЯ на поле боя — становится КОПИЕЙ
+        // случайного соседнего существа (деф, статы и облик целиком;
+        // summonCopyNeighbor в arenaSummons, ветка в afterArrive —
+        // после явления из портала). Соседей нет — является с 0♥ и
+        // гибнет сразу после призыва (общее правило 0♥-явлений — как у
+        // «Иллюзии» wis108 без соседей, просил юзер)
+        wt272: { type: "unit", cost: 3, atk: 0, hp: 0, speed: 1,
+                 creature: "gnome", sheet: "gnome", // мех — лист gnome_256 (как «Базовый мех»; sheetOf не знает elem wisTim)
+                 delay: 1, copyNeighbor: true,
+                 subtype: "elemental", // подтип — по спеке юзера
+                 rarity: "rare", elem: "wisTim",
+                 multi: ["wisdom", "time"],
+                 color: 0x9a8ce8, img: "wisdom_time/272" },
     };
 })();

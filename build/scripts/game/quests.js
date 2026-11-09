@@ -313,6 +313,22 @@
     // "final": панель задания с названием в шапке и кнопками ПОД текстом.
     let cur = null;
 
+    // W79 (поправка юзера): «ускорение печатания реплик на Пробел (как в
+    // визуальных новеллах)» — пока ПРОБЕЛ удерживается, буквы летят в 8
+    // раз быстрее (шаг тикера 24мс → 3мс). Слушатели один раз на модуль;
+    // preventDefault гасит прокрутку страницы и «клик» по сфокусированной
+    // кнопке. Отпустили — обычная скорость; короткий тап даёт рывок
+    let spaceHeld = false;
+    window.addEventListener("keydown", (e) => {
+        if (e.code !== "Space") return;
+        spaceHeld = true;
+        e.preventDefault();
+    });
+    window.addEventListener("keyup", (e) => {
+        if (e.code === "Space") spaceHeld = false;
+    });
+    window.addEventListener("blur", () => { spaceHeld = false; });
+
     const VN_W = 1240, VN_H = 300, VN_BOTTOM = 56; // окно реплик
     const VN_PAD = 30; // зазор текстовый фрейм ↔ портрет (W33, юзер:
     // арт Глома квадратный — портрет шире прежнего силуэта, фиксированный
@@ -645,13 +661,15 @@
             cur.hint = hint;
             // тап по затемнению — допечатать/дальше (кнопки финала отдельно)
             node.on("pointertap", () => advance());
-            // печатание по буквам — общий тикер Pixi (~42 знака/сек)
+            // печатание по буквам — общий тикер Pixi (~42 знака/сек);
+            // с зажатым Пробелом — ~330 знаков/сек (поправка юзера, W79)
             cur.typer = (tk) => {
                 if (!cur || cur.phase !== "lines" || !cur.typing) return;
                 cur.acc += tk.deltaMS;
                 const full = cur.lines[cur.li].text;
-                while (cur.typing && cur.acc >= 24) {
-                    cur.acc -= 24;
+                const step = spaceHeld ? 3 : 24;
+                while (cur.typing && cur.acc >= step) {
+                    cur.acc -= step;
                     cur.shown++;
                     if (cur.shown >= full.length) cur.typing = false;
                 }

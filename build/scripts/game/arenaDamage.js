@@ -756,7 +756,8 @@
                 // СКЛАДЫВАЮТСЯ — способности в этой игре стакаются.
                 // Заклинания и ловушки бьют без killer-существа — не
                 // триггерят. Урон шипов режется «Защитой» атакующего.
-                let spike = target.def.counterSpike || 0;
+                // tagVal — подмена «Экспериментов» (wt271, W79) видна
+                let spike = tagVal(target, "counterSpike");
                 // Вымпел даёт «Ответ 1» КАЖДОМУ объекту стороны — у кого
                 // шипов не было, теперь 1; у «Строя» — 2
                 if (B.units.some((b) => b.side === target.side
@@ -1132,6 +1133,29 @@
                         fxEvent("ward", { x: p.x, y: p.y - 12, scale: 0.66 });
                     }
                     fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.7 });
+                }
+                sfx("chpoc");
+            };
+
+            // «Глубокое изучение» (Магодром, W79 — спека юзера; текст в
+            // HUD данжа): при розыгрыше ДВУХЦВЕТНОЙ карты Мудрость+Время
+            // (elem "wisTim") играющий берёт карту из колоды. Особенность
+            // данжа — читаем CAVES[study] по данжу забега. Хуки — как у
+            // остальных особенностей: addUnit (юниты/постройки, обе
+            // стороны), castSpell игрока ДО эффекта, ловушки игрока — в
+            // spendCard, заклинания/ловушки ИИ — в aiPlay перед эффектом
+            A.multiStudy = function multiStudy(cardId, side) {
+                const def = CARDS[cardId];
+                if (!def || def.elem !== "wisTim") return;
+                const cd = G.dungeon
+                    && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
+                if (!cd || !cd.study) return;
+                floatText(960, side === "p" ? 758 : 318,
+                    GAME_LOC.t("dungeon.studyShort"), 0x9a8ce8);
+                if (side === "p") {
+                    drawCards(1);
+                } else if (B.eDeck.length) { // добор врага — верх колоды
+                    B.eHand.push(B.eDeck.pop());
                 }
                 sfx("chpoc");
             };

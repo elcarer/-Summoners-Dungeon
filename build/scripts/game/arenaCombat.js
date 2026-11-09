@@ -1094,7 +1094,7 @@
                     || (u.quiverBonus || 0) > 0;
                 if (!hasShot && forced == null) return;
                 const dmg = forced != null ? forced
-                    : (u.def.shotDmg || 0) + (u.quiverBonus || 0);
+                    : tagVal(u, "shotDmg") + (u.quiverBonus || 0); // tagVal — подмена «Экспериментов» (wt271, W79)
                 const dir = u.side === "p" ? -1 : 1;
                 for (let r = u.row + dir; r >= 0 && r < GRID; r += dir) {
                     const o = unitAt(u.col, r);
@@ -1147,7 +1147,7 @@
             // (как у лучника).
             A.siegeShot = function siegeShot(u) {
                 if (!B.units.includes(u) || !u.def.siegeShot) return;
-                const dmg = u.def.shotDmg || 1;
+                const dmg = tagVal(u, "shotDmg") || 1; // tagVal — подмена «Экспериментов» (wt271, W79)
                 const dir = u.side === "p" ? -1 : 1;
                 for (let r = u.row + dir; r >= 0 && r < GRID; r += dir) {
                     const o = unitAt(u.col, r);

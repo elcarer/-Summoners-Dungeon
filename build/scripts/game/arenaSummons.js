@@ -157,17 +157,40 @@
                 return true;
             };
 
-            // «Элементаль серы» (wis115): после призыва все соседние (верт/гориз)
-            // существа ОБЕИХ сторон теряют 2 урона и 1 жизнь. Урон — постоянная
-            // «Слабость» (минус в bonusAtk, клампит recalcAuras); жизнь
-            // снимается напрямую (не входящий урон: защита и реакции на удар
-            // не срабатывают, как у «Песчаного духа»). На 0♥ сосед погибает.
-
-            // «Элементаль серы» (wis115): после призыва все соседние (верт/гориз)
-            // существа ОБЕИХ сторон теряют 2 урона и 1 жизнь. Урон — постоянная
-            // «Слабость» (минус в bonusAtk, клампит recalcAuras); жизнь
-            // снимается напрямую (не входящий урон: защита и реакции на удар
-            // не срабатывают, как у «Песчаного духа»). На 0♥ сосед погибает.
+            // «Мехо-иллюзия» (wt272, W79 — спека юзера): когда ЯВЛЯЕТСЯ на
+            // поле боя (через «Сдвиг 1»; зовётся из afterArrive addUnit),
+            // становится КОПИЕЙ случайного соседнего существа (верт/гориз,
+            // любая сторона): деф, статы и ОБЛИК целиком — узел
+            // пересобирается по дефу цели. Статы — текущие (как у
+            // «Иллюзии» wis108), ауры пересчитываются по новой клетке.
+            // Соседей нет — остаётся собой 0/0. Вызов после явления: тик
+            // arrivals уже снёс запись (узел больше не нужен), старый узел
+            // можно спокойно заменить
+            A.summonCopyNeighbor = function summonCopyNeighbor(u) {
+                if (!B.units.includes(u)) return false; // мог погибнуть, не явившись
+                const near = B.units.filter((v) => v !== u && v.def.type === "unit"
+                    && Math.abs(v.col - u.col) + Math.abs(v.row - u.row) === 1);
+                if (!near.length) return false; // некого копировать
+                const src = near[(Math.random() * near.length) | 0];
+                const p = cellXY(u.col, u.row);
+                u.def = src.def;
+                u.bonusAtk = src.bonusAtk || 0;
+                u.hp = src.hp;
+                u.tagOver = src.tagOver ? { ...src.tagOver } : null;
+                const old = u.node;
+                const nn = makeUnitNode(u); // облик/бейджи — по новому дефу
+                nn.scale.set(1); // уже явился (портал играл на старом узле)
+                root.unitsLayer.addChild(nn);
+                u.node = nn;
+                if (old && !old.destroyed) old.destroy({ children: true });
+                recalcAuras(); // ауры по новому дефу и соседям
+                floatText(p.x, p.y - 75,
+                    "= " + GAME_LOC.t(`card.${cardIdOf(src.def)}.name`),
+                    0x9a8ce8);
+                fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.8 });
+                sfx("chpoc");
+                return true;
+            };
             A.summonSulfur = function summonSulfur(u) {
                 if (!B.units.includes(u)) return false; // мог умереть от мины при призыве
                 // соседние существа ОБЕИХ сторон (W73: под «Лесным оплотом»

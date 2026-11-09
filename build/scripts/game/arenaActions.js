@@ -22,7 +22,9 @@
                 B.spellTarget = false;
                 B.islandPick = false; // прицел «Летучего острова» не переживает смену хода
                 B.dmgHalt = { p: false, e: false }; // новый ход — урон снова наносится (hw267)
+                B.turnSummons = { p: 0, e: 0 }; // новый ход — счётчик «шестерён» с нуля (wtGears)
                 tokenPanelClose(); // панель «Управления временем» не переживает смену хода
+                tagPanelClose(); // панель «Экспериментов» не переживает смену хода (W79)
                 refreshHud();
                 firewallTick("e"); // стена костров врага — конец хода врага
                 sproutTick("e");   // ростки врага подросли — конец его хода
@@ -79,6 +81,7 @@
                 if (CARDS[cardId] && CARDS[cardId].type === "trap") {
                     multiValor(cardId, "p");
                     multiWeave(cardId, "p");
+                    multiStudy(cardId, "p"); // «Глубокое изучение» (Магодром, W79)
                 }
                 // улетание карты в сброс (анимации руки, просил юзер):
                 // позиция снимается ДО splice; узел мог быть пересобран
@@ -239,6 +242,7 @@
             // снять выбор карты: карты руки снова интерактивны
             A.deselect = function deselect() {
                 tokenPanelClose(); // панель «Управления временем» закрывается
+                tagPanelClose(); // панель «Экспериментов» тоже (W79)
                 swapPickClear(); // «Перемена мест»: первая цель и маркер (W65)
                 if (B.selected === null && !B.spellTarget) return;
                 B.selected = null;
@@ -332,6 +336,152 @@
                 const target = { col: B.tokenPick.col, row: B.tokenPick.row, dir };
                 const sel = B.selected;
                 tokenPanelClose();
+                if (sel !== null) castSpell(sel, target);
+                else deselect();
+            };
+
+            // ── «Эксперименты» (wt271, W79 — спека юзера) ────────────────
+            // Цель — ЛЮБАЯ метка эффекта: значок «Сдвига» на клетке (обе
+            // стороны) или существо с числовой меткой («Выстрел» shotDmg /
+            // «Защита» protect / «Ответ» counterSpike). «Возврат» меткой
+            // цели не бывает: счётчик — снапшот при появлении (u.ret).
+            // Значение выбранной метки становится минимальным или
+            // максимальным (панелька) среди ВСЕХ меток ЭТОГО ТИПА
+            // ИГРАЮЩЕГО (tagPool по стороне castSpell)
+            A.tagPickAt = function tagPickAt(col, row) {
+                const u = unitAt(col, row);
+                if (u && (tagVal(u, "shotDmg") || tagVal(u, "protect")
+                    || tagVal(u, "counterSpike"))) return { kind: "unit", u };
+                for (const s of ["p", "e"])
+                    if (B.delayed[s] && B.delayed[s]
+                        .some((e) => e.col === col && e.row === row))
+                        return { kind: "delay" };
+                return null;
+            };
+            // пул текущих значений метки типа key у стороны side
+            A.tagPool = function tagPool(side, key) {
+                if (key === "delay")
+                    return (B.delayed[side] || []).map((e) => e.left);
+                const vals = [];
+                for (const v of B.units)
+                    if (v.side === side && B.units.includes(v)
+                        && tagVal(v, key)) vals.push(tagVal(v, key));
+                return vals;
+            };
+            // применение: value = min/max пула → значок (e.left) или
+            // персональная подмена u.tagOver (читается через tagVal)
+            A.applyTagPick = function applyTagPick(side, target) {
+                if (!target || target.col === undefined
+                    || !target.tagKey) return false;
+                const vals = tagPool(side, target.tagKey);
+                if (!vals.length) return false;
+                const val = target.mm === "min"
+                    ? Math.min(...vals) : Math.max(...vals);
+                for (const s of ["p", "e"]) {
+                    const e = (B.delayed[s] || []).find((d) =>
+                        d.col === target.col && d.row === target.row);
+                    if (e) {
+                        if (target.tagKey !== "delay") return false;
+                        e.left = val;
+                        A.delayDrawNode(e); // цифра на значке обновится
+                        const p = cellXY(e.col, e.row);
+                        floatText(p.x, p.y - 84,
+                            `⏳ ${GAME_LOC.t("status.delay.name")} ${val}`,
+                            0x9a8ce8);
+                        sfx("chpoc");
+                        return true;
+                    }
+                }
+                const u = unitAt(target.col, target.row);
+                if (!u || !tagVal(u, target.tagKey)) return false;
+                u.tagOver = u.tagOver || {};
+                u.tagOver[target.tagKey] = val;
+                recalcAuras(); // бейдж «Защиты» синхронизируется
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 84,
+                    `${GAME_LOC.t(`tag.${target.tagKey}`)}: ${val}`, 0x9a8ce8);
+                fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.7 });
+                sfx("chpoc");
+                return true;
+            };
+            // панелька: строки — метки цели, у играющего есть пул значений
+            A.tagPanelOpen = function tagPanelOpen(col, row) {
+                tagPanelClose();
+                const pick = tagPickAt(col, row);
+                if (!pick) return;
+                const rows = [];
+                if (pick.kind === "delay" && tagPool("p", "delay").length)
+                    rows.push({ key: "delay" });
+                if (pick.kind === "unit")
+                    for (const key of ["shotDmg", "protect", "counterSpike"])
+                        if (tagVal(pick.u, key) && tagPool("p", key).length)
+                            rows.push({ key });
+                if (!rows.length) { // меток с пулом нет — карта не тратится
+                    floatText(cellXY(col, row).x, cellXY(col, row).y - 60,
+                        GAME_LOC.t("tag.none"), 0x9a8ce8);
+                    deselect();
+                    return;
+                }
+                B.tagPick = { col, row };
+                const H = 128 + rows.length * 74;
+                const panel = new PIXI.Container();
+                const bg = new PIXI.Graphics();
+                bg.roundRect(960 - 350, 196, 700, H, 14);
+                bg.fill({ color: 0x1c1a2e, alpha: 0.93 });
+                bg.stroke({ width: 3, color: 0x9a8ce8 });
+                panel.addChild(bg);
+                const cap = T(GAME_LOC.t("tag.title"), 24, 0xf3e6c2,
+                    { stroke: { color: 0x1c1207, width: 4 } });
+                cap.anchor.set(0.5);
+                cap.position.set(960, 226);
+                cap.eventMode = "none";
+                panel.addChild(cap);
+                const hint = T(GAME_LOC.t("tag.hint"), 19, 0x8c7f9e);
+                hint.anchor.set(0.5);
+                hint.position.set(960, 258);
+                hint.eventMode = "none";
+                panel.addChild(hint);
+                rows.forEach((rw, i) => {
+                    const y = 306 + i * 74;
+                    const cur = rw.key === "delay"
+                        ? ((B.delayed.p || []).find((d) =>
+                            d.col === col && d.row === row) || {}).left
+                        : tagVal(pick.u, rw.key);
+                    const lab = T(`${GAME_LOC.t(`tag.${rw.key}`)}: ${cur}`,
+                        26, 0xf3e6c2,
+                        { stroke: { color: 0x1c1207, width: 4 } });
+                    lab.anchor.set(0, 0.5);
+                    lab.position.set(640, y);
+                    lab.eventMode = "none";
+                    panel.addChild(lab);
+                    const pool = tagPool("p", rw.key);
+                    for (const [mm, x] of [["min", 1010], ["max", 1230]]) {
+                        const val = mm === "min"
+                            ? Math.min(...pool) : Math.max(...pool);
+                        panel.addChild(globalThis.GAME_UI.button(ctx, {
+                            tex: "button_menu.png",
+                            label: `${mm === "min" ? "↓" : "↑"} ${val}`,
+                            x, y, scale: 0.72, fontSize: 34,
+                            onTap: () => tagPanelCast(rw.key, mm),
+                        }));
+                    }
+                });
+                root.tagPanel = panel;
+                root.addChild(panel); // поверх поля; умрёт вместе с root (exit боя)
+            };
+            A.tagPanelClose = function tagPanelClose() {
+                B.tagPick = null;
+                if (root && root.tagPanel && !root.tagPanel.destroyed) {
+                    root.tagPanel.destroy({ children: true });
+                }
+                if (root) root.tagPanel = null;
+            };
+            A.tagPanelCast = function tagPanelCast(tagKey, mm) {
+                if (!B.tagPick) return;
+                const target = { col: B.tagPick.col, row: B.tagPick.row,
+                    tagKey, mm };
+                const sel = B.selected;
+                tagPanelClose();
                 if (sel !== null) castSpell(sel, target);
                 else deselect();
             };
@@ -498,6 +648,15 @@
                         // направление (−2/+2) выбирается в панельке
                         const pick = tokenAt(col, row);
                         if (pick) tokenPanelOpen(col, row);
+                        else deselect();
+                        return;
+                    }
+                    if (tg === "tagPick") { // «Эксперименты» (wt271, W79) —
+                        // по МЕТКЕ эффекта: значок «Сдвига» или существо
+                        // с числовой меткой; мин/макс — в панельке
+                        const pk = tagPickAt(col, row);
+                        if (pk && (!pk.u || spellAimable(pk.u)))
+                            tagPanelOpen(col, row);
                         else deselect();
                         return;
                     }

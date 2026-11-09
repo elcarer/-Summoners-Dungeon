@@ -112,6 +112,18 @@
             return Object.keys(CARDS).find((k) => CARDS[k] === def
                 || (def && def.__base && CARDS[k] === def.__base));
         };
+        // Значение ЧИСЛОВОЙ метки эффекта существа («Выстрел N» — shotDmg,
+        // «Защита N» — protect, «Ответ N» — counterSpike): персональная
+        // подмена «Экспериментов» (wt271, u.tagOver) поверх печатной.
+        // Все ЧТЕНИЯ таких меток в бою идут через tagVal — подмена видна
+        // и урону, и бейджам. Живой счётчик «Сдвига» живёт не в дефе
+        // (значок-маркер B.delayed), «Возврат» — снапшот u.ret при
+        // появлении: эти две метки через tagVal не идут
+        A.tagVal = function tagVal(u, key) {
+            if (u && u.tagOver && u.tagOver[key] != null)
+                return u.tagOver[key];
+            return u && u.def ? (u.def[key] || 0) : 0;
+        };
         // «Защита от заклинаний» (u.spellWard, способность героя Миры):
         // существо нельзя выбрать целью заклинаний. Проверка ОДНА на весь бой
         // — здесь. Все списки целей (игрок: onCellTap/applySpellPInner/

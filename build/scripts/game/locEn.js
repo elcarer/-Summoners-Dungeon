@@ -21,6 +21,9 @@
             // W75 (юзер): особенность «Небесного дворца» — текст в HUD данжа
             "dungeon.weave": "Weaving of Powers: when a White-Blue (two-color) card is played, your random creature gains a random positive effect",
             "dungeon.weaveShort": "Weaving of Powers",
+            // W79 (юзер): особенность «Магодрома» — текст в HUD данжа
+            "dungeon.study": "Deep Study: when a Purple-Blue (Wisdom-Time two-color) card is played, draw a card",
+            "dungeon.studyShort": "Deep Study",
             "dungeon.deckLow": "Deck is below the minimum ({min}) — build your deck",
             "dungeon.hp": "HP {hp}/{max}",
             "dungeon.exitLabel": "DESCEND",
@@ -42,6 +45,8 @@
             "world.caveGh": "White Thicket",
             // W75: мультицветный данж у границы Чести и Мудрости
             "world.caveHw": "Celestial Palace",
+            // W79: мультицветный данж у границы Мудрости и Времени
+            "world.caveWt": "Magodrome",
             "world.soon": "Coming soon…",
             "world.deckLow": "Not enough cards: at least {min} required to enter",
             "world.resLow": "To enter you need: 1 Power Charm and 1 Life Sprout",
@@ -696,6 +701,20 @@
             // W78: босс «Небесного дворца» (3-й, последний этаж)
             "enc.hwMagicBlob.title": "Magic Clump",
             "hero.hwMagicBlob.ability": "At the start of the battle, draw any 2 cards from the deck, then discard 2 cards from your hand",
+            // W79: карты «Магодрома» (Мудрость+Время) и враг 1-го этажа
+            "card.wt271.name": "Experiments",
+            "card.wt271.desc": "Choose any effect mark — a Shift counter on a cell or a unit with a Shot, Guard or Retaliation mark. The chosen mark's value becomes the minimum or maximum (your choice) value among all your marks of that effect type",
+            "card.wt272.name": "Mecha-Illusion",
+            "card.wt272.desc": "Elemental ?/?. Shift 1: appears on the chosen cell at the start of your next turn if it stays free. When it enters the battlefield it becomes a copy of a random adjacent creature (attack, health, abilities and look); with no neighbors it arrives with 0 health and dies",
+            "enc.wtGears.title": "Mad Cogwheels",
+            "hero.wtGears.ability": "Whenever your third creature enters the battlefield this turn, gain 1 energy",
+            "tag.title": "Experiments",
+            "tag.hint": "Pick a mark and its value among your marks",
+            "tag.none": "No marks with your values",
+            "tag.delay": "Shift",
+            "tag.shotDmg": "Shot",
+            "tag.protect": "Guard",
+            "tag.counterSpike": "Retaliation",
             // W73: босс «Белой пущи» (3-й, последний этаж)
             "enc.ghBastion.title": "Forest Bulwark",
             "hero.ghBastion.ability": "All your buildings are additionally treated as units for effects",
@@ -864,6 +883,9 @@
             // W75: мульти-стихия «Небесного дворца»
             "elem.honWis": "Honor + Wisdom",
             "elem.honWis.short": "H+W",
+            // W79: мульти-стихия «Магодрома»
+            "elem.wisTim": "Wisdom + Time",
+            "elem.wisTim.short": "W+T",
             "menu.pickHero": "CHOOSE YOUR HERO",
             "menu.pickHeroSub": "The hero defines your base health, deck elements and special ability",
             "menu.pickHeroSoon": "Coming soon…",

@@ -36,6 +36,8 @@
         // W75: ядро врага «Кружащая стая» («Небесный дворец») — та же
         // симметрия
         honWis: starterCollection(STARTER_DECKS.honWis),
+        // W79: ядро врага «Бешеные шестерни» («Магодром») — та же симметрия
+        wisTim: starterCollection(STARTER_DECKS.wisTim),
     };
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N
@@ -362,6 +364,13 @@
         "hw270", "hw270", "hw270",
         "hw267"];
 
+    // W79 (спека юзера): пул наград/драфта «Магодрома» — Мудрость, Время
+    // и двухцветные Мудрость+Время (встречаются только в этом данже).
+    // Новые wt-карты: обычная 271 ×3, редкая 272 ×3
+    REWARD_POOLS.wisTim = [...REWARD_POOLS.wisdom, ...REWARD_POOLS.time,
+        "wt271", "wt271", "wt271",
+        "wt272", "wt272", "wt272"];
+
     const { ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM,
         FLOOR_MOBS_DECAY, FLOOR_MOBS_HONOR, FLOOR_MOBS_TIME, MOB_TABLES,
         ENEMY_FILL, ENEMY_FILLS } = globalThis.GAME_ENCOUNTERS;
@@ -416,6 +425,16 @@
         // комнате только спуск)
         hw: { elem: "honWis", elems: ["honor", "wisdom"], maxFloor: 3,
               boss: "hwMagicBlob", bossLast: true, weave: true },
+        // W79 (спека юзера): «Магодром» — МУЛЬТИЦВЕТНЫЙ данж
+        // Мудрость+Время (по образцу «Рыжего леса»/«Белой пущи»).
+        // 1 ЭТАЖ без босса: враг — «Бешеные шестерни» (герой 78, 16♥).
+        // elems — стихии ДРАФТА «Карты сокровищ» (Мудрость, Время,
+        // двухцветные wisTim); elem — мульти-стихия (рубашки
+        // card_multi_back.png). Особенность study — «Глубокое изучение»:
+        // при розыгрыше двухцветной карты Мудрость−Время возьмите карту
+        // (текст в HUD — dungeon.js; multiStudy в arenaDamage)
+        wt: { elem: "wisTim", elems: ["wisdom", "time"], maxFloor: 1,
+              study: true },
     };
     // Колода врага: ядро архетипа; весь добор — только боссу (просил
     // юзер): с глубиной (floor ≥ 1) +2 карты из grow за этаж и 3..8 карт
