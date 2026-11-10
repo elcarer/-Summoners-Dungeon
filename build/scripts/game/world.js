@@ -523,10 +523,12 @@
         function makeSquadNode(s) {
             // у мультицветных данжей своей строки в heroSheets нет:
             // «Белая пуща» (groHon) ходит рыцарем — «они же рыцари даже
-            // по названию» (просил юзер), «Рыжий лес» (strGro) остаётся
-            // гоблином-разбойником; прочее — гоблин, как прежде
+            // по названию» (просил юзер), «Некро-раскопки» (timDec) —
+            // некромантом necr_256 (просил юзер W86), «Рыжий лес» (strGro)
+            // остаётся гоблином-разбойником; прочее — гоблин, как прежде
             const sheet = ctx.heroSheets[s.elem]
-                || ctx.heroSheets[s.elem === "groHon" ? "honor" : "strength"];
+                || ctx.heroSheets[s.elem === "groHon" ? "honor"
+                    : s.elem === "timDec" ? "decay" : "strength"];
             const sprite = new PIXI.AnimatedSprite(sheet.animations.walk_front, false);
             sprite.anchor.set(0.5, 1);
             sprite.scale.set(0.375); // как герой (96×96)
@@ -535,6 +537,19 @@
             shadow.fill({ color: 0x0e140c, alpha: 0.45 });
             return { sprite, shadow, sheet };
         }
+
+        // W86 (тесты): каким heroSheets-ключом реально рисуется отряд
+        // («Некро-раскопки» — necr/decay, «Белая пуща» — honor, …);
+        // сравнение первой текстуры walk-анимации — имена листов не нужны
+        const sheetNameOf = (ref) => {
+            if (!ref || !ref.animations || !ref.animations.walk_front) return null;
+            for (const [k, sh] of Object.entries(ctx.heroSheets)) {
+                if (!sh.animations || !sh.animations.walk_front) continue;
+                if (sh.animations.walk_front[0] === ref.animations.walk_front[0])
+                    return k;
+            }
+            return null;
+        };
 
         // бой с отрядом: как касание врага в подземелье (arenaScene читает
         // G.activeEnemy), только флаг wander — трофей и реванш вернут в мир,
@@ -1264,6 +1279,7 @@
                         const made = makeSquadNode(s);
                         s.sprite = made.sprite;
                         s.shadow = made.shadow;
+                        s.sheetRef = made.sheet; // W86: ключ листа для тестов
                         s.sprite.position.set(st.x, st.y);
                         s.sprite.zIndex = st.y;
                         s.shadow.position.set(st.x, st.y - 9.8);
@@ -1303,6 +1319,7 @@
                     const made = makeSquadNode(s);
                     s.sprite = made.sprite;
                     s.shadow = made.shadow;
+                    s.sheetRef = made.sheet; // W86: ключ листа для тестов
                     s.sprite.position.set(st.x, st.y);
                     s.sprite.zIndex = st.y;
                     s.shadow.position.set(st.x, st.y - 9.8);
@@ -2041,6 +2058,8 @@
                                 x: s && s.id !== null ? COMPONENTS.positionX[s.id] : st.x,
                                 y: s && s.id !== null ? COMPONENTS.positionY[s.id] : st.y,
                                 enc: s ? s.enc : null,
+                                // W86: каким листом реально рисуется отряд
+                                sheet: s ? sheetNameOf(s.sheetRef) : null,
                                 route: d.route,
                                 active: !!globalThis.GAME_DATA.CAVES[d.cave],
                                 face: s && s.id !== null
@@ -2063,6 +2082,8 @@
                             enc: guardEncOf(d.elem),
                             x: s && s.id !== null ? COMPONENTS.positionX[s.id] : st.x,
                             y: s && s.id !== null ? COMPONENTS.positionY[s.id] : st.y,
+                            // W86: каким листом реально рисуется отряд
+                            sheet: s ? sheetNameOf(s.sheetRef) : null,
                             route: d.route,
                             // персонаж мира: взгляд и «идёт» (контроллер)
                             face: s && s.id !== null

@@ -125,9 +125,23 @@
             const iy = -st.t * Math.max(0, st.contentH - st.viewH);
             return { x: PANE_POS[side].x + e.cx, y: PANE_POS[side].y + e.cy + iy };
         };
+        // показать/скрыть карточку панели вместе с её счётчиком (W86)
+        const setPaneCardVisible = (e, v) => {
+            if (!e) return;
+            if (e.node && !e.node.destroyed) e.node.visible = v;
+            if (e.label && !e.label.destroyed) e.label.visible = v;
+        };
+        // конечная карта полёта (по id в ТЕКУЩЕЙ панели — переживает
+        // пересборку панелей)
+        const destCard = (toSide, id) =>
+            (paneCards[toSide] || []).find((x) => x.id === id);
         function flyCard(id, from, toSide) {
             if (!root) return;
-            const tgt = paneCards[toSide].find((e) => e.id === id);
+            const tgt = destCard(toSide, id);
+            // W86 (юзер): конечная карта НЕ видна, пока летит перелёт —
+            // видна только летящая карта; на месте она появится после
+            // посадки (раньше показывалась сразу под летящей)
+            if (tgt) setPaneCardVisible(tgt, false);
             // фильтры могут прятать карту в целевой панели — летим к её шапке
             const to = tgt ? paneGlobal(toSide, tgt)
                 : { x: PANE_POS[toSide].x + 300, y: PANE_POS[toSide].y + 110 };
@@ -136,7 +150,7 @@
             node.position.set(from.x, from.y);
             root.addChild(node);
             flights.push({ node, fx: from.x, fy: from.y, tx: to.x, ty: to.y,
-                life: 0.42, total: 0.42 });
+                life: 0.42, total: 0.42, id, toSide });
         }
 
         // ── левое окно: колода карточками (как коллекция) ──────────────────
@@ -163,7 +177,8 @@
                 cnt.position.set(cx, cy + 138); // под картой (×1.5 от базы 1280)
                 cnt.eventMode = "none";
                 c.addChild(cnt);
-                paneCards.left.push({ id, node: card, cx, cy, labelY: cy + 138 });
+                paneCards.left.push({ id, node: card, label: cnt, cx, cy,
+                    labelY: cy + 138 });
             });
             const rowsN = Math.ceil(ids.length / 3);
             c.userData = { contentH: ids.length ? (138 + (rowsN - 1) * 307.5 + 232.5) : 60 };
@@ -202,7 +217,8 @@
                 cnt.position.set(cx, cy + 138); // под картой (×1.5 от базы 1280)
                 cnt.eventMode = "none";
                 c.addChild(cnt);
-                paneCards.right.push({ id, node: card, cx, cy, labelY: cy + 138 });
+                paneCards.right.push({ id, node: card, label: cnt, cx, cy,
+                    labelY: cy + 138 });
                 if (inDeck > 0) {
                     const mark = T(`+${inDeck}`, 22, 0x9fd489);
                     mark.anchor.set(0.5);
@@ -235,6 +251,10 @@
                 const c = buildCollection();
                 rightPane.setContent(c, c.userData.contentH);
             }
+            // W86: пересборка создаёт карты видимыми — конечные карты
+            // активных полётов снова скрыты до посадки
+            for (const f of flights)
+                setPaneCardVisible(destCard(f.toSide, f.id), false);
             rebuildChips();
             headerText();
         }
@@ -703,8 +723,14 @@
             })),
             // узлы/геометрия карточек панелей (тесты: эмит pointerover/out)
             cardNode: (side, i) => (paneCards[side] && paneCards[side][i] ? paneCards[side][i].node : null),
-            cardInfo: (side, i) => (paneCards[side] && paneCards[side][i]
-                ? { ...paneCards[side][i], node: undefined } : null),
+            cardInfo: (side, i) => {
+                const e = paneCards[side] && paneCards[side][i];
+                if (!e) return null;
+                // W86: видимость лица и счётчика (скрытие на время полёта)
+                return { ...e, node: undefined,
+                    nodeV: e.node && !e.node.destroyed ? e.node.visible : null,
+                    labelV: e.label && !e.label.destroyed ? e.label.visible : null };
+            },
             // ряд лого стихий (тесты): число, активный фильтр, левый край,
             // фактическая позиция первого лого (должна совпадать с центром круга)
             elemInfo: () => ({
@@ -771,6 +797,11 @@
                     if (f.life <= 0) {
                         flights.splice(i, 1);
                         f.node.destroy({ children: true });
+                        // посадка (W86): карта появляется на своём месте —
+                        // если её не несёт ещё один полёт того же названия
+                        if (!flights.some((o) => o.id === f.id
+                            && o.toSide === f.toSide))
+                            setPaneCardVisible(destCard(f.toSide, f.id), true);
                     }
                 }
                 if (zoom) {

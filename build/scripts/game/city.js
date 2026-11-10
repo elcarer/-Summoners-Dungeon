@@ -96,9 +96,10 @@
             : { x0: (CW >> 1) - 1, x1: (CW >> 1) + 1, y: CH - 1 };
         // спавн: клетка из дизайна или над центром прохода
         const sp = d.spawn || { x: (pg.x0 + pg.x1) >> 1, y: pg.y - 1 };
-        // Глом (W70, юзер): живёт ТОЛЬКО в стартовом городе героя (home) —
-        // у дома из плана, без дома — у ратуши; в столице и прочих городах
-        // его нет (дом там — декорация)
+        // Глом (W86, юзер): выходит для выдачи квеста в ЛЮБОМ городе,
+        // где есть его «дом Глома» (glomHouse в плане города); в
+        // стартовом (home) без дома — у ратуши, как прежде (W70). Дом в
+        // прочих городах больше не декорация
         const house = blds.find((b) => b.type === "glomHouse");
         const anch = house
             || (home ? blds.find((b) => b.type === "townHall") : null);
@@ -161,11 +162,11 @@
             treeCells, // явные деревья + рощи «F»
             walls, // ручные варианты стен дизайна (пусто — авто-подбор)
             floors, // ручные плитки пола (пусто — квадранты листа стихии)
-            glom: home && glomHome ? {
+            glom: glomHome ? {
                 state: "hidden", // hidden → walking → talking → idle
                 x: glomHome.x, y: glomHome.y,
             } : null,
-            glomHome: home && glomHome ? glomHome : null,
+            glomHome: glomHome || null,
             exitPassage: pg,
             spawn: { x: sp.x * TS + TS / 2, y: sp.y * TS + TS / 2 },
         };
@@ -354,9 +355,9 @@
             }
             return o;
         });
-        // Глом (W70, юзер): только в стартовом городе героя (home) —
-        // у дома из плана (дизайн), без дома — у ратуши; в столице и
-        // прочих городах его нет
+        // Глом (W86, юзер): выходит для выдачи квеста в ЛЮБОМ городе,
+        // где есть его «дом Глома» (glomHouse в плане); в стартовом
+        // (home) без дома — у ратуши, как прежде (W70)
         const house = blds.find((b) => b.type === "glomHouse");
         const anch = house
             || (home ? blds.find((b) => b.type === "townHall") : null);
@@ -381,11 +382,11 @@
             districts: rooms.length, // районов-комнат: 5 / 8
             roomRects: rooms, // [x0,y0,x1,y1] кварталов — для проб (W37)
             feat, // особенности стихии (W38): trees/forest/swamp/mounts/maze/water/bridges
-            glom: home && glomHome ? {
+            glom: glomHome ? {
                 state: "hidden", // hidden → walking → talking → idle
                 x: glomHome.x, y: glomHome.y,
             } : null,
-            glomHome: home && glomHome ? glomHome : null,
+            glomHome: glomHome || null,
         };
         // Ворота (W37, юзер): воротный квартал без зданий — якорь
         // исключений реки (W38) и декора; в столице — южный, в городе —
@@ -1243,6 +1244,17 @@
             }));
             leaveBtn.x = 960 + 170;
             c.addChild(leaveBtn);
+        } else if (rare && m.mode === "taken" && SQ.rareCardBlocked(G, poi)) {
+            // W86 (юзер): карта поиска ТОЛЬКО в колоде — отдавать нечего,
+            // вместо «Отдать» предупреждение «сначала переместите из
+            // колоды в коллекцию» (в редакторе колоды); «Уйти» — вправо
+            const warn = T(t("sideq.rare.inDeck"), 24, 0xff8f6e,
+                { wordWrap: true, wordWrapWidth: 520, align: "center" });
+            warn.anchor.set(0.5, 0);
+            warn.position.set(960, top + h - 138);
+            warn.eventMode = "none";
+            c.addChild(warn);
+            leaveBtn.x = 960 + 170;
         }
         // W66 (юзер): у редкости справа — ЛИЦО заказанной карты с ховер-
         // зумом (как в магазине); тексты сдвинуты влево, чтобы ужились
@@ -1268,7 +1280,14 @@
         if (!refs || !refs.quest) refs = { leaveBtn, quest: {
             state: () => ({ mode: m.mode, type: m.type || null,
                 name: name.text, text: body.text, reward: rew.text,
-                cardId: m.cardId || null, canGive: !!giveTap, card: !!cardNode }),
+                cardId: m.cardId || null, canGive: !!giveTap,
+                // W86: карта поиска только в колоде — окно с предупреждением
+                blocked: rare && m.mode === "taken"
+                    ? !!SQ.rareCardBlocked(G, poi) : false,
+                warn: rare && m.mode === "taken"
+                    && SQ.rareCardBlocked(G, poi)
+                    ? t("sideq.rare.inDeck") : null,
+                card: !!cardNode }),
             accept: () => {},
             give: giveTap || (() => {}),
             zoom: () => zr.state(),

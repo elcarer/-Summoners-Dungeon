@@ -341,27 +341,41 @@
         if (G.saveRun) G.saveRun();
         return q;
     }
+    // СВОБОДНЫЕ копии карты: все добытые минус лежащие в колоде (W86,
+    // юзер: отдать коллекционеру можно только копию НЕ из колоды)
+    const freeCopies = (G, id) =>
+        (G.collection[id] || 0) - G.deck.filter((c) => c === id).length;
     // Сдача карты коллекционеру (кнопка «Отдать карту» в его окне):
-    // карта уходит НАВСЕГДА — из колоды тоже (как потерянная при
-    // поражении, loseCard в main.js), иначе редактор вернул бы её даром
+    // карта уходит НАВСЕГДА из коллекции (W86, юзер: копия НЕ из колоды —
+    // если все копии лежат в колоде, сдача заблокирована, окно показывает
+    // предупреждение; ранее карту вынимали и из колоды)
     function giveRareCard(G, poi) {
         const sq = stateOf(G);
         const q = sq && sq.active.find((a) => a.type === "rare"
             && a.city === keyOf(poi));
-        if (!q || (G.collection[q.cardId] || 0) <= 0) return false;
-        const di = G.deck.lastIndexOf(q.cardId);
-        if (di >= 0) G.deck.splice(di, 1);
-        G.collection[q.cardId] = Math.max(0, G.collection[q.cardId] - 1);
+        if (!q || freeCopies(G, q.cardId) <= 0) return false;
+        G.collection[q.cardId] = (G.collection[q.cardId] || 0) - 1;
         if (G.persistMeta) G.persistMeta();
         complete(G, q, "sideq.rareDone", 2);
         return true;
     }
-    // есть ли у героя карта активного поиска этого города (кнопка «Отдать»)
+    // есть ли у героя СВОБОДНАЯ копия карты поиска этого города
+    // (кнопка «Отдать»)
     function rareCardReady(G, poi) {
         const sq = stateOf(G);
         const q = sq && sq.active.find((a) => a.type === "rare"
             && a.city === keyOf(poi));
-        return !!q && (G.collection[q.cardId] || 0) > 0;
+        return !!q && freeCopies(G, q.cardId) > 0;
+    }
+    // W86 (юзер): карта поиска есть, но ТОЛЬКО в колоде — «Отдать» не
+    // показывается, в окне предупреждение «сначала переместите из колоды
+    // в коллекцию» (редактор колоды)
+    function rareCardBlocked(G, poi) {
+        const sq = stateOf(G);
+        const q = sq && sq.active.find((a) => a.type === "rare"
+            && a.city === keyOf(poi));
+        return !!q && (G.collection[q.cardId] || 0) > 0
+            && freeCopies(G, q.cardId) <= 0;
     }
 
     // Модели АКТИВНЫХ поручений для окна-просмотра (W45, юзер; W66 — их
@@ -778,7 +792,8 @@
         fresh, stateOf, model, accept, onHuntWin, onEnterCity,
         arrowTargets, glowCities, huntMobs, repairQuests,
         // «Поиск редкостей» коллекционера (W66, юзер)
-        rareModel, acceptRare, giveRareCard, rareCardReady, rarePoolCard,
+        rareModel, acceptRare, giveRareCard, rareCardReady, rareCardBlocked,
+        rarePoolCard,
         // окно активного поручения (W45): кнопка в HUD мира/города
         showReview, closeReview, reviewOpen, activeModel, activeModels,
         reviewState,

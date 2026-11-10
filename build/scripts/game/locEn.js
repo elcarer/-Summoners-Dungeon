@@ -1289,6 +1289,8 @@
             "sideq.rare.desc": "My collection is incomplete: bring me the \"{card}\" card and I will reward you generously.",
             "sideq.rare.active": "Bring the \"{card}\" card to the Collector.",
             "sideq.rare.give": "Give the card",
+            // W86 (user): the ordered card lies in the deck — cannot be given
+            "sideq.rare.inDeck": "This card is in your deck — move it to the collection first (deck editor).",
             "sideq.rare.doneCity": "This Collector has already received his rarity.",
             "sideq.reward2": "Reward: 2 × {res}",
             "sideq.rareDone": "Rarity handed over: +2 × {res}",
