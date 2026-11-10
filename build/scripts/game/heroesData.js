@@ -255,6 +255,15 @@
         necSoulRiver: { id: "necSoulRiver", rarity: "rare", baseHp: 18,
                         elems: ["time", "decay"], starter: "necSoulRiver",
                         img: "83", ability: "soulRiver" },
+        // W83 (спека юзера): «Биоугроза» — враг 3-го этажа «Некро-раскопок».
+        // Герой 84 (20♥, редкая, способность bioReflect — хук в damageUnit
+        // (arenaDamage): 1 раз в ход, когда у существа противника
+        // уменьшаются жизни на число, база противника получает столько же
+        // урона (не больше 2); флаг heroFlags.bioHit сбрасывается
+        // в начале каждого хода)
+        necBiothreat: { id: "necBiothreat", rarity: "rare", baseHp: 20,
+                        elems: ["time", "decay"], starter: "timDec",
+                        img: "84", ability: "bioReflect" },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -603,6 +612,7 @@
         "wtArtMage", // «Искусственный маг»: БОСС «Магодрома» (W81)
         "necGuards", // «Некро-стражи»: враг 1-го этажа «Некро-раскопок» (W82)
         "necSoulRiver", // «Река душ»: враг 2-го этажа «Некро-раскопок» (W82)
+        "necBiothreat", // «Биоугроза»: враг 3-го этажа «Некро-раскопок» (W83)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

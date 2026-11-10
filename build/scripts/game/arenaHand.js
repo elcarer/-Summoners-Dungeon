@@ -49,6 +49,8 @@
                 exhumingMark: { name: "spell.exhuming.name", desc: "spell.exhuming.desc", val: (u) => u.exhuming },
                 domeMark: { name: "spell.dome.name", desc: "spell.dome.desc", val: () => 0 },
                 repairMark: { name: "spell.repair.name", desc: "spell.repair.desc", val: () => 0 },
+                // «Некроз» (nec286, W83): метка уязвимости — ×2 урона
+                rotMark: { name: "spell.rot.name", desc: "spell.rot.desc", val: () => 0 },
             };
             A.effectTip = null; // { key, node }
             A.effectTipHide = function effectTipHide() {

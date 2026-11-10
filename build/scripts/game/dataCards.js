@@ -385,13 +385,16 @@
 
     // W82 (спека юзера): пул наград/драфта «Некро-раскопок» — Время, Тлен
     // и двухцветные Время+Тлен (встречаются только в этом данже). Новые
-    // nec-карты: обычные 281/282/283 ×3, редкая 285 ×3, эпическая 284 ×3
+    // nec-карты: обычные 281/282/283 ×3, редкая 285 ×3, эпическая 284 ×3.
+    // W83 (спека юзера): + обычная 286 ×3 и редкая 287 ×3
     REWARD_POOLS.timDec = [...REWARD_POOLS.time, ...REWARD_POOLS.decay,
         "nec281", "nec281", "nec281",
         "nec282", "nec282", "nec282",
         "nec283", "nec283", "nec283",
         "nec285", "nec285", "nec285",
-        "nec284", "nec284", "nec284"];
+        "nec284", "nec284", "nec284",
+        "nec286", "nec286", "nec286",
+        "nec287", "nec287", "nec287"];
 
     const { ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM,
         FLOOR_MOBS_DECAY, FLOOR_MOBS_HONOR, FLOOR_MOBS_TIME, MOB_TABLES,
@@ -469,7 +472,7 @@
         // «Зараза из глубин»: при розыгрыше двухцветной карты Время−Тлен
         // случайный враг играющего (существо/постройка/база) теряет
         // 1 жизнь (текст в HUD — dungeon.js; multiPlague в arenaDamage)
-        nec: { elem: "timDec", elems: ["time", "decay"], maxFloor: 2,
+        nec: { elem: "timDec", elems: ["time", "decay"], maxFloor: 3,
                plague: true },
     };
     // Колода врага: ядро архетипа; весь добор — только боссу (просил

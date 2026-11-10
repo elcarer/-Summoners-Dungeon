@@ -566,5 +566,28 @@
                   rarity: "rare", elem: "timDec",
                   multi: ["time", "decay"],
                   color: 0x8a5fc0, img: "time_decay/285" },
+
+        // ── W83 (спека юзера): карты 286–287 — Время+Тлен, только
+        // «Некро-раскопки» ────────────────────────────────────────────
+        // «Некроз» (nec286): заклинание — любое существо получает В 2
+        // РАЗА больше урона от любых источников (метка rot, гейт в
+        // damageUnit — arenaDamage; держится до гибели цели)
+        nec286: { type: "spell", cost: 0,
+                  spell: { target: "anyUnit", rot: true },
+                  kind: "damage", // тип эффекта — по спеке юзера (Нанесение урона)
+                  rarity: "common", elem: "timDec",
+                  multi: ["time", "decay"],
+                  color: 0x8a5fc0, img: "time_decay/286" },
+        // «Нулевой образец» (nec287): Зомби 0/4 — когда СУЩЕСТВО
+        // противника теряет жизни (любой источник), это существо
+        // случайно получает +1 к урону или +1 к жизни (painGrow — хук в
+        // damageUnit, arenaDamage; «случайно +1/0 или 0/+1» спеки)
+        nec287: { type: "unit", cost: 5, atk: 0, hp: 4, speed: 1,
+                  creature: "zombie", sheet: "zomb", // Зомби, лист зомби юзера
+                  painGrow: true,
+                  subtype: "zombie", // подтип — по спеке юзера (Зомби)
+                  rarity: "rare", elem: "timDec",
+                  multi: ["time", "decay"],
+                  color: 0x8a5fc0, img: "time_decay/287" },
     };
 })();

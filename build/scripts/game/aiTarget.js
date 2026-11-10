@@ -762,10 +762,13 @@
                 // «Смыв»/«Слабость»/«Ледяной удар»/«Гидроудар»/«Трупный яд»/
                 // «Разложение» целятся в ИГРОКА — этот гейт их не касается
                 if (s.target === "anyUnit" && !s.bounce && !s.debuffAtk && !s.iceStrike
-                    && !s.hydroPunch && !s.poison && !s.destroy
+                    && !s.hydroPunch && !s.poison && !s.destroy && !s.rot
                     && !spellTargets(B.units.filter((v) => v.side === "e"
                         && v.def.type === "unit"
                         && (!s.enchantFire || !v.enchantFire))).length) return false;
+                // «Некроз» (nec286, W83) — есть существо игрока без метки
+                if (s.rot && !spellTargets(B.units.filter((v) => v.side === "p"
+                    && v.def.type === "unit" && !v.rot)).length) return false;
                 // «Трупный яд» (dec144)/«Разложение» (dec145) — есть существо
                 // игрока (сброс «Разложения» при пустой руке просто не
                 // срабатывает — уничтожение остаётся)

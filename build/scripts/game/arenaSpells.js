@@ -363,6 +363,29 @@
                         sfx("chpoc");
                         return true;
                     }
+                    if (def.spell.rot) { // «Некроз» (nec286, W83 — спека
+                        // юзера): цель получает В 2 РАЗА больше урона от
+                        // ЛЮБЫХ источников (гейт в damageUnit —
+                        // arenaDamage). Метка держится до гибели цели,
+                        // повторное заклинание ничего не меняет
+                        u.rot = true;
+                        if (!u.node.getChildByName("rotMark")) {
+                            const mark = new PIXI.Graphics();
+                            mark.circle(0, 0, 10.5);
+                            mark.fill({ color: 0x3a2a5c });
+                            mark.stroke({ width: 3, color: 0xc79af0 });
+                            mark.position.set(-36, -54);
+                            mark.name = "rotMark";
+                            mark.eventMode = "none";
+                            u.node.addChild(mark);
+                        }
+                        floatText(p.x, p.y - 66,
+                            "☣ " + GAME_LOC.t("spell.rot.name"), 0xc79af0);
+                        fxEvent("ward", { x: p.x, y: p.y - 14, scale: 0.9 });
+                        punch(u.node);
+                        sfx("chpoc");
+                        return true;
+                    }
                     if (def.spell.airShield) { // «Воздушный щит» (hw263, W75):
                         // цель не получает урона, кроме обычных атак —
                         // читает damageUnit (arenaDamage); держится до
@@ -958,6 +981,14 @@
                     const foes = spellTargets(B.units.filter((u) => u.side !== "p"
                         && u.def.type === "unit"));
                     const best = foes.slice().sort((a, b) => aiThreat(b) - aiThreat(a))[0];
+                    return best ? { col: best.col, row: best.row } : null;
+                }
+                if (tg === "anyUnit" && def.spell.rot) { // «Некроз» (nec286, W83):
+                    // вражеское существо без метки с максимальными жизнями
+                    const foes = spellTargets(B.units.filter((u) => u.side !== "p"
+                        && u.def.type === "unit" && !u.rot));
+                    const best = foes.slice()
+                        .sort((a, b) => (b.hp - a.hp) || (a.row - b.row))[0];
                     return best ? { col: best.col, row: best.row } : null;
                 }
                 if (tg === "anyUnit" || tg === "ownUnit") {

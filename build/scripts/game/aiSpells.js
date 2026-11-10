@@ -132,6 +132,35 @@
                     volleyAct("e");
                     return;
                 }
+                if (s.rot) { // «Некроз» (nec286, W83 — спека юзера): вражеское
+                    // существо без метки с максимальными жизнями — удвоенный
+                    // урон от любых источников (руна-фокус приоритетнее)
+                    const foes = B.units.filter((v) => v.side !== "e"
+                        && v.def.type === "unit" && !v.rot && B.units.includes(v));
+                    const best = foes.slice()
+                        .sort((a, b) => (b.hp - a.hp) || (a.row - b.row))[0];
+                    const t = focus && foes.includes(focus) ? focus : best;
+                    if (t) {
+                        aimOff(t);
+                        t.rot = true;
+                        if (!t.node.getChildByName("rotMark")) {
+                            const mark = new PIXI.Graphics();
+                            mark.circle(0, 0, 10.5);
+                            mark.fill({ color: 0x3a2a5c });
+                            mark.stroke({ width: 3, color: 0xc79af0 });
+                            mark.position.set(-36, -54);
+                            mark.name = "rotMark";
+                            mark.eventMode = "none";
+                            t.node.addChild(mark);
+                        }
+                        floatText(cellXY(t.col, t.row).x,
+                            cellXY(t.col, t.row).y - 66,
+                            "☣ " + GAME_LOC.t("spell.rot.name"), 0xc79af0);
+                        punch(t.node);
+                        sfx("chpoc");
+                    }
+                    return;
+                }
                 if (s.target === "anyUnit" && !s.nova) { // усиление/очарование — лучшему
                     // «Полные колчаны» (gh259, W72): лучшему СТРЕЛКУ
                     // (выстрел станет на 1 больше); стрелков нет —

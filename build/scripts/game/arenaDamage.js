@@ -712,6 +712,13 @@
                 if (amt > 0 && killer && killer.def && killer.def.siegeDouble
                     && killer.side !== target.side
                     && target.def.type === "building") amt *= 2;
+                // «Некроз» (nec286, W83 — спека юзера): существо с меткой
+                // Некроза получает В 2 РАЗА больше урона от ЛЮБЫХ
+                // источников — атака, заклинания, ловушки, способности
+                // (всё идёт через damageUnit). Умножение ДО брони/купола —
+                // как у «Тараномобиля»: защита гасит уже удвоенный урон;
+                // метка держится до гибели цели
+                if (amt > 0 && target.rot) amt *= 2;
                 let blocked = 0;
                 // «Снизошедший» (hon190): страж — если ПРОТИВНИК атакует это
                 // существо (удар существом: марш, «Скорость», «Тёмные цепи»)
@@ -750,6 +757,53 @@
                 target.hp -= amt;
                 procEnchantFire(killer);
                 procSpores(killer, amt); // «Призрачные споры» отражают урон по базе
+                // «Нулевой образец» (nec287, W83 — спека юзера): когда
+                // СУЩЕСТВО противника теряет жизни (любой источник;
+                // постройки и базы — не существа; погасший бронёй/куполом
+                // урон жизни не уменьшает), каждый живой «Образец» другой
+                // стороны случайно получает +1 к урону или +1 к жизни
+                // (50/50 — «случайно +1/0 или 0/+1» спеки)
+                if (amt > 0 && target.def.type === "unit") {
+                    const growers = B.units.filter((v) => v.side !== target.side
+                        && v.def.painGrow && v.def.type === "unit"
+                        && B.units.includes(v));
+                    for (const z of growers) {
+                        const zp = cellXY(z.col, z.row);
+                        if (Math.random() < 0.5) { // +1 к урону
+                            z.bonusAtk = (z.bonusAtk || 0) + 1;
+                            recalcAuras();
+                            const an = z.node.getChildByName("atk");
+                            if (an) an.text = String(z.curAtk);
+                            floatText(zp.x, zp.y - 39, "+1⚔", 0xc79af0);
+                            onBuff(z, 1, 0);
+                        } else { // +1 к жизни
+                            z.hp += 1;
+                            const hn = z.node.getChildByName("hp");
+                            if (hn) hn.text = String(z.hp);
+                            floatText(zp.x, zp.y - 39, "+1♥", 0x9fd489);
+                            onBuff(z, 0, 1);
+                        }
+                        fxEvent("buff", { x: zp.x, y: zp.y - 12, scale: 0.7 });
+                        sfx("chpoc");
+                    }
+                }
+                // «Биоугроза» (necBiothreat, W83 — спека юзера): 1 РАЗ В
+                // ХОД, когда у существа противника владельца способности
+                // уменьшаются жизни на число, база противника получает
+                // столько же урона (НЕ БОЛЬШЕ 2; реальное уменьшение —
+                // броня/купол, съевшие весь урон, жизней не трогают).
+                // База — не существо: отражённый урон дальше не отражается
+                if (amt > 0 && target.def.type === "unit"
+                    && !B.heroFlags.bioHit[target.side === "p" ? "e" : "p"]) {
+                    const hd = heroDefOf(target.side === "p" ? "e" : "p");
+                    if (hd && hd.ability === "bioReflect") {
+                        B.heroFlags.bioHit[target.side === "p" ? "e" : "p"] = true;
+                        damageBase(target.side, Math.min(amt, 2),
+                            { x: 960, y: target.side === "p" ? 840 : 240,
+                              fill: 0xb07ad5 });
+                        sfx("chpoc");
+                    }
+                }
                 const n = target.node.getChildByName("hp");
                 if (n) n.text = String(Math.max(0, target.hp));
                 const p = cellXY(target.col, target.row);
