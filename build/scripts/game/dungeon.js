@@ -1157,19 +1157,35 @@
                 ctx.collide.rows = MAPROWS; // коллизии героя — по карте этажа
                 ctx.collide.ts = TS; // клетка этажа — 64px (тайлы данжа)
                 ctx.collide.extra = null; // блок тел городов мира (W42) — только в мире
-                // сейв стоя на лестнице не должен мгновенно поднимать героя
-                if (st.ladder && st.heroPos
-                    && Math.hypot(st.ladder.x - st.heroPos.x, st.ladder.y - st.heroPos.y) < TS * 0.9) {
-                    st.heroPos = { ...st.spawn };
-                }
-                // сейв в клетках прохода города (W52): груз не должен
-                // сразу выкидывать в мир — герой возвращается к спавну
-                if (st.city && st.exitPassage && st.heroPos) {
-                    const pg = st.exitPassage;
-                    const pcx = Math.floor(st.heroPos.x / TS),
-                          pcy = Math.floor(st.heroPos.y / TS);
-                    if (pcy === pg.y && pcx >= pg.x0 && pcx <= pg.x1)
+                // Вход из UI (колода/настройки/бой/драфт): ни один штатный
+                // путь остывание не ставил, а позиция героя легитимна —
+                // он пришёл на неё пешком. Гейты-телепорты ниже (сейв у
+                // лестницы / в проходе города) для этого входа не нужны,
+                // зато выходу нужно 2с «остывание» (W22): стоящий у
+                // лестницы герой при возврате из колоды получал ДВА
+                // телепорта — гейт вёл его к спавну, а спавн стоит в
+                // пороге выхода (ровно TS от лестницы < TS*1.02) — первый
+                // кадр update() выкидывал на этаж выше (баг юзера: сменил
+                // героя в колоде, стоя у лестницы). Штатные входы (мир —
+                // world.js, спуск — ниже, «Продолжить» — main.js) ставят
+                // ladderCoolMs ДО сцен — их ветка не трогает
+                if (!(st.ladderCoolMs > 0)) {
+                    st.ladderCoolMs = 2000;
+                } else {
+                    // сейв стоя на лестнице не должен мгновенно поднимать героя
+                    if (st.ladder && st.heroPos
+                        && Math.hypot(st.ladder.x - st.heroPos.x, st.ladder.y - st.heroPos.y) < TS * 0.9) {
                         st.heroPos = { ...st.spawn };
+                    }
+                    // сейв в клетках прохода города (W52): груз не должен
+                    // сразу выкидывать в мир — герой возвращается к спавну
+                    if (st.city && st.exitPassage && st.heroPos) {
+                        const pg = st.exitPassage;
+                        const pcx = Math.floor(st.heroPos.x / TS),
+                              pcy = Math.floor(st.heroPos.y / TS);
+                        if (pcy === pg.y && pcx >= pg.x0 && pcx <= pg.x1)
+                            st.heroPos = { ...st.spawn };
+                    }
                 }
                 // старт без «лестницы наверх» (ленивая инициализация):
                 // восстанавливается из карты этажа
@@ -1763,6 +1779,8 @@
             // в экранные (тесты кликают по полу через реальные события мыши);
             // layer стоит в (0,0) мира — его трансформ и есть мировая матрица
             path: () => path,
+            // «прожиг» перехода этажа (descentGo) — тест-хук диагностики
+            floorLock: () => floorLock,
             // тест-хук: эмуляция клика по местности (обработчик зоны)
             clickAt: (x, y) => zoneRef && zoneRef.emit("pointertap",
                 { global: layer ? layer.toGlobal({ x, y }) : { x, y } }),
