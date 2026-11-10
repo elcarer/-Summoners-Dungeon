@@ -152,6 +152,7 @@
                         const cell2 = { col: e.col, row: e.row };
                         const id2 = cardIdOf(u.def);
                         removeUnit(u);
+                        soulRiverLeave(u); // «Река душ» (W82): ушёл в «Сдвиг» — покинул поле
                         A.delayPlace(side, id2, cell2.col, cell2.row,
                             { token: e.token,
                               left: Math.max(1, A.effDelayVal(1, side)) });

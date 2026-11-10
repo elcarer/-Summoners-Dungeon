@@ -25,7 +25,7 @@
             "dungeon.study": "Deep Study: when a Purple-Blue (Wisdom-Time two-color) card is played, draw a card",
             "dungeon.studyShort": "Deep Study",
             // W82 (юзер): особенность «Некро-раскопок» — текст в HUD данжа
-            "dungeon.plague": "Plague from the Depths: when a Purple-Black (Time-Decay two-color) card is played, a random enemy (creature, building or base of the opponent) loses 1 life; if it is a creature, it also loses 1 attack or nothing",
+            "dungeon.plague": "Plague from the Depths: when a Purple-Black (Time-Decay two-color) card is played, a random enemy (creature, building or base of the opponent) loses 1 life; if it is a creature, it also loses 1 attack (−1/0)",
             "dungeon.plagueShort": "Plague from the Depths",
             "dungeon.deckLow": "Deck is below the minimum ({min}) — build your deck",
             "dungeon.hp": "HP {hp}/{max}",

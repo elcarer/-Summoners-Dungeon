@@ -663,6 +663,7 @@
                     const cell = { col: u.col, row: u.row };
                     const left = trap.def.trap.delay || 2;
                     removeUnit(u);
+                    soulRiverLeave(u); // «Река душ» (W82): ушёл в «Сдвиг» — покинул поле
                     const p2 = cellXY(cell.col, cell.row);
                     floatText(p2.x, p2.y - 66,
                         "⏳ " + GAME_LOC.t("status.delay.name"), 0xc9a0ef);

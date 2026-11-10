@@ -351,6 +351,7 @@
                     ownBaseHit(u);
                     triggerAttackTraps(u); // удар по базе — тоже атака (руна)
                     removeUnit(u);
+                    soulRiverLeave(u); // «Река душ» (W82): существо покинуло поле
                     refreshHud();
                     checkEnd();
                     return;
@@ -532,6 +533,7 @@
                             triggerAttackTraps(u); // удар по базе — тоже атака (руна)
                             axeStrike(u); // «Лабрис основателя» (wt279, W81)
                             removeUnit(u);
+                            soulRiverLeave(u); // «Река душ» (W82): существо покинуло поле
                             refreshHud();
                             if (checkEnd()) return;
                             break;
@@ -670,6 +672,7 @@
                 const p = cellXY(u.col, u.row);
                 packFrenzy(u); // «Безумие стаи»: способность труса сработала
                 removeUnit(u);
+                soulRiverLeave(u); // «Река душ» (W82): существо покинуло поле (побег)
                 floatText(p.x, p.y - 60, GAME_LOC.t(`card.${id}.name`), 0xd8c79d);
                 let i = discard.indexOf(id);
                 let src = "discard";
