@@ -186,14 +186,16 @@
                     return;
                 }
                 if (s.necroGrow) { // «Некро-наросты» (nec288, W84 — спека
-                    // юзера): свой объект с наибольшим числом вражеских
-                    // соседей — носитель бьёт их в начале хода противника
-                    // (руна-фокус приоритетнее)
-                    const own = spellTargets(B.units.filter((v) => v.side === "e"
-                        && B.units.includes(v)));
+                    // юзера): объект с наибольшим числом соседей-игрока
+                    // (ЛЮБОЙ стороны — нарост на p-объект бьёт его же
+                    // соседей: саботаж; владелец эффекта — ИИ, тик в начале
+                    // хода противника владельца = хода игрока). Руна-фокус
+                    // приоритетнее
+                    const own = spellTargets(B.units.filter((v) =>
+                        B.units.includes(v)));
                     let best = null, bestN = 0;
                     for (const v of own) {
-                        const n = B.units.filter((o) => o.side !== "e"
+                        const n = B.units.filter((o) => o.side === "p"
                             && Math.abs(o.col - v.col)
                             + Math.abs(o.row - v.row) === 1).length;
                         if (n > bestN) { bestN = n; best = v; }
@@ -202,7 +204,7 @@
                         : (bestN > 0 ? best : null);
                     if (t) {
                         aimOff(t);
-                        necroGrowTarget(t);
+                        necroGrowTarget(t, "e"); // владелец — ИИ
                     }
                     return;
                 }

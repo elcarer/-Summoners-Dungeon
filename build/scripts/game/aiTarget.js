@@ -782,12 +782,11 @@
                         && effCreature(o)
                         && Math.abs(o.col - v.col)
                         + Math.abs(o.row - v.row) === 1))) return false;
-                // «Некро-наросты» (nec288, W84) — есть свой объект с вражеским
-                // соседом (носитель бьёт в начале хода противника)
-                if (s.necroGrow && !B.units.some((v) => v.side === "e"
-                    && B.units.some((o) => o.side === "p"
-                        && Math.abs(o.col - v.col)
-                        + Math.abs(o.row - v.row) === 1))) return false;
+                // «Некро-наросты» (nec288, W84) — есть объект с соседом-игроком
+                // (ЛЮБОЙ стороны: нарост на p-объект бьёт его же соседей)
+                if (s.necroGrow && !B.units.some((v) => B.units.some((o) =>
+                    o.side === "p" && Math.abs(o.col - v.col)
+                    + Math.abs(o.row - v.row) === 1))) return false;
                 // «Трупный яд» (dec144)/«Разложение» (dec145) — есть существо
                 // игрока (сброс «Разложения» при пустой руке просто не
                 // срабатывает — уничтожение остаётся)
