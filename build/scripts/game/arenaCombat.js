@@ -1132,6 +1132,30 @@
                     damageBase(v.side === "p" ? "e" : "p", k,
                         { x: 960, y: v.side === "p" ? 240 : 840, fill: 0xb07ad5 });
                 }
+                // «Обитаемый могильник» (nec284, W82 — спека юзера): когда
+                // карта ВЛАДЕЛЬЦА уходит в сброс, постройка призывает
+                // Призрака 2/1 (жетон ghost) в случайную пустую клетку поля
+                // боя. Терминология игры — как у «Проклятых артефактов»/
+                // «Дурного варева» («когда ваша карта сбрасывается»): любые
+                // пути в сброс, включая потраченные карты. Несколько
+                // могильников — каждый зовёт своего Призрака. Случайная
+                // клетка оказалась с ловушкой — Призрак встречает её как
+                // обычный призыв (штатный triggerCellTraps в addUnit)
+                if (side && ids && ids.length) for (const v of B.units.slice()) {
+                    if (!v.def.graveGhost || v.side !== side
+                        || !B.units.includes(v)) continue;
+                    const cells = [];
+                    for (let c2 = 0; c2 < GRID; c2++)
+                        for (let r2 = 0; r2 < GRID; r2++)
+                            if (!unitAt(c2, r2)) cells.push([c2, r2]);
+                    if (!cells.length) continue;
+                    const [gc, gr] = cells[(Math.random() * cells.length) | 0];
+                    addUnit(side, "ghost", gc, gr, { token: true });
+                    const gp = cellXY(gc, gr);
+                    floatText(gp.x, gp.y - 60,
+                        GAME_LOC.t("card.ghost.name"), 0xb7d0ef);
+                    sfx("chpoc");
+                }
                 // «Каток» (tim236): урон равен длине сброса владельца —
                 // любой выход карты в сброс меняет его (дёшево: пересчёт
                 // только обновляет бейдж, если число изменилось)

@@ -239,6 +239,22 @@
         wtArtMage: { id: "wtArtMage", rarity: "epic", baseHp: 22,
                      elems: ["wisdom", "time"], starter: "wisTim",
                      img: "81", ability: "chaosPlay" },
+        // W82 (спека юзера): «Некро-стражи» — враг 1-го этажа
+        // «Некро-раскопок» (данж Время+Тлен). Герой 82 (16♥, редкая,
+        // способность secondSummonDig — хук в addUnit (arenaBoard): когда
+        // владелец разыгрывает ВТОРОЙ призыв за ход, это второе призванное
+        // существо получает «Выкапывание 1»)
+        necGuards: { id: "necGuards", rarity: "rare", baseHp: 16,
+                     elems: ["time", "decay"], starter: "timDec",
+                     img: "82", ability: "secondSummonDig" },
+        // W82 (спека юзера): «Река душ» — враг 2-го этажа «Некро-раскопок».
+        // Герой 83 (18♥, редкая, способность soulRiver — хуки в killUnit/
+        // bounceUnit (arenaDamage): когда существо владельца покидает поле
+        // боя, случайная карта с руки сбрасывается, и в освободившуюся
+        // клетку призывается Призрак 2/1)
+        necSoulRiver: { id: "necSoulRiver", rarity: "rare", baseHp: 18,
+                        elems: ["time", "decay"], starter: "necSoulRiver",
+                        img: "83", ability: "soulRiver" },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -585,6 +601,8 @@
         "wtMagic", // «Техномагия»: враг 2-го этажа «Магодрома» (W80)
         "wtDarkKing", // «Тёмный царь»: враг 3-го этажа «Магодрома» (W81)
         "wtArtMage", // «Искусственный маг»: БОСС «Магодрома» (W81)
+        "necGuards", // «Некро-стражи»: враг 1-го этажа «Некро-раскопок» (W82)
+        "necSoulRiver", // «Река душ»: враг 2-го этажа «Некро-раскопок» (W82)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
@@ -627,6 +645,7 @@
         groHon: "logo/growth_honor_logo.png", // Рост + Честь («Белая пуща»)
         honWis: "logo/honor_wisdom_logo.png", // Честь + Мудрость («Небесный дворец», W75)
         wisTim: "logo/wisdom_time_logo.png", // Мудрость + Время («Магодром», W79)
+        timDec: "logo/time_decay_logo.png", // Время + Тлен («Некро-раскопки», W82)
     };
     // Часть каталога для cardsData.js (его читают игра и tools/cards.html).
     globalThis.GAME_HEROES_DATA = { HEROES, HERO_ORDER, HERO_FOE_ORDER,

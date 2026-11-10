@@ -1431,14 +1431,16 @@
                 // «Ярость природы» — «Рыжий лес»; «Растущая доблесть» —
                 // «Белая пуща» (W62, юзер); «Переплетение сил» — «Небесный
                 // дворец» (W75, юзер); «Глубокое изучение» — «Магодром»
-                // (W79, юзер)
+                // (W79, юзер); «Зараза из глубин» — «Некро-раскопки»
+                // (W82, юзер)
                 {
                     const cd = globalThis.GAME_DATA.CAVES[st.cave];
                     uiHud.userData.featT.text = !st.city && cd
                         ? (cd.fury ? GAME_LOC.t("dungeon.fury")
                             : cd.valor ? GAME_LOC.t("dungeon.valor")
                             : cd.weave ? GAME_LOC.t("dungeon.weave")
-                            : cd.study ? GAME_LOC.t("dungeon.study") : "")
+                            : cd.study ? GAME_LOC.t("dungeon.study")
+                            : cd.plague ? GAME_LOC.t("dungeon.plague") : "")
                         : "";
                 }
                 uiHud.userData.goldT.text = String(G.gold);

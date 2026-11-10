@@ -24,6 +24,9 @@
             // W79 (юзер): особенность «Магодрома» — текст в HUD данжа
             "dungeon.study": "Deep Study: when a Purple-Blue (Wisdom-Time two-color) card is played, draw a card",
             "dungeon.studyShort": "Deep Study",
+            // W82 (юзер): особенность «Некро-раскопок» — текст в HUD данжа
+            "dungeon.plague": "Plague from the Depths: when a Purple-Black (Time-Decay two-color) card is played, a random enemy (creature, building or base of the opponent) loses 1 life; if it is a creature, it also loses 1 attack or nothing",
+            "dungeon.plagueShort": "Plague from the Depths",
             "dungeon.deckLow": "Deck is below the minimum ({min}) — build your deck",
             "dungeon.hp": "HP {hp}/{max}",
             "dungeon.exitLabel": "DESCEND",
@@ -47,6 +50,8 @@
             "world.caveHw": "Celestial Palace",
             // W79: мультицветный данж у границы Мудрости и Времени
             "world.caveWt": "Magodrome",
+            // W82: мультицветный данж у границы Времени и Тлена
+            "world.caveNec": "Necro Excavations",
             "world.soon": "Coming soon…",
             "world.deckLow": "Not enough cards: at least {min} required to enter",
             "world.resLow": "To enter you need: 1 Power Charm and 1 Life Sprout",
@@ -729,11 +734,27 @@
             "card.wt279.name": "Founder's Labrys",
             "card.wt279.desc": "Whenever this creature attacks, it deals 3 damage to a random enemy (creature, building or the opposing base)",
             "card.wt280.name": "Time Mage",
-            "card.wt280.desc": "Mage 1/2. \"Return 2\": goes back to your hand 2 turns after being summoned. While this creature is on the battlefield, your creatures' return counters do not decrease",
+            "card.wt280.desc": "Mage 1/2. \"Return 2\": goes back to your hand 2 turns after being summoned. While this creature is on the battlefield, your creatures' return counters do not decrease, except for the Time Mage's own return counter",
             "enc.wtDarkKing.title": "Dark King",
             "hero.wtDarkKing.ability": "Whenever your creature enters the battlefield, it deals 1 damage to itself and 1 damage to a random enemy (creature, building or the opposing base)",
             "enc.wtArtMage.title": "Artificial Mage",
             "hero.wtArtMage.ability": "When playing a card from hand, cancel its effect and play another random card from hand (energy for that card is spent, for the other one it is not)",
+            // W82 (спека юзера): карты «Некро-раскопок» (Время+Тлен) и
+            // враги 1–2-го этажей
+            "card.nec281.name": "Necro Gnome",
+            "card.nec281.desc": "Gnome 3/1. \"Delay 1\": appears on the chosen cell at the start of your next turn if it stays free. \"Exhuming 2\": after death returns to the same cell twice without spending energy",
+            "card.nec282.name": "Cyber Zombie",
+            "card.nec282.desc": "Zombie 1/1. \"Delay 2\": appears on the chosen cell at the start of your turn in 2 turns if it stays free. \"Exhuming 3\": after death returns to the same cell three times without spending energy",
+            "card.nec283.name": "Realm Armor",
+            "card.nec283.desc": "Trap on an empty cell. When a creature moves or is summoned onto this cell, it gains +3 attack and loses 2 health",
+            "card.nec284.name": "Inhabited Crypt",
+            "card.nec284.desc": "Whenever one of your cards is discarded, summon a Ghost 2/1 onto a random cell of the battlefield",
+            "card.nec285.name": "Modified Relics",
+            "card.nec285.desc": "Whenever your creature enters the battlefield adjacent to this building, it gains +1 to its lowest stat (attack or health)",
+            "enc.necGuards.title": "Necro Guards",
+            "hero.necGuards.ability": "When you play your second summon this turn, that second summoned creature gains \"Exhuming 1\"",
+            "enc.necSoulRiver.title": "River of Souls",
+            "hero.necSoulRiver.ability": "Whenever your creature leaves the battlefield, discard a random card from hand and summon a Ghost 2/1 onto the cell where it was",
             "proj.title": "Projection of the Past",
             "proj.up": "Effect tokens: +1",
             "proj.down": "Effect tokens: −1",
@@ -916,6 +937,9 @@
             // W79: мульти-стихия «Магодрома»
             "elem.wisTim": "Wisdom + Time",
             "elem.wisTim.short": "W+T",
+            // W82: мульти-стихия «Некро-раскопок»
+            "elem.timDec": "Time + Decay",
+            "elem.timDec.short": "T+D",
             "menu.pickHero": "CHOOSE YOUR HERO",
             "menu.pickHeroSub": "The hero defines your base health, deck elements and special ability",
             "menu.pickHeroSoon": "Coming soon…",

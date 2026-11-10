@@ -503,8 +503,9 @@
                  multi: ["wisdom", "time"],
                  color: 0x9a8ce8, img: "wisdom_time/279" },
         // «Маг времени» (wt280): «Возврат 2» — пока он на поле боя,
-        // счётчики «Возврата» существ владельца НЕ уменьшаются (гейт
-        // retLock в returnTick, arenaUpkeep; тик Возврата сгорает)
+        // счётчики «Возврата» существ владельца НЕ уменьшаются, КРОМЕ
+        // СВОЕГО счётчика Мага (поправка W82; гейт retLock в returnTick,
+        // arenaUpkeep — его тик проходит честно)
         wt280: { type: "unit", cost: 3, atk: 1, hp: 2, speed: 1,
                  creature: "gnome", // плейсхолдер спрайт-листа (маг)
                  subtype: "mage", // подтип — по спеке юзера (Маг)
@@ -512,5 +513,58 @@
                  rarity: "common", elem: "wisTim",
                  multi: ["wisdom", "time"],
                  color: 0x9a8ce8, img: "wisdom_time/280" },
+
+        // ── W82 (спека юзера): карты 281–285 — Время+Тлен, только
+        // «Некро-раскопки» (2 этажа: «Некро-стражи», «Река душ») ──────
+        // «Некро-гном» (nec281): Гном 3/1 — «Сдвиг 1» (delay: появится
+        // на клетке в начале следующего хода) + «Выкапывание 2» (exhuming:
+        // после смерти дважды возвращается на ту же клетку)
+        nec281: { type: "unit", cost: 3, atk: 3, hp: 1, speed: 1,
+                  creature: "gnome", sheet: "gnome", // Гном — лист гномов (как у мехов)
+                  delay: 1, // «Сдвиг 1» — маркер-счётчик на клетке
+                  exhuming: 2, // «Выкапывание 2»
+                  subtype: "gnome", // подтип — по спеке юзера (Гном)
+                  rarity: "common", elem: "timDec",
+                  multi: ["time", "decay"],
+                  color: 0x8a5fc0, img: "time_decay/281" },
+        // «Кибер-зомби» (nec282): Зомби 1/1 — «Сдвиг 2» + «Выкапывание 3»
+        nec282: { type: "unit", cost: 1, atk: 1, hp: 1, speed: 1,
+                  creature: "zombie", sheet: "zomb", // Зомби, лист зомби юзера
+                  delay: 2, // «Сдвиг 2»
+                  exhuming: 3, // «Выкапывание 3»
+                  subtype: "zombie", // подтип — по спеке юзера (Зомби)
+                  rarity: "common", elem: "timDec",
+                  multi: ["time", "decay"],
+                  color: 0x8a5fc0, img: "time_decay/282" },
+        // «Доспех царства» (nec283): ловушка-усиление на пустую клетку —
+        // вошедшее ЛЮБОЕ существо (нейтральная, как «Пролом реальности»)
+        // получает +3 урона и −2 жизни (necroArmor — triggerCellTraps,
+        // arenaTraps). В спеке врага №1 названа «Древний доспех» (юзер:
+        // «не успел поправить везде» — это та же карта)
+        nec283: { type: "trap", cost: 1,
+                  trap: { event: "onCell", effect: "necroArmor" },
+                  kind: "buff", // тип эффекта — по спеке юзера (Усиление)
+                  rarity: "common", elem: "timDec",
+                  multi: ["time", "decay"],
+                  color: 0x8a5fc0, img: "time_decay/283" },
+        // «Обитаемый могильник» (nec284): постройка — когда карта
+        // владельца уходит в сброс (любыми путями, как у «Проклятых
+        // артефактов»/«Дурного варева»: включая потраченные; graveGhost —
+        // хук в noteDiscard, arenaCombat), призывает Призрака 2/1 (жетон
+        // ghost) в случайную пустую клетку поля боя
+        nec284: { type: "building", cost: 4, atk: 0, hp: 6,
+                  graveGhost: true,
+                  rarity: "epic", elem: "timDec",
+                  multi: ["time", "decay"],
+                  color: 0x8a5fc0, img: "time_decay/284" },
+        // «Модифицированные реликвии» (nec285): постройка — существо
+        // владельца, пришедшее на поле боя по соседству, получает +1 к
+        // своему минимальному параметру (урон или жизни; равенство —
+        // урон; relicsBuff — хук в addUnit рядом с «Мечом в алтаре»)
+        nec285: { type: "building", cost: 3, atk: 0, hp: 4,
+                  relicsBuff: true,
+                  rarity: "rare", elem: "timDec",
+                  multi: ["time", "decay"],
+                  color: 0x8a5fc0, img: "time_decay/285" },
     };
 })();

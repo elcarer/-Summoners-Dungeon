@@ -38,6 +38,8 @@
         honWis: starterCollection(STARTER_DECKS.honWis),
         // W79: ядро врага «Бешеные шестерни» («Магодром») — та же симметрия
         wisTim: starterCollection(STARTER_DECKS.wisTim),
+        // W82: ядро врага «Некро-стражи» («Некро-раскопки») — та же симметрия
+        timDec: starterCollection(STARTER_DECKS.timDec),
     };
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N
@@ -381,6 +383,16 @@
         "wt279", "wt279", "wt279",
         "wt280", "wt280", "wt280"];
 
+    // W82 (спека юзера): пул наград/драфта «Некро-раскопок» — Время, Тлен
+    // и двухцветные Время+Тлен (встречаются только в этом данже). Новые
+    // nec-карты: обычные 281/282/283 ×3, редкая 285 ×3, эпическая 284 ×3
+    REWARD_POOLS.timDec = [...REWARD_POOLS.time, ...REWARD_POOLS.decay,
+        "nec281", "nec281", "nec281",
+        "nec282", "nec282", "nec282",
+        "nec283", "nec283", "nec283",
+        "nec285", "nec285", "nec285",
+        "nec284", "nec284", "nec284"];
+
     const { ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM,
         FLOOR_MOBS_DECAY, FLOOR_MOBS_HONOR, FLOOR_MOBS_TIME, MOB_TABLES,
         ENEMY_FILL, ENEMY_FILLS } = globalThis.GAME_ENCOUNTERS;
@@ -448,6 +460,17 @@
         // (текст в HUD — dungeon.js; multiStudy в arenaDamage)
         wt: { elem: "wisTim", elems: ["wisdom", "time"], maxFloor: 3,
               boss: "wtArtMage", bossLast: true, study: true },
+        // W82 (спека юзера): «Некро-раскопки» — МУЛЬТИЦВЕТНЫЙ данж
+        // Время+Тлен (по образцу «Магодрома»). ЭТАЖА 2 (босс и 3-й этаж —
+        // со спекой юзера): враги — «Некро-стражи» (герой 82, 16♥) и
+        // «Река душ» (герой 83, 18♥). elems — стихии ДРАФТА «Карты
+        // сокровищ» (Время, Тлен, двухцветные timDec); elem — мульти-
+        // стихия (рубашки card_multi_back.png). Особенность plague —
+        // «Зараза из глубин»: при розыгрыше двухцветной карты Время−Тлен
+        // случайный враг играющего (существо/постройка/база) теряет
+        // 1 жизнь (текст в HUD — dungeon.js; multiPlague в arenaDamage)
+        nec: { elem: "timDec", elems: ["time", "decay"], maxFloor: 2,
+               plague: true },
     };
     // Колода врага: ядро архетипа; весь добор — только боссу (просил
     // юзер): с глубиной (floor ≥ 1) +2 карты из grow за этаж и 3..8 карт

@@ -288,7 +288,8 @@
                             || e === "dandelionPath" // «Путь одуванчиков» — только существа (W65)
                             || e === "sporeCurse" // «Призрачные споры» — только существа (W60)
                             || e === "bldVolley" // «Засека» — только существа (W73)
-                            || e === "realityRift") // «Пролом реальности» — только существа (W81)
+                            || e === "realityRift" // «Пролом реальности» — только существа (W81)
+                            || e === "necroArmor") // «Доспех царства» — только существа (W82)
                             return u.def.type === "unit";
                         return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
                             || e === "confuse" || e === "cellDebuff"
@@ -319,6 +320,8 @@
                             || (t.def.trap.effect === "tarKettles"
                                 && u.def.type === "unit")
                             || (t.def.trap.effect === "realityRift"
+                                && u.def.type === "unit")
+                            || (t.def.trap.effect === "necroArmor"
                                 && u.def.type === "unit")));
                 }
                 if (i < 0) return;
@@ -684,6 +687,29 @@
                     floatText(p2.x, p2.y - 108,
                         GAME_LOC.t("card.ghost.name"), 0xb7d0ef);
                     sfx("chpoc");
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
+                if (trap.def.trap.effect === "necroArmor") {
+                    // «Доспех царства» (nec283, W82 — спека юзера): вошедшее
+                    // ЛЮБОЕ существо (нейтральная ловушка) получает +3 урона
+                    // и −2 жизни (+3/−2); не пережило доспех — гибнет.
+                    // Стат-мод, не «урон»: Щиты/Ответ и пр. не ловят
+                    u.bonusAtk = (u.bonusAtk || 0) + 3;
+                    recalcAuras();
+                    const an = u.node.getChildByName("atk");
+                    if (an) an.text = String(u.curAtk);
+                    u.hp -= 2;
+                    const hn = u.node.getChildByName("hp");
+                    if (hn) hn.text = String(Math.max(0, u.hp));
+                    const p2 = cellXY(u.col, u.row);
+                    floatText(p2.x, p2.y - 60, "+3⚔ −2♥", 0xc79af0);
+                    punch(u.node);
+                    fxEvent("buff", { x: p2.x, y: p2.y - 12, scale: 0.7 });
+                    onBuff(u, 3, -2); // «Белая пуща» (W61): единый хук усиления
+                    sfx("chpoc");
+                    if (u.hp <= 0) killUnit(u, null);
                     refreshHud();
                     checkEnd();
                     return;

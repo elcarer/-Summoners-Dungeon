@@ -76,6 +76,7 @@
                 const id = cardIdOf(u.def);
                 removeUnit(u);
                 recalcAuras();
+                soulRiverLeave(u); // «Река душ» (W82): существо покинуло поле
                 if (u.token) return;
                 if (returnCardToHand(u.side, id))
                     floatText(p.x, p.y - 66, "↩ " + GAME_LOC.t(`card.${id}.name`), 0x8cd0ef);
@@ -340,9 +341,43 @@
                 lichRaiseGhost(killer, u); // «Лич»: призрак на клетку убитого
                 deathKnightGain(killer, u); // «Рыцарь смерти»: +1⚡ владельцу
                 exhumingReplay(u); // «Выкапливание»: существо возвращается после смерти
+                soulRiverLeave(u); // «Река душ» (W82): существо покинуло поле
                 if (ambush) ambushRiseAct(ambush.side, ambush.trap,
                     ambush.col, ambush.row); // «Засадный отряд»
                 return true;
+            };
+
+            // «Река душ» (necSoulRiver, W82 — спека юзера): когда СУЩЕСТВО
+            // владельца покидает поле боя, случайная карта с руки
+            // сбрасывается и в освободившуюся клетку призывается Призрак
+            // 2/1 (жетон ghost). «Покидает» = гибель (killUnit) и возврат
+            // в руку (bounceUnit: «Ремонт», «Циклон», «Возврат N», «Смыв»);
+            // постройки не «существо». Клетку успели занять каскадами
+            // («Лич», «Засадный отряд», «Выкапывание») — призыва нет
+            A.soulRiverLeave = function soulRiverLeave(u) {
+                if (!u || !B || !B.units || u.def.type !== "unit") return;
+                const hd = heroDefOf(u.side);
+                if (!hd || hd.ability !== "soulRiver") return;
+                const side = u.side, col = u.col, row = u.row;
+                const hand = side === "p" ? B.hand : B.eHand;
+                if (hand.length) {
+                    const i = (Math.random() * hand.length) | 0;
+                    const id = hand.splice(i, 1)[0];
+                    (side === "p" ? B.discard : B.eDiscard).push(id);
+                    noteDiscard(1, side, [id]);
+                    const hp = cellXY(col, row);
+                    floatText(hp.x, hp.y - 108,
+                        "⤓ " + GAME_LOC.t(`card.${id}.name`), 0xc79af0);
+                    if (side === "p") layoutHand();
+                }
+                if (!unitAt(col, row)) {
+                    addUnit(side, "ghost", col, row, { token: true });
+                    const gp = cellXY(col, row);
+                    floatText(gp.x, gp.y - 60,
+                        GAME_LOC.t("card.ghost.name"), 0xb7d0ef);
+                }
+                sfx("chpoc");
+                refreshHud();
             };
 
             // Способности «Охранников мостов» (просил юзер). Срабатывают
@@ -1186,6 +1221,54 @@
                     drawCards(1);
                 } else if (B.eDeck.length) { // добор врага — верх колоды
                     B.eHand.push(B.eDeck.pop());
+                }
+                sfx("chpoc");
+            };
+
+            // «Зараза из глубин» («Некро-раскопки», W82 — спека юзера;
+            // текст в HUD данжа): при розыгрыше ДВУХЦВЕТНОЙ карты
+            // Время+Тлен (elem "timDec") случайный враг ИГРАЮЩЕГО
+            // (существо/постройка/база) теряет 1 жизнь; если это существо —
+            // дополнительно −1 урона или 0 (50/50). Особенность данжа —
+            // читаем CAVES[plague] по данжу забега. Хуки — как у остальных
+            // особенностей: addUnit (юниты/постройки, обе стороны),
+            // castSpell игрока ДО эффекта, ловушки игрока — в spendCard,
+            // заклинания/ловушки ИИ — в aiPlay перед эффектом
+            A.multiPlague = function multiPlague(cardId, side) {
+                const def = CARDS[cardId];
+                // Жетоны — не «розыгрыш двухцветной карты» (гейт, как у study)
+                if (!def || def.elem !== "timDec" || def.token) return;
+                const cd = G.dungeon
+                    && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
+                if (!cd || !cd.plague) return;
+                // Поправка юзера (W79.2): «Особенность этого подземелья
+                // для всех врагов» — только у врагов
+                if (side !== "e") return;
+                floatText(960, 318,
+                    GAME_LOC.t("dungeon.plagueShort"), 0xc79af0);
+                // случайный враг играющего: существа/постройки поля + база
+                // («последний билет» — как у «Тёмного царя», W81)
+                const foes = B.units.filter((v) => v.side === "p"
+                    && B.units.includes(v));
+                const pick = (Math.random() * (foes.length + 1)) | 0;
+                if (pick >= foes.length) {
+                    damageBase("p", 1, { x: 960, y: 840, fill: 0xb07ad5 });
+                } else {
+                    const t = foes[pick];
+                    const fp = cellXY(t.col, t.row);
+                    floatText(fp.x, fp.y - 60, "1", 0xef9f8c);
+                    damageUnit(t, 1, null, "dam");
+                    // существо — дополнительно −1 урона или 0 (50/50);
+                    // погибло от первой жизни — бонус не нужен
+                    if (t.def.type === "unit" && B.units.includes(t)
+                        && Math.random() < 0.5) {
+                        t.bonusAtk = (t.bonusAtk || 0) - 1;
+                        recalcAuras();
+                        const an = t.node.getChildByName("atk");
+                        if (an) an.text = String(t.curAtk);
+                        const p2 = cellXY(t.col, t.row);
+                        floatText(p2.x, p2.y - 84, "−1⚔", 0xc79af0);
+                    }
                 }
                 sfx("chpoc");
             };

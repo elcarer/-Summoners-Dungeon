@@ -600,8 +600,13 @@
 
             // ── Перетаскивание карт (режим «Перетаскивание» в Настройках) ────────
             // Наведение увеличивает карту; перетаскивание рисует кривую от её
-            // слота в руке до центра клетки, отпускание — призыв. Спеллы и ловушки
-            // ставятся кликом как раньше.
+            // слота в руке до центра клетки, отпускание — розыгрыш.
+            // W82 (поправка юзера): режим ПОЛНОЦЕННЫЙ и включён по умолчанию
+            // (meta.js) — тащатся не только существа/постройки, но и ловушки
+            // (клетка/руна/засада — те же правила, что у клика) и заклинания
+            // (с целью — отпускание на допустимой клетке-цели; без цели — на
+            // ЛЮБОЙ клетке поля). Проверки розыгрыша остаются в onCellTap —
+            // canDropAt лишь зеркалит их для зелёной дуги
             A.drag = null;
             A.dragFx = null; // drag: {idx,node,homeX,homeY,sx,sy,moved,over}
             A.dragFxGlowNode = null; // тестам: слой свечения дуги (W66)
@@ -621,9 +626,53 @@
             };
             A.canDropAt = function canDropAt(handIdx, col, row) {
                 const def = CARDS[B.hand[handIdx]];
-                return !!def && (def.type === "unit" || def.type === "building")
-                    && effCost(B.hand[handIdx]) <= B.energy
-                    && deployRows("p").includes(row) && !unitAt(col, row);
+                if (!def || effCost(B.hand[handIdx]) > B.energy) return false;
+                if (def.type === "unit" || def.type === "building")
+                    return deployRows("p").includes(row) && !unitAt(col, row);
+                if (def.type === "trap") {
+                    // те же правила, что у клика (onCellTap): руна — на
+                    // существо, засада — на свою постройку, «Опутывание
+                    // корней» — на любую клетку, прочие — пустая клетка
+                    const u = unitAt(col, row);
+                    if (def.trap.effect === "castRandom")
+                        return !!u && u.def.type === "unit";
+                    if (def.trap.effect === "ambushRise")
+                        return !!u && u.side === "p" && u.def.type === "building";
+                    return def.trap.effect === "entangle" || !u;
+                }
+                if (def.type !== "spell") return false;
+                // заклинания: без цели — любая клетка поля; с целью —
+                // зеркало проверок прицела onCellTap (зелёная дуга)
+                const sdef = def;
+                if (sdef.spell.target === "none") return true;
+                const u = unitAt(col, row);
+                if (sdef.spell.swap) return !!u && spellAimable(u);
+                if (sdef.spell.target === "anyCell") return true;
+                if (sdef.spell.target === "emptyCell") return !u;
+                if (sdef.spell.target === "token") return !!tokenAt(col, row);
+                if (sdef.spell.target === "tagPick") {
+                    const pk = tagPickAt(col, row);
+                    return !!pk && (!pk.u || spellAimable(pk.u));
+                }
+                const tg = sdef.spell.target;
+                const typeOk = spellAimable(u)
+                    && (tg === "anyUnitDmg"
+                        ? (u.def.type === "unit"
+                            || (u.def.type === "building" && !sdef.spell.noBuildings))
+                        : tg === "anyUnitOrFoe" ? effCreature(u)
+                        : tg === "enemyUnit" ? effCreature(u)
+                        : tg === "ownBuilding" ? u.def.type === "building"
+                        : tg === "anyObj" ? true
+                        : effCreature(u));
+                const sideOk = !u
+                    || ((tg === "ownUnit" || tg === "ownBuilding") ? u.side === "p"
+                    : tg === "enemyUnit" ? u.side !== "p" : true);
+                const known = tg === "anyUnit" || tg === "anyUnitDmg"
+                    || tg === "anyUnitOrFoe" || tg === "enemyUnit"
+                    || tg === "ownUnit" || tg === "ownBuilding"
+                    || tg === "anyObj";
+                const effectOk = !sdef.spell.iceStrike || !!iceStrikeVictim(u);
+                return !!u && typeOk && sideOk && known && effectOk;
             };
             // Подсказка «−X» у шкалы энергии (просил юзер): курсор на карте
             // руки — рядом с текущей энергией видно, сколько уйдёт на розыгрыш.
@@ -682,9 +731,13 @@
                 if (f) f.visible = raised;
             };
             A.startCardDrag = function startCardDrag(idx, e) {
-                if (!G.settings.dragSummon || B.phase !== "player" || overlay || B.discarding || B.picking) return;
+                if (!G.settings.dragSummon || B.phase !== "player" || overlay
+                    || B.discarding || B.picking
+                    || B.journeySummon || B.resurrectSummon) return;
+                // W82 (поправка юзера): тащатся ВСЕ карты — существа,
+                // постройки, ловушки и заклинания (полноценный режим)
                 const def = CARDS[B.hand[idx]];
-                if (!def || (def.type !== "unit" && def.type !== "building")) return;
+                if (!def) return;
                 const node = handNode(idx);
                 if (!node) return;
                 const p = toDesign(e.global);
@@ -781,9 +834,18 @@
                     if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) over = null;
                 }
                 if (over && canDropAt(d.idx, over[0], over[1])) {
-                    B.selected = d.idx;
-                    B.spellTarget = false;
-                    onCellTap(over[0], over[1]);
+                    const def = CARDS[B.hand[d.idx]];
+                    // заклинания без цели (W82) играются сразу — как клик по
+                    // карте (onCardTap); остальные — розыгрыш через ту же
+                    // точку onCellTap, что и клик (все проверки на месте)
+                    if (def && def.type === "spell"
+                        && def.spell.target === "none") {
+                        castSpell(d.idx);
+                    } else {
+                        B.selected = d.idx;
+                        B.spellTarget = !!def && def.type === "spell";
+                        onCellTap(over[0], over[1]);
+                    }
                     if (ctx.sfx) ctx.sfx();
                 } else {
                     B.selected = null;

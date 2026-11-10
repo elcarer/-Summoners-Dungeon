@@ -412,7 +412,11 @@
                     floatText(p.x, p.y - 118, "+1⚡ +1", 0xffd98c);
                     sfx("chpoc");
                 }
-                const u2 = addUnit(side, id, cell[0], cell[1], { rebirth: true });
+                // noDelay (W82): у существ со «Сдвигом» (nec281/282) возврат
+                // «Выкапыванием» — СРАЗУ на клетку (выкопали — встал), без
+                // повторного ухода в значок «Сдвига»
+                const u2 = addUnit(side, id, cell[0], cell[1],
+                    { rebirth: true, noDelay: true });
                 if (u2 && left > 0 && B.units.includes(u2)) addExhuming(u2, left);
             };
 

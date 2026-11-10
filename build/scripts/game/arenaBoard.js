@@ -744,6 +744,7 @@
                 multiValor(cardId, side); // «Растущая доблесть» (Белая пуща, W62)
                 multiWeave(cardId, side); // «Переплетение сил» (Небесный дворец, W75)
                 multiStudy(cardId, side); // «Глубокое изучение» (Магодром, W79)
+                multiPlague(cardId, side); // «Зараза из глубин» (Некро-раскопки, W82)
                 sfx("aqua"); // призыв (обе стороны)
                 B.units.push(u);
                 recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда
@@ -763,6 +764,22 @@
                             floatText(960, side === "p" ? 700 : 380, "+1⚡",
                                 0xffd98c);
                             punch(root.hud);
+                            sfx("chpoc");
+                        }
+                    }
+                    // «Некро-стражи» (necGuards, W82 — спека юзера): ВТОРОЙ
+                    // призыв владельца за ход получает «Выкапывание 1»
+                    // (счётчик общий с меткой/костями; приход через «Сдвиг»
+                    // — тоже призыв, как у «Бешеных шестерён»)
+                    if (B.turnSummons[side] === 2) {
+                        const hd2 = heroDefOf(side);
+                        if (hd2 && hd2.ability === "secondSummonDig"
+                            && B.units.includes(u)) {
+                            addExhuming(u, (u.exhuming || 0) + 1);
+                            const gp = cellXY(u.col, u.row);
+                            floatText(gp.x, gp.y - 84,
+                                "⛏ " + GAME_LOC.t("spell.exhuming.name"),
+                                0xc9b98c);
                             sfx("chpoc");
                         }
                     }
@@ -1001,6 +1018,34 @@
                         floatText(mp.x, mp.y - 60, "−1♥", 0xef9f8c);
                         punch(o.node);
                         damageUnit(o, 1, null, "monolith");
+                    }
+                    // «Модифицированные реликвии» (nec285, W82 — спека
+                    // юзера): существо владельца, пришедшее на поле боя по
+                    // соседству с этой постройкой, получает +1 к своему
+                    // МИНИМАЛЬНОМУ параметру (урон или жизни; равенство —
+                    // урон). Приход через «Сдвиг» — тоже приход (общий
+                    // addUnit); постройка не «существо» — не усиливается
+                    if (effCreature(u)) for (const o of B.units.slice()) {
+                        if (o === u || o.side !== side || o.def.type !== "building"
+                            || !o.def.relicsBuff || !B.units.includes(o)
+                            || Math.abs(o.col - col) + Math.abs(o.row - row) !== 1) continue;
+                        const p = cellXY(u.col, u.row);
+                        if ((u.curAtk || 0) <= (u.hp || 0)) { // минимальный — урон
+                            u.bonusAtk = (u.bonusAtk || 0) + 1;
+                            recalcAuras();
+                            const an = u.node.getChildByName("atk");
+                            if (an) an.text = String(u.curAtk);
+                            floatText(p.x, p.y - 39, "+1⚔", 0xc79af0);
+                            onBuff(u, 1, 0);
+                        } else { // минимальный — жизни
+                            u.hp += 1;
+                            const hn = u.node.getChildByName("hp");
+                            if (hn) hn.text = String(u.hp);
+                            floatText(p.x, p.y - 39, "+1♥", 0x9fd489);
+                            onBuff(u, 0, 1);
+                        }
+                        fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.7 });
+                        sfx("chpoc");
                     }
                     // «Болото рождения» (dec151): призванное рядом (верт/гориз)
                     // СВОЁ существо получает +2⚔/+2♥, постройка при этом

@@ -7,11 +7,14 @@
     const LS_RUN = "sd_run";
     const LS_BLOCKS = "sd_blocks";
 
-    // dragSummon — способ призыва на поле: false — клик по карте + клик по
-    // клетке; true — перетаскивание карты на клетку (drag&drop).
+    // dragSummon — способ розыгрыша карт: false — клик по карте + клик по
+    // клетке; true — перетаскивание карты на клетку (drag&drop; W82 —
+    // полноценный режим: существа, постройки, ловушки и заклинания с
+    // целью; заклинания без цели играются перетаскиванием на любую клетку).
+    // Дефолт ВКЛ (поправка юзера W82) — при первом запуске игры.
     // animSpeed — скорость анимаций/передвижений боя, 0..10; 5 = дефолт
     // (в 1.5 раза медленнее исходной), см. arena.js animK()
-    const DEFAULT_SETTINGS = { sound: 5, music: 5, lang: "ru", dragSummon: false, animSpeed: 5 };
+    const DEFAULT_SETTINGS = { sound: 5, music: 5, lang: "ru", dragSummon: true, animSpeed: 5 };
 
     function loadSettings() {
         try {

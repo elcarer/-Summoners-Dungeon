@@ -65,11 +65,13 @@
         // задники ДВУХЦВЕТНЫХ подземелий (арт юзера, W75): «Рыжий лес»
         // (Сила+Рост) — 7, «Небесный дворец» (Честь+Мудрость) — 8,
         // «Белая пуща» (Рост+Честь) — 9, W79 (юзер): «Магодром»
-        // (Мудрость+Время) — 10
+        // (Мудрость+Время) — 10, W82 (юзер): «Некро-раскопки»
+        // (Время+Тлен) — 11
         uiTextures["scenes/7.png"] = await assets.loadTexture("./images/scenes/7.png");
         uiTextures["scenes/8.png"] = await assets.loadTexture("./images/scenes/8.png");
         uiTextures["scenes/9.png"] = await assets.loadTexture("./images/scenes/9.png");
         uiTextures["scenes/10.png"] = await assets.loadTexture("./images/scenes/10.png");
+        uiTextures["scenes/11.png"] = await assets.loadTexture("./images/scenes/11.png");
         // эффект поля «Стена костров» и рубашки колод по стихиям
         // (гоблины/природа/мудрость/тлен/честь)
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
@@ -100,7 +102,8 @@
         for (const lair of ["goblins_lair", "growth_lair", "water_lair",
                             "necro_lair", "honor_lair", "time_lair",
                             "str_gro", "gro_hon",
-                            "hon_wis", "wis_tim"]) { // W54/W61/W75/W79: тайлы юзера
+                            "hon_wis", "wis_tim",
+                            "tim_nec"]) { // W54/W61/W75/W79/W82: тайлы юзера
             for (const f of TILE_FILES) {
                 uiTextures[`dungeon_tiles/${lair}/${f}.png`] =
                     await assets.loadTexture(`./images/dungeon_tiles/${lair}/${f}.png`);

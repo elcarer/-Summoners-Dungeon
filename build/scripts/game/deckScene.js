@@ -38,21 +38,22 @@
             return true;
         }
         function clearFilter(key) { if (filters[key]) filters[key].clear(); }
-        // кнопки фильтра стихий: 6 одноцветных + 3 ДВУХЦВЕТНЫЕ (арт юзера
-        // W74/W75, MULTI_LOGO) — мульти-карты фильтруются по def.elem
+        // кнопки фильтра стихий: 6 одноцветных + 5 ДВУХЦВЕТНЫХ (арт юзера
+        // W74/W75/W82, MULTI_LOGO) — мульти-карты фильтруются по def.elem
         const ELEM_KEYS = [...Object.keys(ELEM_LOGO), ...Object.keys(MULTI_LOGO)];
         const PANE_POS = { left: { x: 90, y: 222 }, right: { x: 780, y: 279 } };
         // ряд лого стихий (общие константы: использует и rebuildChips, и api).
-        // 10 кнопок (4-я мульти-стихия wisTim, W79): шаг 42, круг 40px
-        // (лого 32px), ряд до x≈1847 — правая панель до 1848 (в W75 было
-        // 9 кнопок шагом 44, круг 42px; в W74 — 8 кнопок шагом 50, круг
-        // 48px; раньше — 6 кнопок шагом 66, лого 57px). Слева ряд ограничен
-        // чипами «Тип»
-        const ELEM_Y = 144, ELEM_X0 = 1449, STEP = 42;
-        const ELEM_R = 20, ELEM_ICON = 32; // круг 2*ELEM_R, лого ELEM_ICON px
+        // 11 кнопок (5-я мульти-стихия timDec, W82): БЕЗ кружков (поправка
+        // юзера W82 — само лого и есть кнопка), лого 40px, шаг 44; ряд
+        // сдвинут влево так, чтобы правый край был ровно у панели коллекции
+        // (1848): x0 = 1848 − (10·44 + 40) = 1368 (в W79–W81 было 10 кнопок
+        // с кружками 40px шагом 42 от x=1449). Слева ряд ограничен чипами
+        // «Тип»
+        const ELEM_Y = 144, ELEM_ICON = 40, STEP = 44;
+        const ELEM_X0 = 1848 - ((ELEM_KEYS.length - 1) * STEP + ELEM_ICON);
         const paneCards = { left: [], right: [] }; // для тестов: {id, node, cx, cy, labelY}
-        const elemBtns = []; // круги-логотипы (эмитят pointertap в тестах)
-        const elemSprites = []; // спрайты лого (тесты: позиция = центр круга)
+        const elemBtns = []; // спрайты-логотипы (эмитят pointertap в тестах)
+        const elemSprites = []; // те же спрайты (тесты: позиция = центр лого)
         let zoom = null; // {id, node, cur, tgt} — ховер-зум карты
 
         // Наведение на карту: копия поверх панели растёт 0.5 → 1 (полный
@@ -585,42 +586,39 @@
                     cx += ch.userData.w + 9;
                 }
             }
-            // ── фильтр стихий: ряд из 6 одноцветных + 3 двухцветных лого в
+            // ── фильтр стихий: ряд из 6 одноцветных + 5 двухцветных лого в
             // ПРАВОЙ части экрана, на свободном месте над панелью коллекции
-            // (просил юзер). Лого — такие же переключатели, как чипы: клик
-            // добавляет стихию к выбору, повторный — убирает; ни одной
-            // выбранной = «Все».
+            // (просил юзер). W82 (поправка юзера): кружки вокруг лого
+            // УБРАНЫ — само лого (40px) и есть кнопка: клик добавляет
+            // стихию к выбору, повторный — убирает; ни одной выбранной =
+            // «Все». Неактивное лого приглушено (alpha 0.6), активное —
+            // полное
             for (let i = 0; i < ELEM_KEYS.length; i++) {
                 const value = ELEM_KEYS[i];
                 const active = filterOn("elem", value);
                 const c2 = new PIXI.Container();
-                const g = new PIXI.Graphics();
-                g.circle(ELEM_R, ELEM_R, ELEM_R);
-                g.fill(active ? 0x3a4a2e : 0x2e2822);
-                g.stroke({ width: 3, color: active ? 0xa8e890 : 0x6b5c40 });
-                g.eventMode = "static";
-                g.on("pointertap", () => {
+                const sp = new PIXI.Sprite(uiTex(ELEM_LOGO[value] || MULTI_LOGO[value]));
+                sp.anchor.set(0.5);
+                sp.scale.set(ELEM_ICON / sp.texture.width);
+                sp.position.set(ELEM_ICON / 2, ELEM_ICON / 2); // центр лого
+                sp.eventMode = "static";
+                sp.on("pointertap", () => {
                     if (ctx.sfx) ctx.sfx();
                     toggleFilterOpt("elem", value);
                     rebuildPanes();
                 });
-                const sp = new PIXI.Sprite(uiTex(ELEM_LOGO[value] || MULTI_LOGO[value]));
-                sp.anchor.set(0.5);
-                sp.scale.set(ELEM_ICON / sp.texture.width);
-                sp.position.set(ELEM_R, ELEM_R); // центр круга, не угол контейнера
-                sp.eventMode = "none";
-                if (!active) sp.alpha = 0.6;
-                c2.addChild(g, sp);
+                sp.alpha = active ? 1 : 0.6;
+                c2.addChild(sp);
                 c2.position.set(ELEM_X0 + i * STEP, ELEM_Y);
                 c2.userData = { isChip: true };
                 root.addChild(c2);
-                elemBtns.push(g);
+                elemBtns.push(sp);
                 elemSprites.push(sp);
             }
             const cap = T(t("filter.elem"), 19, 0xcfc4a6);
             cap.anchor.set(0.5, 0);
-            cap.position.set(ELEM_X0 + (ELEM_KEYS.length - 1) * STEP / 2 + ELEM_R,
-                ELEM_Y + 2 * ELEM_R + 14);
+            cap.position.set(ELEM_X0 + (ELEM_KEYS.length - 1) * STEP / 2
+                + ELEM_ICON / 2, ELEM_Y + ELEM_ICON + 14);
             cap.eventMode = "none";
             root.addChild(cap);
         }

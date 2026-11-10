@@ -251,6 +251,7 @@
                         multiValor(id, side);
                         multiWeave(id, side);
                         multiStudy(id, side);
+                        multiPlague(id, side); // «Зараза из глубин» (Некро-раскопки, W82)
                         cryptSettle(side, id);
                         armTrap(side, id, col, row, unit);
                         afterTrapPlaced(side);
@@ -269,6 +270,7 @@
                         multiValor(id, side);
                         multiWeave(id, side);
                         multiStudy(id, side);
+                        multiPlague(id, side); // «Зараза из глубин» (Некро-раскопки, W82)
                         B.playCtx = { side, cardId: id };
                         enemyCastSpellEffect(d, true); // авто-цели ИИ
                         B.playCtx = null;

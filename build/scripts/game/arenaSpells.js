@@ -1131,6 +1131,7 @@
                 multiValor(cardId, "p");
                 multiWeave(cardId, "p");
                 multiStudy(cardId, "p"); // «Глубокое изучение» (Магодром, W79)
+                multiPlague(cardId, "p"); // «Зараза из глубин» (Некро-раскопки, W82)
                 if (!applySpellP(cardId, target, false,
                     (resetHand || brainstorm) ? { skipHandReset: true } : null)) {
                     B.playCtx = null;
