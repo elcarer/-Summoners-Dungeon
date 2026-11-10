@@ -1253,7 +1253,9 @@
                     || (u.quiverBonus || 0) > 0;
                 if (!hasShot && forced == null) return;
                 const dmg = forced != null ? forced
-                    : tagVal(u, "shotDmg") + (u.quiverBonus || 0); // tagVal — подмена «Экспериментов» (wt271, W79)
+                    : (tagVal(u, "shotDmg")
+                        || (u.def.ability === "archer" ? 1 : 0)) // лучник без поля — «Выстрел 1» (регресс W72, пойман смоуком)
+                        + (u.quiverBonus || 0); // tagVal — подмена «Экспериментов» (wt271, W79)
                 const dir = u.side === "p" ? -1 : 1;
                 for (let r = u.row + dir; r >= 0 && r < GRID; r += dir) {
                     const o = unitAt(u.col, r);

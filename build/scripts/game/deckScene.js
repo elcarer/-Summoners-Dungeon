@@ -43,11 +43,13 @@
         const ELEM_KEYS = [...Object.keys(ELEM_LOGO), ...Object.keys(MULTI_LOGO)];
         const PANE_POS = { left: { x: 90, y: 222 }, right: { x: 780, y: 279 } };
         // ряд лого стихий (общие константы: использует и rebuildChips, и api).
-        // 9 кнопок: шаг 44, круг 42px (лого 32px), ряд до x≈1843 — правая
-        // панель до 1848 (в W74 было 8 кнопок шагом 50, круг 48px; раньше —
-        // 6 кнопок шагом 66, лого 57px). Слева ряд ограничен чипами «Тип»
-        const ELEM_Y = 144, ELEM_X0 = 1449, STEP = 44;
-        const ELEM_R = 21, ELEM_ICON = 32; // круг 2*ELEM_R, лого ELEM_ICON px
+        // 10 кнопок (4-я мульти-стихия wisTim, W79): шаг 42, круг 40px
+        // (лого 32px), ряд до x≈1847 — правая панель до 1848 (в W75 было
+        // 9 кнопок шагом 44, круг 42px; в W74 — 8 кнопок шагом 50, круг
+        // 48px; раньше — 6 кнопок шагом 66, лого 57px). Слева ряд ограничен
+        // чипами «Тип»
+        const ELEM_Y = 144, ELEM_X0 = 1449, STEP = 42;
+        const ELEM_R = 20, ELEM_ICON = 32; // круг 2*ELEM_R, лого ELEM_ICON px
         const paneCards = { left: [], right: [] }; // для тестов: {id, node, cx, cy, labelY}
         const elemBtns = []; // круги-логотипы (эмитят pointertap в тестах)
         const elemSprites = []; // спрайты лого (тесты: позиция = центр круга)
