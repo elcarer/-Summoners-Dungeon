@@ -323,6 +323,12 @@
         if (e.code !== "Space") return;
         spaceHeld = true;
         e.preventDefault();
+        // W85 (юзер): нажатый ПРОБЕЛ при показанной «далее» листает
+        // реплику, как Эскейп (тот в диалоге зовёт tap() → advance()).
+        // Пока строка печатается — просто ускорение (W79); автоповтор
+        // удержания не листает — одно нажатие = одна реплика
+        if (!e.repeat && cur && cur.phase === "lines" && !cur.typing)
+            advance();
     });
     window.addEventListener("keyup", (e) => {
         if (e.code === "Space") spaceHeld = false;

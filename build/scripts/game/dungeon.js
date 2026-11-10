@@ -489,6 +489,32 @@
             glomShadow.zIndex = gl.y - 0.5;
         }
 
+        // Клетка выхода Глома (баг юзера W85): дверь дома вычисляется как
+        // клетка ПОД домом, и в дизайнах юзера (Тлен/Время) дом прижат к
+        // стене — дверь попадает ВНУТРЬ стены. Глом спавнился в стене,
+        // bfsPath из непроходимой клетки давал null, и он навсегда застывал
+        // «между стеной и домом». Дом не должен блокировать его перемещение:
+        // ищем ближайшую ходибельную клетку (дверь, затем низ/бока, затем
+        // радиус 2) и берём первую, ОТ КОТОРОЙ ЕСТЬ ПУТЬ к герою (клетка
+        // героя — тоже успех: разговор начнётся сам); совсем без пути —
+        // первая ходибельная (Глом хотя бы на полу, не в стене).
+        function glomSpawnCell(anch, hx, hy) {
+            const hgx = Math.floor(hx / TS), hgy = Math.floor(hy / TS);
+            const ring = [[0, 0], [0, 1], [-1, 0], [1, 0], [0, -1],
+                [-1, 1], [1, 1], [-1, -1], [1, -1],
+                [-2, 0], [2, 0], [0, 2], [0, -2], [-2, 1], [2, 1],
+                [-1, 2], [1, 2], [-2, -1], [2, -1], [-1, -2], [1, -2]];
+            let any = null;
+            for (const [dx, dy] of ring) {
+                const x = anch.col + dx, y = anch.row + dy;
+                if (!walkable(x, y)) continue;
+                if (!any) any = [x, y];
+                if ((x === hgx && y === hgy) || bfsPath(x, y, hgx, hgy))
+                    return [x, y];
+            }
+            return any || [anch.col, anch.row];
+        }
+
         // Иконка-кнопка HUD (настройки/колода): спрайт-иконка без подписи
         function hudIcon(texName, x, y, onTap, scale = 0.9) {
             const sp = new PIXI.Sprite(uiTex(texName));
@@ -1513,6 +1539,11 @@
                             hcy = (anch.gy + anch.h / 2) * TS;
                         if (busy && !ctx.questModal
                             && Math.hypot(hx - hcx, hy - hcy) < TS * 4) {
+                            // (W85) выходит на пол: дверь дома может быть
+                            // стеной — см. glomSpawnCell
+                            const sc = glomSpawnCell(anch, hx, hy);
+                            gl.x = sc[0] * TS + TS / 2;
+                            gl.y = sc[1] * TS + TS / 2;
                             spawnGlom(gl); // вышел из-за дома
                             gl.state = "walking";
                         }
