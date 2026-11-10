@@ -782,6 +782,7 @@
                                 "⛏ " + GAME_LOC.t("spell.exhuming.name"),
                                 0xc9b98c);
                             sfx("chpoc");
+                            onEffectGain(u); // «Изменённый» (W84): выданное «Выкапывание»
                         }
                     }
                 }
@@ -965,6 +966,7 @@
                         floatText(bp.x, bp.y - 96,
                             "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0xc9b98c);
                         sfx("chpoc");
+                        onEffectGain(u); // «Изменённый» (W84): выданное «Выкапывание»
                     }
                     // Врождённое «Выкапливание N» (dec146 «Восставший
                     // нетопырь»): счётчик общий с меткой/Мортисом/костями.
@@ -1258,6 +1260,7 @@
                             floatText(sp.x, sp.y - 96,
                                 "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0xc9b98c);
                             sfx("chpoc");
+                            onEffectGain(u); // «Изменённый» (W84): выданное «Выкапывание»
                         }
                     }
                     // «Леон фон Орэ» (firstHonorGuard, просил юзер): первое

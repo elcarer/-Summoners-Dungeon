@@ -763,12 +763,31 @@
                 // «Разложение» целятся в ИГРОКА — этот гейт их не касается
                 if (s.target === "anyUnit" && !s.bounce && !s.debuffAtk && !s.iceStrike
                     && !s.hydroPunch && !s.poison && !s.destroy && !s.rot
+                    && !s.transformPack && !s.stealEffect
                     && !spellTargets(B.units.filter((v) => v.side === "e"
                         && v.def.type === "unit"
                         && (!s.enchantFire || !v.enchantFire))).length) return false;
                 // «Некроз» (nec286, W83) — есть существо игрока без метки
                 if (s.rot && !spellTargets(B.units.filter((v) => v.side === "p"
                     && v.def.type === "unit" && !v.rot)).length) return false;
+                // «Трансформа» (nec289, W84) — есть своё существо
+                if (s.transformPack && !spellTargets(B.units.filter((v) => v.side === "e"
+                    && v.def.type === "unit")).length) return false;
+                // «Извлечение функции» (nec290, W84) — есть существо игрока
+                // с эффектами и БЕЗ своих соседей-существ (изъятие не
+                // возвращается врагу же)
+                if (s.stealEffect && !B.units.some((v) => v.side === "p"
+                    && v.def.type === "unit" && pickStealEffect(v)
+                    && !B.units.some((o) => o !== v && o.side === "p"
+                        && effCreature(o)
+                        && Math.abs(o.col - v.col)
+                        + Math.abs(o.row - v.row) === 1))) return false;
+                // «Некро-наросты» (nec288, W84) — есть свой объект с вражеским
+                // соседом (носитель бьёт в начале хода противника)
+                if (s.necroGrow && !B.units.some((v) => v.side === "e"
+                    && B.units.some((o) => o.side === "p"
+                        && Math.abs(o.col - v.col)
+                        + Math.abs(o.row - v.row) === 1))) return false;
                 // «Трупный яд» (dec144)/«Разложение» (dec145) — есть существо
                 // игрока (сброс «Разложения» при пустой руке просто не
                 // срабатывает — уничтожение остаётся)

@@ -285,7 +285,8 @@
                         || s.mindTorture || s.iceStrike || s.mindControl) return 2;
                     if (s.buffAtk || s.buffAtkByHp || s.berserk || s.buffAllAtk
                         || s.enchantFire || s.cocoon || s.venom
-                        || s.axeAmp || s.rot) return 4; // wt279 «Лабрис», nec286 «Некроз» — как усиления
+                        || s.axeAmp || s.rot || s.transformPack
+                        || s.stealEffect || s.necroGrow) return 4; // wt279 «Лабрис», nec286 «Некроз», nec288–290 (W84) — как усиления
                     if (s.baseHit || s.wolfVolley) return 4.5; // бьёт СВОИМ существом
                     if (s.iceSwarm || s.skeletonCrowd) return 3; // тела — как обычный призыв
                     if (s.laySummon) return 3; // «Молебен»: тело 2/2 — как призыв

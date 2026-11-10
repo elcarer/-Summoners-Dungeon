@@ -394,7 +394,10 @@
         "nec285", "nec285", "nec285",
         "nec284", "nec284", "nec284",
         "nec286", "nec286", "nec286",
-        "nec287", "nec287", "nec287"];
+        "nec287", "nec287", "nec287",
+        "nec288", "nec288", "nec288",
+        "nec289", "nec289", "nec289",
+        "nec290", "nec290", "nec290"];
 
     const { ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM,
         FLOOR_MOBS_DECAY, FLOOR_MOBS_HONOR, FLOOR_MOBS_TIME, MOB_TABLES,
@@ -473,7 +476,8 @@
         // случайный враг играющего (существо/постройка/база) теряет
         // 1 жизнь (текст в HUD — dungeon.js; multiPlague в arenaDamage)
         nec: { elem: "timDec", elems: ["time", "decay"], maxFloor: 3,
-               plague: true },
+               plague: true,
+               boss: "necMutant", bossLast: true }, // W84 (спека юзера): босс «Изменённый» в последней комнате 3-го этажа
     };
     // Колода врага: ядро архетипа; весь добор — только боссу (просил
     // юзер): с глубиной (floor ≥ 1) +2 карты из grow за этаж и 3..8 карт

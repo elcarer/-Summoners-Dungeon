@@ -264,6 +264,14 @@
         necBiothreat: { id: "necBiothreat", rarity: "rare", baseHp: 20,
                         elems: ["time", "decay"], starter: "timDec",
                         img: "84", ability: "bioReflect" },
+        // W84 (спека юзера): «Изменённый» — БОСС последней комнаты 3-го
+        // этажа «Некро-раскопок» (bossLast — dataCards). Герой 85 (22♥,
+        // эпическая, способность effectGrow — хук onEffectGain (arenaStatus):
+        // когда существо владельца получает эффект (способность/метку),
+        // оно получает ещё +1/+1)
+        necMutant: { id: "necMutant", rarity: "epic", baseHp: 22,
+                     elems: ["time", "decay"], starter: "timDec",
+                     img: "85", ability: "effectGrow" },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -613,6 +621,7 @@
         "necGuards", // «Некро-стражи»: враг 1-го этажа «Некро-раскопок» (W82)
         "necSoulRiver", // «Река душ»: враг 2-го этажа «Некро-раскопок» (W82)
         "necBiothreat", // «Биоугроза»: враг 3-го этажа «Некро-раскопок» (W83)
+        "necMutant", // «Изменённый»: БОСС «Некро-раскопок», последняя комната 3-го этажа (W84)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

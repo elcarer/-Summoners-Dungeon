@@ -63,6 +63,41 @@
                 fxEvent("ward", { x: p.x, y: p.y - 12, scale: 0.85 });
                 punch(u.node);
                 sfx("chpoc");
+                A.onEffectGain(u); // «Изменённый» (W84): полученный купол
+            };
+
+            // «Некро-наросты» (nec288, W84 — спека юзера): метка нароста на
+            // существо/постройку — носитель в начале хода ПРОТИВНИКА наносит
+            // 1 урон случайному существу/постройке противника по соседству
+            // (тик в upkeep — arenaUpkeep). Общая для игрока
+            // (applySpellPInner) и ИИ (enemyCastSpellEffect); наросты
+            // складываются, бейдж показывает сумму
+            A.necroGrowTarget = function necroGrowTarget(u) {
+                u.necroGrow = (u.necroGrow || 0) + 1;
+                let mark = u.node.getChildByName("necroGrowMark");
+                if (!mark) {
+                    mark = new PIXI.Container();
+                    mark.name = "necroGrowMark";
+                    mark.eventMode = "none";
+                    const g = new PIXI.Graphics();
+                    g.circle(0, 0, 13.5);
+                    g.fill({ color: 0x3a2a5c });
+                    g.stroke({ width: 3, color: 0xc79af0 });
+                    mark.addChild(g);
+                    const tx = T("", 17, 0xe0c8f8);
+                    tx.anchor.set(0.5);
+                    mark.addChild(tx);
+                    mark.position.set(-54, -54);
+                    u.node.addChild(mark);
+                }
+                mark.getChildAt(1).text = String(u.necroGrow);
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 66,
+                    "☣ " + GAME_LOC.t("spell.necroGrow.name"), 0xc79af0);
+                fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.8 });
+                punch(u.node);
+                sfx("chpoc");
+                A.onEffectGain(u); // «Изменённый» (W84): полученный нарост
             };
 
             // «Ремонт» (tim239, просил юзер): метка «при смерти — в руку
@@ -278,6 +313,19 @@
                     else repairTarget(u); // «Ремонт»: повтор тоже безвреден
                     return true;
                 }
+                if (tg === "anyObj" && def.spell.necroGrow) {
+                    // «Некро-наросты» (nec288, W84 — спека юзера): носитель —
+                    // существо или постройка — в начале хода ПРОТИВНИКА
+                    // наносит 1 урон случайному существу/постройке
+                    // противника по соседству (тик в upkeep — arenaUpkeep;
+                    // «противника» — относительно НОСИТЕЛЯ, как у «Призрачных
+                    // спор»). Повторный нарост складывается
+                    if (!target || target.col === undefined) return false;
+                    const u = unitAt(target.col, target.row);
+                    if (!u) return false;
+                    necroGrowTarget(u);
+                    return true;
+                }
                 if (tg === "anyObj" && def.spell.swap) {
                     // «Перемена мест» (gh254, W65): две цели выбираются
                     // ПООЧЕРЁДНО — первая ждёт в B.swapPick (клик/хук),
@@ -350,6 +398,7 @@
                         fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
                         punch(u.node);
                         sfx("chpoc");
+                        onEffectGain(u); // «Изменённый» (W84): полученный «Выстрел»
                         return true;
                     }
                     if (def.spell.axeAmp) { // «Лабрис основателя» (wt279, W81):
@@ -383,6 +432,45 @@
                             "☣ " + GAME_LOC.t("spell.rot.name"), 0xc79af0);
                         fxEvent("ward", { x: p.x, y: p.y - 14, scale: 0.9 });
                         punch(u.node);
+                        sfx("chpoc");
+                        onEffectGain(u); // «Изменённый» (W84): полученный «Некроз»
+                        return true;
+                    }
+                    if (def.spell.transformPack) { // «Трансформа» (nec289, W84 —
+                        // спека юзера): цель получает сразу «Выкапывание 1»,
+                        // «Ответ 1», «Защита 1», «Сокрушение», «Берсерк 1» и
+                        // «Выстрел 1» (transformPackAct — arenaStatus; каждое
+                        // полученное свойство — «эффект» для «Изменённого»)
+                        transformPackAct(u);
+                        floatText(p.x, p.y - 66,
+                            "⨁ " + GAME_LOC.t("card.nec289.name"), 0xc79af0);
+                        fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
+                        punch(u.node);
+                        sfx("chpoc");
+                        return true;
+                    }
+                    if (def.spell.stealEffect) { // «Извлечение функции» (nec290,
+                        // W84 — спека юзера): цель теряет СЛУЧАЙНО ОДИН из
+                        // своих эффектов, соседнее существо ТОЙ ЖЕ стороны
+                        // получает его. Нечего извлекать или некому передать
+                        // (соседей-существ нет) — заклинание не играется
+                        // (энергия и карта целы, как у «Ледяного удара»)
+                        const st = pickStealEffect(u);
+                        if (!st) return false;
+                        const near = B.units.filter((v) => v !== u
+                            && v.side === u.side && effCreature(v)
+                            && Math.abs(v.col - u.col)
+                            + Math.abs(v.row - u.row) === 1);
+                        if (!near.length) return false;
+                        const heir = near[(Math.random() * near.length) | 0];
+                        stealEffectRemove(u, st);
+                        stealEffectGrant(heir, st);
+                        const hp = cellXY(heir.col, heir.row);
+                        floatText(hp.x, hp.y - 66,
+                            "↯ " + GAME_LOC.t("card.nec290.name"), 0xc79af0);
+                        fxEvent("buff", { x: hp.x, y: hp.y - 12, scale: 0.9 });
+                        punch(u.node);
+                        punch(heir.node);
                         sfx("chpoc");
                         return true;
                     }
@@ -533,6 +621,7 @@
                             addExhuming(u, (u.exhuming || 0) + def.spell.exhumingMark);
                             floatText(p.x, p.y - 90,
                                 "⛏ +" + def.spell.exhumingMark, 0xc9b98c);
+                            onEffectGain(u); // «Изменённый» (W84): выданное «Выкапывание»
                         }
                         if (def.spell.buffAtk || def.spell.buffHp
                             || def.spell.buffAtkByHp || def.spell.enchantFire
@@ -990,6 +1079,44 @@
                     const best = foes.slice()
                         .sort((a, b) => (b.hp - a.hp) || (a.row - b.row))[0];
                     return best ? { col: best.col, row: best.row } : null;
+                }
+                if (tg === "anyUnit" && def.spell.transformPack) {
+                    // «Трансформа» (nec289, W84): своё существо с наибольшей
+                    // суммой ⚔+♥ — жирный станет монстром
+                    const own = spellTargets(B.units.filter((u) => u.side === "p"
+                        && u.def.type === "unit"));
+                    const best = own.slice().sort((a, b) =>
+                        ((b.curAtk || 0) + (b.hp || 0)) - ((a.curAtk || 0) + (a.hp || 0)))[0];
+                    return best ? { col: best.col, row: best.row } : null;
+                }
+                if (tg === "anyUnit" && def.spell.stealEffect) {
+                    // «Извлечение функции» (nec290, W84): вражеское существо
+                    // с эффектами и БЕЗ вражеских соседей-существ — эффект
+                    // исчезает (передавать некому); иначе цель не годится
+                    const foes = spellTargets(B.units.filter((u) => u.side !== "p"
+                        && u.def.type === "unit" && pickStealEffect(u)));
+                    const lonely = foes.filter((u) => !B.units.some((v) =>
+                        v !== u && v.side === u.side && effCreature(v)
+                        && Math.abs(v.col - u.col)
+                        + Math.abs(v.row - u.row) === 1));
+                    const best = (lonely.length ? lonely : foes).slice()
+                        .sort((a, b) => (b.hp - a.hp) || (a.row - b.row))[0];
+                    return best ? { col: best.col, row: best.row } : null;
+                }
+                if (tg === "anyObj" && def.spell.necroGrow) {
+                    // «Некро-наросты» (nec288, W84): свой объект с наибольшим
+                    // числом вражеских соседей — носитель бьёт их в начале
+                    // хода противника
+                    const own = spellTargets(B.units.filter((u) => u.side === "p"));
+                    let best = null, bestN = 0;
+                    for (const u of own) {
+                        const n = B.units.filter((v) => v.side !== "p"
+                            && Math.abs(v.col - u.col)
+                            + Math.abs(v.row - u.row) === 1).length;
+                        if (n > bestN) { bestN = n; best = u; }
+                    }
+                    return bestN > 0 && best
+                        ? { col: best.col, row: best.row } : null;
                 }
                 if (tg === "anyUnit" || tg === "ownUnit") {
                     const own = spellTargets(B.units.filter((u) => u.side === "p"

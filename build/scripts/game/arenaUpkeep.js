@@ -197,6 +197,27 @@
                 for (const b of B.units) {
                     if (b.side === side && b.def.islandAct) b.islandUsed = false;
                 }
+                // «Некро-наросты» (nec288, W84 — спека юзера): носители метки
+                // ЛЮБОЙ стороны тикают в начале хода ПРОТИВНИКА (не своего):
+                // каждый нарост — 1 урон случайному существу/постройке
+                // ПРОТИВНИКА носителя по соседству (верт/гориз; «противника»
+                // — относительно носителя, как у «Призрачных спор»). Штатный
+                // урон: режется «Защитой»/куполом, задваивается «Некрозом»,
+                // у смертельной цели — каскады смерти
+                for (const g of B.units.slice()) {
+                    if (g.side === side || !(g.necroGrow > 0)
+                        || !B.units.includes(g)) continue;
+                    const foes = B.units.filter((o) => o.side === side
+                        && Math.abs(o.col - g.col)
+                        + Math.abs(o.row - g.row) === 1);
+                    for (let t = 0; t < g.necroGrow && foes.length; t++) {
+                        const alive = foes.filter((o) => B.units.includes(o));
+                        if (!alive.length) break;
+                        const o = alive[(Math.random() * alive.length) | 0];
+                        damageUnit(o, 1, g, "dam");
+                    }
+                }
+                refreshHud();
                 for (const b of B.units.slice()) {
                     if (b.side !== side || b.def.type !== "building") continue;
                     if (b.def.mycelium) {

@@ -158,6 +158,91 @@
                             "☣ " + GAME_LOC.t("spell.rot.name"), 0xc79af0);
                         punch(t.node);
                         sfx("chpoc");
+                        onEffectGain(t); // «Изменённый» (W84): полученный «Некроз»
+                    }
+                    return;
+                }
+                if (s.transformPack) { // «Трансформа» (nec289, W84 — спека
+                    // юзера): 6 способностей своему жирному существу
+                    // (transformPackAct — arenaStatus; руна-фокус
+                    // приоритетнее)
+                    const own = spellTargets(B.units.filter((v) => v.side === "e"
+                        && v.def.type === "unit" && B.units.includes(v)));
+                    const best = own.slice().sort((a, b) =>
+                        ((b.curAtk || 0) + (b.hp || 0)) - ((a.curAtk || 0) + (a.hp || 0))
+                        || a.row - b.row)[0];
+                    const t = focus && own.includes(focus) ? focus : best;
+                    if (t) {
+                        aimOff(t);
+                        transformPackAct(t);
+                        floatText(cellXY(t.col, t.row).x,
+                            cellXY(t.col, t.row).y - 66,
+                            "⨁ " + GAME_LOC.t("card.nec289.name"), 0xc79af0);
+                        fxEvent("buff", { x: cellXY(t.col, t.row).x,
+                            y: cellXY(t.col, t.row).y - 12, scale: 0.9 });
+                        punch(t.node);
+                        sfx("chpoc");
+                    }
+                    return;
+                }
+                if (s.necroGrow) { // «Некро-наросты» (nec288, W84 — спека
+                    // юзера): свой объект с наибольшим числом вражеских
+                    // соседей — носитель бьёт их в начале хода противника
+                    // (руна-фокус приоритетнее)
+                    const own = spellTargets(B.units.filter((v) => v.side === "e"
+                        && B.units.includes(v)));
+                    let best = null, bestN = 0;
+                    for (const v of own) {
+                        const n = B.units.filter((o) => o.side !== "e"
+                            && Math.abs(o.col - v.col)
+                            + Math.abs(o.row - v.row) === 1).length;
+                        if (n > bestN) { bestN = n; best = v; }
+                    }
+                    const t = focus && own.includes(focus) ? focus
+                        : (bestN > 0 ? best : null);
+                    if (t) {
+                        aimOff(t);
+                        necroGrowTarget(t);
+                    }
+                    return;
+                }
+                if (s.stealEffect) { // «Извлечение функции» (nec290, W84 —
+                    // спека юзера): вражеское существо с эффектами и БЕЗ
+                    // своих соседей-существ — эффект исчезает (передавать
+                    // некому); так изъятие не возвращается врагу же
+                    const foes = B.units.filter((v) => v.side !== "e"
+                        && v.def.type === "unit" && B.units.includes(v)
+                        && pickStealEffect(v));
+                    const lonely = foes.filter((v) => !B.units.some((o) =>
+                        o !== v && o.side === v.side && effCreature(o)
+                        && Math.abs(o.col - v.col)
+                        + Math.abs(o.row - v.row) === 1));
+                    const best = (lonely.length ? lonely : []).slice()
+                        .sort((a, b) => (b.hp - a.hp) || (a.row - b.row))[0];
+                    const t = focus && lonely.includes(focus) ? focus : best;
+                    if (t) {
+                        aimOff(t);
+                        const st = pickStealEffect(t);
+                        if (st) {
+                            stealEffectRemove(t, st);
+                            const near = B.units.filter((v) => v !== t
+                                && v.side === t.side && effCreature(v)
+                                && Math.abs(v.col - t.col)
+                                + Math.abs(v.row - t.row) === 1);
+                            if (near.length) {
+                                const heir = near[(Math.random() * near.length) | 0];
+                                stealEffectGrant(heir, st);
+                                floatText(cellXY(heir.col, heir.row).x,
+                                    cellXY(heir.col, heir.row).y - 66,
+                                    "↯ " + GAME_LOC.t("card.nec290.name"), 0xc79af0);
+                                punch(heir.node);
+                            }
+                            floatText(cellXY(t.col, t.row).x,
+                                cellXY(t.col, t.row).y - 66,
+                                "↯ " + GAME_LOC.t("card.nec290.name"), 0xc79af0);
+                            punch(t.node);
+                            sfx("chpoc");
+                        }
                     }
                     return;
                 }
@@ -472,6 +557,7 @@
                             const p = cellXY(best.col, best.row);
                             floatText(p.x, p.y - 90,
                                 "⛏ +" + s.exhumingMark, 0xc9b98c);
+                            onEffectGain(best); // «Изменённый» (W84)
                         }
                     }
                     punch(best.node);

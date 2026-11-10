@@ -51,6 +51,8 @@
                 repairMark: { name: "spell.repair.name", desc: "spell.repair.desc", val: () => 0 },
                 // «Некроз» (nec286, W83): метка уязвимости — ×2 урона
                 rotMark: { name: "spell.rot.name", desc: "spell.rot.desc", val: () => 0 },
+                // «Некро-наросты» (nec288, W84): метка нароста — бьёт соседа в начале хода противника
+                necroGrowMark: { name: "spell.necroGrow.name", desc: "spell.necroGrow.desc", val: (u) => u.necroGrow },
             };
             A.effectTip = null; // { key, node }
             A.effectTipHide = function effectTipHide() {

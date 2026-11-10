@@ -589,5 +589,41 @@
                   rarity: "rare", elem: "timDec",
                   multi: ["time", "decay"],
                   color: 0x8a5fc0, img: "time_decay/287" },
+
+        // ── W84 (спека юзера): карты 288–290 — Время+Тлен, только
+        // «Некро-раскопки» ────────────────────────────────────────────
+        // «Некро-наросты» (nec288): заклинание — существо/постройка с
+        // меткой нароста в начале хода ПРОТИВНИКА носителя наносит 1
+        // урон случайному существу/постройке противника по соседству
+        // (тик в upkeep — arenaUpkeep; складывается, бейдж с числом)
+        nec288: { type: "spell", cost: 1,
+                  spell: { target: "anyObj", necroGrow: true },
+                  kind: "damage", // тип эффекта — по спеке юзера (Нанесение урона)
+                  rarity: "rare", elem: "timDec",
+                  multi: ["time", "decay"],
+                  color: 0x8a5fc0, img: "time_decay/288" },
+        // «Трансформа» (nec289): заклинание — существо получает сразу
+        // «Выкапывание 1», «Ответ 1», «Защита 1», «Сокрушение»,
+        // «Берсерк 1» и «Выстрел 1» (каждая — штатный механизм выдачи:
+        // addExhuming/tagOver counterSpike/addProtect/crushGrant/
+        // addBerserk/quiverBonus — ветка в arenaSpells)
+        nec289: { type: "spell", cost: 6,
+                  spell: { target: "anyUnit", transformPack: true },
+                  kind: "buff", // тип эффекта — по спеке юзера (Усиление)
+                  rarity: "epic", elem: "timDec",
+                  multi: ["time", "decay"],
+                  color: 0x8a5fc0, img: "time_decay/289" },
+        // «Извлечение функции» (nec290): заклинание — существо теряет
+        // СЛУЧАЙНО ОДИН из своих эффектов (положительные: def-способности
+        // «Извлечения духа» + Защита/Берсерк/Выкапывание/Выстрел/бонусы
+        // урона), соседнее существо ТОЙ ЖЕ стороны получает его
+        // (stealEffect — ветка в arenaSpells; соседей нет — эффект
+        // пропадает, каст отменяется)
+        nec290: { type: "spell", cost: 2,
+                  spell: { target: "anyUnit", stealEffect: true },
+                  kind: "buff", // тип эффекта — по спеке юзера (Усиление)
+                  rarity: "epic", elem: "timDec",
+                  multi: ["time", "decay"],
+                  color: 0x8a5fc0, img: "time_decay/290" },
     };
 })();

@@ -931,6 +931,7 @@
                                     cellXY(v.col, v.row).y - 96,
                                     "⛏ " + (hd.abilityVal || 1), 0xc9b98c);
                                 sfx("chpoc");
+                                onEffectGain(v); // «Изменённый» (W84): выданное «Выкапывание»
                             }
                         }
                     }

@@ -187,6 +187,153 @@
             // бейдж показывает сумму; «Извлечение духа» снимает защиту целиком.
             // «Облачный шпиль» (wis106) добавляет к сумме ауру «Защита 1» —
             // unitProtectTotal считает её динамически, а этот помощник
+            // «Изменённый» (necMutant, W84 — спека юзера): когда СУЩЕСТВО
+            // владельца ПОЛУЧАЕТ эффект (способность/метку), оно получает
+            // ещё +1/+1. Вызывается во всех точках выдачи эффектов:
+            // addProtect/addBerserk/addVenom/addExhuming (выдача с гейтом
+            // внутри), ветки заклинаний «Некроз»/«Некро-наросты»/
+            // «Трансформа»/колчаны/купол, передача «Извлечения функции»,
+            // хук «Некро-стражей». Врождённые способности при призыве —
+            // не «получение» (существо приходит с ними). Баффы СТАТОВ
+            // (+N⚔/+N♥) — не эффекты (см. спеку «Вихрей магии»)
+            A.onEffectGain = function onEffectGain(u) {
+                if (!u || !B.units.includes(u) || !u.node) return;
+                const hd = heroDefOf(u.side);
+                if (!hd || hd.ability !== "effectGrow") return;
+                u.bonusAtk = (u.bonusAtk || 0) + 1;
+                u.hp += 1;
+                recalcAuras();
+                const an = u.node.getChildByName("atk");
+                if (an) an.text = String(u.curAtk);
+                const hn = u.node.getChildByName("hp");
+                if (hn) hn.text = String(u.hp);
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 39, "+1⚔ +1♥", 0xc79af0);
+                fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.7 });
+                punch(u.node);
+                sfx("chpoc");
+                onBuff(u, 1, 1); // «Корона леса» (W61): штатный хук усиления
+            };
+
+            // «Трансформа» (nec289, W84 — спека юзера): выдаёт цели 6
+            // свойств — «Выкапывание 1», «Ответ 1», «Защита 1», «Сокрушение»,
+            // «Берсерк 1», «Выстрел 1» — каждая штатным механизмом выдачи.
+            // Общая для игрока (applySpellPInner) и ИИ
+            // (enemyCastSpellEffect). Каждое полученное свойство —
+            // отдельный «эффект» для способности «Изменённого»
+            // (onEffectGain внутри: боссовское существо получает +6/+6)
+            A.transformPackAct = function transformPackAct(u) {
+                addExhuming(u, (u.exhuming || 0) + 1); // «Выкапывание 1»
+                onEffectGain(u); // (+addExhuming не триггерит: врождённое/rebirth)
+                if (!u.tagOver) u.tagOver = {};
+                // «Ответ 1»: tagVal поверх печатного стакается
+                // (врождённый counterSpike + выданные)
+                u.tagOver.counterSpike = tagVal(u, "counterSpike") + 1;
+                onEffectGain(u);
+                u.protect = (u.protect || 0) + 1; // «Защита 1»
+                refreshProtectMark(u);
+                onEffectGain(u);
+                u.crushGrant = true; // «Сокрушение» (crushHit читает поверх def.crush)
+                onEffectGain(u);
+                addBerserk(u, 1); // «Берсерк 1» (+хук внутри)
+                u.quiverBonus = (u.quiverBonus || 0) + 1; // «Выстрел 1» (как «Полные колчаны»)
+                onEffectGain(u);
+            };
+
+            // «Извлечение функции» (nec290, W84 — спека юзера): реестр
+            // изымаемых эффектов — ПОЛОЖИТЕЛЬНЫЕ свойства существа:
+            // def-способности «Извлечения духа» (PURGE_DEF_KEYS) плюс
+            // выданные Защита/Берсерк/Выкапывание/Выстрел (колчаны) и
+            // перманентный бонус урона. Негативные состояния (яд,
+            // заморозка, путы, проклятия) — не «эффекты»: соседу их
+            // передавать нельзя. Случайный выбор — «случайно один» спеки
+            A.pickStealEffect = function pickStealEffect(u) {
+                if (!u || !B.units.includes(u)) return null;
+                const pool = [];
+                for (const k of PURGE_DEF_KEYS)
+                    if (u.def[k] !== undefined)
+                        pool.push({ defKey: k, val: u.def[k] });
+                if (u.protect) pool.push({ uKey: "protect", val: u.protect });
+                if (u.berserk) pool.push({ uKey: "berserk", val: u.berserk });
+                if (u.exhuming) pool.push({ uKey: "exhuming", val: u.exhuming });
+                if (u.quiverBonus)
+                    pool.push({ uKey: "quiverBonus", val: u.quiverBonus });
+                if (u.bonusAtk)
+                    pool.push({ uKey: "bonusAtk", val: u.bonusAtk });
+                if (u.crushGrant) pool.push({ uKey: "crushGrant", val: true });
+                if (u.tagOver && u.tagOver.counterSpike != null)
+                    pool.push({ tagKey: "counterSpike",
+                        val: u.tagOver.counterSpike });
+                return pool.length ? pool[(Math.random() * pool.length) | 0]
+                    : null;
+            };
+            // Снять изъятый эффект с цели: def-способность — деф подменяется
+            // «очищенной» копией (паттерн «Извлечения духа», purgeUnit;
+            // cardIdOf узнаёт карту по __base), выданные — обнуляются с
+            // синхронизацией бейджа. Тик триггерит: цель ТЕРЯЕТ эффект
+            A.stealEffectRemove = function stealEffectRemove(u, st) {
+                if (st.defKey !== undefined) {
+                    const def = Object.assign({}, u.def);
+                    delete def[st.defKey];
+                    def.__base = u.def.__base || u.def;
+                    u.def = def;
+                    recalcAuras(); // снесённая аура больше не действует
+                } else {
+                    if (st.uKey !== undefined) u[st.uKey] = 0;
+                    if (st.uKey === "crushGrant") u.crushGrant = false;
+                    if (st.tagKey !== undefined && u.tagOver)
+                        delete u.tagOver[st.tagKey];
+                    if (st.uKey === "protect") refreshProtectMark(u);
+                    if (st.uKey === "berserk") { // бейдж «×(N+1)» — снять
+                        const mark = u.node.getChildByName("berserkMark");
+                        if (mark) mark.destroy({ children: true });
+                    }
+                    if (st.uKey === "exhuming") updateExhumingMark(u);
+                    if (st.uKey === "bonusAtk") {
+                        recalcAuras();
+                        const an = u.node.getChildByName("atk");
+                        if (an) an.text = String(u.curAtk);
+                    }
+                }
+            };
+            // Передать изъятый эффект соседу той же стороны; каждая выдача —
+            // «получение эффекта» для «Изменённого» (onEffectGain)
+            A.stealEffectGrant = function stealEffectGrant(v, st) {
+                if (st.defKey !== undefined) {
+                    // сосед получает def-способность: его деф клонируется
+                    // так же, как при изъятии
+                    const def = Object.assign({}, v.def);
+                    def[st.defKey] = st.val;
+                    def.__base = v.def.__base || v.def;
+                    v.def = def;
+                    recalcAuras(); // переданная аура начинает действовать
+                    onEffectGain(v);
+                } else {
+                    if (st.uKey === "protect") {
+                        v.protect = (v.protect || 0) + st.val;
+                        refreshProtectMark(v);
+                    }
+                    if (st.uKey === "berserk") addBerserk(v, st.val);
+                    if (st.uKey === "exhuming")
+                        addExhuming(v, (v.exhuming || 0) + st.val);
+                    if (st.uKey === "quiverBonus")
+                        v.quiverBonus = (v.quiverBonus || 0) + st.val;
+                    if (st.uKey === "bonusAtk") {
+                        v.bonusAtk = (v.bonusAtk || 0) + st.val;
+                        recalcAuras();
+                        const an = v.node.getChildByName("atk");
+                        if (an) an.text = String(v.curAtk);
+                    }
+                    if (st.uKey === "crushGrant") v.crushGrant = true;
+                    if (st.tagKey !== undefined) {
+                        if (!v.tagOver) v.tagOver = {};
+                        v.tagOver[st.tagKey] = tagVal(v, st.tagKey) + st.val;
+                    }
+                    // addBerserk уже триггерит внутри; остальные — здесь
+                    if (st.uKey !== "berserk") onEffectGain(v);
+                }
+            };
+
             // синхронизирует бейдж (появление/гибель шпиля, очистка).
             A.refreshProtectMark = function refreshProtectMark(u) {
                 if (!u || !u.node) return;
@@ -221,6 +368,7 @@
                 fxEvent("ward", { x: p.x, y: p.y - 14, scale: 0.7 });
                 punch(u.node);
                 sfx("chpoc");
+                A.onEffectGain(u); // «Изменённый» (W84): полученная «Защита»
             };
 
             // «Ядовитость N» (grw29): метка на существе — его атаки вешают на
@@ -254,6 +402,7 @@
                 fxEvent("poison", { x: p.x, y: p.y - 10, scale: 0.64 });
                 punch(u.node);
                 sfx("chpoc");
+                A.onEffectGain(u); // «Изменённый» (W84): полученная «Ядовитость»
             };
             A.addPoison = function addPoison(u, m) {
                 if (!B.units.includes(u)) return; // цель умерла от самой атаки
@@ -387,6 +536,7 @@
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 66, `⚔×${u.berserk + 1}`, 0xffb26e);
                 fxEvent("buff", { x: p.x, y: p.y - 12, color: 0xff8a5e, scale: 0.72 });
+                A.onEffectGain(u); // «Изменённый» (W84): полученный «Берсерк»
             };
         }
     };
