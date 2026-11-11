@@ -97,6 +97,7 @@
             "shop.sellNeed": "You need at least {n} cards to descend — selling is locked",
             "shop.leave": "Leave",
             "arena.yourTurn": "YOUR TURN",
+            "arena.vs": "VS",
             "arena.enemyTurn": "ENEMY TURN",
             "arena.endTurn": "End Turn",
             "param.lives": "Lives",

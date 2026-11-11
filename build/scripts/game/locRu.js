@@ -102,6 +102,7 @@
             "shop.sellNeed": "Для спуска нужно минимум {n} карт — продажа закрыта",
             "shop.leave": "Уйти",
             "arena.yourTurn": "ВАШ ХОД",
+            "arena.vs": "VS",
             "arena.enemyTurn": "ХОД ВРАГА",
             "arena.endTurn": "Конец хода",
             "param.lives": "Жизни",

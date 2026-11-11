@@ -26,6 +26,7 @@
 //   aiPlay.js       — ИИ: ход (показ карты врага, разыгрывание руки);
 //   arenaActions.js — действия игрока: выбор, призыв, заклинания;
 //   arenaFx.js      — процедурные эффекты боя (частицы на Graphics);
+//   arenaVs.js      — файтинговая заставка «VS» перед боем (W93);
 //   arenaScene.js   — enter/exit/update;
 //   arenaApi.js     — тестовый API арены.
 // arenaAI.js — корневой файл ИИ (заметки о происхождении «умности»), функций
@@ -52,6 +53,7 @@
         NS.installActions(A);
         NS.installSpells(A); // заклинания — вторая половина actions (W64)
         NS.installFx(A);
+        NS.installVs(A); // заставка «VS» (W93): startVsIntro/vsTick до сцены
         NS.installScene(A);
         NS.installApi(A);
         return { enter: A.enter, exit: A.exit, update: A.update, api: A.api };

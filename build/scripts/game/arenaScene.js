@@ -349,7 +349,9 @@
                 if (heroDef && heroDef.ability === "startBuildingPlay") startBuildingPlay("p");
                 layoutHand();
                 refreshHud();
-                banner(t("arena.yourTurn"));
+                // W93 (юзер): файтинговая заставка «VS» перед боем — баннер
+                // «ваш ход» стартует, когда звезда-диафрагма откроет поле
+                startVsIntro(heroDef, eHeroDef, eBase);
             };
 
             A.exit = function exit() {
@@ -386,6 +388,7 @@
                 if (!root || !B) return;
                 const dt = ticker.deltaMS / 1000;
                 fxTick(dt); // процедурные эффекты боя (искры, кольца, дым)
+                vsTick(dt); // заставка «VS» (W93): слайд карт, удар, star-iris
                 // доскок бегунка шкалы к засечке (после отпускания мыши)
                 if (sliderGlide) {
                     if (performance.now() - sliderGlide.t0 >= SLIDER_GLIDE_MS) sliderGlide = null;
