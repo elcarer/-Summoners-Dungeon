@@ -361,15 +361,28 @@
                     await delay(0.3 / animK());
                     return true;
                 };
+                // «Искусственный маг» (chaosPlay, W96 — просил юзер): его
+                // эффект-отменщик превращает ЛЮБОЙ платный розыгрыш в трату
+                // впустую (карта уходит в сброс без эффекта), зато
+                // chaosFreePlay бесплатно разыгрывает случайную карту руки.
+                // Стратегия: платить энергией только за дешёвые карты
+                // (0–2⚡), дорогие (3+) придерживать в руке — их и вытащит
+                // бесплатный розыгрыш
+                const chaosHold = (heroDefOf("e") || {}).ability === "chaosPlay";
+                const CHAOS_MAX_COST = 2;
                 for (;;) {
                     if (B.stopped || B.phase === "over") return;
                     const affordable = B.eHand
                         .map((c, i) => ({ i, id: c, def: CARDS[c] }))
                         .filter((x) => effCost(x.id, "e") <= B.eEnergy)
+                        .filter((x) => !chaosHold || effCost(x.id, "e") <= CHAOS_MAX_COST)
                         // порядок — по правилам связок (двигатели до урона и
-                        // существ, усиления после), внутри группы дороже раньше
+                        // существ, усиления после), внутри группы дороже раньше;
+                        // магу chaosPlay — наоборот: платить по минимуму
                         .sort((a, b) => (aiGroup(a.id, a.def) - aiGroup(b.id, b.def))
-                            || (effCost(b.id, "e") - effCost(a.id, "e")));
+                            || (chaosHold
+                                ? effCost(a.id, "e") - effCost(b.id, "e")
+                                : effCost(b.id, "e") - effCost(a.id, "e")));
                     if (!affordable.length) { if (!await tryRefill()) return; continue; }
                     let played = false;
                     for (const pick of affordable) {
