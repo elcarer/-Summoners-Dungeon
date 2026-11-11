@@ -24,6 +24,13 @@
                     floatText(p.x, p.y - 60, "−1♥", 0xef9f8c);
                     damageUnit(b, 1, null, "dam");
                 }
+                // «Предвратие» (dstrGate, W95): разыграна ПОСЛЕДНЯЯ карта
+                // руки — раз за ход владелец берёт карту. У ИИ рука уже
+                // без карты (notePlay зовётся после изъятия); игроку
+                // карту ещё не изъяли (notePlay — в начале spendCard) —
+                // у него свой вызов в конце spendCard. Флаг в гейте
+                // heroLastCardDraw дубли не пропустит
+                heroLastCardDraw(side);
             };
 
             A.playerTurnStart = async function playerTurnStart() {
@@ -36,9 +43,12 @@
                 B.dmgHalt = { p: false, e: false }; // новый ход — урон снова наносится (hw267)
                 B.turnSummons = { p: 0, e: 0 }; // новый ход — счётчик «шестерён» с нуля (wtGears)
                 B.heroFlags.bioHit = { p: false, e: false }; // новый ход — «Биоугроза» (W83) снова может отразить раз
+                B.heroFlags.lastCard = { p: false, e: false }; // «Предвратие» (W95): раз за ход снова
                 tokenPanelClose(); // панель «Управления временем» не переживает смену хода
                 tagPanelClose(); // панель «Экспериментов» не переживает смену хода (W79)
                 projPanelClose(); // панель «Проекции прошлого» — туда же (W81)
+                closeDropPanel(); // панель скидывания «бичей» — туда же (W95)
+                B.dropPending = null; // отложенная панель тоже не переживает ход
                 refreshHud();
                 firewallTick("e"); // стена костров врага — конец хода врага
                 sproutTick("e");   // ростки врага подросли — конец его хода
@@ -52,6 +62,7 @@
                 poisonTick("p"); // яд: до марша (просил юзер)
                 returnTick("p"); // «Возврат» (Время): счётчики тают, созревшие — в руку
                 trapReturnTick("p"); // «Возврат» ЛОВУШКИ (tim221): созревшая — в руку
+                summonTick("p"); // «Призыв» (W95): счётчик истёк — существо из колоды
                 await delayArrive("p"); // «Сдвиг» (Время): созревшие являются
                 await marchSide("p");
                 timeCavePulse("p"); // «Пещера времени»: призыв после марша — значок не тает в этом же ходу
@@ -97,6 +108,7 @@
                     multiWeave(cardId, "p");
                     multiStudy(cardId, "p"); // «Глубокое изучение» (Магодром, W79)
                     multiPlague(cardId, "p"); // «Зараза из глубин» (Некро-раскопки, W82)
+                    multiPortal(cardId, "p"); // «Из портала» (Портал в бездну, W95)
                 }
                 // улетание карты в сброс (анимации руки, просил юзер):
                 // позиция снимается ДО splice; узел мог быть пересобран
@@ -124,6 +136,8 @@
                 cryptSettle("p", cardId); // «Склеп» (dec157): сыгранная из него карта — в колоду
                 // «Гном-разбойник» (timRaider, W40): рука опустела — 2 карты
                 heroEmptyHandDraw("p");
+                // «Предвратие» (dstrGate, W95): рука опустела розыгрышем — 1 карта
+                heroLastCardDraw("p");
                 return cardId;
             };
 

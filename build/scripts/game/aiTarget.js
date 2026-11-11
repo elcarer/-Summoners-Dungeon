@@ -529,6 +529,17 @@
                 // залп не в кого, карту переводить зря
                 if (s.volley && !B.units.some((v) => v.side === "e"
                     && v.def.type === "unit")) return false;
+                // «Огненный бич» (dstr291, W95): существ на поле нет —
+                // цель («любое существо») не выбрать, карту переводить зря
+                if (s.dropHand && !B.units.some((v) => v.def.type === "unit"))
+                    return false;
+                // «Игра в кости» (dstr292, W95): цель, карта существа
+                // в сбросе и ЕЩЁ хотя бы одна карта руки (сама кость
+                // скинуться не может) — иначе пар нет, карту переводить зря
+                if (s.dicePlay && !(B.units.some((v) => v.def.type === "unit")
+                    && B.eHand.length >= 2
+                    && B.eDiscard.some((id) => CARDS[id]
+                        && CARDS[id].type === "unit"))) return false;
                 // «Вихри магии» (hw261, W75): своего существа хотя бы с
                 // одним своим эффектом нет — карта переводится зря (+0/+0)
                 if (s.vortexBuff && !B.units.some((v) => v.side === "e"

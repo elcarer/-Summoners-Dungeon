@@ -40,6 +40,9 @@
         wisTim: starterCollection(STARTER_DECKS.wisTim),
         // W82: ядро врага «Некро-стражи» («Некро-раскопки») — та же симметрия
         timDec: starterCollection(STARTER_DECKS.timDec),
+        // W95: ядро врага «Предвратие» («Портал в бездну», Тлен+Сила) —
+        // та же симметрия реестра
+        decStr: starterCollection(STARTER_DECKS.decStr),
     };
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N
@@ -402,6 +405,13 @@
         "nec289", "nec289", "nec289",
         "nec290", "nec290", "nec290"];
 
+    // W95 (спека юзера): пул наград/драфта «Портала в бездну» — Тлен,
+    // Сила и двухцветные Тлен+Сила (встречаются только в этом данже).
+    // Новые dstr-карты: обычная 291 ×3, редкая 292 ×3
+    REWARD_POOLS.decStr = [...REWARD_POOLS.decay, ...REWARD_POOLS.strength,
+        "dstr291", "dstr291", "dstr291",
+        "dstr292", "dstr292", "dstr292"];
+
     const { ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM,
         FLOOR_MOBS_DECAY, FLOOR_MOBS_HONOR, FLOOR_MOBS_TIME, MOB_TABLES,
         ENEMY_FILL, ENEMY_FILLS } = globalThis.GAME_ENCOUNTERS;
@@ -481,6 +491,18 @@
         nec: { elem: "timDec", elems: ["time", "decay"], maxFloor: 3,
                plague: true,
                boss: "necMutant", bossLast: true }, // W84 (спека юзера): босс «Изменённый» в последней комнате 3-го этажа
+        // W95 (спека юзера): «Портал в бездну» — МУЛЬТИЦВЕТНЫЙ данж
+        // Тлен+Сила (по образцу «Некро-раскопок»). ЭТАЖА 3 (враги 2–3-го
+        // этажей и босс — со спекой юзера: на 2–3-м играет враг 1-го, как
+        // в «Рыжем лесу» W54). Враг 1-го этажа — «Предвратие» (герой 86,
+        // 16♥). elems — стихии ДРАФТА «Карты сокровищ» (Тлен, Сила,
+        // двухцветные decStr); elem — мульти-стихия (рубашки
+        // card_multi_back.png). Особенность portal — «Из портала»: при
+        // розыгрыше двухцветной карты Тлен−Сила на случайное существо
+        // ИГРАЮЩЕГО кладётся «Призыв 2» (ПОПРАВКА W79.2 — только у
+        // врагов; текст в HUD — dungeon.js; multiPortal — arenaDamage)
+        dstr: { elem: "decStr", elems: ["decay", "strength"],
+                maxFloor: 3, portal: true },
     };
     // Колода врага: ядро архетипа; весь добор — только боссу (просил
     // юзер): с глубиной (floor ≥ 1) +2 карты из grow за этаж и 3..8 карт

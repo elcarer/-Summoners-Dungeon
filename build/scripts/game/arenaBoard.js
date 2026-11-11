@@ -755,6 +755,7 @@
                 multiWeave(cardId, side); // «Переплетение сил» (Небесный дворец, W75)
                 multiStudy(cardId, side); // «Глубокое изучение» (Магодром, W79)
                 multiPlague(cardId, side); // «Зараза из глубин» (Некро-раскопки, W82)
+                multiPortal(cardId, side); // «Из портала» (Портал в бездну, W95)
                 sfx("aqua"); // призыв (обе стороны)
                 B.units.push(u);
                 recalcAuras(); // строение могло появиться раньше юнита — аура живёт всегда

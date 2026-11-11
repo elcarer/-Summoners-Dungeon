@@ -37,6 +37,7 @@
                 poisonTick("e"); // яд: до марша (просил юзер)
                 returnTick("e"); // «Возврат» (Время): счётчики тают, созревшие — в руку
                 trapReturnTick("e"); // «Возврат» ЛОВУШКИ (tim221): созревшая — в руку
+                summonTick("e"); // «Призыв» (W95): счётчик истёк — существо из колоды
                 await delayArrive("e"); // «Сдвиг» (Время): созревшие являются
                 await marchSide("e");
                 if (B.stopped || B.phase === "over") return;
@@ -253,6 +254,7 @@
                         multiWeave(id, side);
                         multiStudy(id, side);
                         multiPlague(id, side); // «Зараза из глубин» (Некро-раскопки, W82)
+                        multiPortal(id, side); // «Из портала» (Портал в бездну, W95)
                         cryptSettle(side, id);
                         armTrap(side, id, col, row, unit);
                         afterTrapPlaced(side);
@@ -272,6 +274,7 @@
                         multiWeave(id, side);
                         multiStudy(id, side);
                         multiPlague(id, side); // «Зараза из глубин» (Некро-раскопки, W82)
+                        multiPortal(id, side); // «Из портала» (Портал в бездну, W95)
                         B.playCtx = { side, cardId: id };
                         enemyCastSpellEffect(d, true); // авто-цели ИИ
                         B.playCtx = null;
@@ -493,6 +496,7 @@
                                 multiValor(cardId, "e"); // «Растущая доблесть» (Белая пуща, W62)
                                 multiWeave(cardId, "e"); // «Переплетение сил» (Небесный дворец, W75)
                                 multiStudy(cardId, "e"); // «Глубокое изучение» (Магодром, W79)
+                                multiPortal(cardId, "e"); // «Из портала» (Портал в бездну, W95)
                                 cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                                 // «Магопуты»-герой игрока (W77): первая карта
                                 // врага — отменена (энергия потрачена)
@@ -593,6 +597,7 @@
                             multiValor(cardId, "e"); // «Растущая доблесть» (W62)
                             multiWeave(cardId, "e"); // «Переплетение сил» (Небесный дворец, W75)
                             multiStudy(cardId, "e"); // «Глубокое изучение» (Магодром, W79)
+                            multiPortal(cardId, "e"); // «Из портала» (Портал в бездну, W95)
                             // «Магопуты»-герой игрока (W77): первая карта
                             // врага — отменена (энергия потрачена)
                             if (heroVoidFirstCancel("e")) {
@@ -670,6 +675,7 @@
                             multiValor(cardId, "e"); // «Растущая доблесть» (W62)
                             multiWeave(cardId, "e"); // «Переплетение сил» (Небесный дворец, W75)
                             multiStudy(cardId, "e"); // «Глубокое изучение» (Магодром, W79)
+                            multiPortal(cardId, "e"); // «Из портала» (Портал в бездну, W95)
                             if (def.spell.copyLast) {
                                 // «Горящие руны»: повтор ПОСЛЕДНЕГО заклинания тем
                                 // же кодом эффектов (бесплатно для его цены)

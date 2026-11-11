@@ -25,6 +25,35 @@
                     enemyCastSpellEffectInner(def, free, focus, fromHand);
                 } finally { A.spellCasting = false; A.castSide = prevCast; }
             };
+            // Скидывание ИИ «любого количества» («Огненный бич»/
+            // «Игра в кости», W95): n самых дешёвых карт руки, ИГРАЕМАЯ
+            // КАРТА исключается (иначе дешёвый бич cost 0 скинул бы сам
+            // себя — двойной splice в aiPlay унёс бы чужую карту).
+            // Меньше n кандидатов — скинет сколько есть
+            A.aiDropWorst = function aiDropWorst(side, n, selfId) {
+                const hand = side === "p" ? B.hand : B.eHand;
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const cheap = (i) => {
+                    const d = CARDS[hand[i]];
+                    return (d.cost || 0) * 10
+                        + (A.aiCardPower ? A.aiCardPower(d) : 0);
+                };
+                let dropped = 0;
+                for (let k = 0; k < n; k++) {
+                    let bi = -1;
+                    for (let i = 0; i < hand.length; i++) {
+                        if (hand[i] === selfId) continue;
+                        if (bi < 0 || cheap(i) < cheap(bi)) bi = i;
+                    }
+                    if (bi < 0) break; // скидывать нечего (кроме играемой)
+                    const id = hand.splice(bi, 1)[0];
+                    discard.push(id);
+                    noteDiscard(1, side, [id]);
+                    dropped += 1;
+                }
+                return dropped; // фактическое число — урон/пары по нему
+            };
+
             A.enemyCastSpellEffectInner = function enemyCastSpellEffectInner(def, free = false, focus = null, fromHand = false) {
                 const s = def.spell;
                 castTargetOff = 0;
@@ -182,6 +211,53 @@
                             y: cellXY(t.col, t.row).y - 12, scale: 0.9 });
                         punch(t.node);
                         sfx("chpoc");
+                    }
+                    return;
+                }
+                if (s.dropHand) { // «Огненный бич» (dstr291, W95): бьёт
+                    // вражеское (игроково) существо с макс. жизнями
+                    // (урон за скинутые карты); врагов-существ нет —
+                    // баффает своё самое жирное. Скидывает случайное
+                    // число (0..2) самых дешёвых карт руки
+                    const foes = spellTargets(B.units.filter((v) =>
+                        v.side !== "e" && v.def.type === "unit"));
+                    const own = B.units.filter((v) => v.side === "e"
+                        && v.def.type === "unit" && B.units.includes(v));
+                    let t = null;
+                    if (foes.length)
+                        t = foes.slice().sort((a, b) => (b.hp - a.hp)
+                            || (a.row - b.row))[0];
+                    else if (own.length)
+                        t = own.slice().sort((a, b) =>
+                            ((b.curAtk || 0) + (b.hp || 0))
+                            - ((a.curAtk || 0) + (a.hp || 0)))[0];
+                    if (t) {
+                        aimOff(t);
+                        const want = (Math.random()
+                            * Math.min(3, B.eHand.length + 1)) | 0;
+                        // урон — по ФАКТИЧЕСКИ скинутым (рука могла быть
+                        // только из играемой карты)
+                        const n = aiDropWorst("e", want, cardIdOf(def));
+                        dropHandAct({ col: t.col, row: t.row }, n);
+                    }
+                    return;
+                }
+                if (s.dicePlay) { // «Игра в кости» (dstr292, W95): скинуть
+                    // ровно столько карт, сколько карт призыва в его
+                    // сбросе (каждой паре — Гоблин 2/2); цель по спеке
+                    // любое существо — эффект её не читает (передаём
+                    // первое попавшееся)
+                    const any = B.units.filter((v) => v.def.type === "unit"
+                        && B.units.includes(v));
+                    const unitsInDisc = B.eDiscard.filter((id) => CARDS[id]
+                        && CARDS[id].type === "unit").length;
+                    // играемая карта руки скинуться не может
+                    const n = Math.min(unitsInDisc,
+                        Math.max(0, B.eHand.length - 1));
+                    if (n > 0 && any.length) {
+                        aimOff(any[0]);
+                        const dropped = aiDropWorst("e", n, cardIdOf(def));
+                        dicePlayAct("e", dropped);
                     }
                     return;
                 }

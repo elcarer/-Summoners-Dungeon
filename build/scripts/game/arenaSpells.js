@@ -106,6 +106,55 @@
                 A.onEffectGain(u); // «Изменённый» (W84): полученный нарост
             };
 
+            // «Призыв N» (W95, спека юзера): метка-счётчик на существе.
+            // Тик — в начале хода ВЛАДЕЛЬЦА (summonTick — arenaUpkeep):
+            // счётчик тает на 1, на нуле из КОЛОДЫ владельца призывается
+            // случайное существо на соседнюю (верт/гориз) пустую клетку
+            // носителя. Повторное наложение НЕ СТАКАЕТСЯ, а ЗАМЕНЯЕТ
+            // счётчик (спека). Вешается особенностью «Из портала»
+            // (multiPortal — arenaDamage); тултип — summonMark в
+            // EFFECT_MARKS (arenaHand)
+            A.summonMarkDraw = function summonMarkDraw(u) {
+                if (!u.node || u.node.destroyed) return;
+                let mark = u.node.getChildByName("summonMark");
+                if (!mark) {
+                    mark = new PIXI.Container();
+                    mark.name = "summonMark";
+                    mark.eventMode = "none";
+                    const g = new PIXI.Graphics();
+                    g.circle(0, 0, 13.5);
+                    g.fill({ color: 0x6e2418 });
+                    g.stroke({ width: 3, color: 0xf0906a });
+                    mark.addChild(g);
+                    const tx = T("", 17, 0xf8d8c0);
+                    tx.anchor.set(0.5);
+                    mark.addChild(tx);
+                    mark.position.set(36, -54); // под «Возвратом» (справа)
+                    u.node.addChild(mark);
+                }
+                mark.getChildAt(1).text = String(Math.max(0, u.summonN || 0));
+            };
+            A.summonClear = function summonClear(u) {
+                u.summonN = null;
+                if (u.node && !u.node.destroyed) {
+                    const mk = u.node.getChildByName("summonMark");
+                    if (mk) mk.destroy({ children: true });
+                }
+            };
+            A.summonTarget = function summonTarget(u, n, side) {
+                // замена, не стакается (спека юзера)
+                u.summonN = n;
+                summonMarkDraw(u);
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 66,
+                    "⇑ " + GAME_LOC.t("spell.summonMark.name") + " " + n,
+                    0xef9f8c);
+                fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.8 });
+                punch(u.node);
+                sfx("chpoc");
+                A.onEffectGain(u); // «Изменённый» (W84): полученный «Призыв»
+            };
+
             // «Ремонт» (tim239, просил юзер): метка «при смерти — в руку
             // владельца» на существо/постройку. Общая для игрока
             // (applySpellPInner) и ИИ (enemyCastSpellEffect); перехват —
@@ -217,6 +266,70 @@
                 }
                 for (const u of moved)
                     if (B.units.includes(u)) afterMoved(u);
+                refreshHud();
+                checkEnd();
+            };
+
+            // ── W95 (спека юзера): эффекты «скиньте любое количество карт
+            // с руки» — применяются ПОСЛЕ панели скидывания (buildDropPanel
+            // — arenaHand; игрок) или авто-скидом ИИ (aiSpells) ─────────
+            // «Огненный бич» (dstr291): выбранное существо получает
+            // +2 к урону (+2/0 — синтаксис статов «урон/жизни») и 1 урон
+            // за каждую скинутую карту (порядок спеки: сначала +2/0,
+            // потом урон; цель могла погибнуть от урона)
+            A.dropHandAct = function dropHandAct(target, n) {
+                const u = unitAt(target.col, target.row);
+                if (!u || !B.units.includes(u)) return;
+                u.bonusAtk = (u.bonusAtk || 0) + 2;
+                recalcAuras();
+                const an = u.node.getChildByName("atk");
+                if (an) an.text = String(u.curAtk);
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 84, "+2⚔", 0xef9f8c);
+                onBuff(u, 2, 0); // «Белая пуща» (W61): единый хук усиления
+                if (n > 0)
+                    damageUnit(u, n, null, "dam"); // «−N» и звук — сам damageUnit
+                fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
+                punch(u.node);
+                sfx("chpoc");
+                refreshHud();
+                checkEnd();
+            };
+            // «Игра в кости» (dstr292): из сброса ВЛАДЕЛЬЦА удаляется
+            // столько карт призыва (существ), сколько найдётся (не больше
+            // скинутых) — «до конца боя» (изъятие как у «Пролома
+            // реальности»: splice из сброса, при замешивании не вернутся);
+            // за каждую пару (скинутая + удалённая) призывается Гоблин
+            // 2/2 (жетон gobToken) в случайную пустую клетку поля боя
+            A.dicePlayAct = function dicePlayAct(side, n) {
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                let pairs = 0;
+                for (let k = 0; k < n; k++) {
+                    const cand = [];
+                    discard.forEach((id, i) => {
+                        if (CARDS[id] && CARDS[id].type === "unit")
+                            cand.push(i);
+                    });
+                    if (!cand.length) break; // карт призыва в сбросе нет
+                    discard.splice(cand[(Math.random() * cand.length) | 0], 1);
+                    pairs += 1;
+                }
+                if (!pairs) return; // пар нет — эффекта нет
+                let summoned = 0;
+                for (let k = 0; k < pairs; k++) {
+                    const free = [];
+                    for (let r = 0; r < GRID; r++)
+                        for (let c = 0; c < GRID; c++)
+                            if (!unitAt(c, r)) free.push([c, r]);
+                    if (!free.length) break; // поле полно — гоблину нет места
+                    const [c, r] = free[(Math.random() * free.length) | 0];
+                    addUnit(side, "gobToken", c, r, { token: true });
+                    summoned += 1;
+                }
+                floatText(960, side === "p" ? 640 : 300,
+                    `🎲 +${summoned} ` + GAME_LOC.t("card.gobToken.name"),
+                    0xef9f8c);
+                sfx("chpoc");
                 refreshHud();
                 checkEnd();
             };
@@ -388,6 +501,23 @@
                 }
                 if (def.spell.volley) { // «Небо в стрелах» (gh258, W72): без цели
                     volleyAct("p");
+                    return true;
+                }
+                if (def.spell.dropHand || def.spell.dicePlay) {
+                    // «Огненный бич» (dstr291) / «Игра в кости» (dstr292)
+                    // (W95 — спека юзера): скинуть ЛЮБОЕ количество карт
+                    // с руки — панель мультивыбора (buildDropPanel —
+                    // arenaHand) открывается ПОСЛЕ розыгрыша: эффект
+                    // откладывается в B.dropPending, castSpell доводит
+                    // карту до сброса/руку до пересборки и строит панель
+                    // поверх. Цель — любое существо (по спеке; эффект
+                    // «Игры в кости» её не читает). Повтор панели невозможен:
+                    // B.dropPending гасится при строительстве
+                    if (!target || target.col === undefined) return false;
+                    const u = unitAt(target.col, target.row);
+                    if (!u || !effCreature(u)) return false;
+                    B.dropPending = { col: u.col, row: u.row,
+                        dice: !!def.spell.dicePlay };
                     return true;
                 }
                 if (tg === "anyUnit") { // усиление/Смыв/Слабость
@@ -1300,6 +1430,7 @@
                 multiWeave(cardId, "p");
                 multiStudy(cardId, "p"); // «Глубокое изучение» (Магодром, W79)
                 multiPlague(cardId, "p"); // «Зараза из глубин» (Некро-раскопки, W82)
+                multiPortal(cardId, "p"); // «Из портала» (Портал в бездну, W95)
                 if (!applySpellP(cardId, target, false,
                     (resetHand || brainstorm) ? { skipHandReset: true } : null)) {
                     B.playCtx = null;
@@ -1325,6 +1456,15 @@
                 redrawHighlight();
                 refreshHud();
                 checkEnd();
+                // «Огненный бич»/«Игра в кости» (dstr291/292, W95): панель
+                // скидывания ЛЮБОГО количества карт — поверх, после того
+                // как карта ушла в сброс и рука пересобрана (эффект
+                // применится по кнопке «Готово»)
+                if (B.dropPending && !B.stopped && B.phase !== "over") {
+                    const pending = B.dropPending;
+                    B.dropPending = null;
+                    buildDropPanel(pending);
+                }
                 return true;
             };
         }

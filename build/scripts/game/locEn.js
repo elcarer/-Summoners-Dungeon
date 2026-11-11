@@ -27,6 +27,9 @@
             // W82 (юзер): особенность «Некро-раскопок» — текст в HUD данжа
             "dungeon.plague": "Plague from the Depths: when a Purple-Black (Time-Decay two-color) card is played, a random enemy (creature, building or base of the opponent) loses 1 life; if it is a creature, it also loses 1 attack (−1/0)",
             "dungeon.plagueShort": "Plague from the Depths",
+            // W95 (user): "Portal to the Abyss" feature — dungeon HUD text
+            "dungeon.portal": "From the Portal: when a Black-Red (Decay-Strength two-color) card is played, a random creature of the player gets Summon 2",
+            "dungeon.portalShort": "From the Portal",
             "dungeon.deckLow": "Deck is below the minimum ({min}) — build your deck",
             "dungeon.hp": "HP {hp}/{max}",
             "dungeon.exitLabel": "DESCEND",
@@ -52,6 +55,8 @@
             "world.caveWt": "Magodrome",
             // W82: мультицветный данж у границы Времени и Тлена
             "world.caveNec": "Necro Excavations",
+            // W95: multicolor dungeon on the Decay–Strength border
+            "world.caveDstr": "Portal to the Abyss",
             "world.soon": "Coming soon…",
             "world.deckLow": "Not enough cards: at least {min} required to enter",
             "world.resLow": "To enter you need: 1 Power Charm and 1 Life Sprout",
@@ -762,6 +767,12 @@
             "card.nec289.desc": "Chosen creature gains \"Exhuming 1\", \"Retaliate 1\", \"Protection 1\", \"Crush\", \"Berserk 1\" and \"Shot 1\"",
             "card.nec290.name": "Function Extraction",
             "card.nec290.desc": "The creature loses one of its effects at random. That effect is transferred to an adjacent creature of the same side (no neighbors — the effect is lost)",
+            // W95 (user): Portal to the Abyss cards (Decay+Strength)
+            "card.dstr291.name": "Fiery Scourge",
+            "card.dstr291.desc": "Discard any number of cards from your hand: the chosen creature gains +2 attack and takes 1 damage for each discarded card",
+            "card.dstr292.name": "Dice Game",
+            "card.dstr292.desc": "Discard any number of cards from your hand and remove that many summon cards from your discard pile for the rest of the battle. For each pair (a discarded + a removed card) summon a Goblin 2/2 at a random board cell",
+            "card.gobToken.name": "Goblin",
             "enc.necGuards.title": "Necro Guards",
             "hero.necGuards.ability": "When you play your second summon this turn, that second summoned creature gains \"Exhuming 1\"",
             "enc.necSoulRiver.title": "River of Souls",
@@ -769,11 +780,21 @@
             "enc.necBiothreat.title": "Biothreat",
             "hero.necBiothreat.ability": "Once per turn, when an enemy creature loses lives, its base takes the same amount of damage (no more than 2)",
             "enc.necMutant.title": "The Altered",
+            // W95 (user): Portal to the Abyss floor-1 enemy
+            "enc.dstrGate.title": "The Ante-Gate",
+            "hero.dstrGate.ability": "Once per turn, when you play your last card from hand — draw a card",
             "hero.necMutant.ability": "Whenever your creature gains an effect, it also gains +1/+1",
             "spell.rot.name": "Necrosis",
             "spell.rot.desc": "This creature takes twice as much damage from all sources; the mark lasts until the target dies",
             "spell.necroGrow.name": "Growth",
             "spell.necroGrow.desc": "At the start of the opponent's turn this creature or building deals 1 damage to a random enemy creature or building adjacent to it",
+            // W95 (user): Summon mark tooltip
+            "spell.summonMark.name": "Summon",
+            "spell.summonMark.desc": "The counter fades by 1 at the start of its owner's turn; when it runs out, a random creature from the owner's deck is summoned on a cell adjacent to the bearer. Re-applying replaces the counter",
+            // W95: discard-any-number panel
+            "drop.title": "Discard any number of cards",
+            "drop.hint": "Click a card to mark it, click again to unmark; Done confirms",
+            "drop.done": "DONE",
             "proj.title": "Projection of the Past",
             "proj.up": "Effect tokens: +1",
             "proj.down": "Effect tokens: −1",

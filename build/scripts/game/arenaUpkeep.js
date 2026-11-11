@@ -638,6 +638,51 @@
                 }
             };
 
+            // «Призыв N» (W95, спека юзера): в начале хода ВЛАДЕЛЬЦА
+            // счётчики «Призыва» его существ тают на 1; на нуле из КОЛОДЫ
+            // владельца призывается случайное СУЩЕСТВО на соседнюю
+            // (верт/гориз) пустую клетку носителя. Клетки свободной нет —
+            // значок ждёт с нулём (стандарт «Сдвига»); в колоде существ
+            // нет — призывать нечего, метка снимается (эффект исчерпан).
+            // Зовётся из playerTurnStart/aiPlay.enemyTurn рядом с
+            // returnTick. Призыв — штатный addUnit: портал явления,
+            // ловушки клеток и «Отмена призыва» работают как обычно;
+            // карта изымается из колоды (не жетон)
+            A.summonTick = function summonTick(side) {
+                for (const u of B.units.slice()) {
+                    if (u.side !== side || u.summonN === undefined
+                        || u.summonN === null || !B.units.includes(u)) continue;
+                    if (u.summonN > 0) {
+                        u.summonN -= 1;
+                        summonMarkDraw(u);
+                    }
+                    if (u.summonN > 0) continue;
+                    // счётчик исчерпан — призыв случайного существа
+                    const near = [];
+                    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        const c = u.col + dc, r = u.row + dr;
+                        if (c < 0 || c >= GRID || r < 0 || r >= GRID) continue;
+                        if (!unitAt(c, r)) near.push([c, r]);
+                    }
+                    const deck = side === "p" ? B.deck : B.eDeck;
+                    const units = deck.filter((id) => CARDS[id]
+                        && CARDS[id].type === "unit");
+                    if (!units.length) { // существ в колоде нет — метка ушла
+                        summonClear(u);
+                        continue;
+                    }
+                    if (!near.length) continue; // кругом занято — ждёт с нулём
+                    const id = units[(Math.random() * units.length) | 0];
+                    deck.splice(deck.indexOf(id), 1);
+                    const [c, r] = near[(Math.random() * near.length) | 0];
+                    const up = cellXY(u.col, u.row);
+                    summonClear(u);
+                    addUnit(side, id, c, r);
+                    floatText(up.x, up.y - 66,
+                        "⇑ " + GAME_LOC.t(`card.${id}.name`), 0xef9f8c);
+                }
+            };
+
             // «Возврат» ЛОВУШКИ («Удар двойника» tim221, просил юзер):
             // спустя N ходов после установки ловушка возвращается в руку
             // владельца (armTrap ставит trap.ret = def.returnN). Тик — в

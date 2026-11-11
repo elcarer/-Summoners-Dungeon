@@ -53,6 +53,11 @@
                 rotMark: { name: "spell.rot.name", desc: "spell.rot.desc", val: () => 0 },
                 // «Некро-наросты» (nec288, W84): метка нароста — бьёт соседа в начале хода противника
                 necroGrowMark: { name: "spell.necroGrow.name", desc: "spell.necroGrow.desc", val: (u) => u.necroGrow },
+                // «Призыв N» (W95): счётчик тает в начале хода владельца;
+                // на нуле — призыв случайного существа из колоды на
+                // соседнюю клетку носителя
+                summonMark: { name: "spell.summonMark.name",
+                    desc: "spell.summonMark.desc", val: (u) => u.summonN || 0 },
             };
             A.effectTip = null; // { key, node }
             A.effectTipHide = function effectTipHide() {
@@ -1080,6 +1085,119 @@
                     layoutHand();
                     buildDiscardPanel(); // пересборка: новый состав руки и счётчик
                 }
+            };
+
+            // ── Панель СКИДЫВАНИЯ ЛЮБОГО КОЛИЧЕСТВА карт (W95) ──────────────
+            // «Огненный бич» (dstr291) и «Игра в кости» (dstr292): игрок
+            // кликами помечает любое число карт руки (повторный клик —
+            // снимает пометку) и подтверждает кнопкой «Готово» (0 карт —
+            // тоже можно: «любое количество»). Открывается ПОСЛЕ розыгрыша
+            // карты (castSpell строит её по B.dropPending — карта к тому
+            // моменту уже в сбросе, рука пересобрана). По подтверждении
+            // карты уходят в сброс и срабатывает эффект заклинания
+            // (dropHandAct/dicePlayAct — arenaSpells)
+            A.dropPanel = null;
+            A.closeDropPanel = function closeDropPanel() {
+                if (!dropPanel) return;
+                dropPanel.destroy({ children: true });
+                dropPanel = null;
+                if (B) B.discarding = false;
+            };
+            A.buildDropPanel = function buildDropPanel(pending) {
+                closeDropPanel();
+                B.discarding = true;
+                const chosen = new Set();
+                const node = new PIXI.Container();
+                node.eventMode = "static";
+                const dim = new PIXI.Graphics();
+                dim.rect(-3000, -2000, 7920, 5080);
+                dim.fill({ color: 0x000000, alpha: 0.6 });
+                dim.eventMode = "static";
+                node.addChild(dim);
+                const frame = new PIXI.Graphics();
+                frame.roundRect(225, 240, 1470, 525, 18);
+                frame.fill({ color: 0x171310, alpha: 0.96 });
+                frame.stroke({ width: 3, color: 0x6b5c40 });
+                node.addChild(frame);
+                const title = T(t("drop.title"), 39, 0xf0c96a,
+                    { stroke: { color: 0x241505, width: 7.5 } });
+                title.anchor.set(0.5, 0);
+                title.position.set(960, 273);
+                title.eventMode = "none";
+                node.addChild(title);
+                const hint = T(t("drop.hint"), 25, 0xd8c79d);
+                hint.anchor.set(0.5, 0);
+                hint.position.set(960, 339);
+                hint.eventMode = "none";
+                node.addChild(hint);
+                const n = B.hand.length;
+                const spread = Math.min(150, 1350 / Math.max(1, n));
+                const rims = new Map(); // idx → рамка пометки
+                B.hand.forEach((card, idx) => {
+                    const def = CARDS[card];
+                    const c = new PIXI.Container();
+                    if (def.img) {
+                        const face = new PIXI.Sprite(uiTex(`cards/${def.img}.png`));
+                        face.anchor.set(0.5, 0.5);
+                        face.scale.set(0.825);
+                        c.addChild(face);
+                    } else { // фолбэк без картинки: рубашка + имя
+                        const face = new PIXI.Sprite(uiTex("card_back_small.png"));
+                        face.anchor.set(0.5, 0.5);
+                        c.addChild(face);
+                        const nm = T(GAME_LOC.t(`card.${card}.name`), 18, 0xf3e6c2);
+                        nm.anchor.set(0.5);
+                        nm.position.set(0, 69);
+                        nm.eventMode = "none";
+                        c.addChild(nm);
+                    }
+                    c.position.set(960 + (idx - (n - 1) / 2) * spread, 560);
+                    c.eventMode = "static";
+                    c.on("pointertap", () => {
+                        if (chosen.has(idx)) {
+                            chosen.delete(idx);
+                            const r = rims.get(idx);
+                            if (r) { r.destroy(); rims.delete(idx); }
+                            c.y = 560;
+                        } else {
+                            chosen.add(idx);
+                            const r = new PIXI.Graphics();
+                            r.roundRect(-100, -148, 200, 296, 12);
+                            r.stroke({ width: 5, color: 0xf0c96a });
+                            r.eventMode = "none";
+                            c.addChildAt(r, 0); // рамка под лицом карты
+                            rims.set(idx, r);
+                            c.y = 532; // помеченные карты приподнимаются
+                        }
+                        if (ctx.sfx) ctx.sfx();
+                    });
+                    node.addChild(c);
+                });
+                node.addChild(globalThis.GAME_UI.button(ctx, {
+                    tex: "button_menu.png", label: t("drop.done"),
+                    x: 960, y: 722, scale: 0.9, fontSize: 38,
+                    onTap: () => {
+                        if (!B || !B.discarding || !dropPanel) return;
+                        // вынуть помеченные из руки (с конца — индексы
+                        // не едут) и скинуть в сброс владельца
+                        const idxs = [...chosen].sort((a, b) => b - a);
+                        const dropped = idxs.map((i) => B.hand.splice(i, 1)[0])
+                            .filter(Boolean);
+                        dropped.forEach((id) => {
+                            B.discard.push(id);
+                            noteDiscard(1, "p", [id]);
+                            B.scorch.p.delete(id); // метка ушла с картой
+                        });
+                        closeDropPanel();
+                        layoutHand();
+                        refreshHud();
+                        const target = { col: pending.col, row: pending.row };
+                        if (pending.dice) dicePlayAct("p", dropped.length);
+                        else dropHandAct(target, dropped.length);
+                    },
+                }));
+                root.addChild(node);
+                dropPanel = node;
             };
         }
     };

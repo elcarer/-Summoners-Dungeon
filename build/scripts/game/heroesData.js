@@ -272,6 +272,14 @@
         necMutant: { id: "necMutant", rarity: "epic", baseHp: 22,
                      elems: ["time", "decay"], starter: "timDec",
                      img: "85", ability: "effectGrow" },
+        // W95 (спека юзера): «Предвратие» — враг 1-го этажа «Портала в
+        // бездну» (данж Тлен+Сила). Герой 86 (16♥, редкая, способность
+        // lastCardDraw — один раз в ход, когда владелец разыгрывает
+        // последнюю карту с руки, он берёт карту; heroLastCardDraw —
+        // arenaFlow, хуки после розыгрышей карт)
+        dstrGate: { id: "dstrGate", rarity: "rare", baseHp: 16,
+                    elems: ["decay", "strength"], starter: "decStr",
+                    img: "86", ability: "lastCardDraw" },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -622,6 +630,7 @@
         "necSoulRiver", // «Река душ»: враг 2-го этажа «Некро-раскопок» (W82)
         "necBiothreat", // «Биоугроза»: враг 3-го этажа «Некро-раскопок» (W83)
         "necMutant", // «Изменённый»: БОСС «Некро-раскопок», последняя комната 3-го этажа (W84)
+        "dstrGate", // «Предвратие»: враг 1-го этажа «Портала в бездну» (W95)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",
@@ -665,6 +674,7 @@
         honWis: "logo/honor_wisdom_logo.png", // Честь + Мудрость («Небесный дворец», W75)
         wisTim: "logo/wisdom_time_logo.png", // Мудрость + Время («Магодром», W79)
         timDec: "logo/time_decay_logo.png", // Время + Тлен («Некро-раскопки», W82)
+        decStr: "logo/strength_decay_logo.png", // Тлен + Сила («Портал в бездну», W95)
     };
     // Часть каталога для cardsData.js (его читают игра и tools/cards.html).
     globalThis.GAME_HEROES_DATA = { HEROES, HERO_ORDER, HERO_FOE_ORDER,

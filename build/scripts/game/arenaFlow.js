@@ -106,6 +106,24 @@
                 refreshHud();
             };
 
+            // «Предвратие» (dstrGate, W95 — спека юзера): ОДИН раз в ход,
+            // когда владелец разыгрывает последнюю карту с руки, он берёт
+            // карту. Зовётся после розыгрышей карт: spendCard игрока и
+            // розыгрыши ИИ в aiPlay. Панельные сбросы/скидывания руку
+            // в ноль не приводят розыгрышем — не считаются (как выше)
+            A.heroLastCardDraw = function heroLastCardDraw(side) {
+                if (!B || B.heroFlags.lastCard[side]) return;
+                const hand = side === "p" ? B.hand : B.eHand;
+                if (hand.length) return;
+                const hd = heroDefOf(side);
+                if (!hd || hd.ability !== "lastCardDraw") return;
+                B.heroFlags.lastCard[side] = true;
+                if (side === "p") drawCards(1); else drawEnemy(1);
+                floatText(960, side === "p" ? 640 : 300, "+1 ⤴", 0xef9f8c);
+                sfx("chpoc");
+                refreshHud();
+            };
+
             // «Запутать руны» (wis101): сторона сбрасывает ВСЮ руку и берёт N
             // карт. keepId — карта, которая прямо сейчас разыгрывается из руки
             // и уйдёт в сброс отдельно (само заклинание себя не сбрасывает).

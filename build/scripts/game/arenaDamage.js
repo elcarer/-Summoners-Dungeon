@@ -1339,6 +1339,37 @@
                 sfx("chpoc");
             };
 
+            // «Из портала» («Портал в бездну», W95 — спека юзера; текст
+            // в HUD данжа): при розыгрыше ДВУХЦВЕТНОЙ карты Тлен+Сила
+            // (elem "decStr") на случайное существо ИГРАЮЩЕГО кладётся
+            // эффект «Призыв 2» (summonTarget — arenaSpells; счётчик
+            // тикает в начале хода владельца — summonTick, arenaUpkeep).
+            // Особенность данжа — читаем CAVES[portal] по данжу забега.
+            // Хуки — как у остальных особенностей: addUnit (юниты/
+            // постройки, обе стороны), castSpell игрока ДО эффекта,
+            // ловушки игрока — в spendCard, заклинания/ловушки ИИ — в
+            // aiPlay перед эффектом
+            A.multiPortal = function multiPortal(cardId, side) {
+                const def = CARDS[cardId];
+                // Жетоны (Гоблин из «Игры в кости») — не «розыгрыш
+                // двухцветной карты» (гейт, как у study/plague)
+                if (!def || def.elem !== "decStr" || def.token) return;
+                const cd = G.dungeon
+                    && globalThis.GAME_DATA.CAVES[G.dungeon.cave];
+                if (!cd || !cd.portal) return;
+                // Поправка юзера (W79.2): «Особенность этого подземелья
+                // для всех врагов» — только у врагов
+                if (side !== "e") return;
+                // случайное СУЩЕСТВО играющего врага (постройка — не
+                // существо); существ нет — класть «Призыв» некуда
+                const own = B.units.filter((v) => v.side === "e"
+                    && v.def.type === "unit" && B.units.includes(v));
+                if (!own.length) return;
+                floatText(960, 318,
+                    GAME_LOC.t("dungeon.portalShort"), 0xef9f8c);
+                summonTarget(own[(Math.random() * own.length) | 0], 2, "e");
+            };
+
             // «Круг стихий» (wis102): в начале хода владельца разыгрывает
             // случайного Элементаля из руки в случайную пустую соседнюю
             // (верт/гориз) клетку без траты энергии. Карта уходит в сброс,

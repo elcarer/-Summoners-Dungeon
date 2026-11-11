@@ -72,6 +72,8 @@
         uiTextures["scenes/9.png"] = await assets.loadTexture("./images/scenes/9.png");
         uiTextures["scenes/10.png"] = await assets.loadTexture("./images/scenes/10.png");
         uiTextures["scenes/11.png"] = await assets.loadTexture("./images/scenes/11.png");
+        // W95 (юзер): «Портал в бездну» (Тлен+Сила) — 12
+        uiTextures["scenes/12.png"] = await assets.loadTexture("./images/scenes/12.png");
         // эффект поля «Стена костров» и рубашки колод по стихиям
         // (гоблины/природа/мудрость/тлен/честь)
         uiTextures["effects/fire.png"] = await assets.loadTexture("./images/effects/fire.png");
@@ -103,7 +105,7 @@
                             "necro_lair", "honor_lair", "time_lair",
                             "str_gro", "gro_hon",
                             "hon_wis", "wis_tim",
-                            "tim_nec"]) { // W54/W61/W75/W79/W82: тайлы юзера
+                            "tim_nec", "nec_str"]) { // W54/W61/W75/W79/W82/W95: тайлы юзера
             for (const f of TILE_FILES) {
                 uiTextures[`dungeon_tiles/${lair}/${f}.png`] =
                     await assets.loadTexture(`./images/dungeon_tiles/${lair}/${f}.png`);
