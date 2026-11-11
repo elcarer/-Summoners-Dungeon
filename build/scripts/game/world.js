@@ -1449,6 +1449,23 @@
                 updatePoiVisibility();
                 uiHud = buildHud();
                 ctx.ui.addChild(uiHud);
+                // W94 (юзер): новая игра входит под играющим «прожигом» —
+                // тот же переход, что и спуск в подземелье (W60), запускает
+                // выбор героя. Эффект живёт на общей подложке ctx.ui и
+                // переживает смену сцены; вход мира только ПОДНИМАЕТ его
+                // над своим HUD (сцена сменилась под играющим кольцом) и
+                // снимает флаг. В остальных входах в мир эффекта нет
+                {
+                    const FX = globalThis.GAME_FX;
+                    if (FX && FX.available && G.world.ringUp) {
+                        G.world.ringUp = false;
+                        for (const h of FX.live)
+                            if (h.sprite && !h.sprite.destroyed
+                                && h.sprite.parent === ctx.ui
+                                && h.inst.meta && h.inst.meta.name === "Burn away")
+                                ctx.ui.addChild(h.sprite); // наверх, над HUD
+                    }
+                }
                 // квест-диалоги: анонс нового задания / окно незабранной
                 // награды (открываются поверх мира, герой стоит)
                 globalThis.GAME_QUESTS.onSceneEnter(ctx);

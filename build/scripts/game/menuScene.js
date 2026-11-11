@@ -230,6 +230,7 @@
                 epRoot.addChild(sub);
 
                 const cards = [];
+                let launching = false; // переход уже запущен — повторные тапы мимо
                 // Сетка 3×2 (просил юзер): 5 стартовых героев + пустой слот
                 // под будущего героя следующей стихии. Панель 410×430,
                 // ряды y=400/855, колонны x=480/960/1440 — всё в кадре 1920×1080
@@ -284,11 +285,36 @@
                     c.on("pointerover", () => { glow.alpha = 1; });
                     c.on("pointerout", () => { glow.alpha = 0; });
                     c.on("pointertap", () => {
+                        if (launching) return;
+                        launching = true;
+                        epRoot.interactiveChildren = false; // кольцо жнёт
+                            // экран — ввод выбора героя закрыт (как
+                            // worldLock, W60): тапы по карточкам/«Назад» мимо
                         if (ctx.sfx) ctx.sfx();
                         GAME_META.clearRun();
                         G.resetRun(id);
-                        scenes.go("world"); // новый забег — в открытом мире
                         G.saveRun(); // свежий забег сразу сохранён
+                        // W94 (юзер): вход в открытый мир — тот же двухфазный
+                        // «прожиг», что и при входе в подземелье (W60): первая
+                        // половина эффекта (сужающееся кольцо) играет поверх
+                        // выбора героя, к её концу сцена сменяется миром, и
+                        // доигрывает вторая половина (расширяющееся кольцо),
+                        // открывая его экран. Эффект живёт на ctx.ui — общей
+                        // подложке сцен — поэтому переживает смену.
+                        // Бандл не загрузился — обычный мгновенный переход
+                        const FX = globalThis.GAME_FX;
+                        const fx = FX && FX.available
+                            ? FX.spawn(ctx.ui, "transitions/burn-away",
+                                { x: 0, y: 0, size: 1080 })
+                            : null;
+                        if (fx) {
+                            G.world.ringUp = true; // вход мира поднимет
+                                // кольцо над своим HUD (как descentFx, W60)
+                            setTimeout(() => scenes.go("world"),
+                                1250); // кольцо сузилось (CLOSE ≈ 1.2с эффекта)
+                        } else {
+                            scenes.go("world");
+                        }
                     });
                     epRoot.addChild(c);
                     cards.push({ id, node: c, x: cx, y: cy });
