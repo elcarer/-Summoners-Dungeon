@@ -27,11 +27,17 @@
     // фракции, "boss" — над Боссом этажа там же, "final" — чек-лист:
     // дно (последний этаж) + хозяин ямы (босс последнего этажа) +
     // драфт «Карта сокровищ» (markDraft из старта драфта).
+    // W92 (юзер): продолжение после «Дна» — двухцветные подземелья:
+    // "multiEnter" — вход в ЛЮБОЕ из них (elems у CAVES; onCaveEnter
+    // из world.enterCave после гейтов колоды/ресурсов), "multiBoss" —
+    // победа над боссом последнего (3-го) этажа любого из них.
     const QUESTS = [
         { id: "q1", kind: "wild", kills: 3, gold: 10, cards: 4 },
         { id: "q2", kind: "win", gold: 15 },
         { id: "q3", kind: "boss", gold: 25 },
         { id: "q4", kind: "final", gold: 50, rare: true, epilog: true },
+        { id: "q5", kind: "multiEnter", gold: 20 },
+        { id: "q6", kind: "multiBoss", gold: 50 },
     ];
     const nextOf = (id) => {
         const i = QUESTS.findIndex((q) => q.id === id);
@@ -87,13 +93,14 @@
         return hero ? globalThis.GAME_UI.foeTitle(hero) : "";
     }
     // Подстановки: q1 — счётчик побед, q4 — чек-лист «дно/хозяин/драфт»
-    // (+/−) и имя хозяина ямы
+    // (+/−) и имя хозяина ямы, q5 — текущий размер колоды (W92)
     function questVars(G, q) {
         const P = (G.quests && G.quests.progress) || {};
         if (q.id === "q1") return { n: Math.min(P.wildKills || 0, q.kills || 3) };
         // W60 (юзер): у q3 в тексте тоже {boss} — без подстановки печаталась
         // сырая ссылка «{boss}» (был открыт только q2)
         if (q.id === "q2" || q.id === "q3") return { boss: bossName(G) };
+        if (q.id === "q5") return { n: Math.min(G.deck ? G.deck.length : 0, 24) };
         if (q.id === "q4") return {
             boss: bossName(G),
             b1: P.bottom ? "+" : "-", b2: P.finalBoss ? "+" : "-",
@@ -185,8 +192,36 @@
                     if (G.saveRun) G.saveRun();
                     return null;
                 }
+            } else if (q.kind === "multiBoss") {
+                // W92 (юзер): босс ПОСЛЕДНЕГО (3-го) этажа ЛЮБОГО
+                // двухцветного подземелья. У всех мультицветных босс
+                // стоит ТОЛЬКО в дальней комнате последнего этажа
+                // (bossLast), но проверяем и этаж — честнее спеке.
+                // G.dungeon живёт весь бой из подземелья и хранит cave/floor
+                if (!(info && info.elems && boss)) return null;
+                if (!(G.dungeon
+                    && G.dungeon.floor >= (info.maxFloor || 3))) return null;
             } else return null;
         }
+        G.quests.pending = q.id;
+        if (G.saveRun) G.saveRun();
+        return q.id;
+    }
+
+    // Вход в подземелье (W92, вызов из world.enterCave ПОСЛЕ всех гейтов
+    // колоды/ресурсов — дальше вход уже точно случится): q5 — попадание
+    // в ЛЮБОЕ двухцветное подземелье (elems у CAVES: «Рыжий лес», «Белая
+    // пуща», «Небесный дворец», «Магодром», «Некро-раскопки»). Гейт арки
+    // сам требует на входе 24 карты (caveDeckFor мультицветных), но и
+    // тут проверяем явно — квест про колоду. Возвращает id выполненного
+    // квеста или null.
+    function onCaveEnter(G, caveId) {
+        if (!G.quests || G.quests.pending) return null;
+        const q = QUESTS.find((x) => x.id === G.quests.active);
+        // (W49, юзер) невзятый квест не выполняется — как у onBattleWin
+        if (!q || q.kind !== "multiEnter" || !G.quests.announced) return null;
+        const info = globalThis.GAME_DATA.CAVES[caveId];
+        if (!(info && info.elems) || G.deck.length < 24) return null;
         G.quests.pending = q.id;
         if (G.saveRun) G.saveRun();
         return q.id;
@@ -301,6 +336,22 @@
             // и после побочного квеста-охоты стрелка «перецеплялась» на
             // следующего бродягу. q1 — без стрелки; q2–q4 ведут к арке
             return null;
+        }
+        // W92 (юзер): q5/q6 ведут к БЛИЖАЙШЕМУ двухцветному подземелью —
+        // «любая арка на два цвета», какую стихию взять, герой решает сам
+        if (q.kind === "multiEnter" || q.kind === "multiBoss") {
+            const D = globalThis.GAME_DATA;
+            const f = from || { x: 0, y: 0 };
+            let best = null, bd = Infinity;
+            for (const p of map.pois) {
+                if (p.kind !== "dungeon") continue;
+                const inf = D.CAVES[p.cave];
+                if (!(inf && inf.elems)) continue;
+                const d = Math.hypot((p.gx + 0.5) * 32 - f.x,
+                    (p.gy + 0.5) * 32 - f.y);
+                if (d < bd) { bd = d; best = p; }
+            }
+            return best ? px(best) : null;
         }
         const cave = caveOfElem(G.elem);
         const poi = map.pois.find((p) => p.kind === "dungeon" && p.cave === cave);
@@ -741,6 +792,7 @@
     globalThis.GAME_QUESTS = {
         QUESTS, fresh, revive, onBattleWin, onSceneEnter, talkTo,
         showReview, forcedClose, bossName, markDraft, noteFloor, arrowTarget,
+        onCaveEnter, // W92: вход в двухцветное подземелье (world.enterCave)
         stateOf: (G) => (G.quests ? {
             active: G.quests.active, done: { ...(G.quests.done || {}) },
             announced: !!G.quests.announced, pending: G.quests.pending || null,

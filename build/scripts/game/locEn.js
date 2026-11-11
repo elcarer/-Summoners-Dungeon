@@ -1143,6 +1143,28 @@
                 "glom|Now you're the summoner and I'm the storyteller. Take your prize — and get lost before I lose it gambling.",
             ],
             "quest.q4.reward": "Reward: a rare card and 50 gold",
+            // W92 (user): the chain continues past "The Bottom" — two-color
+            // dungeons (24-card entry, boss on the 3rd floor)
+            "quest.q5.name": "Foreign Arches",
+            "quest.q6.name": "Master of the Third Floor",
+            "quest.q5.text": "Done with your own arch, are you? There are dungeons of two colors at once: Strength with Growth, Honor with Wisdom — each to their own. But those arches are proud: they only let you in with a rich deck — twenty-four cards, no fewer. Find any such arch, build up your deck and step inside. I can't make the walk anymore — my knees are shot.",
+            "quest.q5.goal": "Collect 24 cards in your deck ({n}/24) and enter any two-color dungeon",
+            "quest.q5.lines": [
+                "glom|Tired of staring at your own arch? There are richer dungeons: two colors at once. Strength with Growth, Honor with Wisdom — each to their own.",
+                "hero|Is it better in there?",
+                "glom|It's richer. But those arches are proud: with a deck shorter than twenty-four cards, don't even bother asking.",
+                "glom|Build up your deck, find any two-color arch and step inside. I can't make the walk anymore — the knees are gone, the cards are lost, but the curiosity lingers.",
+            ],
+            "quest.q5.reward": "Reward: 20 gold",
+            "quest.q6.text": "Two-color dungeons have three floors, and the master sits on the very last one — the third. He's two-color, like the whole dungeon: big, mean, and with a tricky deck. Chop down any such master, and you can call yourself a proper summoner.",
+            "quest.q6.goal": "Defeat a boss on the 3rd floor of any two-color dungeon",
+            "quest.q6.lines": [
+                "glom|Stepped inside — good. Now for the main part: there are three floors down there.",
+                "hero|And on the third?",
+                "glom|On the third sits the master. Meaner than anything you saw in your own arch, and his deck is two-color: keep your eyes peeled.",
+                "glom|Chop down any one of them — fifty gold. My last, mind you. Don't let me down.",
+            ],
+            "quest.q6.reward": "Reward: 50 gold",
             "city.name": "Town",
             "city.npcName": "Old Glom",
             "settings.title": "SETTINGS",

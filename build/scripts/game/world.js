@@ -910,6 +910,11 @@
             if (D.CAVES[caveId].fury && D.CAVES[caveId].elems
                 && !D.CAVES[caveId].elems.every((e) =>
                     (G.resources && (G.resources[e] || 0) >= 1))) return false;
+            // W92 (юзер): сюжетный квест «чужие арки» — попадание в
+            // двухцветное подземелье. Вызов ПОСЛЕ гейтов колоды/ресурсов:
+            // дальше вход уже точно случится (сцена данжа)
+            if (globalThis.GAME_QUESTS)
+                globalThis.GAME_QUESTS.onCaveEnter(G, caveId);
             if (heroId !== null) {
                 G.world.heroPos = { x: COMPONENTS.positionX[heroId], y: COMPONENTS.positionY[heroId] };
             }
