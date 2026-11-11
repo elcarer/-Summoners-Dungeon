@@ -741,6 +741,7 @@
                     if (!u || u.side === "p" || u.def.type !== "unit") return false;
                     damageBase("p", def.spell.mindControl, { x: 960, y: 840, fill: 0xff8f6e });
                     u.side = "p"; // «как будто вы его призвали»: марши/атаки по новой стороне, метки остаются
+                    flipVisual(u); // разворот спрайта к новой стороне (W89, юзер): марширует уже к другой базе
                     recalcAuras();
                     const p = cellXY(u.col, u.row);
                     floatText(p.x, p.y - 78, "⇄", 0xc9a0ef);

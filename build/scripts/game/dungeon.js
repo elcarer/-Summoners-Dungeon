@@ -1630,7 +1630,10 @@
                         }
                     }
                 }
-                if (!st.win && !ctx.questModal && !st.city) for (const t of tokens) {
+                // ненападение (peaceMs, W89) гасит ТОЛЬКО начало боя по
+                // касанию: герой может ходить и отойти от врага
+                if (!st.win && !ctx.questModal && !st.city
+                    && !(st.peaceMs > 0)) for (const t of tokens) {
                     if (!t.enemy.alive) continue;
                     if (Math.hypot(t.enemy.x - hx, t.enemy.y - hy) < TS * 0.85) {
                         // мгновенный стоп у энкаунтера (просил юзер): гасим
@@ -1674,6 +1677,13 @@
                 // «Продолжить» в новой сессии блокировала выход до конца
                 // сессии (баг W22)
                 if (st.ladderCoolMs > 0) st.ladderCoolMs -= dt * 1000;
+                // ненападение врагов после поражения (W89, юзер): 2с после
+                // возврата из боя (прямой реванш или добор потерянной карты
+                // из коллекции) — герой успевает отойти от отступа и от
+                // соседей врага. Счётчик тикает только в этой сцене —
+                // в редакторе колоды он заморожен, 2с начинаются при
+                // возврате в подземелье
+                if (st.peaceMs > 0) st.peaceMs -= dt * 1000;
                 const psg = st.city ? st.exitPassage : null;
                 const hitExit = psg
                     ? Math.floor(hy / TS) === psg.y
