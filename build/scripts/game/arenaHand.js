@@ -800,6 +800,17 @@
                 const mx = drag.homeX + dx / 2 - dy / len * bow;
                 const my = drag.homeY + dy / 2 + dx / len * bow;
                 const col = ok ? 0xa8e890 : 0xef9f8c;
+                // стрелка на конце дуги (W90, юзер: обрубок → стрелка):
+                // направление — касательная кривой в конце (target −
+                // контрольная точка), кончик в центре клетки; заливка
+                // сплошная, как у стартовой точки, — полностью накрывает
+                // обрубок штриха под собой
+                const ang = Math.atan2(target.y - my, target.x - mx);
+                const AR = 30, AHW = 0.48; // длина и полуугол стрелки
+                const aLx = target.x - Math.cos(ang - AHW) * AR,
+                    aLy = target.y - Math.sin(ang - AHW) * AR;
+                const aRx = target.x - Math.cos(ang + AHW) * AR,
+                    aRy = target.y - Math.sin(ang + AHW) * AR;
                 // полупрозрачное широкое свечение (размывается фильтром):
                 // три слоя — широкий ореол, средний, яркая середина
                 if (dragFxGlow && !dragFxGlow.destroyed) {
@@ -814,12 +825,22 @@
                     dragFxGlow.stroke({ width: 7, color: col, alpha: 0.65 });
                     dragFxGlow.circle(drag.homeX, drag.homeY - 75, 10);
                     dragFxGlow.fill({ color: col, alpha: 0.5 });
+                    dragFxGlow.moveTo(target.x, target.y);
+                    dragFxGlow.lineTo(aLx, aLy);
+                    dragFxGlow.lineTo(aRx, aRy);
+                    dragFxGlow.closePath();
+                    dragFxGlow.fill({ color: col, alpha: 0.5 });
                 }
                 dragFx.moveTo(drag.homeX, drag.homeY - 75);
                 dragFx.quadraticCurveTo(mx, my, target.x, target.y);
                 dragFx.stroke({ width: 4.5, color: col, alpha: 0.72 });
                 dragFx.circle(drag.homeX, drag.homeY - 75, 7.5);
                 dragFx.fill({ color: col });
+                dragFx.moveTo(target.x, target.y);
+                dragFx.lineTo(aLx, aLy);
+                dragFx.lineTo(aRx, aRy);
+                dragFx.closePath();
+                dragFx.fill({ color: col }); // сплошная стрелка (W90)
                 const rc = cellRect(c2, r2);
                 dragFx.rect(rc.x + 3, rc.y + 3, rc.w - 6, rc.h - 6);
                 dragFx.fill({ color: ok ? 0x7dc95e : 0xd05a3c, alpha: 0.4 });
