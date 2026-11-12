@@ -708,5 +708,62 @@
                    rarity: "rare", elem: "decStr",
                    multi: ["decay", "strength"],
                    color: 0xc05a3e, img: "decay_strength/295" },
+        // ── W100 (спека юзера): пятикарточное пополнение «Портала в
+        // бездну» — встречаются только в мультицветных подземельях
+        // Тлен+Сила. «Гоблинская тату» (dstr296): заклинание 1⚡ на своё
+        // существо — оно получает «Призыв 3» (summonMark — механика W95:
+        // счётчик тает в начале хода владельца, на нуле из его колоды
+        // призывается случайное существо рядом с носителем)
+        dstr296: { type: "spell", cost: 1,
+                   spell: { target: "ownUnit", summonMark: 3 },
+                   kind: "summon", // тип эффекта — по спеке юзера (Появление существ)
+                   rarity: "common", elem: "decStr",
+                   multi: ["decay", "strength"],
+                   color: 0xc05a3e, img: "decay_strength/296" },
+        // «Носитель пламени» (dstr297): Скелет 0/3 за 1⚡, приходит СРАЗУ
+        // (это не «Сдвиг»!) с собственным счётчиком «Призыв 4» — каждые
+        // 4 тика призывает существо из колоды владельца (selfSummonMark —
+        // addUnit, arenaBoard)
+        dstr297: { type: "unit", cost: 1, atk: 0, hp: 3, speed: 1,
+                   creature: "goblin", // плейсхолдер листа (некр по стихии, как dec121)
+                   subtype: "skeleton", // подтип — по спеке юзера (Скелет)
+                   selfSummonMark: 4,
+                   rarity: "common", elem: "decStr",
+                   multi: ["decay", "strength"],
+                   color: 0xc05a3e, img: "decay_strength/297" },
+        // «В котёл!» (dstr298): клеточная ловушка 1⚡ — перемещение/призыв
+        // ЛЮБОГО существа на клетку: оно и соседи СЛЕВА И СПРАВА получают
+        // 1 урон (cellDmgSides — arenaTraps; нейтральная, как «Решётка
+        // с шипами»)
+        dstr298: { type: "trap", cost: 1,
+                   trap: { event: "onEnemyCell", effect: "cellDmgSides",
+                           amount: 1 },
+                   kind: "damage", // тип эффекта — по спеке юзера (Нанесение урона)
+                   rarity: "rare", elem: "decStr",
+                   multi: ["decay", "strength"],
+                   color: 0xc05a3e, img: "decay_strength/298" },
+        // «Возжённый нетопырь» (dstr299): Животное 7/7 с «Полётом» за 8⚡;
+        // альтернативная стоимость — вместо уплаты цены владелец может
+        // СКИНУТЬ с руки карты общей ценой ровно 8 (flyAltCost — выбор
+        // панелью сброса у игрока, точный поднабор у ИИ; бесплатный
+        // розыгрыш — через journeySummon, как «Глубокое путешествие»)
+        dstr299: { type: "unit", cost: 8, atk: 7, hp: 7, speed: 1,
+                   creature: "animal", sheet: "bat", // Животное, лист нетопыря
+                   subtype: "animal", // подтип — по спеке юзера (Животное)
+                   ability: "flyOver",
+                   flyAltCost: true,
+                   rarity: "epic", elem: "decStr",
+                   multi: ["decay", "strength"],
+                   color: 0xc05a3e, img: "decay_strength/299" },
+        // «Мини-портал» (dstr300): постройка 2⚡ 0/3 — когда владелец
+        // СБРАСЫВАЕТ карту призыва (существо), первая его «Мини-портал»
+        // разыгрывает этот призыв в пустую клетку по соседству с собой
+        // БЕЗ траты энергии и теряет 1 жизнь (miniPortal — noteDiscard,
+        // arenaCombat; нет клетки/портала — призыв остаётся в сбросе)
+        dstr300: { type: "building", cost: 2, atk: 0, hp: 3,
+                   miniPortal: true,
+                   rarity: "epic", elem: "decStr",
+                   multi: ["decay", "strength"],
+                   color: 0xc05a3e, img: "decay_strength/300" },
     };
 })();

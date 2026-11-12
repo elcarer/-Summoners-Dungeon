@@ -45,8 +45,10 @@
         decStr: starterCollection(STARTER_DECKS.decStr),
     };
     // W97: dstr293–295 НЕ в стартере decStr (ядро «Предверия» фиксировано
-    // спекой W95) — реестр коллекции дополняется нулями вручную
-    for (const id of ["dstr293", "dstr294", "dstr295"])
+    // спекой W95) — реестр коллекции дополняется нулями вручную.
+    // W100: то же для dstr296–300
+    for (const id of ["dstr293", "dstr294", "dstr295",
+        "dstr296", "dstr297", "dstr298", "dstr299", "dstr300"])
         STARTER_COLLECTIONS.decStr[id] = 0;
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N
@@ -418,7 +420,14 @@
         // W97 (спека юзера): эпическая 293, обычная 294, редкая 295 — ×3
         "dstr293", "dstr293", "dstr293",
         "dstr294", "dstr294", "dstr294",
-        "dstr295", "dstr295", "dstr295"];
+        "dstr295", "dstr295", "dstr295",
+        // W100 (спека юзера): обычные 296/297, редкая 298, эпические
+        // 299/300 — ×3
+        "dstr296", "dstr296", "dstr296",
+        "dstr297", "dstr297", "dstr297",
+        "dstr298", "dstr298", "dstr298",
+        "dstr299", "dstr299", "dstr299",
+        "dstr300", "dstr300", "dstr300"];
 
     const { ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM,
         FLOOR_MOBS_DECAY, FLOOR_MOBS_HONOR, FLOOR_MOBS_TIME, MOB_TABLES,
@@ -510,7 +519,8 @@
         // ИГРАЮЩЕГО кладётся «Призыв 2» (ПОПРАВКА W79.2 — только у
         // врагов; текст в HUD — dungeon.js; multiPortal — arenaDamage)
         dstr: { elem: "decStr", elems: ["decay", "strength"],
-                maxFloor: 3, portal: true },
+                maxFloor: 3, portal: true,
+                boss: "dstrMaster", bossLast: true }, // W100 (спека юзера): босс «Хозяин той стороны» в последней комнате 3-го этажа
     };
     // Колода врага: ядро архетипа; весь добор — только боссу (просил
     // юзер): с глубиной (floor ≥ 1) +2 карты из grow за этаж и 3..8 карт

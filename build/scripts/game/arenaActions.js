@@ -679,6 +679,37 @@
                 const def = CARDS[B.hand[idx]];
                 if (!def) return;
                 if (ctx.sfx) ctx.sfx();
+                // «Возжённый нетопырь» (dstr299, W100 — спека юзера): вместо
+                // уплаты цены можно СКИНУТЬ с руки карты общей ценой ровно
+                // как цена карты. Энергии не хватает — предлагаем альтернативу
+                // (панель точного сброса); хватает — обычный розыгрыш выбором
+                // клетки. Хватает карт на точный поднабор — иначе тап ничего
+                // не делает (карта неиграбельна)
+                if (def.flyAltCost && B.energy < effCost(B.hand[idx])) {
+                    const sub = altCostSubset(B.hand, B.hand[idx], def.cost || 0);
+                    if (!sub) return;
+                    const selfId = B.hand[idx];
+                    buildDropPanel(null, {
+                        exactSum: def.cost || 0,
+                        excludeIdx: idx,
+                        titleKey: "drop.altTitle",
+                        hintKey: "drop.altHint",
+                        onDone: () => {
+                            // нетопырь ушёл из руки в бесплатный призыв —
+                            // клетку выбирает игрок (как «Глубокое
+                            // путешествие»); карта НE в сброс — она станет
+                            // существом
+                            const bi = B.hand.indexOf(selfId);
+                            if (bi >= 0) B.hand.splice(bi, 1);
+                            B.scorch.p.delete(selfId);
+                            B.journeySummon = selfId;
+                            layoutHand();
+                            redrawHighlight();
+                            refreshHud();
+                        },
+                    });
+                    return;
+                }
                 if (def.type === "spell" && def.spell.target === "none") {
                     castSpell(idx); // без цели — сразу
                     return;

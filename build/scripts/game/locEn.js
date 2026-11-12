@@ -786,6 +786,11 @@
             // W97 (user): Portal to the Abyss floor-2 enemy
             "enc.dstrToyBox.title": "Toy Box",
             "hero.dstrToyBox.ability": "When you discard your second card in a turn — draw a card",
+            // W100 (user): floor-3 enemy and boss of Portal to the Abyss
+            "enc.dstrPit.title": "The Pit",
+            "hero.dstrPit.ability": "Whenever your creature takes damage, reduce its Summon counter by 1 (if it has the Summon effect)",
+            "enc.dstrMaster.title": "Master of the Other Side",
+            "hero.dstrMaster.ability": "Whenever you discard a card, reduce a random Summon effect counter by 1",
             // W97 (user): cards 293–295, Decay + Strength
             "card.dstr293.name": "Portal Fodder",
             "card.dstr293.desc": "Building 0/2. Whenever you discard a card, a random creature without Summon gets Summon 3",
@@ -793,6 +798,17 @@
             "card.dstr294.desc": "Animal 5/5. Whenever you discard a card, this creature gains +1/+1. This creature always has −1/−1 for each card in your hand",
             "card.dstr295.name": "Gargoyle",
             "card.dstr295.desc": "Flying animal 3/3. When you discard this card, play it. Whenever you discard a spell, this creature gains +1/+1",
+            // W100 (user): cards 296–300, Decay + Strength
+            "card.dstr296.name": "Goblin Tattoo",
+            "card.dstr296.desc": "This creature gains Summon 3",
+            "card.dstr297.name": "Flame Bearer",
+            "card.dstr297.desc": "Skeleton 0/3. Arrives with a Summon 4 counter: every 4 turns it summons a random creature from your deck next to itself",
+            "card.dstr298.name": "Into the Cauldron!",
+            "card.dstr298.desc": "Trap on an empty cell: whenever any creature moves or is summoned onto it, that creature and the creatures to its left and right take 1 damage",
+            "card.dstr299.name": "Kindled Bat",
+            "card.dstr299.desc": "Flying animal 7/7. Instead of paying this card's cost, you may discard cards from your hand with total cost equal to this card's cost",
+            "card.dstr300.name": "Mini Portal",
+            "card.dstr300.desc": "Building 0/3. Whenever you discard a summon card, play that summon on an empty cell adjacent to this building (without spending energy); this building loses 1 health",
             "hero.necMutant.ability": "Whenever your creature gains an effect, it also gains +1/+1",
             "spell.rot.name": "Necrosis",
             "spell.rot.desc": "This creature takes twice as much damage from all sources; the mark lasts until the target dies",
@@ -804,6 +820,9 @@
             // W95: discard-any-number panel
             "drop.title": "Discard any number of cards",
             "drop.hint": "Click a card to mark it, click again to unmark; Done confirms",
+            // W100: alternative-cost panel (Kindled Bat)
+            "drop.altTitle": "Discard cards worth exactly 8 energy",
+            "drop.altHint": "Instead of paying: the total cost of discarded cards must equal the bat's cost",
             "drop.done": "DONE",
             "proj.title": "Projection of the Past",
             "proj.up": "Effect tokens: +1",

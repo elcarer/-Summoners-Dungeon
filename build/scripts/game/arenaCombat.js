@@ -1258,6 +1258,65 @@
                             sfx("chpoc");
                         }
                     }
+                    // «Хозяин той стороны» (dstrMaster, W100 — спека юзера):
+                    // когда владелец скидывает карту, у него уменьшается на 1
+                    // случайный счётчик эффекта «Призыв» (summonN) — обнуленный
+                    // призовёт в начале его хода штатным summonTick. За каждую
+                    // сброшенную карту — свой тик
+                    const hdM = heroDefOf(side);
+                    if (hdM && hdM.ability === "discardSummonMinus") {
+                        for (let k = 0; k < ids.length; k++) {
+                            const own = B.units.filter((u) => u.side === side
+                                && u.def.type === "unit" && u.summonN > 0
+                                && B.units.includes(u));
+                            if (!own.length) break; // счётчиков нет — нечего тикать
+                            const t = own[(Math.random() * own.length) | 0];
+                            t.summonN -= 1;
+                            summonMarkDraw(t);
+                            const tp = cellXY(t.col, t.row);
+                            floatText(tp.x, tp.y - 96,
+                                "⇑ " + GAME_LOC.t("spell.summonMark.name")
+                                    + " " + Math.max(0, t.summonN), 0xef9f8c);
+                            punch(t.node);
+                            sfx("chpoc");
+                        }
+                    }
+                    // «Мини-портал» (dstr300, W100 — спека юзера): когда
+                    // владелец скидывает карту ПРИЗЫВА (существо), первая его
+                    // «Мини-портал» с пустой соседней клеткой разыгрывает
+                    // этот призыв БЕЗ траты энергии рядом с собой; постройка
+                    // теряет 1 жизнь (стат-потеря, не «урон» — купол/броня
+                    // не режут; погибла — жизнь отнята впустую). Карта
+                    // изымается из сброса (она туда уже легла); клетки
+                    // свободной нет — призыв остаётся в сбросе. Саморозыгрыш
+                    // гаргула выше уже изъял свой dstr295 — дубля нет
+                    for (const id of ids) {
+                        const cd = CARDS[id];
+                        if (!cd || cd.type !== "unit") continue;
+                        const portal = B.units.find((v) => v.side === side
+                            && v.def.miniPortal && B.units.includes(v));
+                        if (!portal) break; // порталов нет — дальше не ищем
+                        const near = [];
+                        for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                            const c = portal.col + dc, r = portal.row + dr;
+                            if (c < 0 || c >= GRID || r < 0 || r >= GRID) continue;
+                            if (!unitAt(c, r)) near.push([c, r]);
+                        }
+                        if (!near.length) continue; // кругом занято — ждёт в сбросе
+                        const discard = side === "p" ? B.discard : B.eDiscard;
+                        const di = discard.indexOf(id);
+                        if (di < 0) continue; // карту уже изъяли/сыграли
+                        discard.splice(di, 1);
+                        const [c, r] = near[(Math.random() * near.length) | 0];
+                        addUnit(side, id, c, r);
+                        portal.hp -= 1;
+                        const hn = portal.node.getChildByName("hp");
+                        if (hn) hn.text = String(Math.max(0, portal.hp));
+                        const pp = cellXY(portal.col, portal.row);
+                        floatText(pp.x, pp.y - 60, "−1♥", 0xef9f8c);
+                        punch(portal.node);
+                        if (portal.hp <= 0) killUnit(portal, null);
+                    }
                 }
                 // «Каток» (tim236): урон равен длине сброса владельца —
                 // любой выход карты в сброс меняет его (дёшево: пересчёт

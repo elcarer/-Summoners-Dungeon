@@ -394,11 +394,24 @@
                     if (costs.length < 3) return B.eEnergy >= 8;
                     return costs[0] + costs[1] + costs[2] <= B.eEnergy;
                 })();
+                // «Возжённый нетопырь» (dstr299, W100 — спека юзера):
+                // альтернативная стоимость — скинуть карты общей ценой РОВНО
+                // как цена карты (8⚡). ИИ пользуется, когда энергии на
+                // обычную уплату не хватает, а точный поднабор в руке есть
+                // (решение — один раз за ход, ДО розыгрышей)
+                const altBat = B.eHand.some((id) => CARDS[id]
+                    && CARDS[id].flyAltCost)
+                    && altCostSubset(B.eHand,
+                        B.eHand.find((id) => CARDS[id] && CARDS[id].flyAltCost),
+                        CARDS[B.eHand.find((id) => CARDS[id]
+                            && CARDS[id].flyAltCost)].cost || 0);
                 for (;;) {
                     if (B.stopped || B.phase === "over") return;
                     const affordable = B.eHand
                         .map((c, i) => ({ i, id: c, def: CARDS[c] }))
-                        .filter((x) => effCost(x.id, "e") <= B.eEnergy)
+                        .filter((x) => effCost(x.id, "e") <= B.eEnergy
+                            // нетопырь по альт-стоимости — тоже играбелен
+                            || (x.def.flyAltCost && altBat))
                         .filter((x) => !chaosHold || effCost(x.id, "e") <= CHAOS_MAX_COST)
                         // «шестерни» копят под тройку: вне залпа существа
                         // не выкладываем (решение — один раз за ход выше)
@@ -498,8 +511,32 @@
                                     break;
                                 }
                             }
-                            B.eHand.splice(pick.i, 1);
-                            B.eEnergy -= effCost(cardId, "e");
+                            // «Возжённый нетопырь» (dstr299, W100) по
+                            // альтернативной стоимости: энергии на обычную
+                            // уплату не хватило — точный поднабор руки уходит
+                            // в сброс (нотификация «скидыванием»: Хозяин той
+                            // стороны / Корм для портала / Мини-портал
+                            // срабатывают как от любого сброса); энергия
+                            // НЕ платится. Поднабор пересчитывается на месте
+                            // (решение за ход могло устареть после первого
+                            // нетопыря); не набралось — карту не тратим
+                            const batAlt = def.flyAltCost
+                                && B.eEnergy < effCost(cardId, "e")
+                                ? altCostSubset(B.eHand, cardId, def.cost || 0)
+                                : null;
+                            if (def.flyAltCost && B.eEnergy < effCost(cardId, "e")
+                                && !batAlt) continue; // ни энергии, ни набора
+                            if (batAlt) {
+                                for (const id of batAlt) {
+                                    B.eHand.splice(B.eHand.indexOf(id), 1);
+                                    B.eDiscard.push(id);
+                                    noteDiscard(1, "e", [id], "discard");
+                                }
+                            }
+                            // сам нетопырь — по indexOf (поднабор выше съехал
+                            // с индексов pick.i)
+                            B.eHand.splice(B.eHand.indexOf(cardId), 1);
+                            if (!batAlt) B.eEnergy -= effCost(cardId, "e");
                             notePlay("e"); // «Конвейер» (tim225)
                             consumeEpicDiscount(cardId, "e"); // «Архилич»
                             // playCtx для «Сброса разума» (decMind): dec146 при

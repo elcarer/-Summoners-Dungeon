@@ -1066,6 +1066,20 @@
                         sfx("chpoc");
                     }
                 }
+                if (s.summonMark) { // «Гоблинская тату» (dstr296, W100): своё
+                    // существо получает «Призыв 3» — носитель покрепче
+                    // (переживёт тик), руна/фокус уважаются
+                    const own = spellTargets(B.units.filter((v) => v.side === "e"
+                        && v.def.type === "unit"));
+                    let best = own.slice().sort((a, b) =>
+                        ((b.curAtk || 0) + (b.hp || 0))
+                            - ((a.curAtk || 0) + (a.hp || 0))
+                        || a.row - b.row)[0];
+                    if (focus && own.includes(focus)) best = focus;
+                    if (!best) return;
+                    aimOff(best);
+                    summonTarget(best, s.summonMark);
+                }
                 if (s.terrainScout) { // «Выбор местности» (dec156): лучшая постройка топ-6 — в руку
                     const top = aiTopCards(Math.min(s.terrainScout || 6, B.eDeck.length));
                     const best = top.filter((m) => CARDS[m.id]

@@ -911,6 +911,12 @@
                     punch(root.hud);
                     sfx("chpoc");
                 }
+                if (def.spell.target === "ownUnit" && def.spell.summonMark) { // «Гоблинская тату» (dstr296, W100 — спека юзера): своё существо получает «Призыв 3» (summonTarget — замена, не стак, W95)
+                    if (!target || target.col === undefined) return false;
+                    const u = unitAt(target.col, target.row);
+                    if (!u || u.side !== "p" || u.def.type !== "unit") return false;
+                    summonTarget(u, def.spell.summonMark);
+                }
                 if (def.spell.terrainScout) { // «Выбор местности» (dec156): верхние N карт колоды — взять 1 постройку
                     openRunesPanel(def.spell.terrainScout, "building");
                 }

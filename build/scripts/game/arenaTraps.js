@@ -289,9 +289,16 @@
                             || e === "sporeCurse" // «Призрачные споры» — только существа (W60)
                             || e === "bldVolley" // «Засека» — только существа (W73)
                             || e === "realityRift" // «Пролом реальности» — только существа (W81)
-                            || e === "necroArmor") // «Доспех царства» — только существа (W82)
+                            || e === "necroArmor" // «Доспех царства» — только существа (W82)
+                            // «Решётка с шипами»/«В котёл!» (W100) — нейтральные
+                            // уронные, ТОЛЬКО существа: чужие — фаза 1, хозяин —
+                            // фаза 2 (спека «любое существо»; до W100 «Решётка»
+                            // на чужих не срабатывала вовсе — ИИ ставил её на
+                            // пути врага впустую)
+                            || e === "cellDmgAll" || e === "cellDmgSides")
                             return u.def.type === "unit";
-                        return e === "cellDmg" || e === "cellDmgMin" || e === "ambush"
+                        return e === "cellDmg" || e === "cellDmgMin"
+                            || e === "ambush"
                             || e === "confuse" || e === "cellDebuff"
                             || e === "ancestor" || e === "entangle";
                     };
@@ -308,7 +315,9 @@
                     // «Засека» (gh260, W73) — нейтральная: «перемещение/призыв
                     // ЛЮБОГО существа» на клетку — залп построек владельца.
                     // «Пролом реальности» (wt276, W81) — нейтральная: на
-                    // ЛЮБОГО вошедшего СУЩЕСТВО (постройки — не существа)
+                    // ЛЮБОГО вошедшего СУЩЕСТВО (постройки — не существа).
+                    // «В котёл!» (dstr298, W100) — нейтральная: на ЛЮБОГО
+                    // вошедшего СУЩЕСТВО (перемещение/призыв)
                     side = u.side;
                     i = B.traps[side].findIndex((t) => t.col === u.col && t.row === u.row
                         && (t.def.trap.effect === "cellDmgAll" || t.def.trap.effect === "cellDebuff"
@@ -322,6 +331,8 @@
                             || (t.def.trap.effect === "realityRift"
                                 && u.def.type === "unit")
                             || (t.def.trap.effect === "necroArmor"
+                                && u.def.type === "unit")
+                            || (t.def.trap.effect === "cellDmgSides"
                                 && u.def.type === "unit")));
                 }
                 if (i < 0) return;
@@ -870,6 +881,26 @@
                     damageUnit(u, (trap.def.trap.amount || 1) + altarBonus(side),
                         null, "acid");
                     if (B.units.includes(u)) relocateMagma(trap, side);
+                    refreshHud();
+                    checkEnd();
+                    return;
+                }
+                if (trap.def.trap.effect === "cellDmgSides") {
+                    // «В котёл!» (dstr298, W100 — спека юзера): вошедшее
+                    // существо и существа СЛЕВА И СПРАВА от него получают
+                    // 1 урон (+ аура алтаря, как у клеточных уронных
+                    // ловушек). Соседи — только по горизонтали той же
+                    // строки (col±1), обе стороны — в спеке «существа»
+                    // без уточнения чьих
+                    const dmg = (trap.def.trap.amount || 1) + altarBonus(side);
+                    damageUnit(u, dmg, null, "acid");
+                    for (const v of B.units.slice()) {
+                        if (v !== u && v.row === u.row
+                            && Math.abs(v.col - u.col) === 1
+                            && B.units.includes(v)) {
+                            damageUnit(v, dmg, null, "acid");
+                        }
+                    }
                     refreshHud();
                     checkEnd();
                     return;

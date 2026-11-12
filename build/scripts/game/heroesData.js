@@ -287,6 +287,21 @@
         dstrToyBox: { id: "dstrToyBox", rarity: "rare", baseHp: 18,
                       elems: ["decay", "strength"], starter: "decStr",
                       img: "87", ability: "secondDiscardDraw" },
+        // W100 (спека юзера): «Узилище» — враг 3-го этажа «Портала в
+        // бездну». Герой 88 (20♥, редкая, способность hurtSummonMinus —
+        // когда существо владельца получает урон, его счётчик «Призыва»
+        // тает на 1; хук в damageUnit — arenaDamage)
+        dstrPit: { id: "dstrPit", rarity: "rare", baseHp: 20,
+                   elems: ["decay", "strength"], starter: "decStr",
+                   img: "88", ability: "hurtSummonMinus" },
+        // W100 (спека юзера): «Хозяин той стороны» — БОСС «Портала в
+        // бездну», последняя комната 3-го этажа. Герой 89 (22♥, эпическая,
+        // способность discardSummonMinus — когда владелец скидывает карту,
+        // случайный счётчик «Призыва» его существ тает на 1; хук в
+        // noteDiscard — arenaCombat)
+        dstrMaster: { id: "dstrMaster", rarity: "epic", baseHp: 22,
+                      elems: ["decay", "strength"], starter: "decStr",
+                      img: "89", ability: "discardSummonMinus" },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -641,6 +656,8 @@
         "necMutant", // «Изменённый»: БОСС «Некро-раскопок», последняя комната 3-го этажа (W84)
         "dstrGate", // «Предвратие»: враг 1-го этажа «Портала в бездну» (W95)
         "dstrToyBox", // «Коробка игрушек»: враг 2-го этажа «Портала в бездну» (W97)
+        "dstrPit", // «Узилище»: враг 3-го этажа «Портала в бездну» (W100)
+        "dstrMaster", // «Хозяин той стороны»: БОСС «Портала в бездну», последняя комната 3-го этажа (W100)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

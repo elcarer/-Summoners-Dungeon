@@ -808,6 +808,26 @@
                         sfx("chpoc");
                     }
                 }
+                // «Узилище» (dstrPit, W100 — спека юзера): когда существо
+                // владельца способности получает урон (жизни реально
+                // уменьшились — броня/купол, съевшие весь урон, уроном не
+                // считаются), его счётчик «Призыва» тает на 1. Обнуленный
+                // призовёт в начале хода владельца штатным summonTick —
+                // как при естественном тике (счётчик 0 не уходит в минус)
+                if (amt > 0 && target.def.type === "unit"
+                    && target.summonN > 0) {
+                    const hdU = heroDefOf(target.side);
+                    if (hdU && hdU.ability === "hurtSummonMinus") {
+                        target.summonN -= 1;
+                        summonMarkDraw(target);
+                        const up = cellXY(target.col, target.row);
+                        floatText(up.x, up.y - 96,
+                            "⇑ " + GAME_LOC.t("spell.summonMark.name")
+                                + " " + Math.max(0, target.summonN), 0xef9f8c);
+                        punch(target.node);
+                        sfx("chpoc");
+                    }
+                }
                 const n = target.node.getChildByName("hp");
                 if (n) n.text = String(Math.max(0, target.hp));
                 const p = cellXY(target.col, target.row);

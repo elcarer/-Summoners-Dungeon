@@ -805,6 +805,10 @@
                     && v.def.type === "unit")).length) return false;
                 // дротик/варево/огнешар — только если есть цель
                 if (s.target === "anyUnitDmg" && !aiDmgTargets(def).length) return false;
+                // «Гоблинская тату» (dstr296, W100) — своего существа нет:
+                // метку «Призыва» вешать не на кого
+                if (s.summonMark && !B.units.some((v) => v.side === "e"
+                    && v.def.type === "unit" && effCreature(v))) return false;
                 return true;
             };
             // ── Общая «сила карты» для поиска/варки/путешествия ───────────────

@@ -1103,7 +1103,39 @@
                 dropPanel = null;
                 if (B) B.discarding = false;
             };
-            A.buildDropPanel = function buildDropPanel(pending) {
+            // Точный поднабор руки на сумму цен (W100): для альтернативной
+            // стоимости «Возжённого нетопыря» (dstr299) — карты общей ценой
+            // РОВНО need (спека). Обе стороны: игрок (панель сброса) и ИИ
+            // (aiPlay). selfId исключается; из равных по размеру — первый
+            // найденный (порядок руки), из разных — самый короткий
+            A.altCostSubset = function altCostSubset(hand, selfId, need) {
+                const items = [];
+                hand.forEach((id) => {
+                    if (id === selfId) return;
+                    const c = CARDS[id] ? (CARDS[id].cost || 0) : 0;
+                    if (c > 0) items.push({ id, c });
+                });
+                const n = items.length;
+                let best = null;
+                for (let m = 1; m < (1 << n); m++) {
+                    let sum = 0, cnt = 0;
+                    for (let k = 0; k < n && sum <= need; k++)
+                        if (m & (1 << k)) { sum += items[k].c; cnt++; }
+                    if (sum !== need) continue;
+                    const sub = items.filter((_, k) => m & (1 << k))
+                        .map((x) => x.id);
+                    if (!best || sub.length < best.length) best = sub;
+                    if (best.length === 1) break;
+                }
+                return best;
+            };
+            // opts (W100, «Возжённый нетопырь»): { exactSum, excludeIdx,
+            // onDone, titleKey, hintKey } — режим альтернативной стоимости:
+            // собрать карты РОВНО на exactSum (кнопка подтверждения молчит
+            // до точной суммы), исключённая карта не выбирается, по
+            // подтверждению вызывается onDone(сброшенные) вместо
+            // dropHandAct
+            A.buildDropPanel = function buildDropPanel(pending, opts = null) {
                 closeDropPanel();
                 B.discarding = true;
                 const chosen = new Set();
@@ -1119,13 +1151,15 @@
                 frame.fill({ color: 0x171310, alpha: 0.96 });
                 frame.stroke({ width: 3, color: 0x6b5c40 });
                 node.addChild(frame);
-                const title = T(t("drop.title"), 39, 0xf0c96a,
+                const title = T(t(opts && opts.titleKey
+                    || "drop.title"), 39, 0xf0c96a,
                     { stroke: { color: 0x241505, width: 7.5 } });
                 title.anchor.set(0.5, 0);
                 title.position.set(960, 273);
                 title.eventMode = "none";
                 node.addChild(title);
-                const hint = T(t("drop.hint"), 25, 0xd8c79d);
+                const hint = T(t(opts && opts.hintKey
+                    || "drop.hint"), 25, 0xd8c79d);
                 hint.anchor.set(0.5, 0);
                 hint.position.set(960, 339);
                 hint.eventMode = "none";
@@ -1150,6 +1184,15 @@
                         nm.position.set(0, 69);
                         nm.eventMode = "none";
                         c.addChild(nm);
+                    }
+                    // исключённая карта (сам «Возжённый нетопырь») — затемнена
+                    // и не выбирается
+                    if (opts && opts.excludeIdx === idx) {
+                        c.alpha = 0.42;
+                        c.eventMode = "none";
+                        c.position.set(960 + (idx - (n - 1) / 2) * spread, 560);
+                        node.addChild(c);
+                        return;
                     }
                     c.position.set(960 + (idx - (n - 1) / 2) * spread, 560);
                     c.eventMode = "static";
@@ -1181,6 +1224,15 @@
                         // вынуть помеченные из руки (с конца — индексы
                         // не едут) и скинуть в сброс владельца
                         const idxs = [...chosen].sort((a, b) => b - a);
+                        // альтернативная стоимость: подтверждение только
+                        // на РОВНОЙ сумме цен (иначе кнопка молчит, карты
+                        // остаются выбранными)
+                        if (opts && opts.exactSum) {
+                            const sum = idxs.reduce((a, i) => a
+                                + (CARDS[B.hand[i]]
+                                    ? (CARDS[B.hand[i]].cost || 0) : 0), 0);
+                            if (sum !== opts.exactSum) return;
+                        }
                         const dropped = idxs.map((i) => B.hand.splice(i, 1)[0])
                             .filter(Boolean);
                         dropped.forEach((id) => {
@@ -1191,6 +1243,10 @@
                         closeDropPanel();
                         layoutHand();
                         refreshHud();
+                        if (opts && opts.onDone) {
+                            opts.onDone(dropped);
+                            return;
+                        }
                         const target = { col: pending.col, row: pending.row };
                         if (pending.dice) dicePlayAct("p", dropped.length);
                         else dropHandAct(target, dropped.length);
