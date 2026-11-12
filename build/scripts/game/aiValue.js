@@ -45,26 +45,11 @@
                 }
                 if (nextMana >= 12) eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
                 if (B.eEnergy >= 20) eCards = HAND_MAX - B.eHand.length; // только карты
-                // W104 (юзер): «Бешеные шестерни» — ползунок в ЭНЕРГИЮ, пока
-                // залп не собран: быстрее выйти на «три существа за ход» или
-                // накопить на нужную постройку. Добор — максимум 1 карта и
-                // только когда на руке меньше 3 призывов (набирать тройку
-                // нечем). Залп собран (тройка по карману; <3 юнитов — как
-                // gearsBurst в aiPlay, при ≥8⚡ копить бессмысленно) — план
-                // обычный
-                if ((heroDefOf("e") || {}).ability === "thirdSummonEnergy") {
-                    const units = B.eHand.filter((id) => CARDS[id]
-                        && CARDS[id].type === "unit");
-                    const costs = units.map((id) => effCost(id, "e"))
-                        .sort((a, b) => a - b);
-                    const budget = B.eEnergy + total - eCards;
-                    const burst = costs.length >= 3
-                        ? costs[0] + costs[1] + costs[2] <= budget
-                        : budget >= 8;
-                    if (!burst) eCards = units.length < 3
-                        ? Math.min(1, Math.max(0, HAND_MAX - B.eHand.length))
-                        : 0;
-                }
+                // W105 (юзер): спец-добор «шестерён» под тройку УБРАН —
+                // стратегия сменена: тяжёлые «Сдвиги» выходят сразу
+                // (2–3-й ход, они ждут на клетках и не занимают стол),
+                // одновременного прихода добиваются «Экспериментами»,
+                // а не удержанием карт; план добора обычный
                 return Math.max(0, Math.min(eCards,
                     HAND_MAX - B.eHand.length,
                     B.turnNo >= 4 ? total + B.eEnergy : total));
@@ -257,6 +242,62 @@
                         && !unitAt(c2, r2)) n++;
                 }
                 return n;
+            };
+            // W105 (юзер): план «Экспериментов» (wt271) — какую метку и к
+            // какому пределу вести. Вынесен из каста, чтобы тот же план
+            // видел гейт играбельности (карта не разыгрывается без пользы).
+            // Приоритеты: (1) свой БОЛЬШОЙ «Сдвиг» к меньшему — приходы
+            // синхронизируются и лягут в один ход (просил юзер: за
+            // одновременный приход трёх существ «шестерни» получают 1⚡);
+            // (2) свой «Возврат» к максимуму (существо должно ОСТАВАТЬСЯ
+            // на поле); (3) «Возврат» игрока к минимуму наших; (4) свой
+            // «Выстрел» к максимуму; (5) значок «Сдвига» игрока к нашему
+            // максимуму (его приход позже)
+            A.aiTagPickPlan = function aiTagPickPlan() {
+                const dPool = tagPool("e", "delay");
+                if (dPool.length > 1) {
+                    const mn = Math.min(...dPool);
+                    const e = (B.delayed.e || [])
+                        .filter((d) => d.left > mn)
+                        .sort((a, b) => b.left - a.left)[0];
+                    if (e) return { col: e.col, row: e.row,
+                        tagKey: "delay", mm: "min" };
+                }
+                const rPool = tagPool("e", "ret");
+                if (rPool.length > 1) {
+                    const mx = Math.max(...rPool);
+                    const u = B.units.find((v) => v.side === "e"
+                        && B.units.includes(v)
+                        && v.ret > 0 && v.ret < mx);
+                    if (u) return { col: u.col, row: u.row,
+                        tagKey: "ret", mm: "max" };
+                }
+                if (rPool.length) {
+                    const mn = Math.min(...rPool);
+                    const u = B.units.find((v) => v.side === "p"
+                        && B.units.includes(v)
+                        && v.ret > 0 && v.ret > mn);
+                    if (u) return { col: u.col, row: u.row,
+                        tagKey: "ret", mm: "min" };
+                }
+                const sPool = tagPool("e", "shotDmg");
+                if (sPool.length) {
+                    const mx = Math.max(...sPool);
+                    const u = B.units.find((v) => v.side === "e"
+                        && B.units.includes(v)
+                        && tagVal(v, "shotDmg")
+                        && tagVal(v, "shotDmg") < mx);
+                    if (u) return { col: u.col, row: u.row,
+                        tagKey: "shotDmg", mm: "max" };
+                }
+                if (dPool.length && (B.delayed.p || []).length) {
+                    const mx = Math.max(...dPool);
+                    const e = (B.delayed.p || [])
+                        .find((d) => d.left < mx);
+                    if (e) return { col: e.col, row: e.row,
+                        tagKey: "delay", mm: "max" };
+                }
+                return null;
             };
             // «Стена костров» (str21): ряд горит ТРЁМИ тиками и бьёт ВСЕХ в ряду.
             // Выгоден ряд с давлением игрока — его существа в ряду (успеют
@@ -532,8 +573,19 @@
                 }
                 if (def.ability === "archer") {
                     const t = aiNearestInCol("e", col, row);
-                    if (t && t.side === "p") score += 0.8; // есть куда стрелять
+                    // W105 (юзер): позади своего существа/постройки не
+                    // ставим — выстрел бьёт ПЕРВОГО на линии, своим
+                    // «стрелять в своих же» дороже свободной клетки
+                    if (t && t.side === "e") score -= 2.6;
+                    else if (t && t.side === "p") score += 0.8; // есть куда стрелять
                     else if (!t) score += 0.5; // колонка пуста — выстрел в базу
+                    // W105 (юзер): стрелок — ближе к своей базе: дольше
+                    // идёт до врага, больше выстрелов по подходящим
+                    // (или в базу по пустой вертикали)
+                    if (rows.length > 1) {
+                        if (row === rows[0]) score += 0.8;
+                        else if (row === frontRow) score -= 0.7;
+                    }
                 }
                 if (def.ability === "assassin") {
                     if (B.units.some((v) => v.side === "p" && v.col === col && v.row > row

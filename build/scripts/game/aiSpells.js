@@ -889,62 +889,11 @@
                     punch(root.hud);
                     sfx("chpoc");
                 }
-                if (s.target === "tagPick") { // «Эксперименты» (wt271, W79): метка цели →
-                    // мин/макс среди меток ИИ. Эвристика: свой «Сдвиг» к
-                    // минимуму (быстрее явится), свой «Выстрел» к максимуму,
-                    // значок противника — к максимуму своих «Сдвигов»
-                    const pick = (() => {
-                        const dPool = tagPool("e", "delay");
-                        if (dPool.length > 1) {
-                            const mn = Math.min(...dPool);
-                            const e = (B.delayed.e || [])
-                                .filter((d) => d.left > mn)
-                                .sort((a, b) => b.left - a.left)[0];
-                            if (e) return { col: e.col, row: e.row,
-                                tagKey: "delay", mm: "min" };
-                        }
-                        // свой живой значок «Возврата» ниже максимума —
-                        // к МАКСИМУМУ (поправка юзера: существо должно
-                        // ОСТАВАТЬСЯ на поле — возврат в руку заставит
-                        // разыгрывать его заново; чем дольше, тем лучше)
-                        const rPool = tagPool("e", "ret");
-                        if (rPool.length > 1) {
-                            const mx = Math.max(...rPool);
-                            const u = B.units.find((v) => v.side === "e"
-                                && B.units.includes(v)
-                                && v.ret > 0 && v.ret < mx);
-                            if (u) return { col: u.col, row: u.row,
-                                tagKey: "ret", mm: "max" };
-                        }
-                        // значок «Возврата» ИГРОКА — к минимуму своих
-                        // (его существо раньше уйдёт с поля в руку)
-                        if (rPool.length) {
-                            const mn = Math.min(...rPool);
-                            const u = B.units.find((v) => v.side === "p"
-                                && B.units.includes(v)
-                                && v.ret > 0 && v.ret > mn);
-                            if (u) return { col: u.col, row: u.row,
-                                tagKey: "ret", mm: "min" };
-                        }
-                        const sPool = tagPool("e", "shotDmg");
-                        if (sPool.length) {
-                            const mx = Math.max(...sPool);
-                            const u = B.units.find((v) => v.side === "e"
-                                && B.units.includes(v)
-                                && tagVal(v, "shotDmg")
-                                && tagVal(v, "shotDmg") < mx);
-                            if (u) return { col: u.col, row: u.row,
-                                tagKey: "shotDmg", mm: "max" };
-                        }
-                        if (dPool.length && (B.delayed.p || []).length) {
-                            const mx = Math.max(...dPool);
-                            const e = (B.delayed.p || [])
-                                .find((d) => d.left < mx);
-                            if (e) return { col: e.col, row: e.row,
-                                tagKey: "delay", mm: "max" };
-                        }
-                        return null;
-                    })();
+                if (s.target === "tagPick") { // «Эксперименты» (wt271): метка
+                    // цели → мин/макс среди меток ИИ. План (в т.ч. для гейта
+                    // играбельности) — общий aiTagPickPlan (W105): приоритет
+                    // — синхронизация «Сдвигов» к одновременному приходу
+                    const pick = aiTagPickPlan();
                     if (pick) applyTagPick("e", pick);
                 }
                 if (s.debuffEnemyAtkAll) { // «Нехватка воздуха»: −N урона всем существам игрока
@@ -1290,20 +1239,51 @@
                         A.recalcAuras(); // «Каток» (tim236): сброс стал короче
                     }
                 }
-                if (s.excavate) { // «Раскопки»: худшую свою постройку — в сброс, из сброса — лучшую
-                    const own = B.units.filter((v) => v.side === "e" && v.def.type === "building")
-                        .sort((a, b) => aiCardPower(a.def) - aiCardPower(b.def));
-                    const back = B.eDiscard.filter((id) => CARDS[id] && CARDS[id].type === "building")
-                        .sort((a, b) => aiCardPower(CARDS[b]) - aiCardPower(CARDS[a]))[0];
-                    const out = own[0];
-                    if (out && back && aiCardPower(CARDS[back]) > aiCardPower(out.def)) {
+                if (s.excavate) { // «Раскопки»: W105 (юзер) — сперва
+                    // ПЕРЕЗАГРУЗКА важной раненой постройки (та же/дороже из
+                    // сброса встанет с полными жизнями), иначе прежний
+                    // обмен: худшая своя → лучшая постройка сброса
+                    const own = B.units.filter((v) => v.side === "e" && v.def.type === "building");
+                    const fullHp = (v) => (CARDS[cardIdOf(v.def)] || { hp: 0 }).hp;
+                    let out = null, backId = null;
+                    const hurt = own
+                        .filter((v) => aiDangerBld(v.def) > 0 && fullHp(v) - v.hp >= 2)
+                        .sort((a, b) => aiDangerBld(b.def) - aiDangerBld(a.def)
+                            || (fullHp(b) - b.hp) - (fullHp(a) - a.hp));
+                    for (const v of hurt) {
+                        const id = cardIdOf(v.def);
+                        const cands = B.eDiscard.filter((x) => CARDS[x]
+                            && CARDS[x].type === "building"
+                            && (x === id || CARDS[x].cost >= v.def.cost));
+                        if (!cands.length) continue;
+                        // та же карта — точная перезагрузка; иначе самая дорогая
+                        backId = cands.includes(id) ? id
+                            : cands.sort((a, b) => CARDS[b].cost - CARDS[a].cost)[0];
+                        out = v;
+                        break;
+                    }
+                    if (!out) { // апгрейд худшей (прежнее поведение)
+                        const sorted = own.slice()
+                            .sort((a, b) => aiCardPower(a.def) - aiCardPower(b.def));
+                        const cand = sorted[0];
+                        const best = B.eDiscard.filter((x) => CARDS[x]
+                            && CARDS[x].type === "building")
+                            .sort((a, b) => aiCardPower(CARDS[b])
+                                - aiCardPower(CARDS[a]))[0];
+                        if (cand && best
+                            && aiCardPower(CARDS[best]) > aiCardPower(cand.def)) {
+                            out = cand;
+                            backId = best;
+                        }
+                    }
+                    if (out && backId) {
                         const cell = { col: out.col, row: out.row };
                         removeUnit(out); // в сброс без каскадов смерти
                         recalcAuras();
                         B.eDiscard.push(cardIdOf(out.def));
                         noteDiscard(1, "e", [cardIdOf(out.def)]);
-                        B.eDiscard.splice(B.eDiscard.indexOf(back), 1);
-                        addUnit("e", back, cell.col, cell.row);
+                        B.eDiscard.splice(B.eDiscard.indexOf(backId), 1);
+                        addUnit("e", backId, cell.col, cell.row);
                         sfx("chpoc");
                     }
                 }

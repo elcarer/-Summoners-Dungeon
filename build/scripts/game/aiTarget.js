@@ -601,10 +601,17 @@
                 // «Мозговой штурм» (tim206): полная смена руки +1 карта —
                 // окупается от трёх карт в руке
                 if (s.brainstorm && B.eHand.length < 3) return false;
-                // «Добыча кристаллов» (tim211) — без своих значков «Сдвига»
-                // энергии не даёт
-                if (s.crystalHarvest && !(B.delayed && B.delayed.e.length))
+                // «Добыча кристаллов» (tim211) — W105 (юзер): держим, пока
+                // суммарный «Сдвиг» ждущих меньше ТРЁХ — раньше карта не
+                // окупается (энергия должна быть «за все сдвиги» сразу)
+                if (s.crystalHarvest && !((B.delayed && B.delayed.e.length)
+                    && B.delayed.e.reduce((a, e) => a + Math.max(0, e.left), 0) >= 3))
                     return false;
+                // «Эксперименты» (wt271) — W105 (юзер): играем для
+                // синхронизации «Сдвигов» (большой к меньшему — одновременный
+                // приход) и прочих полезных пределов; бесполезный размен
+                // метки карта не делает (план пуст — держим)
+                if (s.target === "tagPick" && !aiTagPickPlan()) return false;
                 // «Управление временем» (tim223) — жетонов на поле нет вообще
                 if (s.tokenShift && !aiTokenPick()) return false;
                 // «Поток маны» — без своих ловушек энергии не даёт
@@ -626,15 +633,13 @@
                 // «Поднять стяги!» — окупается при двух и более своих существах
                 if (s.buffAllAtk
                     && B.units.filter((v) => v.side === "e" && v.def.type === "unit").length < 2) return false;
-                // «Ковка оружия» (tim208) — есть кому: в этот ход уже
-                // появлялись свои существа ИЛИ в руке есть призыв, который
-                // выйдет сразу (эффективный «Сдвиг» 0 — «Машина времени»)
+                // «Ковка оружия» (tim208) — W105 (юзер): держим карту, пока
+                // в этот ход не пришло хотя бы ДВОЕ своих существ — на
+                // одном пришедшем +2⚔ не окупают карту и ход
                 if (s.forge
-                    && !B.units.some((v) => v.side === "e" && v.def.type === "unit"
-                        && v.bornTurn === B.turnNo)
-                    && !B.eHand.some((id) => { const d = CARDS[id];
-                        return d && d.type === "unit" && d.delay
-                            && effDelayVal(d.delay, "e") <= 0; })) return false;
+                    && B.units.filter((v) => v.side === "e"
+                        && v.def.type === "unit"
+                        && v.bornTurn === B.turnNo).length < 2) return false;
                 // «Снабжение» (hon170) — выравнивание статов: играем, если
                 // хотя бы одно своё существо выигрывает (⚔ ≠ ♥)
                 if (s.rebalance && !B.units.some((v) => v.side === "e"
@@ -729,12 +734,22 @@
                 // существо (2+♥): метка на тряпку 0/1 не окупается
                 if (s.exhumingMark && !spellTargets(B.units.filter((v) => v.side === "e"
                     && v.def.type === "unit" && v.hp >= 2)).length) return false;
-                // «Раскопки» — нужна своя постройка и постройка сброса ДОРОЖЕ
-                // худшей своей (иначе обмен картой не окупается)
+                // «Раскопки» — W105 (юзер): ИИ ПЕРЕЗАГРУЖАЕТ важную раненую
+                // постройку (убрал в сброс — поставил заново с полными
+                // жизнями): нужна опасная постройка (aiDangerBld > 0),
+                // потерявшая 2+♥, и в сбросе ТА ЖЕ или более дорогая
+                // постройка. Прежний сценарий остаётся: обмен худшей своей
+                // на постройку сброса ДОРОЖЕ (апгрейд)
                 if (s.excavate) {
                     const own = B.units.filter((v) => v.side === "e" && v.def.type === "building");
                     const back = B.eDiscard.filter((id) => CARDS[id] && CARDS[id].type === "building");
                     if (!own.length || !back.length) return false;
+                    const fullHp = (v) => (CARDS[cardIdOf(v.def)] || { hp: 0 }).hp;
+                    const reload = own.some((v) =>
+                        aiDangerBld(v.def) > 0 && fullHp(v) - v.hp >= 2
+                        && back.some((id) => id === cardIdOf(v.def)
+                            || CARDS[id].cost >= v.def.cost));
+                    if (reload) return true;
                     const worst = own.slice().sort((a, b) =>
                         (a.def.cost - b.def.cost) || (a.hp - b.hp))[0];
                     if (!back.some((id) => CARDS[id].cost > worst.def.cost)) return false;
