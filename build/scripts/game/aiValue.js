@@ -45,6 +45,26 @@
                 }
                 if (nextMana >= 12) eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
                 if (B.eEnergy >= 20) eCards = HAND_MAX - B.eHand.length; // только карты
+                // W104 (юзер): «Бешеные шестерни» — ползунок в ЭНЕРГИЮ, пока
+                // залп не собран: быстрее выйти на «три существа за ход» или
+                // накопить на нужную постройку. Добор — максимум 1 карта и
+                // только когда на руке меньше 3 призывов (набирать тройку
+                // нечем). Залп собран (тройка по карману; <3 юнитов — как
+                // gearsBurst в aiPlay, при ≥8⚡ копить бессмысленно) — план
+                // обычный
+                if ((heroDefOf("e") || {}).ability === "thirdSummonEnergy") {
+                    const units = B.eHand.filter((id) => CARDS[id]
+                        && CARDS[id].type === "unit");
+                    const costs = units.map((id) => effCost(id, "e"))
+                        .sort((a, b) => a - b);
+                    const budget = B.eEnergy + total - eCards;
+                    const burst = costs.length >= 3
+                        ? costs[0] + costs[1] + costs[2] <= budget
+                        : budget >= 8;
+                    if (!burst) eCards = units.length < 3
+                        ? Math.min(1, Math.max(0, HAND_MAX - B.eHand.length))
+                        : 0;
+                }
                 return Math.max(0, Math.min(eCards,
                     HAND_MAX - B.eHand.length,
                     B.turnNo >= 4 ? total + B.eEnergy : total));
@@ -95,8 +115,47 @@
                 if (u.exhuming) v += 0.8 * u.exhuming; // «Выкапливание»: вернётся после смерти
                 return v;
             };
-            // Опасность ЧУЖОГО (игрока) существа для нашей базы/поля. Нужна
-            // для выбора цели заклинания и оценки «кого выгодно добить».
+            // W104 (юзер): ОПАСНЫЕ ПОСТРОЙКИ — приоритетные цели уничтожения
+            // (заклинаниями и существами, «чтобы поломать связку»). Вес:
+            // 1.0 — оружие и саботаж (бьют нас или глушат наши ходы),
+            // 0.8 — движки призыва/статов (кормят связки владельца),
+            // 0.6 — экономика карт/энергии. Пассивная мелочь (Росток,
+            // костёр, Опорник — тот ещё кормит атакующего) — вне списка.
+            A.aiDangerBld = function aiDangerBld(d) {
+                if (!d || d.type !== "building") return 0;
+                // «Дурное варево», требушет, осадная/паровая стрельба, взрыв
+                // при возврате, проклятый обелиск; «Краевой камень», ров,
+                // крепость, «Ответ», лабиринт, техно-руны, отскок портала —
+                // бьют/саботируют наших; «Тёмный алтарь» (снятие эффектов),
+                // «Щит возврата», «Дома на деревьях» (перехват базы), Тракт,
+                // «Грааль» (+2/+2 всем), Небесный шпиль (полёт+защита)
+                if (d.evilBrew || d.trebuchet || d.siegeShot || d.steamShot
+                    || d.boomRet || d.curseObelisk || d.edgeStone || d.moat
+                    || d.fortress || d.counterSpike || d.labyrinth
+                    || d.techRunes || d.portalBounce || d.darkAltar
+                    || d.retShield || d.treeHomes || d.roadPush
+                    || d.aura || d.cloudSpire) return 1.0;
+                // Лагерь, роща, знамя, болото рождений, поле/куча костей,
+                // призрачный портал, Склеп, Мини-портал, круг стихий, монолиты,
+                // машина времени, часовой механизм, пещера времени, деревня,
+                // «Выкапливание», аура эпохи, реликвии, меч в алтаре, аура
+                // заклинаний, «Хирд», Корона леса — двигатели связок
+                if (d.campAura || d.groveAura || d.banner || d.birthSwamp
+                    || d.boneField || d.ghostPortal || d.cryptPlay
+                    || d.miniPortal || d.elementalCircle || d.monolith
+                    || d.timeMachine || d.clockwork || d.timeCave
+                    || d.bonePile || d.epochAura || d.relicsBuff
+                    || d.altarSword || d.spellAura || d.hird || d.buffEcho
+                    || d.village) return 0.8;
+                // Башня звездочёта, грибница, мельница, реликварий, конвейер,
+                // кран, лаборатория, «Визуализатор», корм портала, рунные
+                // постройки, остров, могильный призрак — экономика
+                if (d.starTower || d.mycelium || d.sunsetMill || d.relicVault
+                    || d.conveyor || d.crane || d.lab || d.visualizer
+                    || d.portalFeed || d.runeMonolith || d.runeBurn
+                    || d.islandAct || d.graveGhost) return 0.6;
+                return 0;
+            };
             // Опасность ЧУЖОГО (игрока) существа для нашей базы/поля. Нужна
             // для выбора цели заклинания и оценки «кого выгодно добить».
             A.aiThreat = function aiThreat(u) {
@@ -128,7 +187,12 @@
                 if (u.venom) s += 0.8;
                 if (u.enchantFire) s += 0.8;
                 if (u.berserk) s += 0.5 * u.berserk;
-                if (d.type === "building") s *= 0.8; // здание не марширует
+                if (d.type === "building") {
+                    s *= 0.8; // здание не марширует
+                    // W104 (юзер): опасная постройка — приоритетная цель
+                    // («Дурное варево» и пр.) — поломать связку
+                    s += 3.2 * aiDangerBld(d);
+                }
                 return s;
             };
             // Ценность СВОЕГО существа (для жертвы/кокона): жизни и цена
@@ -477,10 +541,6 @@
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit"
                         && ahead.hp - atk === 1) score += 1.0;
                 }
-                if (unitHasFly({ def, side: "e" }) && ahead && ahead.side === "p"
-                    && ahead.def.type === "unit") {
-                    if (row + 2 < GRID && !unitAt(col, row + 2)) score += 1.0;
-                }
                 if (def.crush && row === frontRow) score += 1.1;
                 if (def.thicket) {
                     const n = B.units.filter((v) => v.side === "p"
@@ -493,6 +553,20 @@
                     }
                 }
                 if (def.ability === "pushBack" && ahead && ahead.side === "p") score += 0.6;
+                // W104 (юзер): «через клетку» — боевое существо ставим в 2
+                // клетках перед вражеским (клетка между свободна): противник
+                // потратит свой марш на подход (скорость 1 с разбега не
+                // бьёт), и наш удар будет первым — на удар больше в размен.
+                // Полётным то же самое (W104-7): в упор они перелетают, а
+                // не бьют, так что и им нужен этот промежуток — в свой
+                // следующий ход перелетят через врага полётом. Раньше
+                // полётным платили за стоянку В УПОР (+1.0) — но игрок
+                // бьёт первым и перелёт не успевал случиться
+                const gapFoe = B.units.find((v) => v.side === "p" && v.col === col
+                    && v.def.type === "unit" && v.row === row + 2);
+                if (gapFoe && role !== "wall" && role !== "support"
+                    && (gapFoe.def.speed || 1) === 1
+                    && row + 1 < GRID && !unitAt(col, row + 1)) score += 1.5;
                 if (def.wolfSummon && row === frontRow) score += 0.4; // ловит урон — зовёт волка
                 if (def.keeperScale) {
                     const animals = B.units.filter((v) => v.side === "e"
@@ -530,26 +604,34 @@
                     }
                     if (best > 0) score += 0.5 + best * 0.14;
                 }
-                // бой в клетке: игрок ходит первым — наш новичок сначала получает
+                // бой в клетке: игрок ходит первым — наш новичок сначала
+                // получает. W104 (юзер): обмен в упор — не приоритет
+                // (выгоднее «через клетку», см. выше), поэтому обычным
+                // бойцам он стоит заметно дешевле, чем стене
                 if (ahead && ahead.side === "p") {
                     const incoming = ahead.def.type === "unit" ? ahead.curAtk : 0;
                     const survives = (def.hp || 0) > incoming;
                     if (incoming) {
-                        score += 0.5 + Math.min(4, incoming) * 0.22; // тело/задержка
+                        score += (role === "wall" ? 0.5 : 0.15)
+                            + Math.min(4, incoming) * 0.22; // тело/задержка
                         score += Math.min(2.2, aiThreat(ahead) * 0.18);
-                        if (survives) score += 0.6;
+                        if (survives) score += role === "wall" ? 0.6 : 0.2;
                         else if ((def.cost || 0) >= 4) score -= 1.2; // дорогого зря теряем
                         if (role === "wall") score += 0.8;
                     }
                     if (survives && ahead.def.type === "unit" && atk >= ahead.hp) {
-                        score += 1.6 + aiThreat(ahead) * 0.35; // убьём в ответ
+                        score += (role === "wall" ? 1.6 : 1.0)
+                            + aiThreat(ahead) * 0.35; // убьём в ответ
                     } else if (survives && atk > 0) {
                         score += 0.2 * Math.min(atk, ahead.hp);
                     }
                     if (ahead.def.type === "building") { // строения не бьют в ответ
-                        score += 0.8 + ((ahead.def.spellAura || ahead.def.campAura
-                            || ahead.def.monolith || ahead.def.treeHomes
-                            || ahead.def.groveAura) ? 1.2 : 0);
+                        // W104 (юзер): опасная постройка врага — ломать связку
+                        const dg = aiDangerBld(ahead.def);
+                        score += dg ? 1.1 + 1.7 * dg
+                            : 0.8 + ((ahead.def.spellAura || ahead.def.campAura
+                                || ahead.def.monolith || ahead.def.treeHomes
+                                || ahead.def.groveAura) ? 1.2 : 0);
                     }
                 }
                 // трус — стеной прямо перед существом игрока (его следующий шаг)
@@ -573,6 +655,38 @@
                 const emark = B.delayed && B.delayed.e
                     && B.delayed.e.find((e) => e.col === col && e.row === row);
                 if (emark) score -= 2.5;
+                // W104 (юзер) «Бой во времени»: «Сдвиг»-карта появится через
+                // N тиков (в начале нашего хода, ПЕРЕД маршем) — ставить
+                // значок так, чтобы при появлении враг стоял прямо впереди
+                // (row+1): пришедшее бьёт сразу, а не подставляется.
+                // Враг в колонке марширует вверх по spd клеток за ход:
+                // соседом станет через (v.row − row − 1)/spd ходов —
+                // совпало с N: идеально; уже впереди, а «Сдвиг» снят
+                // Машиной времени — удар при появлении; подойдёт позже —
+                // пришедшее шагнёт само и получит удар первым (хуже);
+                // пройдёт мимо раньше — нейтрально
+                if (def.delay && def.type === "unit") {
+                    const dly = effDelayVal(def.delay, "e");
+                    let adj = -0.6;
+                    for (const v of B.units) {
+                        if (v.side !== "p" || v.col !== col
+                            || v.def.type !== "unit") continue;
+                        const gap = v.row - row - 1; // 0 = прямо перед клеткой
+                        if (gap < 0) { adj = Math.max(adj, 0.2); continue; }
+                        const spd = v.def.speed || 1;
+                        if (gap === 0) adj = Math.max(adj, dly === 0 ? 1.6 : 0.5);
+                        else if (gap === dly * spd) adj = Math.max(adj, 2.4);
+                        else if (gap < dly * spd) adj = Math.max(adj, 0.4);
+                    }
+                    score += adj;
+                }
+                // W104 (юзер): в колонке врага стоит опасная постройка
+                // («Дурное варево» и пр.) — колонка привлекательнее: марш
+                // существа сам приведёт его на удар по связке
+                const colDanger = B.units.find((v) => v.side === "p"
+                    && v.col === col && v.def.type === "building"
+                    && aiDangerBld(v.def) > 0);
+                if (colDanger) score += 1.0 + 0.8 * aiDangerBld(colDanger.def);
                 // открытая колонка к базе игрока — давление
                 const foesAhead = B.units.some((v) => v.side === "p"
                     && v.col === col && v.row > row);

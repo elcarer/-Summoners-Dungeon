@@ -441,13 +441,22 @@
                     const bigBank = !(chaosHold || gearsHold)
                         && affordable.length >= 2
                         && B.eEnergy >= top2[0] + top2[1];
+                    // W104 (юзер): постройка-аура выходит РАНЬШЕ существ того
+                    // же полухода даже при большом банке — иначе лагерь/роща
+                    // вставали после уже призыванных и усиливали только
+                    // будущих (в лиге так дважды терялись усиления)
+                    const isAuraB = (x) => x.def.type === "building"
+                        && (x.def.campAura || x.def.campfire || x.def.sprout
+                            || x.def.groveAura || x.def.elementalCircle
+                            || x.def.altarSword || x.def.treeHomes);
                     affordable.sort((a, b) => {
                         // W103 (юзер): монолит при готовом комбо — самый
                         // первый (группа 0.5, раньше прочих движков)
                         const grp = (x) => (x.def.monolith && monolithCombo)
                             ? 0.5 : aiGroup(x.id, x.def);
                         if (bigBank) {
-                            return effCost(b.id, "e") - effCost(a.id, "e")
+                            return (isAuraB(a) ? 0 : 1) - (isAuraB(b) ? 0 : 1)
+                                || effCost(b.id, "e") - effCost(a.id, "e")
                                 || grp(a) - grp(b);
                         }
                         // порядок — по правилам связок (двигатели до урона и

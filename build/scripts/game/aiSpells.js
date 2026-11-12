@@ -679,7 +679,7 @@
                         // к нашей базе. Точный урон считается по цели (скидка
                         // древоброда, алтарь, герой), прикидка — без траты
                         // флага «первого уронного» (consume=false).
-                        let best = aiDmgTargetPick(def, targets, free);
+                        let best = aiDmgTargetPick(def, targets, free, false);
                         if (focus && targets.includes(focus)) best = focus; // руна
                         if (!best) return;
                         best = reflectAim("p", best); // «Отражение» (wis120) игрока
@@ -741,20 +741,21 @@
                 }
                 if (s.target === "enemyAny") {
                     const targets = spellTargets(B.units.filter((u) => u.side === "p"));
-                    // если база добивается — бьём базу, даже когда на поле есть
-                    // существа (прежний ИИ всегда бил существо и упускал летал)
+                    // W104 (юзер): порядок целей — 1) добить опасное существо/
+                    // постройку, 2) удар в базу. Нелетально по существу не
+                    // стреляем вовсе; летальная база — раньше всего
                     const baseDmg = s.dmg + heroSpellBonus(def, "e", false, true);
-                    if (!targets.length || B.playerBase <= baseDmg) {
+                    const best = focus && targets.includes(focus)
+                        ? focus // руна: именно атакующий
+                        : aiDmgTargetPick(def, targets);
+                    if (B.playerBase <= baseDmg || !best) {
                         damageBase("p", baseDmg,
                             { x: 960, y: 840, fill: 0xff5f4e });
-                        sfx("chpoc");
                     } else {
-                        const best = focus && targets.includes(focus)
-                            ? focus // руна: именно атакующий
-                            : aiDmgTargetPick(def, targets);
-                        if (best) damageUnit(best, s.dmg + heroSpellBonus(def, "e",
+                        damageUnit(best, s.dmg + heroSpellBonus(def, "e",
                             best.def.type === "unit", true), null, "rocket");
                     }
+                    sfx("chpoc");
                 }
                 if (s.phoenix) { // «Рождение феникса» (sg244): все постройки —
                     // в топку, Элементаль = числу жертв
@@ -844,19 +845,19 @@
                     refreshHud();
                 }
                 if (s.target === "anyUnitOrFoe") { // «Негативный поток»: существо или база
-                    // свои цели смысла не имеют — бьём по существам игрока
+                    // W104 (юзер): летальное по существу → база. Нелетальный
+                    // «пинг» существа — впустую (Чёрная магия так жгла урон)
                     const targets = spellTargets(B.units.filter((u) =>
                         u.side !== "e" && u.def.type === "unit"));
                     const baseDmg = s.dmg + heroSpellBonus(def, "e", false, true);
-                    if (!targets.length || B.playerBase <= baseDmg) {
+                    const best = focus && targets.includes(focus) ? focus
+                        : aiDmgTargetPick(def, targets);
+                    if (best) {
+                        damageUnit(best, s.dmg + heroSpellBonus(def, "e", true, true),
+                            null, "rocket");
+                    } else {
                         damageBase("p", baseDmg, { x: 960, y: 840, fill: 0xff5f4e });
                         sfx("chpoc");
-                    } else {
-                        const best = focus && targets.includes(focus)
-                            ? focus // руна: именно атакованный
-                            : (aiDmgTargetPick(def, targets) || targets[0]);
-                        if (best) damageUnit(best, s.dmg + heroSpellBonus(def, "e", true, true),
-                            null, "rocket");
                     }
                 }
                 if (s.stealEnergy) { // «Похищение энергии»: 2⚡ игрока — нам

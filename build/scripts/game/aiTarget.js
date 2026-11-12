@@ -207,31 +207,31 @@
                     && (v.def.type === "unit"
                         || (v.def.type === "building" && !s.noBuildings))));
             };
-            // Выбор цели урона: добивание важнее «поцарапать» крупного;
-            // иначе — максимум пользы на единицу урона (угроза × доля жизней),
-            // плюс приоритет движкам игрока. Летал по базе проверяется отдельно.
-            // Выбор цели урона: добивание важнее «поцарапать» крупного;
-            // иначе — максимум пользы на единицу урона (угроза × доля жизней),
-            // плюс приоритет движкам игрока. Летал по базе проверяется отдельно.
-            A.aiDmgTargetPick = function aiDmgTargetPick(def, targets, free = false) {
+            // Выбор цели урона. W104 (юзер): приоритеты заклинаний —
+            // 1) сразу УБИТЬ опасное существо/постройку противника,
+            // 2) ударить базу (null → вызовущий бьёт базу/пропускает каст).
+            // Нелетальный «пинг» существа — глупость, отучены. Опасные
+            // постройки (aiDangerBld) среди летальных целей ценнее —
+            // поломать связку; когда база НЕ вариант (baseOk=false —
+            // дротики без базовой цели), разрешён и нелетальный удар по
+            // опасной постройке — урон по зданию «прилипает», в отличие
+            // от существа.
+            A.aiDmgTargetPick = function aiDmgTargetPick(def, targets,
+                free = false, baseOk = true) {
                 let best = null, bestScore = -Infinity;
                 for (const v of targets) {
                     const dmg = aiDmgFor(def, v, free, false);
                     if (dmg <= 0) continue;
                     const pos = (GRID - 1 - v.row) * 0.35; // ближе к нашей базе — опаснее
+                    const dg = v.def.type === "building" ? aiDangerBld(v.def) : 0;
                     let score;
-                    if (v.hp <= dmg) {
-                        score = 14 + aiThreat(v) * 1.1 + pos
+                    if (v.hp <= dmg) { // добивание — единственная причина бить существо
+                        score = 14 + aiThreat(v) * 1.1 + pos + dg * 4
                             - Math.max(0, dmg - v.hp) * 0.15;
-                    } else {
-                        score = (dmg / Math.max(1, v.hp)) * (aiThreat(v) * 0.9 + pos)
-                            + dmg * 0.35 + (v.hp - dmg <= 2 ? 1.2 : 0);
-                    }
-                    if (v.def.type === "building") {
-                        score *= 0.85;
-                        if (v.def.spellAura || v.def.campAura || v.def.treeHomes
-                            || v.def.monolith || v.def.groveAura || v.def.mycelium
-                            || v.def.sprout) score += 2;
+                    } else if (baseOk || !dg) {
+                        continue; // нелетально по существу — никогда
+                    } else { // нелетально по опасной постройке (дротик без базы)
+                        score = 6 * dg + dmg * 0.3 + pos;
                     }
                     if (score > bestScore) { bestScore = score; best = v; }
                 }
