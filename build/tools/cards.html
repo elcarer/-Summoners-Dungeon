@@ -6,7 +6,8 @@
 <title>Картотека — Развернутый Мир</title>
 <link rel="icon" href="data:,">
 <!-- ОТДЕЛЬНАЯ ОТ ИГРЫ программка (открывается двойным кликом): читает
-     чистые данные карт (scripts/game/cardsData.js) и локализацию (loc.js).
+     чистые данные карт (scripts/game/cardsData.js), энкаунтеров
+     (dataEncounters.js — ядра колод врагов) и локализацию (loc.js).
      Просмотр всех карт по фильтрам + конструктор колод с сохранением
      в файл и в память браузера. Никаких fetch — только <script>/img. -->
 <style>
@@ -144,6 +145,29 @@
     .htile .cap { text-align: center; margin-top: 4px; font-size: 14px; }
     .htile .cap small { color: var(--dim); }
 
+    /* ── ядро колоды героя (просил юзер, W101): список строк в окне героя,
+       наведение на строку показывает карту «в нормальном размере» ────── */
+    #detail .coreTitle { margin: 12px 0 4px; color: var(--dim); font-size: 14px; }
+    #coreList {
+        max-height: 250px; overflow-y: auto; border: 1px solid var(--line);
+        border-radius: 8px; background: #1a140d;
+    }
+    .crow {
+        display: flex; align-items: center; gap: 6px;
+        padding: 3px 8px; border-bottom: 1px solid #241c11; font-size: 14px;
+        cursor: pointer;
+    }
+    .crow:last-child { border-bottom: none; }
+    .crow:hover { background: #3d2f1a; }
+    .crow .cost { color: var(--dim); width: 26px; text-align: right; flex-shrink: 0; }
+    .crow .nm { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .crow .cnt { color: var(--gold); flex-shrink: 0; }
+    #hoverCard { position: fixed; z-index: 55; display: none; pointer-events: none; }
+    #hoverCard img {
+        width: 253px; display: block; border-radius: 12px;
+        border: 1px solid var(--gold); box-shadow: 0 6px 24px #000;
+    }
+
     /* ── подробности о карте ───────────────────────────────────────────── */
     #dim { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: none; z-index: 40; }
     #detail {
@@ -248,6 +272,7 @@
 
 <div id="dim"></div>
 <div id="detail"><button id="detailClose">✕</button><div class="cols" id="detailCols"></div></div>
+<div id="hoverCard"><img alt=""></div>
 <div id="toast"></div>
 
 <!-- Каталог карт разбит по стихиям (W64): части → герои → сборка -->
@@ -260,6 +285,8 @@
 <script src="../scripts/game/cardsMulti.js"></script>
 <script src="../scripts/game/heroesData.js"></script>
 <script src="../scripts/game/cardsData.js"></script>
+<!-- Ядра колод врагов (вкладка «Персонажи», просил юзер W101) -->
+<script src="../scripts/game/dataEncounters.js"></script>
 <!-- Локализация частями (W64): словари RU/EN → ядро -->
 <script src="../scripts/game/locRu.js"></script>
 <script src="../scripts/game/locEn.js"></script>
@@ -269,6 +296,7 @@
     "use strict";
     const D = globalThis.GAME_CARD_DATA;
     const CARDS = D.CARDS;
+    const ENC = globalThis.GAME_ENCOUNTERS.ENCOUNTERS;
     const loc = globalThis.GAME_LOC;
     const t = (k, v) => loc.t(k, v);
     const $ = (id) => document.getElementById(id);
@@ -311,6 +339,8 @@
             copied: "JSON колоды скопирован", heroHp: "♥ базы: {n}",
             noFace: "без лица", stats: "⚡ {cost}  ·  ⚔ {atk}  ·  ♥ {hp}  ·  👟 {spd}",
             statsSpell: "⚡ {cost}", rawTitle: "Параметры:",
+            coreTitle: "Ядро колоды",
+            coreWild: "Колода случайная — это дикий отряд (ядро собирается при встрече).",
         },
         en: {
             title: "Card Files", tabCards: "CARDS", tabHeroes: "HEROES",
@@ -346,6 +376,8 @@
             copied: "Deck JSON copied", heroHp: "base ♥: {n}",
             noFace: "no face", stats: "⚡ {cost}  ·  ⚔ {atk}  ·  ♥ {hp}  ·  👟 {spd}",
             statsSpell: "⚡ {cost}", rawTitle: "Parameters:",
+            coreTitle: "Deck core",
+            coreWild: "Deck is random — a wild band (assembled on encounter).",
         },
     };
     const L = () => UI[loc.lang] || UI.ru;
@@ -407,6 +439,20 @@
     function natKey(id) { // str2 < str10: каталог с числовым хвостом
         const m = id.match(/^([a-z]+)(\d*)$/i);
         return m ? m[1] + String(m[2] || 0).padStart(6, "0") : id;
+    }
+    // Ядро колоды героя (просил юзер, W101): у врага — core энкаунтера
+    // (enc.hero === id), у своего героя — стартовая колода по starter
+    // (так же собирает heroDecks в main.js). У диких отрядов (Simple/
+    // Raider) core пуст, колода случайная — вернём null
+    function heroCore(id) {
+        for (const k of Object.keys(ENC)) {
+            const e = ENC[k];
+            if (e.hero === id && e.core && e.core.length) return e.core;
+        }
+        const d = D.HEROES[id];
+        if (!D.HERO_FOE_ORDER.includes(id) && d.starter && D.STARTER_DECKS[d.starter])
+            return D.STARTER_DECKS[d.starter];
+        return null;
     }
     const hex = (n) => "#" + Number(n).toString(16).padStart(6, "0");
 
@@ -796,6 +842,7 @@
         desc.className = "desc";
         desc.textContent = t("hero." + id + ".ability");
         info.appendChild(desc);
+        appendHeroCore(info, id); // ядро колоды списком + ховер-зум (W101)
         cols.appendChild(info);
         $("detail").style.display = "block";
         $("dim").style.display = "block";
@@ -803,6 +850,69 @@
     function hideDetail() {
         $("detail").style.display = "none";
         $("dim").style.display = "none";
+        zoomHide();
+    }
+    // ── ядро колоды героя: список строк, ховер — карта в полный размер ──
+    const hv = $("hoverCard");
+    const hvImg = hv.querySelector("img");
+    function zoomShow(id, ev) {
+        const d = CARDS[id];
+        if (!d) return;
+        hvImg.src = d.img ? "../images/cards/" + d.img + ".png" : backOf(d.elem);
+        hv.style.display = "block";
+        zoomMove(ev);
+    }
+    function zoomMove(ev) { // правее курсора, с прижимом к краям экрана
+        const w = 255, h = Math.round(w * 338 / 230); // лицо 230×338
+        let x = ev.clientX + 18, y = Math.round(ev.clientY - h / 3);
+        if (x + w > window.innerWidth - 8) x = ev.clientX - w - 18;
+        if (x < 8) x = 8;
+        y = Math.max(8, Math.min(y, window.innerHeight - h - 8));
+        hv.style.left = x + "px"; hv.style.top = y + "px";
+    }
+    function zoomHide() { hv.style.display = "none"; }
+    function appendHeroCore(info, id) {
+        const core = heroCore(id);
+        if (!core) { // дикие отряды: фиксированного ядра нет
+            if (D.HERO_FOE_ORDER.includes(id)) {
+                const note = document.createElement("p");
+                note.className = "desc";
+                note.textContent = T("coreWild");
+                info.appendChild(note);
+            }
+            return;
+        }
+        const counts = {}; // сгруппировать повторы ядра: id → копий
+        let total = 0;
+        core.forEach((cid) => {
+            if (!CARDS[cid]) return;
+            counts[cid] = (counts[cid] || 0) + 1;
+            total++;
+        });
+        const ttl = document.createElement("div");
+        ttl.className = "coreTitle";
+        ttl.textContent = T("coreTitle") + " · " + total;
+        info.appendChild(ttl);
+        const list = document.createElement("div");
+        list.id = "coreList";
+        Object.keys(counts).sort(byCostThenName).forEach((cid) => {
+            const row = document.createElement("div");
+            row.className = "crow";
+            row.dataset.id = cid; // для проб и отладки
+            const cost = document.createElement("span");
+            cost.className = "cost"; cost.textContent = CARDS[cid].cost + "⚡";
+            const nm = document.createElement("span");
+            nm.className = "nm"; nm.textContent = nameOf(cid);
+            const cnt = document.createElement("span");
+            cnt.className = "cnt"; cnt.textContent = "×" + counts[cid];
+            row.append(cost, nm, cnt);
+            row.addEventListener("mouseenter", (e) => zoomShow(cid, e));
+            row.addEventListener("mousemove", zoomMove);
+            row.addEventListener("mouseleave", zoomHide);
+            row.addEventListener("click", () => { zoomHide(); showCard(cid); });
+            list.appendChild(row);
+        });
+        info.appendChild(list);
     }
     $("dim").addEventListener("click", hideDetail);
     $("detailClose").addEventListener("click", hideDetail);
@@ -1052,6 +1162,7 @@
             else { renderFilters(); renderGrid(); }
         },
         heroIds: () => heroIds(),
+        heroCore,
         deckIds: () => filteredIds(),
         add: addCard, remove: removeCard,
         clear: () => { state.deck.cards = {}; persist(); renderDeck(); renderGrid(); },
