@@ -820,7 +820,8 @@
                 // «Тёмный царь» (wtDarkKing, W81 — спека юзера): когда его
                 // существо приходит в игру (любой призыв — рука, эффекты,
                 // «Сдвиг»; постройки не считаются), оно наносит 1 урон СЕБЕ
-                // и 1 урон случайному врагу (существу/постройке; врагов на
+                // и 2 урона случайному врагу (поправка юзера W98: было
+                // 1, увеличен урон по врагу; существу/постройке; врагов на
                 // поле нет — удар уходит в базу, «последний билет»)
                 if (def.type === "unit") {
                     const hdP = heroDefOf(side);
@@ -833,13 +834,13 @@
                             && B.units.includes(v));
                         const pick = (Math.random() * (foes.length + 1)) | 0;
                         if (pick >= foes.length) {
-                            damageBase(side === "p" ? "e" : "p", 1,
+                            damageBase(side === "p" ? "e" : "p", 2,
                                 side === "p" ? { x: 960, y: 60, fill: 0xff8f6e }
                                     : { x: 960, y: 840, fill: 0xff5f4e });
                         } else {
                             const fp = cellXY(foes[pick].col, foes[pick].row);
-                            floatText(fp.x, fp.y - 60, "1", 0xff8f6e);
-                            damageUnit(foes[pick], 1, u, "dam");
+                            floatText(fp.x, fp.y - 60, "2", 0xff8f6e);
+                            damageUnit(foes[pick], 2, u, "dam");
                         }
                     }
                 }

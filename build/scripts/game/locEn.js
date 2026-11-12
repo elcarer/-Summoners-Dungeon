@@ -742,7 +742,7 @@
             "card.wt280.name": "Time Mage",
             "card.wt280.desc": "Mage 1/2. \"Return 2\": goes back to your hand 2 turns after being summoned. While this creature is on the battlefield, your creatures' return counters do not decrease, except for the Time Mage's own return counter",
             "enc.wtDarkKing.title": "Dark King",
-            "hero.wtDarkKing.ability": "Whenever your creature enters the battlefield, it deals 1 damage to itself and 1 damage to a random enemy (creature, building or the opposing base)",
+            "hero.wtDarkKing.ability": "Whenever your creature enters the battlefield, it deals 1 damage to itself and 2 damage to a random enemy (creature, building or the opposing base)",
             "enc.wtArtMage.title": "Artificial Mage",
             "hero.wtArtMage.ability": "When playing a card from hand, cancel its effect and play another random card from hand (energy for that card is spent, for the other one it is not)",
             // W82 (спека юзера): карты «Некро-раскопок» (Время+Тлен) и
@@ -776,7 +776,7 @@
             "enc.necGuards.title": "Necro Guards",
             "hero.necGuards.ability": "When you play your second summon this turn, that second summoned creature gains \"Exhuming 1\"",
             "enc.necSoulRiver.title": "River of Souls",
-            "hero.necSoulRiver.ability": "Whenever your creature leaves the battlefield, discard a random card from hand and summon a Ghost 2/1 onto the cell where it was",
+            "hero.necSoulRiver.ability": "Whenever your creature (not a token, one summoned by a summon card) leaves the battlefield, discard a random card from hand and summon a Ghost 2/1 onto the cell where it was",
             "enc.necBiothreat.title": "Biothreat",
             "hero.necBiothreat.ability": "Once per turn, when an enemy creature loses lives, its base takes the same amount of damage (no more than 2)",
             "enc.necMutant.title": "The Altered",
