@@ -434,6 +434,19 @@
                     else if (row === rows[0]) score += 0.8;
                 }
                 score += aiSummonAuraScore(def, col, row);
+                // W103 (юзер): свой «Три монолита» на поле + этот юнит
+                // образует пару (в колоде ИИ есть юнит ровно на 1 дороже)
+                // — целенаправленно встаём в соседнюю к монолиту клетку:
+                // поиск дороже на 1 сработает сразу после постановки
+                if (B.units.some((o) => o.side === "e" && o.def.type === "building"
+                        && o.def.monolith && B.units.includes(o))
+                    && B.eDeck.some((x) => CARDS[x] && CARDS[x].type === "unit"
+                        && CARDS[x].cost === (def.cost || 0) + 1)
+                    && B.units.some((o) => o.side === "e"
+                        && o.def.type === "building" && o.def.monolith
+                        && B.units.includes(o)
+                        && Math.abs(o.col - col) + Math.abs(o.row - row) === 1))
+                    score += 1.6;
                 const ahead = unitAt(col, row + 1);
                 const atk = def.atk || 0;
                 // собственные способности призыва/марша: «Скорость» —
@@ -577,17 +590,18 @@
             // W86 (юзер): ИИ не ставит существ с «Возвратом N», если они
             // не успеют ДОБЕЖАТЬ до существа/постройки врага (в колонке
             // клетки) или базы противника раньше, чем вернутся в руку.
-            // Тик «Возврата» — в начале хода владельца ДО марша
-            // (aiPlay.enemyTurn: returnTick → marchSide), так что
-            // призванному сейчас доступно returnN−1 маршей по speed
-            // шагов. Шаги до цели: ближайший юнит в колонке клетки —
-            // враг на ряду r достижим за r−row шагов (последний шаг —
-            // атака), СВОЙ раньше цели стопарит марш («своим не даём
+            // Тик «Возврата» — ПОСЛЕ марша владельца (W103 — юзер: существо
+            // успевает походить/ударить и только потом возвращается в руку;
+            // aiPlay.enemyTurn/arenaActions.playerTurnStart: marchSide →
+            // returnTick), так что призванному сейчас доступно returnN
+            // маршей по speed шагов. Шаги до цели: ближайший юнит в колонке
+            // клетки — враг на ряду r достижим за r−row шагов (последний
+            // шаг — атака), СВОЙ раньше цели стопарит марш («своим не даём
             // пройти, своих не бьём» — цель за ним недостижима), пустая
             // колонка — выпад в базу игрока за 5−row шагов. Консервативно:
             // «Зелёный портал» и прочие перепрыгивания не учитываем
             A.retRushOk = function retRushOk(def, col, row) {
-                const marches = (def.returnN || 0) - 1;
+                const marches = def.returnN || 0;
                 const spd = def.speed || 0;
                 if (marches <= 0 || spd <= 0) return false; // ни шага не успеет
                 let steps = 5 - row; // база игрока за последним рядом
@@ -610,10 +624,22 @@
                 if (!free.length) return null;
                 // W86 (юзер): «Возврат» — только клетки, ОТКУДА успеет
                 // добежать до цели/базы (см. retRushOk); таких нет —
-                // карта не играется (в руке останется до конца хода)
+                // карта не играется (в руке останется до конца хода).
+                // W103 (юзер): исключение — целитель с «Возвратом»
+                // (healArrive, tim219): лечение соседа срабатывает при
+                // ПОЯВЛЕНИИ, до возврата, — если рядом есть раненое своё,
+                // выходим туда и без раш-клеток
                 if (def.type === "unit" && def.returnN) {
-                    free = free.filter(([c, r]) => retRushOk(def, c, r));
-                    if (!free.length) return null;
+                    const rush = free.filter(([c, r]) => retRushOk(def, c, r));
+                    if (rush.length) free = rush;
+                    else if (def.healArrive) {
+                        const hurt = free.filter(([c, r]) => B.units.some((v) =>
+                            v.side === "e" && v.def.type === "unit"
+                            && v.hp < (CARDS[cardIdOf(v.def)] || { hp: 0 }).hp
+                            && Math.abs(v.col - c) + Math.abs(v.row - r) === 1));
+                        if (!hurt.length) return null;
+                        free = hurt;
+                    } else return null;
                 }
                 // «Иллюзия» без соседей — 0/0 и мгновенная гибель (просил
                 // юзер): только клетки рядом с существом (любой стороны —

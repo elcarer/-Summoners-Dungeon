@@ -61,13 +61,15 @@
                 if (B.stopped) return;
                 upkeep("p"); // грибницы игрока
                 poisonTick("p"); // яд: до марша (просил юзер)
-                returnTick("p"); // «Возврат» (Время): счётчики тают, созревшие — в руку
                 trapReturnTick("p"); // «Возврат» ЛОВУШКИ (tim221): созревшая — в руку
                 summonTick("p"); // «Призыв» (W95): счётчик истёк — существо из колоды
                 await delayArrive("p"); // «Сдвиг» (Время): созревшие являются
                 await marchSide("p");
                 timeCavePulse("p"); // «Пещера времени»: призыв после марша — значок не тает в этом же ходу
                 if (B.stopped || B.phase === "over") return;
+                // «Возврат» (Время, W103 — юзер): ПОСЛЕ действия существа
+                // (движения/атаки), а не до
+                returnTick("p");
                 B.phase = "player";
                 layoutHand();
                 redrawHighlight();

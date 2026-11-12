@@ -36,12 +36,15 @@
                 riteStumpTick("e"); // пень обряда врага подсмотрел и решил
                 portalMasterTick("e"); // «Мастер порталов»: ловушка с верха колоды — бесплатно
                 poisonTick("e"); // яд: до марша (просил юзер)
-                returnTick("e"); // «Возврат» (Время): счётчики тают, созревшие — в руку
                 trapReturnTick("e"); // «Возврат» ЛОВУШКИ (tim221): созревшая — в руку
                 summonTick("e"); // «Призыв» (W95): счётчик истёк — существо из колоды
                 await delayArrive("e"); // «Сдвиг» (Время): созревшие являются
                 await marchSide("e");
                 if (B.stopped || B.phase === "over") return;
+                // «Возврат» (Время, W103 — юзер): ПОСЛЕ действия существа
+                // (движения/атаки), а не до — юнит успевает походить/ударить
+                // и только тогда возвращается в руку
+                returnTick("e");
                 timeCavePulse("e"); // «Пещера времени»: призыв после марша — значок не тает в этом же ходу
                 await aiPlay();
                 if (B.stopped || B.phase === "over") return;
@@ -405,6 +408,19 @@
                         B.eHand.find((id) => CARDS[id] && CARDS[id].flyAltCost),
                         CARDS[B.eHand.find((id) => CARDS[id]
                             && CARDS[id].flyAltCost)].cost || 0);
+                // W103 (юзер): «Три монолита» — комбо готово (в руке юнит
+                // ценой X и в колоде юнит ценой X+1)? Тогда постройка
+                // играется ВЫСОКИМ приоритетом (группа 0.5 — раньше движков),
+                // а юнит-пара встанет рядом с ней (бонус в aiSpotScore):
+                // поиск дороже на 1 сработает сразу
+                const monolithCombo = B.eHand.some((id) => {
+                    const d = CARDS[id];
+                    return d && d.type === "unit" && B.eDeck.some((x) => CARDS[x]
+                        && CARDS[x].type === "unit"
+                        && CARDS[x].cost === d.cost + 1);
+                });
+                // W103 (юзер): замена застрявшей карты в тупике — раз за ход
+                let deadSwapUsed = false;
                 for (;;) {
                     if (B.stopped || B.phase === "over") return;
                     const affordable = B.eHand
@@ -415,17 +431,64 @@
                         .filter((x) => !chaosHold || effCost(x.id, "e") <= CHAOS_MAX_COST)
                         // «шестерни» копят под тройку: вне залпа существа
                         // не выкладываем (решение — один раз за ход выше)
-                        .filter((x) => x.def.type !== "unit" || gearsBurst)
+                        .filter((x) => x.def.type !== "unit" || gearsBurst);
+                    // W103 (юзер): большой банк энергии (хватает на ДВЕ самые
+                    // дорогие играбельные карты) — ДОРОГИЕ идут раньше групп:
+                    // дешёвыми не замуровывать стол, клетки кончаются раньше
+                    // энергии; спецстратегии (chaos/шестерни) не трогаем
+                    const top2 = affordable.map((x) => effCost(x.id, "e"))
+                        .sort((a, b) => b - a);
+                    const bigBank = !(chaosHold || gearsHold)
+                        && affordable.length >= 2
+                        && B.eEnergy >= top2[0] + top2[1];
+                    affordable.sort((a, b) => {
+                        // W103 (юзер): монолит при готовом комбо — самый
+                        // первый (группа 0.5, раньше прочих движков)
+                        const grp = (x) => (x.def.monolith && monolithCombo)
+                            ? 0.5 : aiGroup(x.id, x.def);
+                        if (bigBank) {
+                            return effCost(b.id, "e") - effCost(a.id, "e")
+                                || grp(a) - grp(b);
+                        }
                         // порядок — по правилам связок (двигатели до урона и
                         // существ, усиления после), внутри группы дороже раньше;
                         // магу chaosPlay — наоборот: платить по минимуму;
                         // «шестерням» залп тоже удобнее от дешёвых — тройка
                         // вероятнее уместится в энергию
-                        .sort((a, b) => (aiGroup(a.id, a.def) - aiGroup(b.id, b.def))
+                        return grp(a) - grp(b)
                             || ((chaosHold || gearsHold)
                                 ? effCost(a.id, "e") - effCost(b.id, "e")
-                                : effCost(b.id, "e") - effCost(a.id, "e")));
-                    if (!affordable.length) { if (!await tryRefill()) return; continue; }
+                                : effCost(b.id, "e") - effCost(a.id, "e"));
+                    });
+                    if (!affordable.length) {
+                        if (await tryRefill()) continue;
+                        // W103 (юзер): тупик — играть нечего, добирать
+                        // неоткуда; МЕНЯЕМ одну карту: самая дорогая «не по
+                        // карману» уходит в сброс, взамен добор (даже сверх
+                        // 7 карт — легальная замена для продвижения вариантов)
+                        if (!deadSwapUsed && B.eHand.length) {
+                            let worst = -1, worstCost = -1;
+                            B.eHand.forEach((id, i2) => {
+                                const c2 = effCost(id, "e");
+                                if (c2 > B.eEnergy && c2 > worstCost) {
+                                    worstCost = c2; worst = i2;
+                                }
+                            });
+                            if (worst >= 0) {
+                                deadSwapUsed = true;
+                                const id = B.eHand.splice(worst, 1)[0];
+                                B.eDiscard.push(id);
+                                noteDiscard(1, "e", [id], "discard");
+                                floatText(1330, 140,
+                                    "↺ " + GAME_LOC.t(`card.${id}.name`), 0xb7d0ef);
+                                drawEnemy(1);
+                                refreshHud();
+                                await delay(0.3 / animK());
+                                continue;
+                            }
+                        }
+                        return;
+                    }
                     let played = false;
                     for (const pick of affordable) {
                         const def = pick.def;
@@ -438,15 +501,11 @@
                             // это 0–1/0–1 — карту не переводим (группа 3.5 уже
                             // отодвинула его в конец розыгрыша)
                             if (def.energyToStats && B.eEnergy - effCost(pick.id, "e") < 2) continue;
-                            // «Три монолита» — движок добора: без существа в руке
-                            // и пары «цена+1» в колоде он пока пустой; не тратим
-                            // темп (просил юзер: карта не в приоритете)
-                            if (def.monolith && !B.eHand.some((id) => {
-                                const d = CARDS[id];
-                                return d && d.type === "unit" && B.eDeck.some((x) => CARDS[x]
-                                    && CARDS[x].type === "unit"
-                                    && CARDS[x].cost === d.cost + 1);
-                            })) continue;
+                            // «Три монолита» — движок добора: без существа в
+                            // руке и пары «цена+1» в колоде он пока пустой;
+                            // при готовом комбо приоритет ВЫСОКИЙ (W103, юзер:
+                            // монолит → юнит рядом → в руке карта дороже)
+                            if (def.monolith && !monolithCombo) continue;
                             // «Круг стихий»: без Элементаля в руке призыв пуст —
                             // постройку держим до подходящей карты
                             if (def.elementalCircle && !B.eHand.some((id) => {
