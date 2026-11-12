@@ -21,7 +21,7 @@ Git-правило: `build/`, `PLAN.md`, `README.md`, этот файл и `docs
 ```bash
 cd build && python dev_server.py 8147     # http://127.0.0.1:8147/index.html
 bash for_work/smoke.sh                    # полный смоук (последний полный — 740/0, 2026-11-06; счётчик меняется с волнами)
-bash for_work/mini.sh for_work/quest_test.mjs   # мини-пробы волн: свой сервер 8174 + chrome 9344
+bash for_work/mini.sh for_work/probe_w97.mjs   # мини-пробы волн: свой сервер 8174 + chrome 9344
 
 ```
 
@@ -29,18 +29,13 @@ bash for_work/mini.sh for_work/quest_test.mjs   # мини-пробы волн: 
 свой профиль `for_work/.chrome_profile`) и гонит `for_work/smoke_test.mjs`
 под watchdog-ом `for_work/runtest.sh` (полный лог — /tmp/test_out.log,
 stdout обёртки — только tail; rc ненадёжен — сверять итоговую строку).
-Живой регресс — `for_work/regress_v5.sh` (последовательно, мини-порты):
-probe_fix3 (эталон эпохи мира), probe_world, probe_tiles, probe_v7shots,
-mini_test, mini_fix_test, quest_test, probe_decay2, probe_honor2..honor7,
-probe_wander, probe_time, probe_bridge, probe_tim2, probe_tim3, probe_w18,
-probe_w19, probe_w20, probe_w21, probe_w22, probe_fix1, probe_fix2, probe_ai_smart (свой раннер, 8164/9347) + оффлайн
-tiles_offline /
-forest_offline; генератор отдельно — `check_worldgen.mjs` (2000 сидов).
-⚠ regress_v5 не гонялся с эры W19–W30 и частично протух: probe_world
-падает пачкой (генератор не отдаёт v, арок 8 — W54/W61; помечен в шапке),
-актуальное покрытие мира — полный смоук (740/0, 2026-11-06) + probe_wander
-38/0. Прочие пробы — история волн, не перепрогонять. Паттерн
-пробы: свой порт 8174+ и одноразовый Chrome-профиль.
+Живой регресс — пробы последних волн в `for_work/` (check_w95/check_w97
+офлайн, probe_w95/probe_w96/probe_w97 на мини-портах); пробы старых волн
+и разовые скрипты вычищены 2026-11-12 (шум/скрины/профили — мусор,
+протухшие прогонять нельзя; детали волн — journal и git-история).
+Главный регресс после больших волн — полный смоук (только по явному
+распоряжению юзера). Паттерн пробы: свой порт 8174+ и одноразовый
+Chrome-профиль.
 CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 
 **Картотека карт** (w24, просил юзер) — отдельная от игры программка
@@ -519,8 +514,8 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
   ряда лого фильтров после 4-й мульти-стихии W79 (ряд ужат шаг 42/круг 40),
   протухшие литералы смоука (каталог/лого) и тайминги асинхронного рывка
   W66 в тестах). Полный смоук — только по явному распоряжению.
-- Детали последних волн — `docs/journal.md` (W72–W93 дословно,
-  W41–W71 — однострочники, сжат 2026-11-10),
+- Детали последних волн — `docs/journal.md` (W82–W97 дословно,
+  W41–W81 — однострочники, сжат 2026-11-12),
   полная история — там же и в git-истории HANDOFF.md.
 
 ## Дальше
