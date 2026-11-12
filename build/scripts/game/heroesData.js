@@ -280,6 +280,13 @@
         dstrGate: { id: "dstrGate", rarity: "rare", baseHp: 16,
                     elems: ["decay", "strength"], starter: "decStr",
                     img: "86", ability: "lastCardDraw" },
+        // W97 (спека юзера): «Коробка игрушек» — враг 2-го этажа «Портала
+        // в бездну». Герой 87 (18♥, редкая, способность secondDiscardDraw —
+        // когда владелец сбрасывает вторую карту за ход, он берёт карту;
+        // хук в noteDiscard — arenaCombat, счётчик toyDiscards)
+        dstrToyBox: { id: "dstrToyBox", rarity: "rare", baseHp: 18,
+                      elems: ["decay", "strength"], starter: "decStr",
+                      img: "87", ability: "secondDiscardDraw" },
         // ── «Подземные ключи»: карты персонажей врагов (просил юзер).
         // 1-й этаж (арт heroes/17.png): Мудрость, 10♥, первое заклинание
         // боя даёт владельцу 1 энергию (firstSpellEnergy);
@@ -631,6 +638,7 @@
         "necBiothreat", // «Биоугроза»: враг 3-го этажа «Некро-раскопок» (W83)
         "necMutant", // «Изменённый»: БОСС «Некро-раскопок», последняя комната 3-го этажа (W84)
         "dstrGate", // «Предвратие»: враг 1-го этажа «Портала в бездну» (W95)
+        "dstrToyBox", // «Коробка игрушек»: враг 2-го этажа «Портала в бездну» (W97)
         "wisBreeze", "wisWater", "wisSpirits", "wisFlurry", "wisMaster",
         "wisCity", "wisMad",
         "decBones", "decBlack", "decUnder", "decMind", "decArmy",

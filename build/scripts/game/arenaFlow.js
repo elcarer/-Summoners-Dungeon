@@ -40,6 +40,9 @@
                     B.hiddenDraw = (B.hiddenDraw || 0) + drawn.length;
                     animateDraw("p", drawn, B.hand.length - drawn.length);
                 }
+                // рука игрока изменилась — аура «Голодного цербера»
+                // (−1/−1 за карту в руке) пересчитывается (W97)
+                if (drawn.length) A.recalcAuras();
             };
             A.drawEnemy = function drawEnemy(count) {
                 const drawn = [];
@@ -64,6 +67,9 @@
                     drawn.push(id);
                 }
                 if (drawn.length) sfx("acid"); // взятие карты (W34, юзер)
+                // рука врага изменилась — аура «Голодного цербера»
+                // (−1/−1 за карту в руке) пересчитывается (W97)
+                if (drawn.length) A.recalcAuras();
                 // жест добора врага (просил юзер): рубашка летит от его колоды
                 // к верхнему краю и растворяется — рука врага не видна
                 if (drawn.length && root && root.cardFxLayer && !B.stopped) {
@@ -164,7 +170,7 @@
                     if (scorch && scorch.has(id)) { scorch.delete(id); burned++; burnedIds.push(id); }
                     else { discard.push(id); dropped++; droppedIds.push(id); }
                 }
-                noteDiscard(dropped, side, droppedIds); // «Болотная слизь»: вся рука в сброс
+                noteDiscard(dropped, side, droppedIds, "discard"); // «Болотная слизь»: вся рука в сброс
                 const n = count | 0;
                 const k2 = animK();
                 sweep.forEach((sv, j2) => {

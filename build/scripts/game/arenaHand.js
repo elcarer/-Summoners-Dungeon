@@ -1049,7 +1049,7 @@
                 const cardId = B.hand.splice(idx, 1)[0];
                 if (cardId) {
                     B.discard.push(cardId);
-                    noteDiscard(1, "p", [cardId]);
+                    noteDiscard(1, "p", [cardId], "discard");
                     B.scorch.p.delete(cardId); // метка ушла вместе с этой картой
                     // карта из панели летит в сброс (анимации руки, просил юзер)
                     const pn = discardPanel.children.find((n2) =>
@@ -1185,7 +1185,7 @@
                             .filter(Boolean);
                         dropped.forEach((id) => {
                             B.discard.push(id);
-                            noteDiscard(1, "p", [id]);
+                            noteDiscard(1, "p", [id], "discard");
                             B.scorch.p.delete(id); // метка ушла с картой
                         });
                         closeDropPanel();

@@ -668,5 +668,45 @@
                     subtype: "goblin", // подтип — по спеке юзера (Гоблин)
                     rarity: "common", elem: "decStr",
                     color: 0xc05a3e },
+
+        // ── W97 (спека юзера): карты 293–295 «Тлен + Сила» — тоже только
+        // в «Портале в бездну». Все три живут на СБРОСАХ (терминология
+        // юзера W97: сброс карты = скинутая эффектом или переполнением
+        // руки >7 в конце хода; РАЗЫГРАННАЯ карта сбросом НЕ считается —
+        // единый гейт kind === "discard" в noteDiscard — arenaCombat)
+        // «Корм для портала» (dstr293): постройка 2♥ — когда владелец
+        // сбрасывает карту, случайное СУЩЕСТВО владельца без «Призыва»
+        // получает «Призыв 3» (summonTarget — arenaSpells, повтор
+        // вешания заменяет счётчик; фильтр «без Призыва» — u.summonN)
+        dstr293: { type: "building", cost: 3, hp: 2,
+                   portalFeed: true,
+                   rarity: "epic", elem: "decStr",
+                   multi: ["decay", "strength"],
+                   color: 0xc05a3e, img: "decay_strength/293" },
+        // «Голодный цербер» (dstr294): 5/5 — когда владелец сбрасывает
+        // карту, цербер получает +1/+1 (за каждую сброшенную); и ВСЕГДА
+        // −1/−1 за каждую карту в руке владельца (динамическая аура —
+        // recalcAuras, arenaBoard: пересчёт при любом изменении руки)
+        dstr294: { type: "unit", cost: 3, atk: 5, hp: 5, speed: 1,
+                   creature: "animal", sheet: "wolf", // Животное, лист волка
+                   subtype: "animal", // подтип — по спеке юзера (Животное)
+                   hungryCerb: true, cerbHand: true,
+                   rarity: "common", elem: "decStr",
+                   multi: ["decay", "strength"],
+                   color: 0xc05a3e, img: "decay_strength/294" },
+        // «Гаргул» (dstr295): 3/3 с «Полётом» (flyOver, как «Нетопырь»);
+        // когда владелец СБРАСЫВАЕТ этого гаргула (не разыгрывает!), карта
+        // удаляется из сброса и РАЗЫГРЫВАЕТСЯ — призыв в свободную клетку
+        // своих рядов (gargoyleSelfPlay — arenaCombat; нет клетки —
+        // остаётся в сбросе); когда владелец сбрасывает заклинание,
+        // гаргул получает +1/+1 (за каждое сброшенное заклинание)
+        dstr295: { type: "unit", cost: 5, atk: 3, hp: 3, speed: 1,
+                   creature: "animal", sheet: "bat", // Животное, лист нетопыря (летает)
+                   subtype: "animal", // подтип — по спеке юзера (Животное)
+                   ability: "flyOver",
+                   gargoyle: true,
+                   rarity: "rare", elem: "decStr",
+                   multi: ["decay", "strength"],
+                   color: 0xc05a3e, img: "decay_strength/295" },
     };
 })();

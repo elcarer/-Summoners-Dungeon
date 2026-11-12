@@ -33,7 +33,7 @@
                 const [col, row] = near[(Math.random() * near.length) | 0];
                 const p = cellXY(col, row);
                 if (counterTrapConsume(side === "p" ? "e" : "p", "counterSummon")) {
-                noteDiscard(1, side, [cardId]);
+                noteDiscard(1, side, [cardId], "discard");
                     discard.push(cardId);
                     floatText(p.x, p.y - 60,
                         "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
@@ -82,7 +82,7 @@
                 const [col, row] = free[(Math.random() * free.length) | 0];
                 const p = cellXY(col, row);
                 if (counterTrapConsume(side === "p" ? "e" : "p", "counterSummon")) {
-                    noteDiscard(1, side, [cardId]);
+                    noteDiscard(1, side, [cardId], "discard");
                     discard.push(cardId);
                     floatText(p.x, p.y - 60,
                         "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
@@ -324,7 +324,7 @@
                                     `🔥 ${GAME_LOC.t("burn.gone")}`, 0xff8f6e);
                             } else {
                                 discard.push(id);
-                                noteDiscard(1, side, [id]);
+                                noteDiscard(1, side, [id], "discard");
                                 floatText(bp.x, bp.y - 66,
                                     "⤓ " + GAME_LOC.t(`card.${id}.name`), 0xc9b98c);
                             }

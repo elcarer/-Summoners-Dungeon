@@ -374,7 +374,7 @@
                     const i = (Math.random() * hand.length) | 0;
                     const id = hand.splice(i, 1)[0];
                     (side === "p" ? B.discard : B.eDiscard).push(id);
-                    noteDiscard(1, side, [id]);
+                    noteDiscard(1, side, [id], "discard");
                     const hp = cellXY(col, row);
                     floatText(hp.x, hp.y - 108,
                         "⤓ " + GAME_LOC.t(`card.${id}.name`), 0xc79af0);
@@ -427,7 +427,7 @@
                     }
                     const id = hand.splice(bi, 1)[0];
                     discard.push(id);
-                    noteDiscard(1, side, [id]);
+                    noteDiscard(1, side, [id], "discard");
                 };
                 if (hd.ability === "elemDeathSnipe") {
                     const foes = B.units.filter((v) => v.side !== side);

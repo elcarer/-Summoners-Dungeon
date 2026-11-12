@@ -1075,7 +1075,15 @@
                 }
                 sfx("chpoc");
             };
-            A.noteDiscard = function noteDiscard(n = 1, side = null, ids = null) {
+            // kind — вид выхода карты в сброс (W97, терминология юзера):
+            // "discard" — СБРОС карты (скинутая эффектом или переполнением
+            // руки >7 в конце хода); null — остальное (розыгранная карта,
+            // обмен построек и пр.). РАЗЫГРАННАЯ карта сбросом НЕ считается
+            // (спека юзера W97: «"разыгранная" карта не считается
+            // "сброшенной"») — на чистый сброс смотрят все приёмники:
+            // dec138/dec139/nec284/wis116 и карты W97 (dstr293–295,
+            // «Коробка игрушек»)
+            A.noteDiscard = function noteDiscard(n = 1, side = null, ids = null, kind = null) {
                 if (!B) return;
                 // «Сброс разума» (decMind): первая за бой карта стороны, чьим
                 // ЭФФЕКТОМ сброшены карты (B.playCtx ставят точки розыгрыша
@@ -1102,7 +1110,10 @@
                     && B.discardReplay.id === ids[0]) {
                     discardReplayReturn(B.discardReplay.side, ids[0]);
                 }
-                for (const v of B.units.slice()) {
+                // «Болотная слизь» (wis116): +1⚔ за каждую СБРОШЕННУЮ карту
+                // (у любой стороны) — терминология W97: только сброс
+                // (эффектом/переполнением), разыгранные не считаются
+                if (kind === "discard") for (const v of B.units.slice()) {
                     if (!v.def.slimeGain || !B.units.includes(v)) continue;
                     v.bonusAtk = (v.bonusAtk || 0) + n;
                     recalcAuras(); // обновит и бейдж урона
@@ -1113,8 +1124,10 @@
                 }
                 // «Проклятые артефакты» (dec138): СВОЯ сброшенная карта
                 // запоминается постройкой (ids — карты, реально ушедшие
-                // в сброс; сгоревшие «Сожжением» не считаются)
-                if (side && ids && ids.length) for (const v of B.units.slice()) {
+                // в сброс; сгоревшие «Сожжением» не считаются). W97:
+                // разыгранные карты сбросом не считаются — только сброс
+                // (терминология юзера)
+                if (side && ids && ids.length && kind === "discard") for (const v of B.units.slice()) {
                     if (!v.def.relicVault || v.side !== side
                         || !B.units.includes(v)) continue;
                     v.relics = v.relics || [];
@@ -1123,9 +1136,10 @@
                     floatText(p.x, p.y - 60, `⤓ +${ids.length}`, 0xc9b98c);
                 }
                 // «Дурное варево» (dec139): ЛЮБАЯ сброшенная карта (обе
-                // стороны, включая потраченные заклинания) — база противника
-                // владельца варева теряет 1 жизнь за каждую карту
-                for (const v of B.units.slice()) {
+                // стороны) — база противника владельца варева теряет 1
+                // жизнь за каждую карту. W97 (спека юзера): только сброс —
+                // разыгранные (в т.ч. потраченные заклинания) не считаются
+                if (kind === "discard") for (const v of B.units.slice()) {
                     if (!v.def.evilBrew || !B.units.includes(v)) continue;
                     const k = ids ? ids.length : n;
                     if (!(k > 0)) continue;
@@ -1133,15 +1147,15 @@
                         { x: 960, y: v.side === "p" ? 240 : 840, fill: 0xb07ad5 });
                 }
                 // «Обитаемый могильник» (nec284, W82 — спека юзера): когда
-                // карта ВЛАДЕЛЬЦА уходит в сброс, постройка призывает
+                // карта ВЛАДЕЛЬЦА сбрасывается, постройка призывает
                 // Призрака 2/1 (жетон ghost) в случайную пустую клетку поля
-                // боя. Терминология игры — как у «Проклятых артефактов»/
-                // «Дурного варева» («когда ваша карта сбрасывается»): любые
-                // пути в сброс, включая потраченные карты. Несколько
-                // могильников — каждый зовёт своего Призрака. Случайная
-                // клетка оказалась с ловушкой — Призрак встречает её как
-                // обычный призыв (штатный triggerCellTraps в addUnit)
-                if (side && ids && ids.length) for (const v of B.units.slice()) {
+                // боя. Терминология W97 (поправка юзера): сброс карты =
+                // скинутая эффектом или переполнением руки — разыгранные
+                // карты больше не считаются. Несколько могильников — каждый
+                // зовёт своего Призрака. Случайная клетка оказалась с
+                // ловушкой — Призрак встречает её как обычный призыв
+                // (штатный triggerCellTraps в addUnit)
+                if (side && ids && ids.length && kind === "discard") for (const v of B.units.slice()) {
                     if (!v.def.graveGhost || v.side !== side
                         || !B.units.includes(v)) continue;
                     const cells = [];
@@ -1156,11 +1170,119 @@
                         GAME_LOC.t("card.ghost.name"), 0xb7d0ef);
                     sfx("chpoc");
                 }
+                // ── W97 (спека юзера): карты «Тлен + Сила» 293–295 и
+                // способность героя «Коробка игрушек» — все живут только на
+                // СБРОСАХ (kind === "discard"; разыгранные карты сбросом
+                // не считаются — терминология юзера W97) ────────────────
+                if (side && ids && ids.length && kind === "discard") {
+                    // «Гаргул» (dstr295): скинутый с руки гаргул РАЗЫГРЫВАЕТСЯ
+                    // — удаляется из сброса и призывается в свободную клетку
+                    // своих рядов (нет клетки — остаётся в сбросе). Розыгрыш
+                    // здесь карту в сброс НЕ возвращает (она уже там) —
+                    // повторных нотификаций и зацикливания нет. ПЕРВЫМ —
+                    // разыгранный гаргул законный адресат эффектов ниже
+                    if (ids.includes("dstr295"))
+                        for (let k = 0; k < ids.filter((x) => x === "dstr295").length; k++)
+                            gargoyleSelfPlay(side);
+                    // «Корм для портала» (dstr293): за каждую сброшенную
+                    // карту владельца случайное СУЩЕСТВО владельца БЕЗ
+                    // «Призыва» получает «Призыв 3» (повтор вешания
+                    // заменяет счётчик — спека; «без Призыва» — u.summonN;
+                    // постройки не существа — как у «Из портала», W95)
+                    for (const v of B.units.slice()) {
+                        if (!v.def.portalFeed || v.side !== side
+                            || !B.units.includes(v)) continue;
+                        for (let k = 0; k < ids.length; k++) {
+                            const own = B.units.filter((u2) => u2.side === side
+                                && u2.def.type === "unit" && !u2.summonN);
+                            if (!own.length) break; // все уже с «Призывом»
+                            summonTarget(own[(Math.random() * own.length) | 0], 3);
+                        }
+                    }
+                    // «Голодный цербер» (dstr294):
+                    // карту владельца цербер получает +1/+1 (постоянно);
+                    // динамический штраф «−1/−1 за карту в руке» пересчитает
+                    // recalcAuras в конце noteDiscard (рука уже уменьшилась)
+                    for (const v of B.units.slice()) {
+                        if (!v.def.hungryCerb || v.side !== side
+                            || !B.units.includes(v)) continue;
+                        v.bonusAtk = (v.bonusAtk || 0) + ids.length;
+                        v.hp += ids.length;
+                        const hn = v.node.getChildByName("hp");
+                        if (hn) hn.text = String(v.hp);
+                        const cp = cellXY(v.col, v.row);
+                        floatText(cp.x, cp.y - 39,
+                            `+${ids.length}/+${ids.length}`, 0x9fd489);
+                        onBuff(v, ids.length, ids.length); // «Белая пуща» (W61)
+                        punch(v.node);
+                    }
+                    // «Гаргул» (dstr295): за каждое СБРОШЕННОЕ заклинание
+                    // владельца гаргул получает +1/+1 (скинутый сам гаргул —
+                    // не заклинание; разыгранный выше гаргул уже на поле и
+                    // тоже получает своё)
+                    const spellsDropped = ids.filter((id) =>
+                        CARDS[id] && CARDS[id].type === "spell").length;
+                    if (spellsDropped) for (const v of B.units.slice()) {
+                        if (!v.def.gargoyle || v.side !== side
+                            || !B.units.includes(v)) continue;
+                        v.bonusAtk = (v.bonusAtk || 0) + spellsDropped;
+                        v.hp += spellsDropped;
+                        const hn = v.node.getChildByName("hp");
+                        if (hn) hn.text = String(v.hp);
+                        const gp2 = cellXY(v.col, v.row);
+                        floatText(gp2.x, gp2.y - 39,
+                            `+${spellsDropped}/+${spellsDropped}`, 0xb7a0ef);
+                        onBuff(v, spellsDropped, spellsDropped);
+                        punch(v.node);
+                    }
+                    // «Коробка игрушек» (dstrToyBox, W97): вторая СБРОШЕННАЯ
+                    // карта владельца за ход даёт добор (триггер один —
+                    // на пересечении счётчиком двойки; потраченные карты
+                    // сбросом не считаются)
+                    const hdT = heroDefOf(side);
+                    if (hdT && hdT.ability === "secondDiscardDraw") {
+                        const was = B.heroFlags.toyDiscards[side] || 0;
+                        B.heroFlags.toyDiscards[side] = was + ids.length;
+                        if (was < 2 && B.heroFlags.toyDiscards[side] >= 2) {
+                            if (side === "p") {
+                                drawCards(1);
+                                floatText(960, 640, "✧ +1", 0x9ecbe8);
+                            } else {
+                                drawEnemy(1);
+                                floatText(960, 300, "✧ +1", 0x9ecbe8);
+                            }
+                            sfx("chpoc");
+                        }
+                    }
+                }
                 // «Каток» (tim236): урон равен длине сброса владельца —
                 // любой выход карты в сброс меняет его (дёшево: пересчёт
                 // только обновляет бейдж, если число изменилось)
                 A.recalcAuras();
                 refreshHud();
+            };
+            // «Гаргул» (dstr295, W97): саморозыгрыш скинутого гаргула —
+            // карта удаляется из сброса владельца и призывается в свободную
+            // клетку своих рядов (deployRows — как авто-клетка «Двойной
+            // магией»/подбора ИИ). Нет свободной клетки — карта остаётся
+            // в сбросе (сыграется при следующем сбросе). Вызывается ИЗ
+            // noteDiscard, когда сброшенные ids содержат dstr295
+            A.gargoyleSelfPlay = function gargoyleSelfPlay(side) {
+                const discard = side === "p" ? B.discard : B.eDiscard;
+                const di = discard.lastIndexOf("dstr295");
+                if (di < 0) return; // карты в сбросе нет (не должно случиться)
+                const free = [];
+                for (const row of deployRows(side))
+                    for (let c = 0; c < GRID; c++)
+                        if (!unitAt(c, row)) free.push([c, row]);
+                if (!free.length) return; // поле полно — гаргул ждёт в сбросе
+                discard.splice(di, 1); // из сброса — на поле
+                const [col, row] = free[(Math.random() * free.length) | 0];
+                addUnit(side, "dstr295", col, row);
+                const p = cellXY(col, row);
+                floatText(p.x, p.y - 60, "⇑ " + GAME_LOC.t("card.dstr295.name"),
+                    0xc9b98c);
+                sfx("chpoc");
             };
 
             // «Гроза» (wis118): вся оставшаяся энергия (сверх цены, при

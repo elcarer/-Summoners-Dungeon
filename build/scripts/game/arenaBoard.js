@@ -628,13 +628,34 @@
                         const baseAtk = u.def.discardAtk
                             ? (side === "p" ? B.discard.length : B.eDiscard.length)
                             : u.def.atk;
+                        // «Голодный цербер» (dstr294, W97): ВСЕГДА −1/−1 за
+                        // каждую карту в руке владельца — динамическая аура.
+                        // Рука выросла — жизни тают (но не ниже 1), рука
+                        // уменьшилась — возвращаются; cerbHandMark хранит
+                        // последний учтённый размер руки (умирает вместе с
+                        // юнитом). recalcAuras зовётся при любом изменении
+                        // руки — доборы/траты/скидывания/возвраты
+                        let cerbHand = 0;
+                        if (u.def.cerbHand) {
+                            cerbHand = side === "p" ? B.hand.length : B.eHand.length;
+                            if ((u.cerbHandMark || 0) !== cerbHand) {
+                                const hd = (u.cerbHandMark || 0) - cerbHand;
+                                if (hd) {
+                                    u.hp = Math.max(1, u.hp + hd);
+                                    const hn = u.node.getChildByName("hp");
+                                    if (hn) hn.text = String(u.hp);
+                                }
+                                u.cerbHandMark = cerbHand;
+                            }
+                        }
                         // «Шипастые лозы» уводят бонус в минус — урон не ниже нуля;
                         // atkPenalty — постоянная убыль «Песчаного духа» (wis109);
                         // atkZero — «Ловушка-пузырь» (wis119): урон ровно 0
                         const newAtk = u.atkZero ? 0
                             : Math.max(0, baseAtk + (u.bonusAtk || 0)
                                 + (u.atkPenalty || 0) + atk - tarDebuff(u)
-                                + (u.def.subtype === "skeleton" ? kings : 0));
+                                + (u.def.subtype === "skeleton" ? kings : 0)
+                                - cerbHand);
                         if (u.curAtk !== newAtk) {
                             u.curAtk = newAtk;
                             const n = u.node.getChildByName("atk");
@@ -854,7 +875,7 @@
                         const id = deck.pop();
                         discard.push(id);
                         milled.push(id);
-                        noteDiscard(1, side, [id]);
+                        noteDiscard(1, side, [id], "discard");
                     }
                     const millP = cellXY(col, row);
                     if (milled.length)

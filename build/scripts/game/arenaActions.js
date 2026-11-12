@@ -44,6 +44,7 @@
                 B.turnSummons = { p: 0, e: 0 }; // новый ход — счётчик «шестерён» с нуля (wtGears)
                 B.heroFlags.bioHit = { p: false, e: false }; // новый ход — «Биоугроза» (W83) снова может отразить раз
                 B.heroFlags.lastCard = { p: false, e: false }; // «Предвратие» (W95): раз за ход снова
+                B.heroFlags.toyDiscards = { p: 0, e: 0 }; // «Коробка игрушек» (W97): счётчик сбросов за ход — с нуля
                 tokenPanelClose(); // панель «Управления временем» не переживает смену хода
                 tagPanelClose(); // панель «Экспериментов» не переживает смену хода (W79)
                 projPanelClose(); // панель «Проекции прошлого» — туда же (W81)
@@ -133,6 +134,9 @@
                 B.hand.splice(handIdx, 1);
                 B.selected = null;
                 B.spellTarget = false;
+                // рука игрока изменилась (карта разыграна) — аура «Голодного
+                // цербера» (−1/−1 за карту в руке) пересчитывается (W97)
+                A.recalcAuras();
                 cryptSettle("p", cardId); // «Склеп» (dec157): сыгранная из него карта — в колоду
                 // «Гном-разбойник» (timRaider, W40): рука опустела — 2 карты
                 heroEmptyHandDraw("p");

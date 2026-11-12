@@ -44,6 +44,10 @@
         // та же симметрия реестра
         decStr: starterCollection(STARTER_DECKS.decStr),
     };
+    // W97: dstr293–295 НЕ в стартере decStr (ядро «Предверия» фиксировано
+    // спекой W95) — реестр коллекции дополняется нулями вручную
+    for (const id of ["dstr293", "dstr294", "dstr295"])
+        STARTER_COLLECTIONS.decStr[id] = 0;
     const DEFAULT_COLLECTION = STARTER_COLLECTIONS.strength;
     // Актуальный минимум колоды НА этаже забега (просил юзер): этаж N
     // достигнут спуском с этажа N−1, требовавшим 12+(N−1) карт, — минимум
@@ -410,7 +414,11 @@
     // Новые dstr-карты: обычная 291 ×3, редкая 292 ×3
     REWARD_POOLS.decStr = [...REWARD_POOLS.decay, ...REWARD_POOLS.strength,
         "dstr291", "dstr291", "dstr291",
-        "dstr292", "dstr292", "dstr292"];
+        "dstr292", "dstr292", "dstr292",
+        // W97 (спека юзера): эпическая 293, обычная 294, редкая 295 — ×3
+        "dstr293", "dstr293", "dstr293",
+        "dstr294", "dstr294", "dstr294",
+        "dstr295", "dstr295", "dstr295"];
 
     const { ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM,
         FLOOR_MOBS_DECAY, FLOOR_MOBS_HONOR, FLOOR_MOBS_TIME, MOB_TABLES,

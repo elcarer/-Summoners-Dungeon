@@ -783,6 +783,16 @@
             // W95 (user): Portal to the Abyss floor-1 enemy
             "enc.dstrGate.title": "The Ante-Gate",
             "hero.dstrGate.ability": "Once per turn, when you play your last card from hand — draw a card",
+            // W97 (user): Portal to the Abyss floor-2 enemy
+            "enc.dstrToyBox.title": "Toy Box",
+            "hero.dstrToyBox.ability": "When you discard your second card in a turn — draw a card",
+            // W97 (user): cards 293–295, Decay + Strength
+            "card.dstr293.name": "Portal Fodder",
+            "card.dstr293.desc": "Building 0/2. Whenever you discard a card, a random creature without Summon gets Summon 3",
+            "card.dstr294.name": "Hungry Cerberus",
+            "card.dstr294.desc": "Animal 5/5. Whenever you discard a card, this creature gains +1/+1. This creature always has −1/−1 for each card in your hand",
+            "card.dstr295.name": "Gargoyle",
+            "card.dstr295.desc": "Flying animal 3/3. When you discard this card, play it. Whenever you discard a spell, this creature gains +1/+1",
             "hero.necMutant.ability": "Whenever your creature gains an effect, it also gains +1/+1",
             "spell.rot.name": "Necrosis",
             "spell.rot.desc": "This creature takes twice as much damage from all sources; the mark lasts until the target dies",
@@ -980,6 +990,9 @@
             // W82: мульти-стихия «Некро-раскопок»
             "elem.timDec": "Time + Decay",
             "elem.timDec.short": "T+D",
+            // W97: Portal to the Abyss (Decay + Strength) — filter/back name
+            "elem.decStr": "Decay + Strength",
+            "elem.decStr.short": "D+S",
             "menu.pickHero": "CHOOSE YOUR HERO",
             "menu.pickHeroSub": "The hero defines your base health, deck elements and special ability",
             "menu.pickHeroSoon": "Coming soon…",

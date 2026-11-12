@@ -48,7 +48,7 @@
                     if (bi < 0) break; // скидывать нечего (кроме играемой)
                     const id = hand.splice(bi, 1)[0];
                     discard.push(id);
-                    noteDiscard(1, side, [id]);
+                    noteDiscard(1, side, [id], "discard");
                     dropped += 1;
                 }
                 return dropped; // фактическое число — урон/пары по нему
@@ -1255,7 +1255,7 @@
                         if (!want || CARDS[top[i]].type !== want) B.eDiscard.push(top[i]);
                     const grimRest = top.filter((id) => !want
                         || CARDS[id].type !== want);
-                    noteDiscard(grimRest.length, "e", grimRest); // «Болотная слизь»
+                    noteDiscard(grimRest.length, "e", grimRest, "discard"); // «Болотная слизь»
                     if (want) sfx("chpoc");
                 }
                 if (s.discardPick) { // «Варка зелий»: лучшее заклинание сбросов — в руку
@@ -1306,7 +1306,7 @@
                         B.eHand.push(rest[r]); // одна случайная — в руку (по правилу карты)
                         for (let i = 0; i < rest.length; i++) if (i !== r) B.eDiscard.push(rest[i]);
                         noteDiscard(rest.length - 1, "e",
-                            rest.filter((_, i) => i !== r)); // «Болотная слизь»
+                            rest.filter((_, i) => i !== r), "discard"); // «Болотная слизь»
                     }
                     if (chosenId) {
                         // клетка призыва — теми же правилами связок, что и обычный

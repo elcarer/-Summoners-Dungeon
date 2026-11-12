@@ -15,6 +15,7 @@
                 B.dmgHalt = { p: false, e: false }; // новый ход — урон снова наносится (hw267)
                 B.turnSummons = { p: 0, e: 0 }; // новый ход — счётчик «шестерён» с нуля (wtGears)
                 B.heroFlags.bioHit = { p: false, e: false }; // новый ход — «Биоугроза» (W83) снова может отразить раз
+                B.heroFlags.toyDiscards = { p: 0, e: 0 }; // «Коробка игрушек» (W97): счётчик сбросов за ход — с нуля
                 tokenPanelClose(); // панель «Управления временем» не переживает смену хода
                 tagPanelClose(); // панель «Экспериментов» не переживает смену хода (W79)
                 projPanelClose(); // панель «Проекции прошлого» — туда же (W81)
@@ -718,7 +719,7 @@
                                 const sp = B.eHand.splice((Math.random() * B.eHand.length) | 0, 1)[0];
                                 flyEnemyDiscard();
                                 B.eDiscard.push(sp);
-                                noteDiscard(1, "e", [sp]);
+                                noteDiscard(1, "e", [sp], "discard");
                                 B.scorch.e.delete(sp); // метка ушла вместе с картой
                             }
                             if (B.scorch.e.has(cardId) || def.burn) { // «Сожжение»: карта удалена из боя
