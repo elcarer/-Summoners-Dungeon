@@ -80,8 +80,12 @@
                     // скидка первой постройке («Город мудрости»); первая
                     // способность Мага дважды («Безумный маг»)
                     heroFlags: { firstSpell: { p: false, e: false },
-                        delayMinus: { p: false, e: false },
-                        returnPlus: { p: false, e: false }, // «В прошлом»: первый «Возврат» +2
+                        // W99 (спеки юзера): «Долгий сдвиг» — первые ТРИ
+                        // «Сдвига» на 1 ход раньше; «В прошлое» — первые
+                        // ДВА «Возврата» с счётчиком на 2 больше (было по
+                        // одному — счётчик вместо boolean)
+                        delayMinus: { p: 0, e: 0 },
+                        returnPlus: { p: 0, e: 0 },
                         spellEnergy: { p: false, e: false },
                         trapEnergy: { p: false, e: false },
                         elementalDraw: { p: false, e: false },

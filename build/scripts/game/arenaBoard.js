@@ -718,14 +718,16 @@
                 // (delayArrive), opts.testSummon — тест-хук _spawn
                 if ((def.type === "unit" || def.type === "building")
                     && def.delay && !opts.noDelay && !opts.testSummon) {
-                    // «Долгий сдвиг» (firstDelayMinus, просил юзер): первый
-                    // за бой призыв стороны со «Сдвигом» из своей карты
-                    // приходит на 1 ход раньше (0 — появляется сразу)
+                    // «Долгий сдвиг» (firstDelayMinus; W99 — спека юзера):
+                    // ПЕРВЫЕ ТРИ призыва стороны со «Сдвигом» из своей
+                    // карты приходят на 1 ход раньше (0 — сразу);
+                    // abilityN — сколько призывов ускоряется (3)
                     let dv = A.effDelayVal(def.delay, side);
-                    if (dv > 0 && !B.heroFlags.delayMinus[side]) {
+                    if (dv > 0 && (B.heroFlags.delayMinus[side] || 0) < 3) {
                         const hd = heroDefOf(side);
                         if (hd && hd.ability === "firstDelayMinus") {
-                            B.heroFlags.delayMinus[side] = true;
+                            B.heroFlags.delayMinus[side] =
+                                (B.heroFlags.delayMinus[side] || 0) + 1;
                             dv -= hd.abilityVal || 1;
                         }
                     }
@@ -851,10 +853,12 @@
                 // (firstReturnPlus) усиливает и постройку — это «призыв»
                 if (def.type === "building" && def.returnN && !u.token) {
                     let rv = def.returnN;
-                    if (!B.heroFlags.returnPlus[side]) {
+                    // W99 (спека юзера): ПЕРВЫЕ ДВА призыва со «Возвратом»
+                    if ((B.heroFlags.returnPlus[side] || 0) < 2) {
                         const hdR = heroDefOf(side);
                         if (hdR && hdR.ability === "firstReturnPlus") {
-                            B.heroFlags.returnPlus[side] = true;
+                            B.heroFlags.returnPlus[side] =
+                                (B.heroFlags.returnPlus[side] || 0) + 1;
                             rv += hdR.abilityVal || 2;
                         }
                     }
@@ -1142,17 +1146,19 @@
                     // «Возврат N» (tim215/218/219/220, просил юзер): спустя N
                     // ходов после призыва существо вернётся в руку (тик — в
                     // начале хода владельца, returnTick). «В прошлом»
-                    // (firstReturnPlus): первый за бой призыв стороны со
-                    // «Возвратом» приходит с счётчиком на 2 больше.
+                    // (firstReturnPlus; W99 — спека юзера): первые ДВА за
+                    // бой призыва стороны со «Возвратом» приходят с
+                    // счётчиком на 2 больше.
                     // Только СУЩЕСТВА: у построек «Возврат» ставится своим
                     // блоком выше (W73 — постройка-босса сюда не доходит,
                     // счётчик не задвоится)
                     if (def.returnN && !u.token && def.type === "unit") {
                         let rv = def.returnN;
-                        if (!B.heroFlags.returnPlus[side]) {
+                        if ((B.heroFlags.returnPlus[side] || 0) < 2) {
                             const hdR = heroDefOf(side);
                             if (hdR && hdR.ability === "firstReturnPlus") {
-                                B.heroFlags.returnPlus[side] = true;
+                                B.heroFlags.returnPlus[side] =
+                                    (B.heroFlags.returnPlus[side] || 0) + 1;
                                 rv += hdR.abilityVal || 2;
                             }
                         }

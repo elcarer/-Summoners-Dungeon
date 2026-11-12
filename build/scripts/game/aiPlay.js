@@ -371,17 +371,45 @@
                 // бесплатный розыгрыш
                 const chaosHold = (heroDefOf("e") || {}).ability === "chaosPlay";
                 const CHAOS_MAX_COST = 2;
+                // «Бешеные шестерни» (thirdSummonEnergy, W99 — просил юзер):
+                // способность «третье существо за ход — +1⚡» для ИИ спала —
+                // энергии на 3 карты за ход не хватает, существа выкладываются
+                // по одному. Стратегия: КОПИТЬ энергию и не выкладывать
+                // существ, пока нельзя сыграть ТРОИХ за ход (в руке ≥3 карт
+                // существ и энергии хватает на три самые дешёвые) — тогда
+                // залп тройкой и +1⚡. Заклинания/постройки/ловушки гейт не
+                // трогает. Решение принимается ОДИН раз за ход, ДО
+                // розыгрышей (иначе после первого же существа тройка
+                // «развалится» и остаток хода зависнет); побег из
+                // накопления: если в руке троицу не собрать, а энергии уже
+                // с запасом (≥8⚡) — копить дальше бессмысленно, играем
+                // как обычно
+                const gearsHold =
+                    (heroDefOf("e") || {}).ability === "thirdSummonEnergy";
+                const gearsBurst = !gearsHold || (() => {
+                    const costs = B.eHand
+                        .filter((id) => CARDS[id] && CARDS[id].type === "unit")
+                        .map((id) => effCost(id, "e"))
+                        .sort((a, b) => a - b);
+                    if (costs.length < 3) return B.eEnergy >= 8;
+                    return costs[0] + costs[1] + costs[2] <= B.eEnergy;
+                })();
                 for (;;) {
                     if (B.stopped || B.phase === "over") return;
                     const affordable = B.eHand
                         .map((c, i) => ({ i, id: c, def: CARDS[c] }))
                         .filter((x) => effCost(x.id, "e") <= B.eEnergy)
                         .filter((x) => !chaosHold || effCost(x.id, "e") <= CHAOS_MAX_COST)
+                        // «шестерни» копят под тройку: вне залпа существа
+                        // не выкладываем (решение — один раз за ход выше)
+                        .filter((x) => x.def.type !== "unit" || gearsBurst)
                         // порядок — по правилам связок (двигатели до урона и
                         // существ, усиления после), внутри группы дороже раньше;
-                        // магу chaosPlay — наоборот: платить по минимуму
+                        // магу chaosPlay — наоборот: платить по минимуму;
+                        // «шестерням» залп тоже удобнее от дешёвых — тройка
+                        // вероятнее уместится в энергию
                         .sort((a, b) => (aiGroup(a.id, a.def) - aiGroup(b.id, b.def))
-                            || (chaosHold
+                            || ((chaosHold || gearsHold)
                                 ? effCost(a.id, "e") - effCost(b.id, "e")
                                 : effCost(b.id, "e") - effCost(a.id, "e")));
                     if (!affordable.length) { if (!await tryRefill()) return; continue; }

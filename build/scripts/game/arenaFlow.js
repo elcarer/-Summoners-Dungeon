@@ -244,13 +244,20 @@
                             ? x.def.type === "unit" && x.def.delay
                         : want === "building" ? x.def.type === "building"
                             : !!x.def.plant); // растение — существо или постройка
-                if (!pool.length) return;
-                const pick = pool[(Math.random() * pool.length) | 0];
-                deck.splice(pick.i, 1);
-                hand.push(pick.id);
-                sfx("chpoc");
-                floatText(960, side === "p" ? 840 : 240,
-                    `+ ${GAME_LOC.t(`card.${pick.id}.name`)}`, 0xffd98c);
+                // W99 (спека юзера): «Бой во времени» (startDrawDelayed)
+                // берёт ДВЕ карты; остальные герои — по одной
+                const cnt = want === "delayed" ? 2 : 1;
+                for (let n = 0; n < cnt && pool.length; n++) {
+                    const pick = pool.splice((Math.random() * pool.length) | 0, 1)[0];
+                    // пул строился по индексам ДО изъятий — после splice
+                    // индексы съехали, ищем ту же карту заново (копии
+                    // одной карты взаимозаменяемы — достаточно indexOf)
+                    deck.splice(deck.indexOf(pick.id), 1);
+                    hand.push(pick.id);
+                    sfx("chpoc");
+                    floatText(960, side === "p" ? 840 : 240,
+                        `+ ${GAME_LOC.t(`card.${pick.id}.name`)}`, 0xffd98c);
+                }
             };
 
             // ── «Великая битва» (honGreatBattle, просил юзер): в начале боя
