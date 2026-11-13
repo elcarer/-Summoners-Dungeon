@@ -170,14 +170,22 @@
     // Рубашка колоды по стихии (просил юзер): Рост — природная
     // (card_nature_back), Мудрость — синяя (card_wisdom_back),
     // Тлен — чёрная (card_decay_back), Честь — белая (card_honor_back),
-    // Время — фиолетовая (card_time_back), прочие — гоблинская
+    // Время — фиолетовая (card_time_back), мультицвет — card_multi_back
+    // (ВСЕ составные стихии двухцветных героев и данжей — strGro, groHon,
+    // honWis, wisTim, timDec, decStr: до сих пор мультицвет был только у
+    // strGro (W54), остальные пять падали в гоблинскую), прочие —
+    // гоблинская. Массив elems (двухцветный герой) — тоже мультицвет.
+    const MULTI_ELEMS = ["strGro", "groHon", "honWis", "wisTim", "timDec", "decStr"];
     function backTexOf(elem) {
-        return elem === "growth" ? "card_nature_back.png"
+        if (Array.isArray(elem)) {
+            return elem.length > 1 ? "card_multi_back.png" : backTexOf(elem[0]);
+        }
+        return MULTI_ELEMS.includes(elem) ? "card_multi_back.png"
+            : elem === "growth" ? "card_nature_back.png"
             : elem === "wisdom" ? "card_wisdom_back.png"
             : elem === "decay" ? "card_decay_back.png"
             : elem === "honor" ? "card_honor_back.png"
             : elem === "time" ? "card_time_back.png"
-            : elem === "strGro" ? "card_multi_back.png" // W54: мультицвет
             : "card_goblin_back.png";
     }
 
