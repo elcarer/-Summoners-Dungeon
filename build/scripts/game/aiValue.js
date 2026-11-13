@@ -554,18 +554,22 @@
                     score += 1.6;
                 const ahead = unitAt(col, row + 1);
                 const atk = def.atk || 0;
-                // собственные способности призыва/марша: «Скорость» —
-                // unitDash (dash1/dashN-ключи и dashN-флаг равнозначны)
-                if (unitDash(def) === 1) {
+                // W107 (юзер): «Скорость» — СПОСОБНОСТЬ (dash1/dashN-ключи и
+                // dashN-флаг, хелпер unitDash), НЕ марш-поле speed — то есть
+                // обычное движение движком боя, у большинства существ. У
+                // скоростного после призыва сразу шаг/удар — ему ВЫГОДНО
+                // стоять в упор к врагу (клетка перед ним оценивается ниже)
+                const dash = unitDash(def);
+                if (dash === 1) {
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit" && atk >= ahead.hp)
                         score += 2.6 + aiThreat(ahead) * 0.35;
                     else if (ahead && ahead.side === "p") score += 0.9;
                     else if (!ahead) score += 0.7; // сразу шагнёт вперёд
                 }
-                if (unitDash(def) > 1) {
+                if (dash > 1) {
                     // «Скорость N» (Колесница): две попытки — убить дважды
                     // бьющего или пройти свободную колонку дальше
-                    const n = unitDash(def);
+                    const n = dash;
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit" && atk * n >= ahead.hp)
                         score += 2.6 + aiThreat(ahead) * 0.35;
                     else if (ahead && ahead.side === "p") score += 1.1;
@@ -609,6 +613,9 @@
                 // клетках перед вражеским (клетка между свободна): противник
                 // потратит свой марш на подход (скорость 1 с разбега не
                 // бьёт), и наш удар будет первым — на удар больше в размен.
+                // W107 (юзер): правило ТОЛЬКО для существ БЕЗ «Скорости» —
+                // скоростным промежуток не нужен (рывок сразу бьёт стоящего
+                // перед ним), их в упор оценивает ветка «Скорости» выше.
                 // Полётным то же самое (W104-7): в упор они перелетают, а
                 // не бьют, так что и им нужен этот промежуток — в свой
                 // следующий ход перелетят через врага полётом. Раньше
@@ -618,7 +625,8 @@
                     && v.def.type === "unit" && v.row === row + 2);
                 if (gapFoe && role !== "wall" && role !== "support"
                     && (gapFoe.def.speed || 1) === 1
-                    && row + 1 < GRID && !unitAt(col, row + 1)) score += 1.5;
+                    && row + 1 < GRID && !unitAt(col, row + 1)
+                    && !dash) score += 1.5;
                 if (def.wolfSummon && row === frontRow) score += 0.4; // ловит урон — зовёт волка
                 if (def.keeperScale) {
                     const animals = B.units.filter((v) => v.side === "e"

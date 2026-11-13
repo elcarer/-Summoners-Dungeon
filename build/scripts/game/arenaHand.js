@@ -657,7 +657,11 @@
                 const u = unitAt(col, row);
                 if (sdef.spell.swap) return !!u && spellAimable(u);
                 if (sdef.spell.target === "anyCell") return true;
-                if (sdef.spell.target === "emptyCell") return !u;
+                if (sdef.spell.target === "emptyCell") {
+                    // W107: nearRows — пустая клетка в ближних к базе рядах
+                    return !u && (!sdef.spell.nearRows
+                        || nearBaseRows("p").includes(row));
+                }
                 if (sdef.spell.target === "token") return !!tokenAt(col, row);
                 if (sdef.spell.target === "tagPick") {
                     const pk = tagPickAt(col, row);

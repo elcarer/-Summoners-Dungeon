@@ -858,7 +858,11 @@
                         return;
                     }
                     if (tg === "emptyCell") { // культ кочерыжки — только пустая клетка
-                        if (!unitAt(col, row)) castSpell(B.selected, { col, row });
+                        // W107: nearRows — ближние к базе игрока два ряда
+                        const ok = !unitAt(col, row)
+                            && (!sdef.spell.nearRows
+                                || nearBaseRows("p").includes(row));
+                        if (ok) castSpell(B.selected, { col, row });
                         else deselect();
                         return;
                     }

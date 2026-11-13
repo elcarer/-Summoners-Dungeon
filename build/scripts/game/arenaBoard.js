@@ -250,7 +250,10 @@
                     }
                     if (tg === "emptyCell") { // культ кочерыжки — годится пустая клетка
                         root.board.userData.baseZone.eventMode = "none";
-                        for (let r = 0; r < GRID; r++) for (let col = 0; col < GRID; col++) {
+                        // W107: nearRows — ближние к базе игрока два ряда
+                        const rowsOk = def.spell.nearRows
+                            ? nearBaseRows("p") : [...Array(GRID).keys()];
+                        for (const r of rowsOk) for (let col = 0; col < GRID; col++) {
                             if (unitAt(col, r)) continue;
                             const rc = cellRect(col, r);
                             hi.rect(rc.x, rc.y, rc.w, rc.h);

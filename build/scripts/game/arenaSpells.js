@@ -801,6 +801,9 @@
                 if (def.spell.target === "emptyCell") { // культ — ряд в гоблинах; толпа — 3 скелета
                     if (!target || target.col === undefined) return false;
                     if (unitAt(target.col, target.row)) return false;
+                    // W107: nearRows — ближние к базе владельца два ряда
+                    if (def.spell.nearRows
+                        && !nearBaseRows("p").includes(target.row)) return false;
                     if (def.spell.skeletonCrowd) { // «Толпа скелетов»: клетка + слева/справа
                         if (skeletonCrowdSpawn("p", target.col, target.row)) sfx("aqua");
                     } else cultRowSpawn("p", target.row);
@@ -1323,13 +1326,21 @@
                     return { col: 2, row: counts.indexOf(Math.max(...counts)) };
                 }
                 if (tg === "emptyCell") { // культ — ряд, где больше пустых (ничья — где больше врагов)
-                    const empt = [0, 0, 0, 0, 0], foes = [0, 0, 0, 0, 0];
-                    for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++)
+                    // W107: nearRows — только ближние к базе игрока ряды;
+                    // пустых в них нет — автоповтора нет (null)
+                    const rowsOk = def.spell.nearRows ? nearBaseRows("p")
+                        : [...Array(GRID).keys()];
+                    const empt = {}, foes = {};
+                    for (const r of rowsOk) { empt[r] = 0; foes[r] = 0; }
+                    for (const r of rowsOk) for (let c = 0; c < GRID; c++)
                         if (!unitAt(c, r)) empt[r]++;
-                    for (const v of B.units) if (v.side !== "p") foes[v.row]++;
-                    let best = 0;
-                    for (let r = 1; r < GRID; r++)
-                        if (empt[r] > empt[best] || (empt[r] === empt[best] && foes[r] > foes[best])) best = r;
+                    for (const v of B.units) if (v.side !== "p" && foes[v.row] !== undefined)
+                        foes[v.row]++;
+                    let best = -1;
+                    for (const r of rowsOk)
+                        if (best < 0 || empt[r] > empt[best]
+                            || (empt[r] === empt[best] && foes[r] > foes[best])) best = r;
+                    if (best < 0 || !empt[best]) return null;
                     return { col: 2, row: best };
                 }
                 return null; // без цели или целей нет — эффект повторится «вхолостую»

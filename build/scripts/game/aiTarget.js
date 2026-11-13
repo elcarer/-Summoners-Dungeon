@@ -626,10 +626,14 @@
                 if (s.nova && !aiNovaPick()) return false;
                 // «Ледяной удар» — нужен сосед-существо и выгодный размен
                 if (s.iceStrike && !aiIceStrikeTarget()) return false;
-                // «Культ кочерыжки» — нужна хоть одна пустая клетка под гоблинов
-                if (s.cultRow && B.units.length >= GRID * GRID) return false;
-                // «Толпа скелетов» — нужна хоть одна пустая клетка под скелетов
-                if (s.skeletonCrowd && B.units.length >= GRID * GRID) return false;
+                // «Культ кочерыжки»/«Толпа скелетов» (W107, юзер): цель —
+                // пустая клетка в ближних к базе ИИ двух рядах; нет такой —
+                // карта висит в руке (каст в полный ряд сжёг бы 7⚡ впустую)
+                if ((s.cultRow || s.skeletonCrowd)
+                    && !nearBaseRows("e").some((r) => {
+                        for (let c = 0; c < GRID; c++) if (!unitAt(c, r)) return true;
+                        return false;
+                    })) return false;
                 // «Поднять стяги!» — окупается при двух и более своих существах
                 if (s.buffAllAtk
                     && B.units.filter((v) => v.side === "e" && v.def.type === "unit").length < 2) return false;

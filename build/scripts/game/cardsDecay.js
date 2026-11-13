@@ -128,9 +128,11 @@
                   rarity: "rare", elem: "decay",
                   color: 0x504048, img: "decay/139" },
         // «Толпа скелетов» (dec140): Скелеты 1/2 (служебная карта skel) на
-        // выбранной пустой клетке и слева/справа от неё — только на пустые
+        // выбранной пустой клетке и слева/справа от неё — только на пустые.
+        // W107 (юзер): цель — пустая клетка в ближних к базе владельца
+        // двух рядах (nearRows: 2 — хелпер nearBaseRows)
         dec140: { type: "spell", cost: 3,
-                  spell: { target: "emptyCell", skeletonCrowd: true },
+                  spell: { target: "emptyCell", skeletonCrowd: true, nearRows: 2 },
                   kind: "summon", // тип эффекта — по спеке юзера («Появление существ»)
                   rarity: "common", elem: "decay",
                   color: 0x63424e, img: "decay/140" },

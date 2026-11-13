@@ -183,8 +183,10 @@
                  kind: "control", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "rare", elem: "strength",
                  color: 0x6e4a2e, img: "strength/39" },
-        str40: { type: "spell", cost: 6,
-                 spell: { target: "emptyCell", cultRow: true },
+        // W107 (юзер): цена 7; цель — пустая клетка в ближних к базе
+        // владельца двух рядах (nearRows: 2 — хелпер nearBaseRows)
+        str40: { type: "spell", cost: 7,
+                 spell: { target: "emptyCell", cultRow: true, nearRows: 2 },
                  kind: "summon", // тип эффекта — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "strength",
                  color: 0xb0402e, img: "strength/40" },
