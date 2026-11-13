@@ -591,6 +591,17 @@
                         else if (row === frontRow) score -= 0.7;
                     }
                 }
+                // W109 (юзер): «Герой прошлого» (tim232) — по соседству со
+                // СВОИМ существом получает «Скорость 1» (рывок сразу после
+                // появления): рядом со своим — высокий приоритет; если перед
+                // клеткой враг, которого рывок (atk) убьёт, — максимальный.
+                // Клетки без соседа сюда не доходят (aiUnitSpot отфильтровал)
+                if (def.nearSpeed) {
+                    if (ahead && ahead.side === "p" && ahead.def.type === "unit"
+                        && atk >= ahead.hp) score += 6.5 + aiThreat(ahead) * 0.35;
+                    else if (ahead && ahead.side === "p") score += 0.9;
+                    else score += 0.7; // рывок сразу шагнёт вперёд
+                }
                 if (def.ability === "assassin") {
                     if (B.units.some((v) => v.side === "p" && v.col === col && v.row > row
                         && v.def.type === "unit" && v.hp === 1)) score += 1.8;
@@ -776,8 +787,23 @@
             // «Зелёный портал» и прочие перепрыгивания не учитываем
             A.retRushOk = function retRushOk(def, col, row) {
                 const marches = def.returnN || 0;
-                const spd = def.speed || 0;
-                if (marches <= 0 || spd <= 0) return false; // ни шага не успеет
+                if (marches <= 0) return false;
+                // W109 (юзер): «Герой прошлого» (tim232) — «Скорость 1»
+                // появляется ТОЛЬКО по соседству со своим существом
+                // (nearSpeed): соседняя клетка годна сразу — рывок бьёт при
+                // появлении, дальше ведут 3 марша; без соседа скорости нет —
+                // прежняя блокировка (на лиге 20261115 карта не сыграла НИ
+                // РАЗУ: speed 0 всегда заворачивалась здесь)
+                let near = false;
+                let spd = def.speed || 0;
+                if (def.nearSpeed && B.units.some((v) => v.side === "e"
+                        && v.def.type === "unit" && B.units.includes(v)
+                        && Math.abs(v.col - col) + Math.abs(v.row - row) === 1)) {
+                    spd += def.nearSpeed;
+                    near = true;
+                }
+                if (spd <= 0) return false; // ни шага не успеет
+                if (near) return true; // рывок бьёт сразу — доходимость не важна
                 let steps = 5 - row; // база игрока за последним рядом
                 for (let r = row + 1; r < GRID; r++) {
                     const occ = unitAt(col, r);
@@ -796,6 +822,15 @@
                 const rows = deployRows("e");
                 let free = freeCells(rows);
                 if (!free.length) return null;
+                // W109 (юзер): «Герой прошлого» (tim232) — играть ТОЛЬКО по
+                // соседству со своим существом: иначе «Скорости» не будет,
+                // а speed 0 — «Возврат 3» заберёт карту без единого шага
+                if (def.type === "unit" && def.nearSpeed) {
+                    free = free.filter(([c, r]) => B.units.some((v) => v.side === "e"
+                        && v.def.type === "unit" && B.units.includes(v)
+                        && Math.abs(v.col - c) + Math.abs(v.row - r) === 1));
+                    if (!free.length) return null;
+                }
                 // W86 (юзер): «Возврат» — только клетки, ОТКУДА успеет
                 // добежать до цели/базы (см. retRushOk); таких нет —
                 // карта не играется (в руке останется до конца хода).
