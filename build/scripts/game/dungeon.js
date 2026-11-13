@@ -988,6 +988,22 @@
             goldT.position.set(1798, 66);
             goldT.eventMode = "none";
             c.addChild(goldT);
+            // W111 (юзер): эффект «Coin collect» на карте при продаже и
+            // ЗЕРКАЛЬНО при покупке. Origin — центр карты (карта-контейнер
+            // держит лицо по центру), пластина-счётчик эффекта тикает до
+            // ЦЕНЫ карты: монет = min(10, цена), from = цена − монет
+            // (для 2/6/10 — ноль; для 20/30/100 — десятки). Эффект живёт в
+            // окне c и переживает refreshShop (пересобираются только панели)
+            function shopCoins(x, y, price, flip) {
+                const FX = globalThis.GAME_FX;
+                if (!FX || !FX.available) return;
+                const p = Math.max(1, price | 0);
+                const n = Math.min(10, p);
+                FX.spawn(c, "ui/coin-collect", {
+                    x, y, size: 240, flip,
+                    opts: { count: n, from: p - n },
+                });
+            }
 
             // левая панель: товары (6 карт 3×2), клик — купить
             const left = new PIXI.Graphics();
@@ -1036,7 +1052,13 @@
                     const card = cardFace(ctx, id, { scale: 0.5, dim: sold });
                     card.position.set(cx, cy);
                     card.eventMode = "static";
-                    card.on("pointertap", () => { if (!shopBuy(i)) flashNoGold(); });
+                    // W111 (юзер): купленная карта — тот же эффект монет,
+                    // ЗЕРКАЛЬНО (пластина-счётчик слева); цена — SHOP_BUY.
+                    // Звон монет играет shopBuy (sfx "coins")
+                    card.on("pointertap", () => {
+                        if (shopBuy(i)) shopCoins(90 + cx, 200 + cy, price, true);
+                        else flashNoGold();
+                    });
                     // правило UI: копия растёт до полного размера (позиция
                     // в окне — goodsBox смещён на 90,200)
                     card.on("pointerover", () => zoomer.show(id, 90 + cx, 200 + cy, card));
@@ -1069,7 +1091,15 @@
                     const card = cardFace(ctx, id, { scale: 0.5, dim: !canSell });
                     card.position.set(cx, cy);
                     card.eventMode = "static";
-                    if (canSell) card.on("pointertap", () => { shopSell(id); });
+                    // W111 (юзер): проданная карта — «Coin collect» (монеты
+                    // улетают в пластину-счётчик справа); цена — SHOP_SELL
+                    if (canSell) card.on("pointertap", () => {
+                        const st = sellPane.state;
+                        const iy = -st.t * Math.max(0, st.contentH - st.viewH);
+                        if (shopSell(id))
+                            shopCoins(780 + cx, 195 + cy + iy,
+                                SHOP_SELL[CARDS[id].rarity], false);
+                    });
                     // правило UI: копия растёт до полного размера; позиция
                     // в окне — контент панели (780,195) с поправкой на скролл
                     card.on("pointerover", () => {

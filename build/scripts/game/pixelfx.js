@@ -57,6 +57,9 @@
         if (o.angle) opts.angle = o.angle;
         if (o.seed !== undefined) opts.seed = o.seed;
         if (o.palette) opts.palette = o.palette;
+        // W111 (юзер): свои опции эффекта (у монет магазина — count/from:
+        // пластина-счётчик тикает до ЦЕНЫ карты)
+        if (o.opts) Object.assign(opts, o.opts);
         const hnd = {
             sprite: sp, inst: P.createFx(mod, opts), f: P.createFrame(w, h, 0, 0),
             cv, cx, im,
