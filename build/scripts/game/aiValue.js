@@ -25,6 +25,42 @@
 (function () {
     globalThis.GAME_ARENA.installAiValue = function installAiValue(A) {
         with (A) {
+            // ── W110: вектор весов ИИ (эволюционный тюнер) ────────────────────
+            // Все тюнируемые константы ИИ собраны сюда. ДЕФОЛТЫ — настройка,
+            // проверенная лигами до W110; эволюционный тюнер
+            // (for_work/ai_tuner.mjs, вне git) перебирает вектора короткими
+            // лигами, впрыскивая их через globalThis.AI_W_OVERRIDE (сим).
+            // Подобранный вектор запекается обратно в дефолты.
+            A.AI_W_BASE = {
+                // экономика полухода (aiPlay)
+                refillMin: 5,        // добор «в тупике» от этой энергии
+                refillTries: 2,      // попыток добора за полуход
+                refillCards: 2,      // карт за попытку
+                deadSwapIncK: 2,     // «безнадёжная»: дороже энергии + K×дохода
+                deadSwapHold: 3,     // «застрявшая»: гейт не пускает N полуходов
+                drawTo: 3,           // короткая рука добирается до
+                drawPlayable: 4,     // …и по числу разыгрываемых на след. ману
+                drawFullMana: 12,    // мана след. хода ≥ — рука до 7
+                drawAllEnergy: 20,   // энергия ≥ — вся шкала только в карты
+                // ценность своего существа (aiVal) — тюнинг W110 (фитнес 2.5)
+                vAtk: 1.1, vHp: 1, vBld: 0.467, vCrush: 0.948, vThicket: 0.903,
+                vAura: 1.4, vEngine: 0.8, vBuffEcho: 1.119, vMedic: 1.3,
+                vUndying: 2, vTradeDraw: 1,
+                // угроза чужого (aiThreat)
+                tAtk: 1.25, tHp: 0.6, tCrush: 1.4, tThicket: 1.404, tAura: 1.227,
+                tDangerBld: 3.2, tBldMult: 0.8,
+                runMinAtk: 10,       // разгоны: атака от…
+                runGap: 6,           // …и выше печатной на
+                runMult: 2,        // …угроза УМНОЖАЕТСЯ
+                // клетки призыва (aiSpotScore)
+                sFrontRow: 2, sColFree: 1.5, sOwnAhead: 0.9,
+                sSupportBack: 2.284, sGap: 1.5, sDashKill: 3.315,
+                sKillThreatK: 0.341, sNearKill: 5.651, sCowardAhead: 2.5,
+                sMarkBlock: 3.63,
+            };
+            A.AI_W = Object.assign({}, A.AI_W_BASE,
+                globalThis.AI_W_OVERRIDE || {});
+            const AI_W = A.AI_W;
             // ── План добора ИИ по шкале конца хода (мягкое правило — просил юзер).
             // Короткая рука добирается до 4; с 4-го хода ИИ считает по стоимостям
             // карты руки, сколько реально разыграет на следующую ману (запас +
@@ -36,15 +72,19 @@
                 const total = spheresTotal();
                 const nextMana = B.eEnergy + total; // мана следующего хода
                 let eCards = 0;
-                if (B.eHand.length < 4) eCards = 4 - B.eHand.length;
+                if (B.eHand.length < AI_W.drawTo)
+                    eCards = AI_W.drawTo - B.eHand.length;
                 if (B.turnNo >= 4) {
                     const costs = B.eHand.map((c) => effCost(c, "e")).sort((a, b) => a - b);
                     let mana = nextMana, playable = 0;
                     for (const c of costs) { if (c <= mana) { mana -= c; playable++; } else break; }
-                    if (playable < 4) eCards = Math.max(eCards, 4 - playable);
+                    if (playable < AI_W.drawPlayable)
+                        eCards = Math.max(eCards, AI_W.drawPlayable - playable);
                 }
-                if (nextMana >= 12) eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
-                if (B.eEnergy >= 20) eCards = HAND_MAX - B.eHand.length; // только карты
+                if (nextMana >= AI_W.drawFullMana)
+                    eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
+                if (B.eEnergy >= AI_W.drawAllEnergy)
+                    eCards = HAND_MAX - B.eHand.length; // только карты
                 // W105 (юзер): спец-добор «шестерён» под тройку УБРАН —
                 // стратегия сменена: тяжёлые «Сдвиги» выходят сразу
                 // (2–3-й ход, они ждут на клетках и не занимают стол),
@@ -68,10 +108,10 @@
             A.aiVal = function aiVal(u) {
                 if (!u || !u.def) return 0;
                 const d = u.def;
-                let v = (u.curAtk || 0) * 1.1 + (u.hp || 0);
-                if (d.type === "building") v += 0.5; // стоит, клетку держит
-                if (d.crush) v += 0.8;
-                if (d.thicket) v += 0.8;
+                let v = (u.curAtk || 0) * AI_W.vAtk + (u.hp || 0) * AI_W.vHp;
+                if (d.type === "building") v += AI_W.vBld; // стоит, клетку держит
+                if (d.crush) v += AI_W.vCrush;
+                if (d.thicket) v += AI_W.vThicket;
                 if (d.siegeDouble) v += 0.9; // «Тараномобиль»: ×2 постройкам/базе
                 if (d.ability === "archer") v += 0.4;
                 if (d.ability === "assassin") v += 0.4;
@@ -79,15 +119,15 @@
                 if (d.frostNeighbors) v += 0.6; // «Старший ледовик»: лёд своим бокам
                 if (d.trapOnMove) v += 0.3; // «Выросшие духи»: ловушка с руки
                 if (d.leaderAura || d.plantEcho || d.druidEnergy
-                    || d.sisterDraw || d.spellAura || d.campAura) v += 0.8;
-                if (d.buffEcho) v += 1.2; // gh251 (W61): Корона леса — усиления ×2
-                if (d.aura) v += 1.4; // «Святой Грааль»: +2/+2 всем своим
-                if (d.tradeDraw) v += 1.0; // «Торговец»: карта каждый ход
+                    || d.sisterDraw || d.spellAura || d.campAura) v += AI_W.vEngine;
+                if (d.buffEcho) v += AI_W.vBuffEcho; // gh251 (W61): Корона леса — усиления ×2
+                if (d.aura) v += AI_W.vAura; // «Святой Грааль»: +2/+2 всем своим
+                if (d.tradeDraw) v += AI_W.vTradeDraw; // «Торговец»: карта каждый ход
                 if (d.counterSpike) v += 0.4 * d.counterSpike; // «Ответ»
                 if (d.siegeFollow) v += 1.2; // «Осадная башня»: ездит и стреляет
                 if (unitDash(d) > 1) v += 0.5 * unitDash(d); // «Скорость N»
-                if (d.undying) v += 2.0; // «Снизошедший»: переживает смертельный удар
-                if (d.medicHeal) v += 1.3; // «Полевой медик»: +1♥ случайному каждый ход
+                if (d.undying) v += AI_W.vUndying; // «Снизошедший»: переживает смертельный удар
+                if (d.medicHeal) v += AI_W.vMedic; // «Полевой медик»: +1♥ случайному каждый ход
                 if (d.pillarEnergy) v += 1.0; // «Опорник»: +1⚡ за каждую атаку по нему
                 if (d.altarSword) v += 0.9 + 0.25 * Math.max(0, (u.hp || 0) - 1);
                 if (d.starTower) v += 1.2;
@@ -146,9 +186,9 @@
             A.aiThreat = function aiThreat(u) {
                 if (!u || !u.def) return 0;
                 const d = u.def;
-                let s = (u.curAtk || 0) * 1.25 + (u.hp || 0) * 0.6;
-                if (d.crush) s += 1.4;
-                if (d.thicket) s += 1.4;
+                let s = (u.curAtk || 0) * AI_W.tAtk + (u.hp || 0) * AI_W.tHp;
+                if (d.crush) s += AI_W.tCrush;
+                if (d.thicket) s += AI_W.tThicket;
                 if (d.siegeDouble) s += 1.2; // «Тараномобиль»: ×2 постройкам/базе
                 if (d.ability === "archer") s += 0.9;
                 if (d.ability === "assassin") s += 0.8;
@@ -162,7 +202,7 @@
                 if (d.frostNeighbors) s += 0.8;
                 if (d.leaderAura || d.plantEcho || d.druidEnergy || d.sisterDraw
                     || d.spellAura || d.campAura || d.monolith) s += 0.9;
-                if (d.aura) s += 1.2; // «Святой Грааль»: усиливает всю сторону
+                if (d.aura) s += AI_W.tAura; // «Святой Грааль»: усиливает всю сторону
                 if (d.altarSword) s += 0.7;
                 if (d.starTower) s += 0.8;
                 if (d.cloudSpire) s += 1.4;
@@ -173,11 +213,18 @@
                 if (u.enchantFire) s += 0.8;
                 if (u.berserk) s += 0.5 * u.berserk;
                 if (d.type === "building") {
-                    s *= 0.8; // здание не марширует
+                    s *= AI_W.tBldMult; // здание не марширует
                     // W104 (юзер): опасная постройка — приоритетная цель
                     // («Дурное варево» и пр.) — поломать связку
-                    s += 3.2 * aiDangerBld(d);
+                    s += AI_W.tDangerBld * aiDangerBld(d);
                 }
+                // W110 (юзер): детектор разгонов — существо, чья атака ушла
+                // далеко выше печатной (медик-петли hon195: лига 20261115
+                // видела базы −1736♥), — приоритетная цель: угроза
+                // УМНОЖАЕТСЯ, чтобы контроль и удаление выбирали его первым
+                if ((u.curAtk || 0) >= AI_W.runMinAtk
+                    && (u.curAtk || 0) - (d.atk || 0) >= AI_W.runGap)
+                    s *= AI_W.runMult;
                 return s;
             };
             // Ценность СВОЕГО существа (для жертвы/кокона): жизни и цена
@@ -527,15 +574,16 @@
                 const frontRow = rows[rows.length - 1];
                 const role = aiUnitRole(def);
                 let score = 0;
-                if (row === frontRow) score += 2;
-                if (!B.units.some((o) => o.side === "e" && o.col === col)) score += 1.5;
+                if (row === frontRow) score += AI_W.sFrontRow;
+                if (!B.units.some((o) => o.side === "e" && o.col === col))
+                    score += AI_W.sColFree;
                 // затор: свои впереди в той же колонке не дают пройти
                 const ownAhead = B.units.filter((o) => o.side === "e"
                     && o.col === col && o.row > row).length;
-                if (ownAhead) score -= 0.9 * ownAhead;
+                if (ownAhead) score -= AI_W.sOwnAhead * ownAhead;
                 // поддержка — в тыл, если тыл вообще есть
                 if (role === "support" && rows.length > 1) {
-                    if (row === frontRow) score -= 2.2;
+                    if (row === frontRow) score -= AI_W.sSupportBack;
                     else if (row === rows[0]) score += 0.8;
                 }
                 score += aiSummonAuraScore(def, col, row);
@@ -562,7 +610,7 @@
                 const dash = unitDash(def);
                 if (dash === 1) {
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit" && atk >= ahead.hp)
-                        score += 2.6 + aiThreat(ahead) * 0.35;
+                        score += AI_W.sDashKill + aiThreat(ahead) * AI_W.sKillThreatK;
                     else if (ahead && ahead.side === "p") score += 0.9;
                     else if (!ahead) score += 0.7; // сразу шагнёт вперёд
                 }
@@ -571,7 +619,7 @@
                     // бьющего или пройти свободную колонку дальше
                     const n = dash;
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit" && atk * n >= ahead.hp)
-                        score += 2.6 + aiThreat(ahead) * 0.35;
+                        score += AI_W.sDashKill + aiThreat(ahead) * AI_W.sKillThreatK;
                     else if (ahead && ahead.side === "p") score += 1.1;
                     else if (!ahead) score += 0.8 + 0.25 * n;
                 }
@@ -598,7 +646,8 @@
                 // Клетки без соседа сюда не доходят (aiUnitSpot отфильтровал)
                 if (def.nearSpeed) {
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit"
-                        && atk >= ahead.hp) score += 6.5 + aiThreat(ahead) * 0.35;
+                        && atk >= ahead.hp)
+                        score += AI_W.sNearKill + aiThreat(ahead) * AI_W.sKillThreatK;
                     else if (ahead && ahead.side === "p") score += 0.9;
                     else score += 0.7; // рывок сразу шагнёт вперёд
                 }
@@ -637,7 +686,7 @@
                 if (gapFoe && role !== "wall" && role !== "support"
                     && (gapFoe.def.speed || 1) === 1
                     && row + 1 < GRID && !unitAt(col, row + 1)
-                    && !dash) score += 1.5;
+                    && !dash) score += AI_W.sGap;
                 if (def.wolfSummon && row === frontRow) score += 0.4; // ловит урон — зовёт волка
                 if (def.keeperScale) {
                     const animals = B.units.filter((v) => v.side === "e"
@@ -692,7 +741,7 @@
                     }
                     if (survives && ahead.def.type === "unit" && atk >= ahead.hp) {
                         score += (role === "wall" ? 1.6 : 1.0)
-                            + aiThreat(ahead) * 0.35; // убьём в ответ
+                            + aiThreat(ahead) * AI_W.sKillThreatK; // убьём в ответ
                     } else if (survives && atk > 0) {
                         score += 0.2 * Math.min(atk, ahead.hp);
                     }
@@ -706,7 +755,8 @@
                     }
                 }
                 // трус — стеной прямо перед существом игрока (его следующий шаг)
-                if (def.ability === "coward" && ahead && ahead.side === "p") score += 2.5;
+                if (def.ability === "coward" && ahead && ahead.side === "p")
+                    score += AI_W.sCowardAhead;
                 // защита колонки, где игрок уже близко к нашей базе
                 const near = B.units.filter((v) => v.side === "p" && v.col === col)
                     .sort((a, b) => a.row - b.row)[0];
@@ -722,7 +772,7 @@
                 // свои не трогаем (заблокируем собственный призыв)
                 const pmark = B.delayed && B.delayed.p
                     && B.delayed.p.find((e) => e.col === col && e.row === row);
-                if (pmark) score += pmark.left <= 2 ? 3.2 : 1.2;
+                if (pmark) score += pmark.left <= 2 ? AI_W.sMarkBlock : 1.2;
                 const emark = B.delayed && B.delayed.e
                     && B.delayed.e.find((e) => e.col === col && e.row === row);
                 if (emark) score -= 2.5;

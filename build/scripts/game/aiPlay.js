@@ -301,7 +301,23 @@
                 return false;
             };
 
+            // W110: обёртка подсчёта возраста карт. Тело хода — aiPlayBody;
+            // после розыгрышей карты, ОСТАВШИЕСЯ в руке, получают +1 к
+            // возрасту («сколько СВОИХ полуходов подряд не смогла
+            // сыграться») — «застрявшие» candidate'ы замены тупика.
+            // Возраст keyed по стабильным креслам (в симе swap() зеркалит).
             A.aiPlay = async function aiPlay() {
+                await aiPlayBody();
+                const ha = B.holdAge || (B.holdAge = { p: {}, e: {} });
+                const alive = {};
+                for (const id of B.eHand) {
+                    ha.e[id] = (ha.e[id] || 0) + 1;
+                    alive[id] = true;
+                }
+                for (const id of Object.keys(ha.e))
+                    if (!alive[id]) delete ha.e[id];
+            };
+            A.aiPlayBody = async function aiPlayBody() {
                 // «Склеп» (dec157): верхняя карта своего сброса играется
                 // СРАЗУ — тем же ходом (у игрока клик по постройке
                 // разыгрывает её автоматом); ИИ берёт её в руку и
@@ -356,10 +372,12 @@
                 // энергии вместо давления ИИ не должен.
                 let refillTries = 0;
                 const tryRefill = async () => {
-                    if (B.eEnergy < 5 || refillTries >= 2) return false;
+                    // W110: пороги добора в тупике — в AI_W (тюнируемые)
+                    if (B.eEnergy < AI_W.refillMin
+                        || refillTries >= AI_W.refillTries) return false;
                     refillTries++;
                     const before = B.eHand.length;
-                    drawEnemy(2); // пустые колода/сброс закроет «подкрепление»
+                    drawEnemy(AI_W.refillCards); // пустые колода/сброс закроет «подкрепление»
                     if (B.eHand.length === before) return false; // карт взять неоткуда
                     refreshHud();
                     await delay(0.3 / animK());
@@ -405,6 +423,29 @@
                 });
                 // W103 (юзер): замена застрявшей карты в тупике — раз за ход
                 let deadSwapUsed = false;
+                // W110 (юзер): пакетное добивание базы — affordable-спеллы
+                // урона по базе, СУММАРНО убивающие игрока в ЭТОТ полуход,
+                // идут группой 0 (раньше прочего): по отдельности каждый не
+                // смертелен, и обычный порядок успевал потратить энергию
+                // на прочие карты раньше добивания
+                let lethalSet = null;
+                {
+                    const pack = B.eHand
+                        .map((id) => ({ id, s: CARDS[id] && CARDS[id].spell }))
+                        .filter((x) => x.s && CARDS[x.id].type === "spell"
+                            && x.s.baseDmg > 0)
+                        .filter((x) => effCost(x.id, "e") <= B.eEnergy)
+                        .sort((a, b) => effCost(a.id, "e") - effCost(b.id, "e"));
+                    let pot = 0, paid = 0;
+                    const take = [];
+                    for (const x of pack) {
+                        if (pot >= B.playerBase) break;
+                        const c = effCost(x.id, "e");
+                        if (paid + c > B.eEnergy) continue;
+                        paid += c; pot += x.s.baseDmg; take.push(x.id);
+                    }
+                    if (pot >= B.playerBase && take.length) lethalSet = new Set(take);
+                }
                 for (;;) {
                     if (B.stopped || B.phase === "over") return;
                     const affordable = B.eHand
@@ -431,10 +472,11 @@
                             || x.def.groveAura || x.def.elementalCircle
                             || x.def.altarSword || x.def.treeHomes);
                     affordable.sort((a, b) => {
-                        // W103 (юзер): монолит при готовом комбо — самый
-                        // первый (группа 0.5, раньше прочих движков)
-                        const grp = (x) => (x.def.monolith && monolithCombo)
-                            ? 0.5 : aiGroup(x.id, x.def);
+                        // W110: lethal-пакет — раньше всего; монолит при
+                        // готовом комбо (W103, юзер) — следом (группа 0.5)
+                        const grp = (x) => lethalSet && lethalSet.has(x.id) ? -1
+                            : (x.def.monolith && monolithCombo) ? 0.5
+                            : aiGroup(x.id, x.def);
                         if (bigBank) {
                             return (isAuraB(a) ? 0 : 1) - (isAuraB(b) ? 0 : 1)
                                 || effCost(b.id, "e") - effCost(a.id, "e")
@@ -467,12 +509,20 @@
                         // руке не трогаем вовсе — её ИИ доиграет сам
                         if (!deadSwapUsed && B.eHand.length >= 2) {
                             const inc = A.spheresTotal();
-                            let worst = -1, worstCost = -1;
+                            let worst = -1, worstScore = -1;
                             B.eHand.forEach((id, i2) => {
                                 const c2 = effCost(id, "e");
-                                if (c2 > B.eEnergy && c2 > B.eEnergy + 2 * inc
-                                    && c2 > worstCost) {
-                                    worstCost = c2; worst = i2;
+                                if (c2 <= B.eEnergy) return; // по карману — не трогаем
+                                // «безнадёжная» (W106): дороже энергии + K×дохода;
+                                // «застрявшая» (W110): гейт не пускает N СВОИХ
+                                // полуходов подряд (возраст считает обёртка
+                                // aiPlay) — иначе карта висит до конца боя
+                                const held = (B.holdAge && B.holdAge.e[id]) || 0;
+                                const hopeless = c2 > B.eEnergy + AI_W.deadSwapIncK * inc;
+                                const stuck = held >= AI_W.deadSwapHold;
+                                if ((hopeless || stuck)
+                                    && c2 + held > worstScore) {
+                                    worstScore = c2 + held; worst = i2;
                                 }
                             });
                             if (worst >= 0) {
