@@ -83,7 +83,11 @@
                     scenes.go("heroPick");
                 });
                 const bDeck = addMenuBtn(t("menu.deck"), 960, 810, () => scenes.go("deck"));
-                const bSet = addMenuBtn(t("menu.settings"), 960, 900, () => scenes.go("settings"));
+                const bSet = addMenuBtn(t("menu.settings"), 960, 900, () => {
+                    // сзади настроек — затенённое меню (снимок живой сцены, юзер)
+                    globalThis.GAME_SETTINGS_SCENE.captureSettingsBg(ctx);
+                    scenes.go("settings");
+                });
                 const bExit = addMenuBtn(t("menu.exit"), 960, 990, () => {
                     // выйти по-настоящему: в Electron window.close() закрывает
                     // окно (и приложение), браузер обычно запрещает закрытие

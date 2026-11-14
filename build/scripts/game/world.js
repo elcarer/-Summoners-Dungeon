@@ -765,6 +765,7 @@
             // только по карте героя (просил юзер): карта под иконкой золота
             const settingsBtn = hudIcon("icon_setting.png", 1839, 66, () => {
                 G.uiReturn = "world";
+                globalThis.GAME_SETTINGS_SCENE.captureSettingsBg(ctx); // сзади — мир (юзер)
                 scenes.go("settings");
             });
             c.addChild(settingsBtn);
@@ -1684,7 +1685,7 @@
                 // скорость анимаций из настроек (0..10; 5 = скорость листа) —
                 // живая, как в бою и подземелье (просил юзер)
                 COMPONENTS.animationSpeed[heroId] = (ctx.heroSheet.animationSpeed || 0.2)
-                    * Math.max(0.25, ((G.settings && G.settings.animSpeed) ?? 5) / 5);
+                    * Math.max(0.25, ((G.settings && G.settings.animSpeed) ?? 6) / 6);
 
                 // Эскейп закрывает квест-диалог его кнопкой (просил юзер —
                 // дублирование кнопок «выход» меню на клавишу); окно

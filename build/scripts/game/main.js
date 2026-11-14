@@ -44,6 +44,9 @@
             "UI_cards_hand", "UI_energy",
             // подложки чисел на жетонах поля боя (просил юзер)
             "attack", "heals",
+            // панель настроек — спрайты юзера (макет for_work/arts/example.png)
+            "settings/panel1", "settings/panel2", "settings/panel3", "settings/panel4",
+            "settings/panel5", "settings/point", "settings/abutton", "settings/obutton",
         ];
         say("арт интерфейса…");
         await frame();
@@ -334,8 +337,8 @@
 
         // ── Звук: два канала движка — эффекты («звук») и музыка («музыка») ──
         const audio = createAudio();
-        audio.setVolume(settings.sound / 10);
-        audio.setMusicVolume(settings.music / 10);
+        audio.setVolume(settings.sound / 12);
+        audio.setMusicVolume(settings.music / 12);
 
         // Файлы из build/sound: sfx-эффекты боя/UI + музыка сцен.
         // Музыка грузится лениво при первом вызове music() (треки тяжёлые);
@@ -429,7 +432,7 @@
                 && Math.abs(x - stepLast.x) + Math.abs(y - stepLast.y) > 0.3;
             stepLast = { x, y };
             stepWanted = moving;
-            const vol = Math.max(0, Math.min(1, settings.sound / 10)) * 0.5;
+            const vol = Math.max(0, Math.min(1, settings.sound / 12)) * 0.5;
             if (moving) {
                 stepAudio.volume = vol;
                 if (stepAudio.paused) stepAudio.play().catch(() => { /* нет жеста */ });

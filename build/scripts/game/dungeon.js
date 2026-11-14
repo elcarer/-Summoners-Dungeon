@@ -602,6 +602,7 @@
             // Колода — только по карте героя (просил юзер): карта под золотом
             c.addChild(hudIcon("icon_setting.png", 1839, 66, () => {
                 G.uiReturn = "dungeon";
+                globalThis.GAME_SETTINGS_SCENE.captureSettingsBg(ctx); // сзади — данж (юзер)
                 scenes.go("settings");
             }));
             // карточка героя (просил юзер): под иконкой золота, клик —
@@ -1436,7 +1437,7 @@
                 // скорость анимаций из настроек (0..10; 5 = скорость листа,
                 // ниже 2 — ползунок в минимум) — живая, как в бою (просил юзер)
                 COMPONENTS.animationSpeed[heroId] = (ctx.heroSheet.animationSpeed || 0.2)
-                    * Math.max(0.25, ((G.settings && G.settings.animSpeed) ?? 5) / 5);
+                    * Math.max(0.25, ((G.settings && G.settings.animSpeed) ?? 6) / 6);
                 // y-sort со стенами: низ героя (ноги) против нижней кромки
                 // клеток стен — с юга герой впереди, с севера уходит за стену
                 heroSprite.zIndex = hy;

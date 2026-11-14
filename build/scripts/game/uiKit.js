@@ -25,14 +25,14 @@
     // 1920×1080 (просил юзер), кегль 45 — как в главном меню (просил юзер:
     // все button_menu в игре одного размера и одним кеглем; слишком
     // длинные надписи ужимает фит).
-    function button(ctx, { tex, label, x, y, scale = 1, onTap, fontSize = 45 }) {
+    function button(ctx, { tex, label, x, y, scale = 1, onTap, fontSize = 45, labelColor = 0xf3e6c2 }) {
         const c = new PIXI.Container();
         const sp = new PIXI.Sprite(ctx.uiTex(tex));
         sp.anchor.set(0.5);
         sp.scale.set(scale);
         c.addChild(sp);
         if (label) {
-            const t = T(label, fontSize, 0xf3e6c2, { stroke: { color: 0x1c1207, width: 4 } });
+            const t = T(label, fontSize, labelColor, { stroke: { color: 0x1c1207, width: 4 } });
             t.anchor.set(0.5);
             t.eventMode = "none";
             // подпись не шире кнопки (у широких надписей ужимается кегль)
@@ -107,45 +107,162 @@
     // правило UI: ВСЕ кнопки игры). W58 (юзер): свет должен идти ПО
     // КОНТУРУ кнопки, а не овалом за ней — раньше это была растянутая
     // радиальная текстура, форм кнопки не повторявшая. Теперь — копия
-    // спрайта кнопки чуть большего масштаба под самой кнопкой: золотая
-    // кромка повторяет силуэт (прозрачные поля текстуры не светятся).
-    // Альфа доводится твином (0.25/кадр). Тикер снимается сам, узлы
-    // умерли — сразу. c.userData.glow — доступ тестов.
-    function addGlow(ctx, c, sp, margin = 1.08) {
-        // Контурная подсветка: клон спрайта кнопки, чуть раздутый —
-        // видна только золотая кромка вокруг силуэта
-        const glow = new PIXI.Sprite(sp.texture);
-        glow.anchor.set(0.5);
-        glow.scale.set(sp.scale.x * margin, sp.scale.y * margin);
-        glow.tint = 0xffd75e;
-        glow.blendMode = "add";
-        glow.alpha = 0;
-        glow.eventMode = "none";
-        c.addChildAt(glow, 0); // под картинкой кнопки — кромка Вокруг
-        let a = 0, tgt = 0, running = false;
+    // Свечение Вокруг силуэта ОДНИМ шейдером на кнопке (юзер: без клона —
+    // «просто блюр вокруг изображения»): фильтр получает растр кнопки
+    // (спрайт + надпись) и выводит «изображение + золотой гаусс-ореол по
+    // альфе» одним проходом. На покое uStrength = 0 — шейдер сразу
+    // возвращает картинку как есть. Сила свечения доводится твином
+    // (0.25/кадр). Тикер снимается сам, узлы умерли — сразу.
+    // c.userData.glow — доступ тестов.
+    const GLOW_VERT = `
+in vec2 aPosition;
+out vec2 vTextureCoord;
+uniform vec4 uInputSize;
+uniform vec4 uOutputFrame;
+uniform vec4 uOutputTexture;
+vec4 filterVertexPosition( void )
+{
+    vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
+    position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
+    position.y = position.y * (2.0 * uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
+    return vec4(position, 0.0, 1.0);
+}
+vec2 filterTextureCoord( void )
+{
+    return aPosition * (uOutputFrame.zw * uInputSize.zw);
+}
+void main(void)
+{
+    gl_Position = filterVertexPosition();
+    vTextureCoord = filterTextureCoord();
+}`;
+
+    const GLOW_FRAG = `
+in vec2 vTextureCoord;
+out vec4 finalColor;
+uniform sampler2D uTexture;
+uniform vec4 uInputSize;
+uniform float uStrength;
+void main(void)
+{
+    vec4 img = texture(uTexture, vTextureCoord);
+    if (uStrength <= 0.0) { finalColor = img; return; }
+    vec2 px = 1.0 / uInputSize.xy;
+    float sa = img.a * 0.32;
+    for (int i = 0; i < 12; i++) {
+        float ang = 0.5235988 * float(i);
+        vec2 d = vec2(cos(ang), sin(ang));
+        sa += texture(uTexture, vTextureCoord + d * 2.0 * px).a * 0.13;
+        sa += texture(uTexture, vTextureCoord + d * 4.5 * px).a * 0.06;
+        sa += texture(uTexture, vTextureCoord + d * 8.0 * px).a * 0.025;
+    }
+    float glowA = min(1.0, sa * 0.62) * uStrength * (1.0 - img.a);
+    vec3 gold = vec3(1.0, 0.843, 0.371);
+    finalColor = vec4(img.rgb + gold * glowA, min(1.0, img.a + glowA));
+}`;
+
+    // та же логика для WebGPU (в игре рендерер webgpu — фильтр только с
+    // glProgram под ним МОЛЧА не исполняется)
+    const GLOW_WGSL = `
+struct GlobalFilterUniforms {
+  uInputSize: vec4<f32>,
+  uInputPixel: vec4<f32>,
+  uInputClamp: vec4<f32>,
+  uOutputFrame: vec4<f32>,
+  uGlobalFrame: vec4<f32>,
+  uOutputTexture: vec4<f32>,
+};
+
+struct GlowUniforms {
+  uStrength: f32,
+};
+
+@group(0) @binding(0) var<uniform> gfu: GlobalFilterUniforms;
+@group(0) @binding(1) var uTexture: texture_2d<f32>;
+@group(0) @binding(2) var uSampler : sampler;
+@group(1) @binding(0) var<uniform> glowU : GlowUniforms;
+
+struct VSOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) uv : vec2<f32>,
+};
+
+fn filterVertexPosition(aPosition: vec2<f32>) -> vec4<f32>
+{
+    var position = aPosition * gfu.uOutputFrame.zw + gfu.uOutputFrame.xy;
+    position.x = position.x * (2.0 / gfu.uOutputTexture.x) - 1.0;
+    position.y = position.y * (2.0 * gfu.uOutputTexture.z / gfu.uOutputTexture.y) - gfu.uOutputTexture.z;
+    return vec4(position, 0.0, 1.0);
+}
+
+fn filterTextureCoord(aPosition: vec2<f32>) -> vec2<f32>
+{
+    return aPosition * (gfu.uOutputFrame.zw * gfu.uInputSize.zw);
+}
+
+@vertex
+fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput {
+    return VSOutput(filterVertexPosition(aPosition), filterTextureCoord(aPosition));
+}
+
+@fragment
+fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+    let img = textureSample(uTexture, uSampler, uv);
+    if (glowU.uStrength <= 0.0) { return img; }
+    let px = vec2<f32>(1.0) / gfu.uInputSize.xy;
+    var sa = img.a * 0.32;
+    for (var i: i32 = 0; i < 12; i++) {
+        let ang = 0.5235988 * f32(i);
+        let d = vec2<f32>(cos(ang), sin(ang));
+        sa += textureSample(uTexture, uSampler, uv + d * 2.0 * px).a * 0.13;
+        sa += textureSample(uTexture, uSampler, uv + d * 4.5 * px).a * 0.06;
+        sa += textureSample(uTexture, uSampler, uv + d * 8.0 * px).a * 0.025;
+    }
+    let glowA = min(1.0, sa * 0.62) * glowU.uStrength * (1.0 - img.a);
+    let gold = vec3<f32>(1.0, 0.843, 0.371);
+    return vec4<f32>(img.rgb + gold * glowA, min(1.0, img.a + glowA));
+}`;
+
+    function addGlow(ctx, c, sp) {
+        const filter = new PIXI.Filter({
+            glProgram: PIXI.GlProgram.from({ vertex: GLOW_VERT, fragment: GLOW_FRAG }),
+            gpuProgram: PIXI.GpuProgram.from({
+                vertex: { source: GLOW_WGSL, entryPoint: "mainVertex" },
+                fragment: { source: GLOW_WGSL, entryPoint: "mainFragment" },
+            }),
+            resources: { glowU: new PIXI.UniformGroup({ uStrength: { value: 0, type: "f32" } }) },
+            padding: 14,
+            resolution: 1,
+        });
+        c.filters = [filter];
+        const uni = filter.resources.glowU.uniforms;
+        let a = 0, tgt = 0, running = false, dead = false;
+        const kill = () => { // фильтр и тикер умирают ровно один раз
+            if (dead) return;
+            dead = true;
+            ctx.app.ticker.remove(tick);
+            filter.destroy();
+        };
         const tick = () => {
-            if (c.destroyed || glow.destroyed) { // сцена умерла — снимаем
-                ctx.app.ticker.remove(tick);
-                running = false;
-                return;
-            }
+            if (c.destroyed) { kill(); return; }
             a += (tgt - a) * 0.25;
             if (Math.abs(tgt - a) < 0.012) { // дошли — тикер больше не нужен
                 a = tgt;
                 ctx.app.ticker.remove(tick);
                 running = false;
             }
-            glow.alpha = a;
+            uni.uStrength = a;
         };
         const setGlow = (on) => {
             tgt = on ? 0.8 : 0;
-            if (!running) { running = true; ctx.app.ticker.add(tick); }
+            if (!running && !dead) { running = true; ctx.app.ticker.add(tick); }
         };
         c.on("pointerover", () => setGlow(true));
         c.on("pointerout", () => setGlow(false));
+        c.once("destroyed", kill);
         c.userData = c.userData || {};
-        c.userData.glow = glow;
-        return glow;
+        c.userData.glow = filter;
+        return filter;
     }
 
     // Чип-кнопка (фильтры): маленькая прямоугольная кнопка с текстом

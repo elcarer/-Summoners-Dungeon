@@ -97,10 +97,10 @@
         A.sfx = (name) => { if (ctx.sfx) ctx.sfx(name); };
         A.delay = (s) => new Promise((r) => scheduler.after(s, r));
         // Скорость анимаций и передвижений (ползунок «Анимации» в Настройках,
-        // settings.animSpeed 0..10). 5 = дефолт — в 1.5 раза медленнее
+        // settings.animSpeed 0..12). 6 = дефолт — в 1.5 раза медленнее
         // исходной; все длительности (глиссады, паузы, всплывающий текст)
         // делятся на этот коэффициент, скорость походки — умножается.
-        A.animK = () => Math.max(0.25, (((G.settings && G.settings.animSpeed) ?? 5) * 2) / 15);
+        A.animK = () => Math.max(0.25, (((G.settings && G.settings.animSpeed) ?? 6) * 2) / 18);
         // всего сфер на шкале конца хода: 3 на первом ходу, каждый ход +1
         A.spheresTotal = () => A.B.turnNo + 2;
 
