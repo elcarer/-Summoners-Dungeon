@@ -39,20 +39,14 @@
                 cardsBg.eventMode = "none";
                 menuRoot.addChild(cardsBg);
 
-                // Заголовок и кнопки — по референсу юзера (референсы/
-                // start_menu.png): «Подземелье»/«призывателей» строками с
-                // центрами y≈321/471 (кегль 150 по ширинам 650/804 референса,
-                // тонкий штрих), без подзаголовка; кнопки 274×77 столбцом
-                // по центру с шагом 90 (центры 630..990), подписи кеглем 45.
-                const t1 = T(t("menu.title1"), 150, 0xf0c96a, { stroke: { color: 0x241505, width: 8 } });
-                t1.anchor.set(0.5, 0.5);
-                t1.position.set(960, 321);
-                const t2 = T(t("menu.title2"), 150, 0xf0c96a, { stroke: { color: 0x241505, width: 8 } });
-                t2.anchor.set(0.5, 0.5);
-                t2.position.set(960, 471);
-                t1.eventMode = "none"; t2.eventMode = "none";
-                menuRoot.addChild(t1, t2);
-
+                // Заголовка кодом больше нет — название вшито в новый титульный
+                // арт bg_corridor_1 (просил юзер W116). Кнопки 274×77 — в ДВЕ
+                // КОЛОНКИ ПОД названием внизу (просил юзер W116 по скрину):
+                // плашка с названием занимает центр арта (~370..1540 ×
+                // 360..710), колонки симметрично 960±300 — левая x=660
+                // (игровые действия: Продолжить/Новая игра/Колода), правая
+                // x=1260 (Настройки/Выход); в зоне колонок start_cards
+                // прозрачен (альфа ≤19), подписи кеглем 45.
                 // «Войти» заменён парой «Продолжить»/«Новая игра» (просил юзер):
                 // продолжить можно сохранённый забег (sd_run, пишет G.saveRun),
                 // новая игра снимает сейв и начинает с 1-го этажа. Кнопки — в
@@ -72,23 +66,23 @@
                     return b;
                 };
                 const contEnabled = !!GAME_META.loadRun();
-                const bCont = addMenuBtn(t("menu.continue"), 960, 630, () => {
+                const bCont = addMenuBtn(t("menu.continue"), 660, 800, () => {
                     const r = GAME_META.loadRun();
                     if (!contEnabled || !r) return;
                     ctx.applySavedRun(r); // поднятие забега — см. applySavedRun
                 });
-                const bNew = addMenuBtn(t("menu.newGame"), 960, 720, () => {
+                const bNew = addMenuBtn(t("menu.newGame"), 660, 890, () => {
                     // герой задаёт стихию/стартовую колоду/жизни базы —
                     // сначала выбор героя (юзер)
                     scenes.go("heroPick");
                 });
-                const bDeck = addMenuBtn(t("menu.deck"), 960, 810, () => scenes.go("deck"));
-                const bSet = addMenuBtn(t("menu.settings"), 960, 900, () => {
+                const bDeck = addMenuBtn(t("menu.deck"), 660, 980, () => scenes.go("deck"));
+                const bSet = addMenuBtn(t("menu.settings"), 1260, 845, () => {
                     // сзади настроек — затенённое меню (снимок живой сцены, юзер)
                     globalThis.GAME_SETTINGS_SCENE.captureSettingsBg(ctx);
                     scenes.go("settings");
                 });
-                const bExit = addMenuBtn(t("menu.exit"), 960, 990, () => {
+                const bExit = addMenuBtn(t("menu.exit"), 1260, 935, () => {
                     // выйти по-настоящему: в Electron window.close() закрывает
                     // окно (и приложение), браузер обычно запрещает закрытие
                     // вкладки, открытой не скриптом — тогда остаётся «До встречи»
@@ -101,10 +95,7 @@
                 // хендл для смоука: подписи/размеры кнопок, заголовок, нажатие
                 window.__GAME.menu = {
                     buttons: () => menuInfo.map((b) => ({ ...b })),
-                    titles: () => [t1, t2].map((n) => ({
-                        text: n.text, x: n.x, y: n.y,
-                        fontSize: n.style.fontSize, stroke: n.style.stroke.width,
-                    })),
+                    titles: () => [], // заголовка кодом нет — вшит в арт (W116)
                     texts: () => menuRoot.children.filter((n) => n.text).map((n) => n.text),
                     continueEnabled: () => contEnabled,
                     press(name) {
@@ -146,7 +137,7 @@
                 // ── Появление стартового экрана (W21, просил юзер) ─────────
                 // Сначала виден только коридор; поверх плавно проявляется
                 // фон с картами (fade + мягкий наезд камеры 1.06 → 1);
-                // затем по очереди проявляются заголовок, кнопки, версия
+                // затем по очереди проявляются кнопки и версия
                 // (fade + лёгкий подъём). Кликабельны с первого кадра.
                 const reveals = []; // { node, by, delay, dur, dy, a1 }
                 const reveal = (node, delay, dur, dy = 0, a1 = 1) => {
@@ -154,8 +145,6 @@
                     node.y += dy;
                     reveals.push({ node, by: node.y - dy, delay, dur, dy, a1 });
                 };
-                reveal(t1, 1.3, 0.6, 26);
-                reveal(t2, 1.5, 0.6, 26);
                 reveal(bCont, 1.75, 0.5, 18, contEnabled ? 1 : 0.45);
                 reveal(bNew, 1.87, 0.5, 18);
                 reveal(bDeck, 1.99, 0.5, 18);

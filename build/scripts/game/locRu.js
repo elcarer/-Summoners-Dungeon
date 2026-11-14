@@ -2,10 +2,6 @@
 // (STRINGS = { ru: GAME_LOC_RU, en: GAME_LOC_EN }), ключи и их EN-пары — locEn.js.
 (function () {
     globalThis.GAME_LOC_RU = {
-            "menu.title1": "Развернутый",
-            "menu.title2": "Мир",
-            "menu.subtitle": "карточный рогалик о спуске в глубину",
-            "menu.play": "ВОЙТИ",
             "menu.continue": "ПРОДОЛЖИТЬ",
             "menu.newGame": "НОВАЯ ИГРА",
             "menu.deck": "КОЛОДА",

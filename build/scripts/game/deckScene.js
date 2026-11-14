@@ -61,10 +61,11 @@
         const PANE_POS = { left: { x: 35, y: 245 }, right: { x: 695, y: 255 } };
         // ряд лого стихий (общие константы: использует и rebuildChips, и api).
         // 11 кнопок (5-я мульти-стихия timDec, W82): БЕЗ кружков (поправка
-        // юзера W82 — само лого и есть кнопка), лого 40px, шаг 44; ряд —
-        // в правой части окна коллекции: x0 = 1860 − (10·44 + 40) = 1380.
-        // Слева ряд ограничен чипами «Тип»
-        const ELEM_Y = 118, ELEM_ICON = 40, STEP = 44;
+        // юзера W82 — само лого и есть кнопка). W116 (юзер): лого 60px
+        // (1.5× от 40), ряд выше и левее, чтобы смотрелся красиво: правый
+        // край на месте (1860), ряд вырос влево: x0 = 1860 − (11·66 + 60)
+        // = 1074. Слева ряд ограничен чипами «Тип» (до ~1050)
+        const ELEM_Y = 100, ELEM_ICON = 60, STEP = 58;
         const ELEM_X0 = 1860 - ((ELEM_KEYS.length - 1) * STEP + ELEM_ICON);
         const paneCards = { left: [], right: [] }; // для тестов: {id, node, cx, cy, labelY}
         const elemBtns = []; // спрайты-логотипы (эмитят pointertap в тестах)
@@ -181,7 +182,9 @@
             const locked = G.deck.length <= deckMinNow(); // минимум — убирать нельзя
             ids.forEach((id, i) => {
                 const col = i % 3, rowI = (i / 3) | 0;
-                const cx = 75 + col * 198, cy = 138 + rowI * 307.5;
+                // W116 (юзер): сетка была прижата влево — центр средней карты
+                // на центре окна panel6 (335): 35 + 102 + 198 = 335
+                const cx = 102 + col * 198, cy = 138 + rowI * 307.5;
                 const card = cardFace(ctx, id, { scale: 0.5, dim: locked });
                 card.position.set(cx, cy);
                 card.eventMode = "static";
@@ -217,7 +220,9 @@
                 const capped = inDeck >= DECK_COPIES; // лимит одинаковых карт
                 const elemOk = heroElemOk(id);
                 const canAdd = owned > inDeck && !capped && G.deck.length < DECK_MAX && elemOk;
-                const cx = 75 + col * 240, cy = 138 + rowI * 307.5;
+                // W116 (юзер): та же центровка, что у колоды — центр средней (3-й)
+                // колонки на центре окна panel7 (1285): 695 + 110 + 480 = 1285
+                const cx = 110 + col * 240, cy = 138 + rowI * 307.5;
                 const card = cardFace(ctx, id, {
                     scale: 0.5, dim: owned <= inDeck || capped || !elemOk,
                 });
@@ -236,13 +241,6 @@
                 c.addChild(cnt);
                 paneCards.right.push({ id, node: card, label: cnt, cx, cy,
                     labelY: cy + 138 });
-                if (inDeck > 0) {
-                    const mark = T(`+${inDeck}`, 22, 0x9fd489);
-                    mark.anchor.set(0.5);
-                    mark.position.set(cx + 69, cy - 102);
-                    mark.eventMode = "none";
-                    c.addChild(mark);
-                }
                 if (canAdd) card.on("pointertap", () => api.add(id));
             });
             if (!ids.length) { // фильтры спрятали всё (или коллекция пуста)
@@ -499,7 +497,6 @@
             root.eventMode = "static";
             root.addChild(dimBg(ctx, 0.85));
 
-            buildTabs();
             buildWindows(tab === "heroes" ? "deck.tabHeroes" : "deck.tabDeck");
 
             // подсказка замка (правый верх экрана, над окном коллекции):
@@ -565,6 +562,10 @@
             rightPane.setContent(rc, rc.userData.contentH);
             headerText();
             }
+
+            // вкладки — ПОСЛЕ окон и контента: на переднем плане (юзер W116:
+            // «Герои»/«Колода» были закрыты panel7 и плохо видны)
+            buildTabs();
 
             root.addChild(button(ctx, {
                 tex: "settings/panel3.png", label: t("deck.back"),

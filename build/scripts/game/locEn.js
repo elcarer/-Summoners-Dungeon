@@ -2,10 +2,6 @@
 // loc.js: словарь собирает loc.js (STRINGS = { ru, en }).
 (function () {
     globalThis.GAME_LOC_EN = {
-            "menu.title1": "The Unfolded",
-            "menu.title2": "World",
-            "menu.subtitle": "a card roguelike about descending deep",
-            "menu.play": "ENTER",
             "menu.continue": "CONTINUE",
             "menu.newGame": "NEW GAME",
             "menu.deck": "DECK",

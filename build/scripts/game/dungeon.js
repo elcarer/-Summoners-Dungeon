@@ -1097,7 +1097,9 @@
                     const col = i % 3, rowI = (i / 3) | 0;
                     const free = (G.collection[id] || 0) - countInDeck(id);
                     const canSell = !sellLocked();
-                    const cx = 75 + col * 198, cy = 138 + rowI * 307.5;
+                    // центр средней карты на центре panel6 (335), как в
+                    // колоде deckScene (W116): 35 + 102 + 198 = 335
+                    const cx = 102 + col * 198, cy = 138 + rowI * 307.5;
                     const card = cardFace(ctx, id, { scale: 0.5, dim: !canSell });
                     card.position.set(cx, cy);
                     card.eventMode = "static";
