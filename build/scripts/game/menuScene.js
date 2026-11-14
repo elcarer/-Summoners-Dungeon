@@ -10,6 +10,8 @@
         // ── Сцена «Меню» ───────────────────────────────────────────────────
         let menuRoot = null;
         let menuIntro = null; // тикер появления стартового экрана (W21)
+        let menuSeenOnce = false; // W123: интро играет только при первом
+            // входе в меню после загрузки страницы (выход из игры — мгновенно)
         const T = (text, size, fill, opts = {}) => new PIXI.Text({
             text, style: { fontFamily: "Kereru", fontSize: size, fill, ...opts },
         });
@@ -137,45 +139,57 @@
                 // фон с картами (fade + мягкий наезд камеры 1.06 → 1);
                 // затем по очереди проявляются кнопки и версия
                 // (fade + лёгкий подъём). Кликабельны с первого кадра.
+                // W123 (юзер): интро — ТОЛЬКО при загрузке/включении игры
+                // (первый вход в меню за жизнь страницы); выход в меню
+                // из игры строит всё мгновенно, без задержек.
+                const playIntro = !menuSeenOnce;
+                menuSeenOnce = true;
                 const reveals = []; // { node, by, delay, dur, dy, a1 }
                 const reveal = (node, delay, dur, dy = 0, a1 = 1) => {
                     node.alpha = 0;
                     node.y += dy;
                     reveals.push({ node, by: node.y - dy, delay, dur, dy, a1 });
                 };
-                reveal(bCont, 1.75, 0.5, 18, contEnabled ? 1 : 0.45);
-                reveal(bNew, 1.87, 0.5, 18);
-                reveal(bDeck, 1.99, 0.5, 18);
-                reveal(bSet, 2.11, 0.5, 18);
-                reveal(bExit, 2.23, 0.5, 18);
-                reveal(ver, 2.4, 0.4);
-                const CARD_DELAY = 0.15, CARD_DUR = 1.35;
                 let introT = 0, introDone = false;
-                const smooth = (k) => k * k * (3 - 2 * k); // мягкий ease
-                menuIntro = () => {
-                    // закончилось в прошлый кадр — снимаем отдельным вызовом
-                    // (удаление из тикера прямо во время его же вызова
-                    // зависит от внутренностей Ticker, не рискуем)
-                    if (introDone) {
-                        ctx.app.ticker.remove(menuIntro);
-                        menuIntro = null;
-                        return;
-                    }
-                    introT += Math.min(ctx.app.ticker.deltaMS, 100) / 1000;
-                    const kc = Math.min(1, Math.max(0, (introT - CARD_DELAY) / CARD_DUR));
-                    const ec = smooth(kc);
-                    cardsBg.alpha = ec;
-                    cardsBg.scale.set(cs * (1.06 - 0.06 * ec));
-                    for (const r of reveals) {
-                        const k = Math.min(1, Math.max(0, (introT - r.delay) / r.dur));
-                        const e = smooth(k);
-                        r.node.alpha = r.a1 * e;
-                        r.node.y = r.by + r.dy * (1 - e);
-                    }
-                    introDone = kc >= 1
-                        && reveals.every((r) => introT >= r.delay + r.dur);
-                };
-                ctx.app.ticker.add(menuIntro);
+                if (playIntro) {
+                    reveal(bCont, 1.75, 0.5, 18, contEnabled ? 1 : 0.45);
+                    reveal(bNew, 1.87, 0.5, 18);
+                    reveal(bDeck, 1.99, 0.5, 18);
+                    reveal(bSet, 2.11, 0.5, 18);
+                    reveal(bExit, 2.23, 0.5, 18);
+                    reveal(ver, 2.4, 0.4);
+                    const CARD_DELAY = 0.15, CARD_DUR = 1.35;
+                    const smooth = (k) => k * k * (3 - 2 * k); // мягкий ease
+                    menuIntro = () => {
+                        // закончилось в прошлый кадр — снимаем отдельным вызовом
+                        // (удаление из тикера прямо во время его же вызова
+                        // зависит от внутренностей Ticker, не рискуем)
+                        if (introDone) {
+                            ctx.app.ticker.remove(menuIntro);
+                            menuIntro = null;
+                            return;
+                        }
+                        introT += Math.min(ctx.app.ticker.deltaMS, 100) / 1000;
+                        const kc = Math.min(1, Math.max(0, (introT - CARD_DELAY) / CARD_DUR));
+                        const ec = smooth(kc);
+                        cardsBg.alpha = ec;
+                        cardsBg.scale.set(cs * (1.06 - 0.06 * ec));
+                        for (const r of reveals) {
+                            const k = Math.min(1, Math.max(0, (introT - r.delay) / r.dur));
+                            const e = smooth(k);
+                            r.node.alpha = r.a1 * e;
+                            r.node.y = r.by + r.dy * (1 - e);
+                        }
+                        introDone = kc >= 1
+                            && reveals.every((r) => introT >= r.delay + r.dur);
+                    };
+                    ctx.app.ticker.add(menuIntro);
+                } else {
+                    cardsBg.alpha = 1;
+                    cardsBg.scale.set(cs); // финальный масштаб, без наезда 1.06
+                    bCont.alpha = contEnabled ? 1 : 0.45; // приглушение недоступного «Продолжить»
+                    introDone = true; // хук intro() честно рапортует done
+                }
             },
             exit() {
                 window.__GAME.menu = null; // кнопки умерли вместе с root

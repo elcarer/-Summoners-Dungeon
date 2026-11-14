@@ -537,10 +537,16 @@
             minH.eventMode = "none";
             fit(minH, 420, 13);
             root.addChild(minH);
-            const abilT = T(t(`hero.${hd.id}.ability`), 17, 0x8a7c5e);
+            // Способность героя (просил юзер W123: была одна строка,
+            // сжатая fit'ом до 13px — нечитаемо). Теперь 18px с переносом
+            // на строки; длинные тексты сжимаем ТОЛЬКО до 14px и максимум
+            // на 3 строки (до сетки карт на y=245).
+            const abilT = T(t(`hero.${hd.id}.ability`), 18, 0x8a7c5e,
+                { wordWrap: true, wordWrapWidth: 470 });
             abilT.position.set(180, 192);
             abilT.eventMode = "none";
-            fit(abilT, 420, 13); // одна строка — не наезжает на карты колоды
+            while (abilT.height > 52 && abilT.style.fontSize > 14)
+                abilT.style.fontSize -= 1;
             root.addChild(abilT);
             headerRef = { deck: deckH, min: minH };
             leftPane = scrollPane(ctx, { x: 35, y: 245, w: 575, h: 720, onScroll: () => hideZoom(false) });
