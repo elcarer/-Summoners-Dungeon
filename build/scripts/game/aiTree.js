@@ -125,8 +125,9 @@
 
         // ── применение карты к модели ───────────────────────────────────────
         // Возвращает true, если хоть что-то смоделировано (иначе ценность
-        // карты уходит в статическую часть acc.static).
-        const applyCard = (m, c, acc, st, altarB) => {
+        // карты уходит в статическую часть acc.static). snap — снимок полухода
+        // (нужен resurrect: лучшее существо ИЗ СВОЕГО СБРОСА на момент плана).
+        const applyCard = (m, c, acc, st, altarB, snap) => {
             const def = c.def;
             const s = def.spell || {};
             let modeled = false;
@@ -288,7 +289,7 @@
                 if (cost(c) > m.energy) continue;
                 m.energy -= cost(c);
                 m.hand--;
-                applyCard(m, c, acc, st, snap.altarB);
+                applyCard(m, c, acc, st, snap.altarB, snap);
                 seq.push(c.id);
             }
             return { seq, score: evalModel(snap, m, acc) };
@@ -320,7 +321,7 @@
                         energy: m.energy - cost, hand: m.hand - 1, back: m.back,
                     };
                     const acc2 = { static: acc.static, drew: acc.drew };
-                    applyCard(m2, c, acc2, st, snap.altarB);
+                    applyCard(m2, c, acc2, st, snap.altarB, snap);
                     dfs(m2, seq.concat([c.id]), acc2);
                 }
             };

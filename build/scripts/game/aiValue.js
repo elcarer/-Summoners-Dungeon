@@ -34,28 +34,28 @@
             A.AI_W_BASE = {
                 // экономика полухода (aiPlay)
                 refillMin: 5,        // добор «в тупике» от этой энергии
-                refillTries: 2,      // попыток добора за полуход
+                refillTries: 3,      // попыток добора за полуход
                 refillCards: 2,      // карт за попытку
                 deadSwapIncK: 2,     // «безнадёжная»: дороже энергии + K×дохода
                 deadSwapHold: 3,     // «застрявшая»: гейт не пускает N полуходов
                 drawTo: 3,           // короткая рука добирается до
                 drawPlayable: 4,     // …и по числу разыгрываемых на след. ману
-                drawFullMana: 12,    // мана след. хода ≥ — рука до 7
+                drawFullMana: 16,    // мана след. хода ≥ — рука до 7
                 drawAllEnergy: 20,   // энергия ≥ — вся шкала только в карты
                 // ценность своего существа (aiVal) — тюнинг W110 (фитнес 2.5)
-                vAtk: 1.1, vHp: 1, vBld: 0.467, vCrush: 0.948, vThicket: 0.903,
-                vAura: 1.4, vEngine: 0.8, vBuffEcho: 1.119, vMedic: 1.3,
-                vUndying: 2, vTradeDraw: 1,
+                vAtk: 1.034, vHp: 1, vBld: 0.467, vCrush: 0.923, vThicket: 0.975,
+                vAura: 1.11, vEngine: 0.829, vBuffEcho: 1.119, vMedic: 1.09,
+                vUndying: 3, vTradeDraw: 1,
                 // угроза чужого (aiThreat)
-                tAtk: 1.25, tHp: 0.6, tCrush: 1.4, tThicket: 1.404, tAura: 1.227,
-                tDangerBld: 3.2, tBldMult: 0.8,
-                runMinAtk: 10,       // разгоны: атака от…
+                tAtk: 1.25, tHp: 0.521, tCrush: 1.4, tThicket: 1.404, tAura: 1.227,
+                tDangerBld: 3.213, tBldMult: 0.8,
+                runMinAtk: 9,       // разгоны: атака от…
                 runGap: 6,           // …и выше печатной на
                 runMult: 2,        // …угроза УМНОЖАЕТСЯ
                 // клетки призыва (aiSpotScore)
-                sFrontRow: 2, sColFree: 1.5, sOwnAhead: 0.9,
-                sSupportBack: 2.284, sGap: 1.5, sDashKill: 3.315,
-                sKillThreatK: 0.341, sNearKill: 5.651, sCowardAhead: 2.5,
+                sFrontRow: 2, sColFree: 1.526, sOwnAhead: 0.9,
+                sSupportBack: 2.022, sGap: 2.069, sDashKill: 2.522,
+                sKillThreatK: 0.341, sNearKill: 4.527, sCowardAhead: 2.5,
                 sMarkBlock: 3.63,
                 // дерево розыгрыша (W114, юзер — «этап 2: деревья решений
                 // для связок»): перебор порядков/подмножеств играбельных карт
@@ -66,14 +66,14 @@
                 treeNodes: 400,     // бюджет листьев перебора за полуход
                 treeHold: 1,        // 1 — план может придержать карты
                 treeMinCards: 2,    // гейт: считать план при ≥2 играбельных
-                treeMargin: 0.3,    // план действует, если лучше базы на ≥
+                treeMargin: 0.362,    // план действует, если лучше базы на ≥
                 // веса оценки листа (модель поля aiTree.js)
                 cBoard: 1,          // (ценность своих − угроза чужих)
                 cBase: 1.1,         // урон по базе игрока за ♥
-                cSelfBase: 1.1,     // урон своей базе (штраф/польза)
-                cEnergy: 0.22,      // остаток энергии за ⚡
-                cDraw: 1.2,         // добранная карта
-                cStatic: 0.5,       // несмоделированный эффект (aiCardPower)
+                cSelfBase: 1.159,     // урон своей базе (штраф/польза)
+                cEnergy: 0.192,      // остаток энергии за ⚡
+                cDraw: 0.982,         // добранная карта
+                cStatic: 0.44,       // несмоделированный эффект (aiCardPower)
                 cLethal: 1000,      // добивание базы игрока в переборе
             };
             A.AI_W = Object.assign({}, A.AI_W_BASE,
