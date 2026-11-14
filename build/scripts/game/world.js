@@ -706,72 +706,102 @@
 
         function buildHud() {
             const c = new PIXI.Container();
-            // «хром» HUD без фонов panel_label (просил юзер): невидимая
-            // зона за золотом/квестом ловит клики — герой не идёт в угол
-            const chrome = new PIXI.Container();
-            chrome.eventMode = "static";
-            chrome.hitArea = new PIXI.Rectangle(8, -6, 200, 76);
-            c.addChild(chrome);
+            // Панель героя и ресурсов panel9.png (арт юзера, W120): слева
+            // кольцо героя, правее доска с 7 слотами (золото + 6 ресурсов
+            // стихий), ниже — дощечка на подвесах с иконками квестов.
+            // Вся панель — одна клик-зона (герой не идёт под панель),
+            // прижата к левому верхнему углу ОКНА (clamp в update, как у
+            // прежних краевых элементов). Замер арта: кольцо — центр
+            // (119,119), дырка r≈92; слоты — овалы ~41×78, центры по x
+            // 296..616 (шаг ~53), центр по y≈62; дощечка ~320..590×100..186.
+            const panel = new PIXI.Container();
+            panel.eventMode = "static";
+            panel.hitArea = new PIXI.Rectangle(0, 0, 704, 240);
+            const panelSpr = new PIXI.Sprite(uiTex("settings/panel9.png")); // 704×240
+            panelSpr.eventMode = "none";
+            panel.addChild(panelSpr);
+            c.addChild(panel);
             const hudStyle = { fontFamily: "Kereru", fontSize: 27, fill: 0xf3e6c2,
                 stroke: { color: 0x1c1207, width: 4 } };
             const titleT = new PIXI.Text({ text: GAME_LOC.t("world.title"), style: hudStyle });
             titleT.anchor.set(0.5, 0);
             titleT.position.set(960, 12); // по середине экрана (просил юзер)
             c.addChild(titleT);
-            // золото — около верхнего левого угла (просил юзер), без плашки
-            const goldPlate = new PIXI.Container();
-            goldPlate.position.set(18, 14);
-            const gicon = new PIXI.Sprite(uiTex("icon_gold.png"));
-            gicon.anchor.set(0.5);
-            gicon.scale.set(0.46);
-            gicon.position.set(17, 17);
-            goldPlate.addChild(gicon);
-            const goldT = new PIXI.Text({ text: "0", style: hudStyle });
-            goldT.position.set(38, 3);
-            goldPlate.addChild(goldT);
-            // ресурсы стихий (W40, просил юзер): иконки+числа правее золота —
-            // по аналогии с ним; на начало игры нули, обновляются в update
-            const resStyle = { fontFamily: "Kereru", fontSize: 22,
+            // ── 7 слотов: золото + ресурсы стихий (просил юзер W120) ──────
+            // иконки чуть меньше слота и с мягким свечением, числа — под
+            // иконками, в нижней части слота. Порядок прежнего ряда HUD:
+            // золото, затем RES_ELEMS (Сила, Рост, Мудрость, Тлен, Честь,
+            // Время); на начало игры нули, обновляются в update
+            const resStyle = { fontFamily: "Kereru", fontSize: 21,
                 fill: 0xf3e6c2, stroke: { color: 0x1c1207, width: 4 } };
+            const SLOTS_X = [296.5, 350.5, 402, 455, 508.5, 562, 616];
+            const ICON_Y = 50, NUM_Y = 86; // центр иконки / центр числа в слоте
+            const glowOf = () => { // мягкое свечение под иконкой (просил юзер)
+                const g = new PIXI.Graphics();
+                g.circle(0, 0, 24).fill({ color: 0xffdf8e, alpha: 0.28 });
+                g.circle(0, 0, 33).fill({ color: 0xffdf8e, alpha: 0.10 });
+                g.blendMode = "add";
+                g.eventMode = "none";
+                return g;
+            };
+            const goldT = new PIXI.Text({ text: "0", style: resStyle });
+            {
+                const g0 = glowOf();
+                g0.position.set(SLOTS_X[0], ICON_Y);
+                panel.addChild(g0);
+                const gicon = new PIXI.Sprite(uiTex("icon_gold.png"));
+                gicon.anchor.set(0.5);
+                gicon.scale.set(0.5); // 72 → 36px
+                gicon.position.set(SLOTS_X[0], ICON_Y);
+                gicon.eventMode = "none";
+                panel.addChild(gicon);
+                goldT.anchor.set(0.5);
+                goldT.position.set(SLOTS_X[0], NUM_Y);
+                goldT.eventMode = "none";
+                panel.addChild(goldT);
+            }
             const resT = {};
-            let rx = 150; // золото занимает ~до 110
-            for (const e of globalThis.GAME_SIDEQ.RES_ELEMS) {
+            globalThis.GAME_SIDEQ.RES_ELEMS.forEach((e, i) => {
+                const x = SLOTS_X[i + 1];
+                const g0 = glowOf();
+                g0.position.set(x, ICON_Y);
+                panel.addChild(g0);
                 const icon = new PIXI.Sprite(uiTex(`resources/res_${e}.png`));
                 icon.anchor.set(0.5);
-                icon.scale.set(0.4); // 72 → ~29px
-                icon.position.set(rx + 14, 18);
-                goldPlate.addChild(icon);
+                icon.scale.set(0.5);
+                icon.position.set(x, ICON_Y);
+                icon.eventMode = "none";
+                panel.addChild(icon);
                 const num = new PIXI.Text({ text: "0", style: resStyle });
-                num.position.set(rx + 32, 6);
-                goldPlate.addChild(num);
+                num.anchor.set(0.5);
+                num.position.set(x, NUM_Y);
+                num.eventMode = "none";
+                panel.addChild(num);
                 resT[e] = num;
-                rx += 64;
-            }
-            // активный квест сюжетной линии (просил юзер): иконка правее
-            // ресурсного ряда открывает текст задания. (W46, юзер) иконки
-            // строятся всегда, видимость СИНХРОНИЗИРУЕТСЯ ПО КАДРАМ (update):
-            // руна — только с ВЗЯТЫМ квестом (announced: «Принять» у Глома),
-            // кнопка поручения (W45) — в постоянном слоте правее. W46:
-            // поручение отодвинуто с rx+52 — налезало на руну 72px боком
-            const qRune = hudIcon("icon_rune.png", rx + 16, 17, () => {
+            });
+            // ── квесты: 2 иконки на дощечке (просил юзер W120) ────────────
+            // сюжетная руна + поручения; иконки строятся всегда, видимость
+            // СИНХРОНИЗИРУЕТСЯ ПО КАДРАМ (update): руна — только с ВЗЯТЫМ
+            // квестом (announced: «Принять» у Глома), поручения — при
+            // активных заданиях (как в W46)
+            const qRune = hudIcon("icon_rune.png", 425, 141, () => {
                 globalThis.GAME_QUESTS.showReview(ctx);
-            }, 0.75);
-            const qSide = hudIcon("icon_map.png", rx + 80, 17,
-                () => { globalThis.GAME_SIDEQ.showReview(ctx); }, 0.75);
+            }, 0.62);
+            const qSide = hudIcon("icon_map.png", 492, 141,
+                () => { globalThis.GAME_SIDEQ.showReview(ctx); }, 0.62);
             qRune.visible = qSide.visible = false; // до первой синхронизации
-            goldPlate.addChild(qRune, qSide);
-            c.addChild(goldPlate);
+            panel.addChild(qRune, qSide);
             // настройки доступны и из мира; «Назад» вернёт сюда. Колода —
-            // только по карте героя (просил юзер): карта под иконкой золота
+            // по кружку героя (как по прежней карте, просил юзер)
             const settingsBtn = hudIcon("icon_setting.png", 1839, 66, () => {
                 G.uiReturn = "world";
                 globalThis.GAME_SETTINGS_SCENE.captureSettingsBg(ctx); // сзади — мир (юзер)
                 scenes.go("settings");
             });
             c.addChild(settingsBtn);
-            // счётчик дней открытого мира (W60, юзер): слева от иконки
-            // настроек — иконка icon_day.png и число, по принципу ресурсов
-            // (позиция — ежекадрово от края окна, как у настроек)
+            // счётчик дней открытого мира (W60, юзер): справа у иконки
+            // настроек — иконка icon_day.png и число (позиция — ежекадрово
+            // от края окна, как у настроек)
             const dayPlate = new PIXI.Container();
             const dayIcon = new PIXI.Sprite(uiTex("icon_day.png"));
             dayIcon.anchor.set(0.5);
@@ -782,25 +812,42 @@
             dayT.position.set(30, 54);
             dayPlate.addChild(dayT);
             c.addChild(dayPlate);
-            // карточка героя (просил юзер): под иконкой золота, клик —
-            // в колоду, наведение — рост до натурального размера (ctx.heroHover)
+            // ── герой: круг-вырез из арта (просил юзер W120) ─────────────
+            // в кольце панели — не карта, а вырезанный из её арта кружок;
+            // клик — в колоду, наведение — полная карта натурального
+            // размера 230×338 (верх у верхней кромки экрана); появление
+            // ведёт update (плавный рост scale 0.45 → 1)
             const wHero = globalThis.GAME_DATA.HEROES[G.heroId]
                 || globalThis.GAME_DATA.HEROES.gorbag;
             const heroHolder = new PIXI.Container();
-            heroHolder.position.set(58, 76);
-            heroHolder.hitArea = new PIXI.Rectangle(-57.5, 0, 115, 169); // 115×169
-            const heroCard = new PIXI.Sprite(uiTex(`heroes/${wHero.img}.png`));
-            heroCard.anchor.set(0.5, 0);
-            heroCard.scale.set(0.5); // 230×338 → 115×169
-            heroCard.eventMode = "none";
-            heroHolder.addChild(heroCard);
-            heroHolder.on("pointertap", () => {
-                if (ctx.sfx) ctx.sfx();
-                G.uiReturn = "world";
-                scenes.go("deck");
+            heroHolder.position.set(119, 119); // центр кольца (замер арта)
+            heroHolder.hitArea = new PIXI.Circle(0, 0, 92); // дырка кольца
+            heroHolder.eventMode = "static";
+            panel.addChild(heroHolder);
+            const art = new PIXI.Sprite(uiTex(`heroes/${wHero.img}.png`));
+            art.anchor.set(0.5, 0.42); // персонаж — чуть выше середины арта
+            art.scale.set(184 / 230);  // диаметр дырки кольца / ширина арта
+            heroHolder.addChild(art);
+            const artMask = new PIXI.Graphics();
+            artMask.circle(0, 0, 92).fill(0xffffff);
+            heroHolder.addChild(artMask);
+            art.mask = artMask;
+            const heroName = new PIXI.Text({
+                text: GAME_LOC.t(`hero.${G.heroId || "gorbag"}.name`),
+                style: { fontFamily: "Kereru", fontSize: 26, fill: 0xffe2a8,
+                    stroke: { color: 0x241505, width: 6 } },
             });
-            ctx.heroHover(heroHolder, heroCard, 115, 0); // большой вид целиком на экране
-            c.addChild(heroHolder);
+            heroName.anchor.set(0.5);
+            heroName.position.set(119, 22); // на деревянном ободе кольца
+            heroName.eventMode = "none";
+            panel.addChild(heroName);
+            const heroFull = new PIXI.Sprite(uiTex(`heroes/${wHero.img}.png`));
+            heroFull.anchor.set(0.5, 0);
+            heroFull.position.set(0, -119); // верх карты — верхняя кромка экрана
+            heroFull.scale.set(0.45);
+            heroFull.alpha = 0;
+            heroFull.eventMode = "none";
+            heroHolder.addChild(heroFull);
             const hint = new PIXI.Text({
                 text: GAME_LOC.t("world.hint"),
                 style: { fontFamily: "Kereru", fontSize: 22, fill: 0xbfae87 },
@@ -813,9 +860,16 @@
             // краевые элементы HUD — ссылки для ежекадрового прижатия
             // к краям ОКНА по горизонтали (просил юзер: при переходе
             // из полноэкранного в оконный letterbox-полосы канваса
-            // отодвигали золото/карточку героя и настройки от краёв)
-            c.userData = { goldT, resT, mini, goldPlate, heroHolder,
-                settingsBtn, qRune, qSide, dayPlate, dayT };
+            // отодвигали панель и настройки от краёв)
+            c.userData = { goldT, resT, mini, panel, settingsBtn, qRune, qSide,
+                dayPlate, dayT, heroFull, heroT: 0, heroA: 0 };
+            heroHolder.on("pointerover", () => { c.userData.heroT = 1; });
+            heroHolder.on("pointerout", () => { c.userData.heroT = 0; });
+            heroHolder.on("pointertap", () => {
+                if (ctx.sfx) ctx.sfx();
+                G.uiReturn = "world";
+                scenes.go("deck");
+            });
             return c;
         }
 
@@ -1650,10 +1704,18 @@
                     const rt = ctx.ui.toLocal({
                         x: ctx.app.screen.width, y: 0 });
                     const ud = uiHud.userData;
-                    ud.goldPlate.position.set(lt.x + 18, 14);
-                    ud.heroHolder.position.set(lt.x + 58, 76);
+                    // панель героя/ресурсов — у левого верхнего угла окна
+                    // (вся начинка — дети панели, едет вместе с ней)
+                    ud.panel.position.set(lt.x, 0);
                     ud.settingsBtn.position.set(rt.x - 81, 66);
                     ud.dayPlate.position.set(rt.x - 166, 0);
+                    // плавное увеличение карты героя при наведении на
+                    // кружок в кольце (W120): лерп alpha/масштаба к цели
+                    ud.heroA += (ud.heroT - ud.heroA) * 0.22;
+                    if (ud.heroA < 0.004) ud.heroA = 0;
+                    const he = ud.heroA * ud.heroA * (3 - 2 * ud.heroA);
+                    ud.heroFull.alpha = he;
+                    ud.heroFull.scale.set(0.45 + 0.55 * he);
                 }
                 // дни открытого мира (W60, юзер): тикают ТОЛЬКО здесь —
                 // 20 секунд реального времени = 1 день; бой/город/подземелье/
@@ -2277,7 +2339,7 @@
                         x: ctx.app.screen.width, y: 0 });
                     return {
                         left: lt.x, right: rt.x,
-                        goldX: ud.goldPlate.x, heroX: ud.heroHolder.x,
+                        panelX: ud.panel.x,
                         settingsX: ud.settingsBtn.x,
                     };
                 },

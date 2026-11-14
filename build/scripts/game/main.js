@@ -49,6 +49,8 @@
             "settings/panel5", "settings/point", "settings/abutton", "settings/obutton",
             "settings/panel6", "settings/panel7", "settings/panel8",
             "settings/abutton2", "settings/obutton2",
+            // панель героя/ресурсов мира и подземелий (арт юзера, W120)
+            "settings/panel9",
         ];
         say("арт интерфейса…");
         await frame();

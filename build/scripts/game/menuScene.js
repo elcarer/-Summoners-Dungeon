@@ -40,13 +40,11 @@
                 menuRoot.addChild(cardsBg);
 
                 // Заголовка кодом больше нет — название вшито в новый титульный
-                // арт bg_corridor_1 (просил юзер W116). Кнопки 274×77 — в ДВЕ
-                // КОЛОНКИ ПОД названием внизу (просил юзер W116 по скрину):
-                // плашка с названием занимает центр арта (~370..1540 ×
-                // 360..710), колонки симметрично 960±300 — левая x=660
-                // (игровые действия: Продолжить/Новая игра/Колода), правая
-                // x=1260 (Настройки/Выход); в зоне колонок start_cards
-                // прозрачен (альфа ≤19), подписи кеглем 45.
+                // арт bg_corridor_1 (просил юзер W116). Кнопки 274×77 — В ОДНУ
+                // СТРОКУ ВНИЗУ ЭКРАНА (просил юзер W120 по скрину: две колонки
+                // выглядели несимметрично): ряд симметричен относительно 960,
+                // шаг 310 — центры 340/650/960/1270/1580, y=1000 (нижний край
+                // 1038, до строки «до встречи» на 1059 не доходит).
                 // «Войти» заменён парой «Продолжить»/«Новая игра» (просил юзер):
                 // продолжить можно сохранённый забег (sd_run, пишет G.saveRun),
                 // новая игра снимает сейв и начинает с 1-го этажа. Кнопки — в
@@ -66,23 +64,23 @@
                     return b;
                 };
                 const contEnabled = !!GAME_META.loadRun();
-                const bCont = addMenuBtn(t("menu.continue"), 660, 800, () => {
+                const bCont = addMenuBtn(t("menu.continue"), 340, 1000, () => {
                     const r = GAME_META.loadRun();
                     if (!contEnabled || !r) return;
                     ctx.applySavedRun(r); // поднятие забега — см. applySavedRun
                 });
-                const bNew = addMenuBtn(t("menu.newGame"), 660, 890, () => {
+                const bNew = addMenuBtn(t("menu.newGame"), 650, 1000, () => {
                     // герой задаёт стихию/стартовую колоду/жизни базы —
                     // сначала выбор героя (юзер)
                     scenes.go("heroPick");
                 });
-                const bDeck = addMenuBtn(t("menu.deck"), 660, 980, () => scenes.go("deck"));
-                const bSet = addMenuBtn(t("menu.settings"), 1260, 845, () => {
+                const bDeck = addMenuBtn(t("menu.deck"), 960, 1000, () => scenes.go("deck"));
+                const bSet = addMenuBtn(t("menu.settings"), 1270, 1000, () => {
                     // сзади настроек — затенённое меню (снимок живой сцены, юзер)
                     globalThis.GAME_SETTINGS_SCENE.captureSettingsBg(ctx);
                     scenes.go("settings");
                 });
-                const bExit = addMenuBtn(t("menu.exit"), 1260, 935, () => {
+                const bExit = addMenuBtn(t("menu.exit"), 1580, 1000, () => {
                     // выйти по-настоящему: в Electron window.close() закрывает
                     // окно (и приложение), браузер обычно запрещает закрытие
                     // вкладки, открытой не скриптом — тогда остаётся «До встречи»
