@@ -47,6 +47,8 @@
             // панель настроек — спрайты юзера (макет for_work/arts/example.png)
             "settings/panel1", "settings/panel2", "settings/panel3", "settings/panel4",
             "settings/panel5", "settings/point", "settings/abutton", "settings/obutton",
+            "settings/panel6", "settings/panel7", "settings/panel8",
+            "settings/abutton2", "settings/obutton2",
         ];
         say("арт интерфейса…");
         await frame();

@@ -962,31 +962,47 @@
         function buildShopWin(o) {
             const t = GAME_LOC.t;
             const { CARDS, SHOP_BUY, SHOP_SELL } = globalThis.GAME_DATA;
-            const { T, button, cardFace, scrollPane, cardZoomer } = globalThis.GAME_UI;
+            const { T, fit, button, cardFace, scrollPane, cardZoomer } = globalThis.GAME_UI;
             const c = new PIXI.Container();
             // правило UI: наведение на карту — копия растёт до полного
-            // размера спрайта (host — окно магазина, не скролл-панель)
-            const zoomer = cardZoomer(ctx, { host: c });
+            // размера спрайта (host — окно магазина, не скролл-панель);
+            // кламп по окнам panel6/panel7 — не накрывать выход внизу
+            const zoomer = cardZoomer(ctx, { host: c, yMin: 300, yMax: 740 });
             c.eventMode = "static";
             const dim = new PIXI.Graphics();
             dim.rect(-3000, -2000, 7920, 5080);
             dim.fill({ color: 0x000000, alpha: 0.65 });
             c.addChild(dim);
-            const title = T(t("obj.shop"), 51, 0xf0c96a, { stroke: { color: 0x241505, width: 9 } });
-            title.anchor.set(0.5, 0);
-            title.position.set(960, 21);
-            title.eventMode = "none";
-            c.addChild(title);
+            // W115 (юзер): chrome как у колоды/коллекции — panel6 (слева,
+            // вшитая плашка с надписью «Магазин») + panel7 (справа), выход
+            // panel3 внизу по центру. Спрайты 1:1 из макета dec_ref.png
+            const win6 = new PIXI.Sprite(uiTex("settings/panel6.png"));
+            win6.anchor.set(0.5);
+            win6.position.set(15 + 320, 9 + 498.5); // 640×997
+            win6.eventMode = "none";
+            c.addChild(win6);
+            const pl = T(t("shop.plaque"), 36, 0xf0c96a,
+                { stroke: { color: 0x241505, width: 6 } });
+            pl.anchor.set(0.5);
+            pl.position.set(335, 56);
+            pl.eventMode = "none";
+            fit(pl, 290);
+            c.addChild(pl);
+            const win7 = new PIXI.Sprite(uiTex("settings/panel7.png"));
+            win7.anchor.set(0.5);
+            win7.position.set(665 + 620, 48 + 478); // 1240×956
+            win7.eventMode = "none";
+            c.addChild(win7);
             // золото — живой счётчик справа сверху (обновляется при покупках)
             const goldIcon = new PIXI.Sprite(uiTex("icon_gold.png"));
             goldIcon.anchor.set(0.5);
             goldIcon.scale.set(0.62);
-            goldIcon.position.set(1826, 66);
+            goldIcon.position.set(1826, 26);
             goldIcon.eventMode = "none";
             c.addChild(goldIcon);
             const goldT = T(String(G.gold), 34, 0xffe2a8, { stroke: { color: 0x1c1207, width: 6 } });
             goldT.anchor.set(1, 0.5);
-            goldT.position.set(1798, 66);
+            goldT.position.set(1798, 26);
             goldT.eventMode = "none";
             c.addChild(goldT);
             // W111 (юзер): эффект «Coin collect» на карте при продаже и
@@ -1006,40 +1022,31 @@
                 });
             }
 
-            // левая панель: товары (6 карт 3×2), клик — купить
-            const left = new PIXI.Graphics();
-            left.roundRect(72, 129, 645, 888, 15);
-            left.fill({ color: 0x171310, alpha: 0.92 });
-            left.stroke({ width: 3, color: 0x6b5c40 });
-            c.addChild(left);
-            const goodsH = T(t("shop.goods"), 30, 0xf3e6c2);
-            goodsH.position.set(99, 138);
+            // левое окно (panel6): ПРОДАЖА карт из коллекции (клик по карте)
+            // — юзер W115: «карты колоды в магазине меняются на продаваемые»
+            const sellH = T(t("shop.sellTitle"), 26, 0xf3e6c2);
+            sellH.position.set(60, 112);
+            sellH.eventMode = "none";
+            c.addChild(sellH);
+            const sellPane = scrollPane(ctx, { x: 35, y: 150, w: 575, h: 740, onScroll: () => zoomer.hide(false) });
+            c.addChild(sellPane.node);
+            const sellHint = T(t("shop.sellHint"), 19, 0x8a7c5e, { wordWrap: true, wordWrapWidth: 540 });
+            sellHint.position.set(40, 905);
+            sellHint.eventMode = "none";
+            c.addChild(sellHint);
+
+            // правое окно (panel7): товары (6 карт 3×2), клик — купить
+            const goodsH = T(t("shop.goods"), 26, 0xf3e6c2);
+            goodsH.position.set(710, 112);
             goodsH.eventMode = "none";
             c.addChild(goodsH);
             const goodsBox = new PIXI.Container();
-            goodsBox.position.set(90, 200);
+            goodsBox.position.set(665, 238);
             c.addChild(goodsBox);
-            const buyHint = T(t("shop.buyHint"), 19, 0x8a7c5e, { wordWrap: true, wordWrapWidth: 590 });
-            buyHint.position.set(99, 946);
+            const buyHint = T(t("shop.buyHint"), 19, 0x8a7c5e, { wordWrap: true, wordWrapWidth: 1040 });
+            buyHint.position.set(765, 855);
             buyHint.eventMode = "none";
             c.addChild(buyHint);
-
-            // правая панель: продажа карт из коллекции (клик по карте)
-            const right = new PIXI.Graphics();
-            right.roundRect(762, 129, 1086, 888, 15);
-            right.fill({ color: 0x171310, alpha: 0.92 });
-            right.stroke({ width: 3, color: 0x6b5c40 });
-            c.addChild(right);
-            const sellH = T(t("shop.sellTitle"), 30, 0xf3e6c2);
-            sellH.position.set(789, 138);
-            sellH.eventMode = "none";
-            c.addChild(sellH);
-            const sellPane = scrollPane(ctx, { x: 780, y: 195, w: 1050, h: 768, onScroll: () => zoomer.hide(false) });
-            c.addChild(sellPane.node);
-            const sellHint = T(t("shop.sellHint"), 19, 0x8a7c5e, { wordWrap: true, wordWrapWidth: 1035 });
-            sellHint.position.set(786, 972);
-            sellHint.eventMode = "none";
-            c.addChild(sellHint);
             const noGoldRef = { node: null };
 
             function buildGoods() {
@@ -1047,7 +1054,9 @@
                 const nodes = [];
                 o.stock.forEach((id, i) => {
                     const col = i % 3, rowI = (i / 3) | 0;
-                    const cx = 93 + col * 198, cy = 100 + rowI * 307.5;
+                    // блок 3×2 отцентрован в panel7 (внутр. 1190px):
+                    // левый край 286 → центр первой карты 286+69 = 355
+                    const cx = 355 + col * 240, cy = 100 + rowI * 310;
                     const sold = !!(o.sold && o.sold[i]);
                     const price = SHOP_BUY[CARDS[id].rarity];
                     const card = cardFace(ctx, id, { scale: 0.5, dim: sold });
@@ -1057,12 +1066,12 @@
                     // ЗЕРКАЛЬНО (пластина-счётчик слева); цена — SHOP_BUY.
                     // Звон монет играет shopBuy (sfx "coins")
                     card.on("pointertap", () => {
-                        if (shopBuy(i)) shopCoins(90 + cx, 200 + cy, price, true);
+                        if (shopBuy(i)) shopCoins(665 + cx, 238 + cy, price, true);
                         else flashNoGold();
                     });
                     // правило UI: копия растёт до полного размера (позиция
-                    // в окне — goodsBox смещён на 90,200)
-                    card.on("pointerover", () => zoomer.show(id, 90 + cx, 200 + cy, card));
+                    // в окне — goodsBox смещён на 665,238)
+                    card.on("pointerover", () => zoomer.show(id, 665 + cx, 238 + cy, card));
                     card.on("pointerout", () => zoomer.hide(false));
                     goodsBox.addChild(card);
                     const lbl = T(sold ? t("shop.soldOut") : t("shop.price", { n: price }),
@@ -1085,10 +1094,10 @@
                     .filter((id) => (G.collection[id] || 0) - countInDeck(id) > 0)
                     .sort((a, b) => (CARDS[a].cost - CARDS[b].cost) || a.localeCompare(b));
                 ids.forEach((id, i) => {
-                    const col = i % 5, rowI = (i / 5) | 0;
+                    const col = i % 3, rowI = (i / 3) | 0;
                     const free = (G.collection[id] || 0) - countInDeck(id);
                     const canSell = !sellLocked();
-                    const cx = 93 + col * 198, cy = 138 + rowI * 307.5;
+                    const cx = 75 + col * 198, cy = 138 + rowI * 307.5;
                     const card = cardFace(ctx, id, { scale: 0.5, dim: !canSell });
                     card.position.set(cx, cy);
                     card.eventMode = "static";
@@ -1098,15 +1107,15 @@
                         const st = sellPane.state;
                         const iy = -st.t * Math.max(0, st.contentH - st.viewH);
                         if (shopSell(id))
-                            shopCoins(780 + cx, 195 + cy + iy,
+                            shopCoins(35 + cx, 150 + cy + iy,
                                 SHOP_SELL[CARDS[id].rarity], false);
                     });
                     // правило UI: копия растёт до полного размера; позиция
-                    // в окне — контент панели (780,195) с поправкой на скролл
+                    // в окне — контент панели (35,150) с поправкой на скролл
                     card.on("pointerover", () => {
                         const st = sellPane.state;
                         const iy = -st.t * Math.max(0, st.contentH - st.viewH);
-                        zoomer.show(id, 780 + cx, 195 + cy + iy, card);
+                        zoomer.show(id, 35 + cx, 150 + cy + iy, card);
                     });
                     card.on("pointerout", () => zoomer.hide(false));
                     c2.addChild(card);
@@ -1120,11 +1129,11 @@
                 });
                 if (!ids.length) {
                     const empty = T(t("shop.sellEmpty"), 22, 0x8a7c5e);
-                    empty.position.set(93, 36);
+                    empty.position.set(75, 36);
                     empty.eventMode = "none";
                     c2.addChild(empty);
                 }
-                const rowsN = Math.ceil(ids.length / 5);
+                const rowsN = Math.ceil(ids.length / 3);
                 c2.userData = { contentH: ids.length ? (138 + (rowsN - 1) * 307.5 + 232.5) : 60, rows };
                 return c2;
             }
@@ -1132,7 +1141,7 @@
                 if (noGoldRef.node) return;
                 const n = T(t("shop.noGold"), 30, 0xff8f6e, { stroke: { color: 0x1c1207, width: 6 } });
                 n.anchor.set(0.5);
-                n.position.set(394, 920); // над подсказкой левой панели
+                n.position.set(335, 875); // над подсказкой левого окна
                 n.eventMode = "none";
                 c.addChild(n);
                 noGoldRef.node = n;
@@ -1165,7 +1174,8 @@
             sellRows = firstList.userData.rows;
 
             const leaveBtn = button(ctx, {
-                tex: "button_menu.png", label: t("shop.leave"), x: 165, y: 78, scale: 1,
+                tex: "settings/panel3.png", label: t("shop.leave"),
+                x: 960, y: 1040, fontSize: 24, // выход внизу по центру (W115)
                 onTap: () => {
                     o.cool = true; // повторное открытие — только после отхода
                     closeModal();

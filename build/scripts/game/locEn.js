@@ -100,6 +100,7 @@
             "shop.buyHint": "Click a card to buy it at its rarity price: common 10, rare 30, epic 100 gold",
             "shop.sellHint": "Click a card to sell one spare copy: common 2, rare 6, epic 20 gold. Copies placed in the deck are not sold",
             "shop.sellNeed": "You need at least {n} cards to descend — selling is locked",
+            "shop.plaque": "Shop",
             "shop.leave": "Leave",
             "arena.yourTurn": "YOUR TURN",
             "arena.vs": "VS",

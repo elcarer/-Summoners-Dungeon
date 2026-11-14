@@ -8,6 +8,13 @@
 // добавляет её к выбору, повторный — убирает; внутри оси опции объединяются
 // по «ИЛИ», разные оси — по «И». «Все» сбрасывает ось. Оба окна —
 // скролл-панели (колесо мыши, ползунок, клик по треку). Сохранение сразу.
+// W115 (юзер): окна — спрайты юзера из images/ui/settings/: panel6 (окно
+// колоды 640×997, плашка-заголовок вшита в спрайт сверху), panel7 (окно
+// коллекции 1240×956), вкладки abutton2 (активная, золотая) / obutton2
+// (пассивная, тёмная) 246×85 над окном коллекции, выход — panel3 224×60
+// внизу по центру (как в настройках). Плашки сгенерированы БЕЗ текста —
+// надписи (Kereru) кладём кодом. Позиции — из макета юзера
+// for_work/arts/dec_ref.png (все спрайты 1:1).
 (function () {
     function createDeckScene(ctx) {
         const { scenes, G, ui, uiTex } = ctx;
@@ -41,16 +48,24 @@
         // кнопки фильтра стихий: 6 одноцветных + 5 ДВУХЦВЕТНЫХ (арт юзера
         // W74/W75/W82, MULTI_LOGO) — мульти-карты фильтруются по def.elem
         const ELEM_KEYS = [...Object.keys(ELEM_LOGO), ...Object.keys(MULTI_LOGO)];
-        const PANE_POS = { left: { x: 90, y: 222 }, right: { x: 780, y: 279 } };
+        // ── геометрия W115 (спрайты 1:1 из макета dec_ref.png) ────────────
+        const P6 = { x: 15, y: 9 };    // окно колоды 640×997 (плашка вшита)
+        const P7 = { x: 665, y: 48 };  // окно коллекции 1240×956
+        const PLAQUE_C = { x: P6.x + 320, y: P6.y + 47 }; // центр плашки panel6
+        const TAB_Y = 8, TAB_H = 85;
+        const TABS = [ // [ключ вкладки, x] — активная золотая (abutton2)
+            ["heroes", 805], ["deck", 1057],
+        ];
+        const GOLD = 0xf0c96a, PARCH_DIM = 0xd8c79d;
+        const BACK_POS = { x: 960, y: 1040 }; // panel3 — выход внизу по центру
+        const PANE_POS = { left: { x: 35, y: 245 }, right: { x: 695, y: 255 } };
         // ряд лого стихий (общие константы: использует и rebuildChips, и api).
         // 11 кнопок (5-я мульти-стихия timDec, W82): БЕЗ кружков (поправка
-        // юзера W82 — само лого и есть кнопка), лого 40px, шаг 44; ряд
-        // сдвинут влево так, чтобы правый край был ровно у панели коллекции
-        // (1848): x0 = 1848 − (10·44 + 40) = 1368 (в W79–W81 было 10 кнопок
-        // с кружками 40px шагом 42 от x=1449). Слева ряд ограничен чипами
-        // «Тип»
-        const ELEM_Y = 144, ELEM_ICON = 40, STEP = 44;
-        const ELEM_X0 = 1848 - ((ELEM_KEYS.length - 1) * STEP + ELEM_ICON);
+        // юзера W82 — само лого и есть кнопка), лого 40px, шаг 44; ряд —
+        // в правой части окна коллекции: x0 = 1860 − (10·44 + 40) = 1380.
+        // Слева ряд ограничен чипами «Тип»
+        const ELEM_Y = 118, ELEM_ICON = 40, STEP = 44;
+        const ELEM_X0 = 1860 - ((ELEM_KEYS.length - 1) * STEP + ELEM_ICON);
         const paneCards = { left: [], right: [] }; // для тестов: {id, node, cx, cy, labelY}
         const elemBtns = []; // спрайты-логотипы (эмитят pointertap в тестах)
         const elemSprites = []; // те же спрайты (тесты: позиция = центр лого)
@@ -72,7 +87,9 @@
             const pp = PANE_POS[side];
             const st = (side === "left" ? leftPane : rightPane).state;
             const iy = -st.t * Math.max(0, st.contentH - st.viewH);
-            node.position.set(pp.x + cx, Math.max(270, Math.min(810, pp.y + cy + iy)));
+            // центр полной копии клампится внутрь окон (panel6/panel7):
+            // полная карта 495px — от 320 до 733 по вертикали
+            node.position.set(pp.x + cx, Math.max(320, Math.min(733, pp.y + cy + iy)));
             root.addChild(node);
             zoom = { id, node, cur: 0.5, tgt: 1, base, baseAlpha };
         }
@@ -164,7 +181,7 @@
             const locked = G.deck.length <= deckMinNow(); // минимум — убирать нельзя
             ids.forEach((id, i) => {
                 const col = i % 3, rowI = (i / 3) | 0;
-                const cx = 93 + col * 198, cy = 138 + rowI * 307.5;
+                const cx = 75 + col * 198, cy = 138 + rowI * 307.5;
                 const card = cardFace(ctx, id, { scale: 0.5, dim: locked });
                 card.position.set(cx, cy);
                 card.eventMode = "static";
@@ -200,7 +217,7 @@
                 const capped = inDeck >= DECK_COPIES; // лимит одинаковых карт
                 const elemOk = heroElemOk(id);
                 const canAdd = owned > inDeck && !capped && G.deck.length < DECK_MAX && elemOk;
-                const cx = 93 + col * 198, cy = 138 + rowI * 307.5;
+                const cx = 75 + col * 240, cy = 138 + rowI * 307.5;
                 const card = cardFace(ctx, id, {
                     scale: 0.5, dim: owned <= inDeck || capped || !elemOk,
                 });
@@ -304,29 +321,24 @@
             return [starter, ...HERO_FOE_ORDER.filter((id) => G.captured.includes(id))];
         }
 
-        // ── вкладка «Герои»: слева активный герой, справа все карты ────────
+        // ── вкладка «Герои»: слева активный герой (panel6, плашка «Герои»),
+        // справа сетка всех карт персонажей (panel7) ────────────────────────
         function buildHeroesTab() {
             const active = HEROES[G.heroId] || HEROES.gorbag;
-            // левая рамка: карточка активного героя и его данные
-            const left = new PIXI.Graphics();
-            left.roundRect(72, 129, 645, 888, 15);
-            left.fill({ color: 0x171310, alpha: 0.92 });
-            left.stroke({ width: 3, color: 0x6b5c40 });
-            root.addChild(left);
             const nameT = T(heroName(active.id), 40, 0xf0c96a,
                 { stroke: { color: 0x241505, width: 7 } });
             nameT.anchor.set(0.5, 0);
-            nameT.position.set(394, 165);
+            nameT.position.set(320, 128);
             nameT.eventMode = "none";
-            fit(nameT, 600, 34);
+            fit(nameT, 480, 34);
             root.addChild(nameT);
             const face = new PIXI.Sprite(uiTex(`heroes/${active.img}.png`));
             face.anchor.set(0.5, 0);
             face.scale.set(1); // натуральный размер 230×338
-            face.position.set(215, 235);
+            face.position.set(190, 180);
             face.eventMode = "none";
             root.addChild(face);
-            const statY = 245;
+            const statY = 186; // ниже имени (128 + 48px кегля) — не наезжает
             const lines = [
                 t("hero.baseLine", { n: active.baseHp }),
                 t("hero.elemLine", { elems: active.elems.map((e) => t("elem." + e)).join(", ") }),
@@ -336,14 +348,14 @@
             ];
             lines.forEach((s, i) => {
                 const ln = T(s, 24, 0xd8c79d);
-                ln.position.set(360, statY + i * 36);
+                ln.position.set(330, statY + i * 36);
                 ln.eventMode = "none";
-                fit(ln, 330, 12);
+                fit(ln, 270, 12);
                 root.addChild(ln);
             });
             const abil = T(t("hero.abilityLabel", { text: t(`hero.${active.id}.ability`) }),
-                21, 0xbfd489, { wordWrap: true, wordWrapWidth: 330, align: "left" });
-            abil.position.set(360, statY + lines.length * 36 + 14);
+                21, 0xbfd489, { wordWrap: true, wordWrapWidth: 270, align: "left" });
+            abil.position.set(330, statY + lines.length * 36 + 14);
             abil.eventMode = "none";
             root.addChild(abil);
             // своя колода ещё не собрана — подсказка (завоёванные герои
@@ -351,8 +363,8 @@
             // способности — у длинных способностей он высок
             if ((G.heroDecksOf()[active.id] || []).length === 0) {
                 const warn = T(t("heroes.emptyDeck"), 20, 0xffb26e,
-                    { wordWrap: true, wordWrapWidth: 330 });
-                warn.position.set(360, abil.y + abil.height + 14);
+                    { wordWrap: true, wordWrapWidth: 270 });
+                warn.position.set(330, abil.y + abil.height + 14);
                 warn.eventMode = "none";
                 root.addChild(warn);
             }
@@ -361,32 +373,27 @@
                     const mark = T(t("heroes.active"), 32, 0xf0c96a,
                         { stroke: { color: 0x241505, width: 6 } });
                     mark.anchor.set(0.5);
-                    mark.position.set(394, 930);
+                    mark.position.set(320, 890);
                     mark.eventMode = "none";
                     root.addChild(mark);
                 } else {
                     root.addChild(button(ctx, {
-                        tex: "button_menu.png", label: t("heroes.pick"), x: 394, y: 930, scale: 1,
+                        tex: "button_menu.png", label: t("heroes.pick"), x: 320, y: 890, scale: 1,
                         onTap: () => api.setActive(active.id),
                     }));
                 }
             }
 
-            // правая рамка: сетка всех карт персонажей
-            const right = new PIXI.Graphics();
-            right.roundRect(762, 129, 1086, 888, 15);
-            right.fill({ color: 0x171310, alpha: 0.92 });
-            right.stroke({ width: 3, color: 0x6b5c40 });
-            root.addChild(right);
+            // правое окно: подзаголовок + сетка всех карт персонажей
             const sub = T(t("heroes.subtitle"), 22, 0x8a7c5e);
             sub.anchor.set(0.5, 0);
-            sub.position.set(1305, 150);
+            sub.position.set(1285, 118);
             sub.eventMode = "none";
-            fit(sub, 1000, 14);
+            fit(sub, 1100, 14);
             root.addChild(sub);
             // сетка героев в скролл-панели — как во вкладке карт: карты
             // ростом с карты колоды (276 px), колесо мыши и полоса прокрутки
-            heroesPane = scrollPane(ctx, { x: 790, y: 190, w: 1030, h: 810,
+            heroesPane = scrollPane(ctx, { x: 695, y: 165, w: 1160, h: 780,
                 onScroll: () => {} });
             root.addChild(heroesPane.node);
             const list = new PIXI.Container();
@@ -445,6 +452,44 @@
                 ids.length ? 150 + (rowsN - 1) * 314 + 238 : 60);
         }
 
+        // Вкладки-спрайты над окном коллекции (юзер W115): активная —
+        // abutton2 (золотая), пассивная — obutton2 (тёмная). Плашки
+        // сгенерированы без текста — надпись кодом (как в настройках W113)
+        function buildTabs() {
+            for (const [key, x] of TABS) {
+                const active = tab === key;
+                root.addChild(button(ctx, {
+                    tex: active ? "settings/abutton2.png" : "settings/obutton2.png",
+                    label: t(key === "deck" ? "deck.tabDeck" : "deck.tabHeroes"),
+                    x, y: TAB_Y + TAB_H / 2, fontSize: 24,
+                    labelColor: active ? GOLD : PARCH_DIM,
+                    onTap: () => { if (tab !== key) { tab = key; rebuild(); } },
+                }));
+            }
+        }
+
+        // Окна-спрайты: panel6 (плашка-заголовок вшита, надпись plaqueKey)
+        // + panel7. Оба eventMode "none" — клики проходят к панелям поверх
+        function buildWindows(plaqueKey) {
+            const win6 = new PIXI.Sprite(uiTex("settings/panel6.png"));
+            win6.anchor.set(0.5);
+            win6.position.set(P6.x + 320, P6.y + 498.5); // 640×997
+            win6.eventMode = "none";
+            root.addChild(win6);
+            const pl = T(t(plaqueKey), 36, GOLD,
+                { stroke: { color: 0x241505, width: 6 } });
+            pl.anchor.set(0.5);
+            pl.position.set(PLAQUE_C.x, PLAQUE_C.y);
+            pl.eventMode = "none";
+            fit(pl, 290);
+            root.addChild(pl);
+            const win7 = new PIXI.Sprite(uiTex("settings/panel7.png"));
+            win7.anchor.set(0.5);
+            win7.position.set(P7.x + 620, P7.y + 478); // 1240×956
+            win7.eventMode = "none";
+            root.addChild(win7);
+        }
+
         function rebuild() {
             hideZoom(true); // смена вкладки — ховер-зум мимо (узлы умрут с root)
             if (root) root.destroy({ children: true });
@@ -454,32 +499,15 @@
             root.eventMode = "static";
             root.addChild(dimBg(ctx, 0.85));
 
-            const title = T(t(tab === "heroes" ? "heroes.title" : "deck.title"),
-                51, 0xf0c96a, { stroke: { color: 0x241505, width: 9 } });
-            title.anchor.set(0.5, 0);
-            title.position.set(960, 21);
-            title.eventMode = "none";
-            fit(title, 1350, 30);
-            root.addChild(title);
+            buildTabs();
+            buildWindows(tab === "heroes" ? "deck.tabHeroes" : "deck.tabDeck");
 
-            // вкладки «Колода» / «Герои» (просил юзер): чипы по центру
-            // под заголовком
-            let chipX = 795;
-            for (const [key, label] of [["deck", t("deck.tabDeck")], ["heroes", t("deck.tabHeroes")]]) {
-                const ch = chip(ctx, {
-                    label, x: chipX, y: 95, active: tab === key,
-                    onTap: () => { if (tab !== key) { tab = key; rebuild(); } },
-                });
-                chipX += ch.userData.w + 18;
-                root.addChild(ch);
-            }
-
-            // подсказка замка (правый верхний угол): пустая, пока колода
-            // в норме или выход не в забег
+            // подсказка замка (правый верх экрана, над окном коллекции):
+            // пустая, пока колода в норме или выход не в забег
             const lockHint = T("", 21, 0xff8f6e,
                 { stroke: { color: 0x1c1207, width: 5 } });
             lockHint.anchor.set(1, 0);
-            lockHint.position.set(1836, 104);
+            lockHint.position.set(1880, 18);
             lockHint.eventMode = "none";
             root.addChild(lockHint);
             lockHintRef = lockHint;
@@ -488,20 +516,14 @@
             if (tab === "heroes") {
                 buildHeroesTab();
             } else {
-            // левая рамка + заголовок + скролл-панель
-            const left = new PIXI.Graphics();
-            left.roundRect(72, 129, 645, 888, 15);
-            left.fill({ color: 0x171310, alpha: 0.92 });
-            left.stroke({ width: 3, color: 0x6b5c40 });
-            root.addChild(left);
-            // шапка левой панели: карточка героя (просил юзер) + счётчики
+            // шапка левого окна: карточка героя (просил юзер) + счётчики
             // колоды правее. Герой определяет стихии, разрешённые в колоде.
-            // Всё компактно до верха карт первого ряда (y=236). Держатель
-            // карточки добавляем ПОСЛЕ панели: в увеличенном виде карточка
-            // накрывает счётчики, а не уходит под них
+            // Всё компактно до верха карт первого ряда. Держатель карточки
+            // добавляем ПОСЛЕ панели: в увеличенном виде карточка накрывает
+            // счётчики, а не уходит под них
             const hd = heroDef();
             const heroHolder = new PIXI.Container();
-            heroHolder.position.set(146, 130);
+            heroHolder.position.set(90, 112);
             heroHolder.hitArea = new PIXI.Rectangle(0, 0, 71, 105); // исходное место
             const heroCard = new PIXI.Sprite(uiTex(`heroes/${hd.img}.png`));
             heroCard.anchor.set(0, 0);
@@ -510,37 +532,30 @@
             heroHolder.addChild(heroCard);
             ctx.heroHover(heroHolder, heroCard, 0, 0);
             const deckH = T("", 30, 0xf3e6c2);
-            deckH.position.set(240, 148);
+            deckH.position.set(180, 122);
             deckH.eventMode = "none";
             root.addChild(deckH);
             const minH = T("", 19, 0x8a7c5e);
-            minH.position.set(500, 156);
+            minH.position.set(182, 162);
             minH.eventMode = "none";
-            fit(minH, 210, 13);
+            fit(minH, 420, 13);
             root.addChild(minH);
             const abilT = T(t(`hero.${hd.id}.ability`), 17, 0x8a7c5e);
-            abilT.position.set(240, 198);
+            abilT.position.set(180, 192);
             abilT.eventMode = "none";
-            fit(abilT, 460, 13); // одна строка — не наезжает на карты колоды
+            fit(abilT, 420, 13); // одна строка — не наезжает на карты колоды
             root.addChild(abilT);
             headerRef = { deck: deckH, min: minH };
-            leftPane = scrollPane(ctx, { x: 90, y: 222, w: 609, h: 774, onScroll: () => hideZoom(false) });
+            leftPane = scrollPane(ctx, { x: 35, y: 245, w: 575, h: 720, onScroll: () => hideZoom(false) });
             root.addChild(leftPane.node);
             root.addChild(heroHolder);
 
-            // правая рамка + фильтры + скролл-панель
-            const right = new PIXI.Graphics();
-            right.roundRect(762, 129, 1086, 888, 15);
-            right.fill({ color: 0x171310, alpha: 0.92 });
-            right.stroke({ width: 3, color: 0x6b5c40 });
-            root.addChild(right);
-
-            const hint = T(t("deck.hint"), 19, 0x8a7c5e, { wordWrap: true, wordWrapWidth: 1035 });
-            hint.position.set(786, 978);
+            const hint = T(t("deck.hint"), 19, 0x8a7c5e, { wordWrap: true, wordWrapWidth: 1140 });
+            hint.position.set(700, 952);
             hint.eventMode = "none";
             root.addChild(hint);
 
-            rightPane = scrollPane(ctx, { x: 780, y: 279, w: 1050, h: 684, onScroll: () => hideZoom(false) });
+            rightPane = scrollPane(ctx, { x: 695, y: 255, w: 1160, h: 690, onScroll: () => hideZoom(false) });
             root.addChild(rightPane.node);
 
             rebuildChips();
@@ -552,7 +567,8 @@
             }
 
             root.addChild(button(ctx, {
-                tex: "button_menu.png", label: t("deck.back"), x: 165, y: 78, scale: 1,
+                tex: "settings/panel3.png", label: t("deck.back"),
+                x: BACK_POS.x, y: BACK_POS.y, fontSize: 24,
                 onTap: doBack, // замок минимума — внутри doBack
             }));
             ui.addChild(root);
@@ -563,21 +579,21 @@
             elemSprites.length = 0;
             for (const n of root.children.slice()) {
                 if (n.userData && n.userData.isChip) root.removeChild(n);
-                else if (n.style && n.style.fontSize === 19 && n.y >= 138 && n.y <= 270 && n.x >= 786) {
+                else if (n.style && n.style.fontSize === 19 && n.y >= 118 && n.y <= 250 && n.x >= 690) {
                     root.removeChild(n); // подписи осей фильтров
                 }
             }
             const costs = [...new Set(Object.values(CARDS).map((d) => d.cost))].sort();
             const rows = [
-                { y: 144, label: t("filter.type"), key: "type",
+                { y: 118, label: t("filter.type"), key: "type",
                     opts: [["unit", "building", "spell", "trap"].map((v) => ({ value: v, label: t(`type.${v}.short`) }))] },
-                { y: 189, label: t("filter.cost"), key: "cost",
+                { y: 163, label: t("filter.cost"), key: "cost",
                     opts: [costs.map((v) => ({ value: v, label: String(v) }))] },
-                { y: 234, label: t("filter.rarity"), key: "rarity",
+                { y: 208, label: t("filter.rarity"), key: "rarity",
                     opts: [["common", "rare", "epic"].map((v) => ({ value: v, label: t(`rarity.${v}.short`) }))] },
             ];
             for (const r of rows) {
-                let cx = 786;
+                let cx = 700;
                 const label = T(r.label, 19, 0xcfc4a6);
                 label.position.set(cx, r.y + 9);
                 label.eventMode = "none";
@@ -607,7 +623,7 @@
                 }
             }
             // ── фильтр стихий: ряд из 6 одноцветных + 5 двухцветных лого в
-            // ПРАВОЙ части экрана, на свободном месте над панелью коллекции
+            // ПРАВОЙ части окна коллекции, под его верхней кромкой
             // (просил юзер). W82 (поправка юзера): кружки вокруг лого
             // УБРАНЫ — само лого (40px) и есть кнопка: клик добавляет
             // стихию к выбору, повторный — убирает; ни одной выбранной =
@@ -726,8 +742,10 @@
             cardInfo: (side, i) => {
                 const e = paneCards[side] && paneCards[side][i];
                 if (!e) return null;
-                // W86: видимость лица и счётчика (скрытие на время полёта)
-                return { ...e, node: undefined,
+                // W86: видимость лица и счётчика (скрытие на время полёта);
+                // живые узлы наружу не отдаём (label — Text с круговыми
+                // ссылками, JSON.stringify тестов падает на нём)
+                return { ...e, node: undefined, label: undefined,
                     nodeV: e.node && !e.node.destroyed ? e.node.visible : null,
                     labelV: e.label && !e.label.destroyed ? e.label.visible : null };
             },

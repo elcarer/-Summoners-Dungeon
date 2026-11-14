@@ -18,7 +18,7 @@
     function createDraftScene(ctx) {
         const { scenes, G, ui, scheduler } = ctx;
         const { CARDS } = globalThis.GAME_DATA;
-        const { T, cardFace, button } = globalThis.GAME_UI;
+        const { T, fit, cardFace, button } = globalThis.GAME_UI;
         const t = (k, v) => GAME_LOC.t(k, v);
         let root = null;
         let options = [];   // тройка текущего раунда
@@ -116,11 +116,25 @@
             dim.fill({ color: 0x000000, alpha: 0.55 });
             root.addChild(dim);
 
-            const title = T(t("draft.title"), 66, 0xf0c96a,
-                { stroke: { color: 0x241505, width: 10.5 } });
-            title.anchor.set(0.5, 0);
-            title.position.set(960, 56);
+            // W115 (юзер): окно panel7 + фигурная плашка panel8 сверху,
+            // выход panel3 внизу по центру (спрайты 1:1 из макета юзера
+            // for_work/arts/draft_ref.png; плашка без текста — надпись кодом)
+            const win = new PIXI.Sprite(ctx.uiTex("settings/panel7.png"));
+            win.anchor.set(0.5);
+            win.position.set(340 + 620, 44 + 478); // 1240×956
+            win.eventMode = "none";
+            root.addChild(win);
+            const plaque = new PIXI.Sprite(ctx.uiTex("settings/panel8.png"));
+            plaque.anchor.set(0.5);
+            plaque.position.set(960, 50); // 484×80
+            plaque.eventMode = "none";
+            root.addChild(plaque);
+            const title = T(t("draft.title"), 32, 0xf0c96a,
+                { stroke: { color: 0x241505, width: 5.5 } });
+            title.anchor.set(0.5);
+            title.position.set(960, 50);
             title.eventMode = "none";
+            fit(title, 430);
             root.addChild(title);
 
             const done = G.draft ? G.draft.picks.length : 0;
@@ -129,16 +143,16 @@
                 : t("draft.round", { n: done + 1 }) + " · " + t("draft.pick"),
             30, 0xd8c79d);
             sub.anchor.set(0.5, 0);
-            sub.position.set(960, 168);
+            sub.position.set(960, 115);
             sub.eventMode = "none";
             root.addChild(sub);
 
-            // счётчики колод внизу
+            // счётчики колод внизу окна
             const counts = T(t("draft.deckCount",
                 { n: done, m: G.draft ? G.draft.ePicks.length : 0 }), 30, 0xffe2a8,
             { stroke: { color: 0x1c1207, width: 6 } });
             counts.anchor.set(0.5, 0.5);
-            counts.position.set(960, 986);
+            counts.position.set(960, 950);
             counts.eventMode = "none";
             root.addChild(counts);
 
@@ -183,7 +197,8 @@
             }
 
             root.addChild(button(ctx, {
-                tex: "button_menu.png", label: t("shop.leave"), x: 165, y: 78, scale: 1,
+                tex: "settings/panel3.png", label: t("shop.leave"),
+                x: 960, y: 1040, fontSize: 24, // выход внизу по центру (W115)
                 onTap: () => { if (root) { root.destroy({ children: true }); root = null; } leave(); },
             }));
             ui.addChild(root);
