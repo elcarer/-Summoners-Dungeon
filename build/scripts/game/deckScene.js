@@ -458,7 +458,7 @@
                 const active = tab === key;
                 root.addChild(button(ctx, {
                     tex: active ? "settings/abutton2.png" : "settings/obutton2.png",
-                    label: t(key === "deck" ? "deck.tabDeck" : "deck.tabHeroes"),
+                    label: t(key === "deck" ? "deck.tabCollection" : "deck.tabHeroes"),
                     x, y: TAB_Y + TAB_H / 2, fontSize: 24,
                     labelColor: active ? GOLD : PARCH_DIM,
                     onTap: () => { if (tab !== key) { tab = key; rebuild(); } },
@@ -548,7 +548,8 @@
             root.addChild(heroHolder);
 
             const hint = T(t("deck.hint"), 19, 0x8a7c5e, { wordWrap: true, wordWrapWidth: 1140 });
-            hint.position.set(700, 952);
+            hint.anchor.set(0.5, 0);
+            hint.position.set(P7.x + 620, 952); // W122 (юзер): по центру окна коллекции
             hint.eventMode = "none";
             root.addChild(hint);
 
@@ -652,12 +653,8 @@
                 elemBtns.push(sp);
                 elemSprites.push(sp);
             }
-            const cap = T(t("filter.elem"), 19, 0xcfc4a6);
-            cap.anchor.set(0.5, 0);
-            cap.position.set(ELEM_X0 + (ELEM_KEYS.length - 1) * STEP / 2
-                + ELEM_ICON / 2, ELEM_Y + ELEM_ICON + 14);
-            cap.eventMode = "none";
-            root.addChild(cap);
+            // подпись «Стихия» над рядом лого убрана (W122, юзер) —
+            // лого-кнопки говорят сами за себя
         }
 
         const api = {

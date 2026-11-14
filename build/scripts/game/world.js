@@ -735,7 +735,8 @@
             const resStyle = { fontFamily: "Kereru", fontSize: 21,
                 fill: 0xf3e6c2, stroke: { color: 0x1c1207, width: 4 } };
             const SLOTS_X = [296.5, 350.5, 402, 455, 508.5, 562, 616];
-            const ICON_Y = 50, NUM_Y = 86; // центр иконки / центр числа в слоте
+            const ICON_Y = 60, NUM_Y = 86; // центр иконки (W122: +10px вниз —
+                // по центру овала слота) / центр числа в слоте
             // Свечение иконок — ТОТ ЖЕ шейдер, что у кнопок
             // (GAME_UI.constGlow, просил юзер W121: не полупрозрачные круги).
             // Один фильтр на контейнер ряда иконок — ореол по силуэту каждой
@@ -792,19 +793,23 @@
                 scenes.go("settings");
             });
             c.addChild(settingsBtn);
-            // счётчик дней открытого мира (W60, юзер): справа у иконки
-            // настроек — иконка icon_day.png и число (позиция — ежекадрово
-            // от края окна, как у настроек)
+            // счётчик дней открытого мира (W60, юзер; W122 — слева ПОД
+            // панелью: иконка icon_day.png + число под кольцом героя, чуть
+            // ниже рамки; живёт ребёнком панели — едет вместе с ней при
+            // letterbox-прижатии, отдельный ежекадровый кламп не нужен)
             const dayPlate = new PIXI.Container();
             const dayIcon = new PIXI.Sprite(uiTex("icon_day.png"));
             dayIcon.anchor.set(0.5);
             dayIcon.scale.set(0.44);
             dayIcon.position.set(14, 66);
+            dayIcon.eventMode = "none";
             dayPlate.addChild(dayIcon);
             const dayT = new PIXI.Text({ text: String(G.days || 0), style: resStyle });
             dayT.position.set(30, 54);
+            dayT.eventMode = "none";
             dayPlate.addChild(dayT);
-            c.addChild(dayPlate);
+            dayPlate.position.set(98, 196); // центр иконки (112, 262) — под кольцом
+            panel.addChild(dayPlate);
             // ── герой: круг-вырез из арта (просил юзер W120) ─────────────
             // в кольце панели — не карта, а вырезанный из её арта кружок;
             // клик — в колоду, наведение — полная карта натурального
@@ -855,7 +860,7 @@
             // из полноэкранного в оконный letterbox-полосы канваса
             // отодвигали панель и настройки от краёв)
             c.userData = { goldT, resT, mini, panel, settingsBtn, qRune, qSide,
-                dayPlate, dayT, heroFull, heroT: 0, heroA: 0 };
+                dayT, heroFull, heroT: 0, heroA: 0 };
             heroHolder.on("pointerover", () => { c.userData.heroT = 1; });
             heroHolder.on("pointerout", () => { c.userData.heroT = 0; });
             heroHolder.on("pointertap", () => {
@@ -1698,10 +1703,10 @@
                         x: ctx.app.screen.width, y: 0 });
                     const ud = uiHud.userData;
                     // панель героя/ресурсов — у левого верхнего угла окна
-                    // (вся начинка — дети панели, едет вместе с ней)
+                    // (вся начинка — дети панели, включая счётчик дней
+                    // (W122), едет вместе с ней)
                     ud.panel.position.set(lt.x, 0);
                     ud.settingsBtn.position.set(rt.x - 81, 66);
-                    ud.dayPlate.position.set(rt.x - 166, 0);
                     // плавное увеличение карты героя при наведении на
                     // кружок в кольце (W120): лерп alpha/масштаба к цели
                     ud.heroA += (ud.heroT - ud.heroA) * 0.22;

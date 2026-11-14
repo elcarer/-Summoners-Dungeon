@@ -4,9 +4,10 @@
     globalThis.GAME_LOC_EN = {
             "menu.continue": "CONTINUE",
             "menu.newGame": "NEW GAME",
-            "menu.deck": "DECK",
+            "menu.deck": "COLLECTION", // W122: was "DECK"
             "menu.settings": "SETTINGS",
             "menu.exit": "EXIT",
+            "menu.genWorld": "Generating the world map…", // W122: generation screen before entering the world
             "menu.bye": "See you in the depths…",
             "dungeon.hint": "WASD/arrows — move  ·  click the floor to walk there  ·  touch an enemy — battle",
             "dungeon.floor": "Floor {n}",
@@ -974,7 +975,6 @@
             "filter.type": "Type",
             "filter.cost": "Cost",
             "filter.rarity": "Rarity",
-            "filter.elem": "Element",
             "rarity.common": "Common",
             "rarity.rare": "Rare",
             "rarity.epic": "Epic",
@@ -1063,6 +1063,7 @@
             "trade.discard.title": "MERCHANT",
             "trade.discard.hint": "Discard one card (click a card)",
             "deck.tabDeck": "Deck",
+            "deck.tabCollection": "Collection", // W122: the tab only, the left-window plaque stays "Deck"
             "deck.tabHeroes": "Heroes",
             "heroes.title": "HEROES",
             "heroes.subtitle": "Defeat enemies — their character cards become yours",

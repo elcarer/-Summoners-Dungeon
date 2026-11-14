@@ -275,7 +275,7 @@
                     c.addChild(glow);
                     c.on("pointerover", () => { glow.alpha = 1; });
                     c.on("pointerout", () => { glow.alpha = 0; });
-                    c.on("pointertap", () => {
+                    c.on("pointertap", async () => {
                         if (launching) return;
                         launching = true;
                         epRoot.interactiveChildren = false; // кольцо жнёт
@@ -285,14 +285,46 @@
                         GAME_META.clearRun();
                         G.resetRun(id);
                         G.saveRun(); // свежий забег сразу сохранён
-                        // W94 (юзер): вход в открытый мир — тот же двухфазный
-                        // «прожиг», что и при входе в подземелье (W60): первая
-                        // половина эффекта (сужающееся кольцо) играет поверх
-                        // выбора героя, к её концу сцена сменяется миром, и
-                        // доигрывает вторая половина (расширяющееся кольцо),
-                        // открывая его экран. Эффект живёт на ctx.ui — общей
-                        // подложке сцен — поэтому переживает смену.
-                        // Бандл не загрузился — обычный мгновенный переход
+                        // W122 (юзер): сначала генерация карты мира — на тёмном
+                        // экране с текстом «что делается» (как при загрузке
+                        // ресурсов в начале), и только потом «огненное кольцо»,
+                        // открывающее вид мира. Раньше кольцо играло поверх
+                        // выбора героя (W94), и генерация замораживала его
+                        // середину. Экран живёт на ctx.ui — общей подложке
+                        // сцен — поэтому переживает смену и сжигается кольцом
+                        // поверх уже построенного мира; вид — как у #boot
+                        // (чёрный фон, приглушённый моно-текст по центру).
+                        // Тёмный узел eventMode "static" — клики в мир под
+                        // экраном молчат, пока горит кольцо
+                        const gen = new PIXI.Container();
+                        const dark = new PIXI.Graphics()
+                            .rect(-3000, -2000, 8000, 6000).fill(0x000000);
+                        dark.eventMode = "static";
+                        dark.hitArea = new PIXI.Rectangle(-3000, -2000, 8000, 6000);
+                        gen.addChild(dark);
+                        const genT = new PIXI.Text({
+                            text: t("menu.genWorld"),
+                            style: { fontFamily: "monospace", fontSize: 18,
+                                fill: 0xcfc4a6 },
+                        });
+                        genT.anchor.set(0.5);
+                        genT.position.set(960, 540);
+                        gen.addChild(genT);
+                        ctx.ui.addChild(gen);
+                        const frame = () =>
+                            new Promise((r) => requestAnimationFrame(r));
+                        await frame(); await frame(); // экран отрисован
+                        scenes.go("world"); // генерация идёт за тёмным экраном
+                        await frame();
+                        // корень сцены мира добавился на ui ПОЗЖЕ экрана —
+                        // HUD был бы поверх тёмного; поднимаем экран НАД HUD:
+                        // чистый тёмный экран, как при загрузке ресурсов
+                        // (просил юзер W122; тот же приём, что ringUp, W60)
+                        ctx.ui.addChild(gen);
+                        // «огненное кольцо» — двухфазный «прожиг» (W94/W60):
+                        // первая половина сжигает экран генерации, вторая
+                        // открывает мир. Бандл не загрузился — экран просто
+                        // убирается
                         const FX = globalThis.GAME_FX;
                         const fx = FX && FX.available
                             ? FX.spawn(ctx.ui, "transitions/burn-away",
@@ -301,10 +333,10 @@
                         if (fx) {
                             G.world.ringUp = true; // вход мира поднимет
                                 // кольцо над своим HUD (как descentFx, W60)
-                            setTimeout(() => scenes.go("world"),
+                            setTimeout(() => gen.destroy({ children: true }),
                                 1250); // кольцо сузилось (CLOSE ≈ 1.2с эффекта)
                         } else {
-                            scenes.go("world");
+                            gen.destroy({ children: true });
                         }
                     });
                     epRoot.addChild(c);
