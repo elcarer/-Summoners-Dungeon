@@ -29,9 +29,10 @@ bash for_work/mini.sh for_work/probe_w98.mjs   # мини-пробы волн: �
 свой профиль `for_work/.chrome_profile`) и гонит `for_work/smoke_test.mjs`
 под watchdog-ом `for_work/runtest.sh` (полный лог — /tmp/test_out.log,
 stdout обёртки — только tail; rc ненадёжен — сверять итоговую строку).
-Живой регресс — пробы последних волн в `for_work/` (check_w103,
-league_diff/league_matchups офлайн, probe_w103/probe_w104 на
-мини-портах); пробы старых волн
+Живой регресс — пробы последних волн в `for_work/` (check_w110/check_w114,
+check_w112/check_w111 офлайн, probe_w110/probe_w114, probe_w112 на
+мини-портах; фитнес лиги — `node for_work/w114_fit.mjs <part.json>…`);
+пробы старых волн
 и разовые скрипты вычищены 2026-11-12 (шум/скрины/профили — мусор,
 протухшие прогонять нельзя; детали волн — journal и git-история).
 Симулятор боёв: `node for_work/battle_sim.mjs --n=… [--foes=1
@@ -65,8 +66,23 @@ CDP-драйвер — `cdp.mjs` в корне (connect/evalJs/shot/mouse).
 
 ## Текущее состояние
 
-- Последняя волна: **W113 (закрыта) + W110 (закрыта) + W112 (закрыта) +
-  W111 (закрыта)**.
+- Последняя волна: **W114 (закрыта) + W113 (закрыта) + W110 (закрыта) +
+  W112 (закрыта) + W111 (закрыта)**.
+  W114 — «этап 2» ИИ — дерево розыгрыша (юзер: связки/порядок): aiTree.js —
+  план полухода перебором последовательностей играбельных карт на ЛЁГКОЙ
+  МОДЕЛИ ПОЛЯ (юниты модели несут реальные def — aiVal/aiThreat работают;
+  семейства def.spell смоделированы, прочее — статическая aiCardPower);
+  план действует, только если на модели явно лучше жадной базы aiGroup
+  (treeMargin), придержка (hold) и подмножества включены; lethal-пакет/
+  chaosHold/полная рука не планируются. Вектор AI_W_BASE 40→53 ключей
+  (treeOn/treeLen/treeNodes/treeHold/treeMinCards/treeMargin + веса листа
+  cBoard/cBase/cSelfBase/cEnergy/cDraw/cStatic/cLethal — тюнируемы
+  автоматически). ГЛАВНЫЙ ГРАБЛЬ: планировщик обязан быть
+  ДЕТЕРМИНИРОВАННЫМ — aiUnitSpot/aiBuildingSpot при кандидатуре потребляли
+  Math.random и сдвигали ГПСЧ-поток боя (фиктивная просадка лиги
+  2.444→2.278; детерминированный прогон 2.389 ≈ база — планы парно-нейтральны);
+  гвард «движков» опробован и откачен (−0.111). Проверки: check_w114 OK (25),
+  probe_w114 OK (20), probe_w110 OK (12). Детали: docs/journal.md (W114).
   W113 — настройки на спрайтах юзера (макет for_work/arts/example.png,
   спрайты images/ui/settings/): settingsScene.js переписан на спрайты
   (panel1 окно/panel2 титул/panel3 назад/panel4 бирки/panel5 трек/point/

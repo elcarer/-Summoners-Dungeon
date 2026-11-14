@@ -446,14 +446,57 @@
                     }
                     if (pot >= B.playerBase && take.length) lethalSet = new Set(take);
                 }
+                // W114 (юзер, «этап 2 — деревья решений»): план полухода —
+                // перебор порядков и подмножеств играбельных карт на модели
+                // поля (aiTree.js): связки (аура/бафф до призыва, урон до
+                // добивания) и экономика энергии. План действует, только
+                // если он ЯВНО лучше жадной базы (порядок прежних групп) —
+                // иначе прежнее поведение. Спецрежимы не трогаем:
+                // lethal-пакет (W110) и «Искусственный маг» (chaosHold)
+                // остаются как были; при полной руке план не считается
+                // (придерживать некуда — перетекание в сброс)
+                let plan = null;
+                B.aiPlan = null; // след для проб: план текущего полухода
+                if (AI_W.treeOn > 0 && !lethalSet && !chaosHold
+                    && B.eHand.length < HAND_MAX) {
+                    const preAff = B.eHand
+                        .map((c) => ({ id: c, def: CARDS[c] }))
+                        .filter((x) => x.def && effCost(x.id, "e") <= B.eEnergy);
+                    if (preAff.length >= AI_W.treeMinCards) {
+                        plan = aiPlanTurn(preAff, { monolithCombo });
+                        if (plan) {
+                            plan.left = plan.order.slice();
+                            plan.done = false;
+                            B.aiPlan = { order: plan.order.slice(),
+                                hold: plan.hold.slice() }; // след для проб
+                        } else B.aiPlan = null;
+                    }
+                }
                 for (;;) {
                     if (B.stopped || B.phase === "over") return;
-                    const affordable = B.eHand
+                    const rawAff = B.eHand
                         .map((c, i) => ({ i, id: c, def: CARDS[c] }))
                         .filter((x) => effCost(x.id, "e") <= B.eEnergy
                             // нетопырь по альт-стоимости — тоже играбелен
                             || (x.def.flyAltCost && altBat))
                         .filter((x) => !chaosHold || effCost(x.id, "e") <= CHAOS_MAX_COST);
+                    let affordable = rawAff;
+                    if (plan) {
+                        // отыгранные/ушедшие карты сами выпадают из плана
+                        // (фильтр по руке); план исчерпан — «хвост» полухода:
+                        // придержанные планом карты стоят до конца полухода,
+                        // новые доборы играются прежней логикой
+                        plan.left = plan.left.filter((id) => B.eHand.indexOf(id) >= 0);
+                        if (plan.done || !plan.left.length) {
+                            plan.done = true;
+                            affordable = rawAff.filter(
+                                (x) => plan.hold.indexOf(x.id) < 0);
+                        } else {
+                            affordable = rawAff.filter(
+                                (x) => plan.left.indexOf(x.id) >= 0);
+                            if (!affordable.length) plan.done = true;
+                        }
+                    }
                     // W103 (юзер): большой банк энергии (хватает на ДВЕ самые
                     // дорогие играбельные карты) — ДОРОГИЕ идут раньше групп:
                     // дешёвыми не замуровывать стол, клетки кончаются раньше
@@ -471,7 +514,13 @@
                         && (x.def.campAura || x.def.campfire || x.def.sprout
                             || x.def.groveAura || x.def.elementalCircle
                             || x.def.altarSword || x.def.treeHomes);
-                    affordable.sort((a, b) => {
+                    if (plan && !plan.done) {
+                        // W114: активный план — порядок КАРТ ПЛАНА, остальная
+                        // сортировка (группы/банк) не применяется: дерево
+                        // уже оценило связки на модели поля
+                        const rk = (x) => plan.left.indexOf(x.id);
+                        affordable.sort((a, b) => rk(a.id) - rk(b.id));
+                    } else affordable.sort((a, b) => {
                         // W110: lethal-пакет — раньше всего; монолит при
                         // готовом комбо (W103, юзер) — следом (группа 0.5)
                         const grp = (x) => lethalSet && lethalSet.has(x.id) ? -1
@@ -913,7 +962,15 @@
                             break;
                         }
                     }
-                    if (!played) { if (!await tryRefill()) return; continue; }
+                    if (!played) {
+                        // W114: карты активного плана не сыгралась (гейты
+                        // реального поля строже модели) — снимаем план;
+                        // придержанные планом карты стоят до конца полухода,
+                        // добор в тупике — прежний
+                        if (plan && !plan.done) plan.done = true;
+                        if (!await tryRefill()) return;
+                        continue;
+                    }
                     refreshHud();
                     await delay(0.4 / animK());
                 }
