@@ -223,8 +223,8 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     return vec4<f32>(img.rgb + gold * glowA, min(1.0, img.a + glowA));
 }`;
 
-    function addGlow(ctx, c, sp) {
-        const filter = new PIXI.Filter({
+    function makeGlowFilter() {
+        return new PIXI.Filter({
             glProgram: PIXI.GlProgram.from({ vertex: GLOW_VERT, fragment: GLOW_FRAG }),
             gpuProgram: PIXI.GpuProgram.from({
                 vertex: { source: GLOW_WGSL, entryPoint: "mainVertex" },
@@ -234,6 +234,23 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
             padding: 14,
             resolution: 1,
         });
+    }
+
+    // Постоянное свечение тем же шейдером (W121, просил юзер: свечение
+    // иконок ресурсов на панели — тем же, что у кнопок, а не «полупрозрачные
+    // круги»; сила задана раз и навсегда — наведение не нужно, тикера нет).
+    // c.userData.glow — доступ тестов.
+    function constGlow(c, strength = 0.8) {
+        const filter = makeGlowFilter();
+        filter.resources.glowU.uniforms.uStrength = strength;
+        c.filters = [filter];
+        c.userData = c.userData || {};
+        c.userData.glow = filter;
+        return filter;
+    }
+
+    function addGlow(ctx, c, sp) {
+        const filter = makeGlowFilter();
         c.filters = [filter];
         const uni = filter.resources.glowU.uniforms;
         let a = 0, tgt = 0, running = false, dead = false;
@@ -587,5 +604,5 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         return GAME_LOC.t(`hero.${heroId}.name`);
     }
 
-    globalThis.GAME_UI = { T, fit, button, chip, cardFace, cardZoomer, addGlow, pathFx, backTexOf, dimBg, scrollPane, foeTitle };
+    globalThis.GAME_UI = { T, fit, button, chip, cardFace, cardZoomer, addGlow, constGlow, pathFx, backTexOf, dimBg, scrollPane, foeTitle };
 })();

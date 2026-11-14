@@ -570,25 +570,20 @@
                 fill: 0xf3e6c2, stroke: { color: 0x1c1207, width: 4 } };
             const SLOTS_X = [296.5, 350.5, 402, 455, 508.5, 562, 616];
             const ICON_Y = 50, NUM_Y = 86; // центр иконки / центр числа в слоте
-            const glowOf = () => { // мягкое свечение под иконкой (просил юзер)
-                const g = new PIXI.Graphics();
-                g.circle(0, 0, 24).fill({ color: 0xffdf8e, alpha: 0.28 });
-                g.circle(0, 0, 33).fill({ color: 0xffdf8e, alpha: 0.10 });
-                g.blendMode = "add";
-                g.eventMode = "none";
-                return g;
-            };
+            // Свечение иконок — ТОТ ЖЕ шейдер, что у кнопок
+            // (GAME_UI.constGlow, просил юзер W121: не полупрозрачные круги).
+            // Один фильтр на контейнер ряда иконок — ореол по силуэту каждой
+            // иконки; числа в ряд не входят, чтобы ореол не шёл вокруг цифр.
+            const iconRow = new PIXI.Container();
+            panel.addChild(iconRow);
             const goldT = new PIXI.Text({ text: "0", style: resStyle });
             {
-                const g0 = glowOf();
-                g0.position.set(SLOTS_X[0], ICON_Y);
-                panel.addChild(g0);
                 const gicon = new PIXI.Sprite(uiTex("icon_gold.png"));
                 gicon.anchor.set(0.5);
                 gicon.scale.set(0.5); // 72 → 36px
                 gicon.position.set(SLOTS_X[0], ICON_Y);
                 gicon.eventMode = "none";
-                panel.addChild(gicon);
+                iconRow.addChild(gicon);
                 goldT.anchor.set(0.5);
                 goldT.position.set(SLOTS_X[0], NUM_Y);
                 goldT.eventMode = "none";
@@ -597,15 +592,12 @@
             const resT = {};
             globalThis.GAME_SIDEQ.RES_ELEMS.forEach((e, i) => {
                 const x = SLOTS_X[i + 1];
-                const g0 = glowOf();
-                g0.position.set(x, ICON_Y);
-                panel.addChild(g0);
                 const icon = new PIXI.Sprite(uiTex(`resources/res_${e}.png`));
                 icon.anchor.set(0.5);
                 icon.scale.set(0.5);
                 icon.position.set(x, ICON_Y);
                 icon.eventMode = "none";
-                panel.addChild(icon);
+                iconRow.addChild(icon);
                 const num = new PIXI.Text({ text: "0", style: resStyle });
                 num.anchor.set(0.5);
                 num.position.set(x, NUM_Y);
@@ -613,6 +605,7 @@
                 panel.addChild(num);
                 resT[e] = num;
             });
+            globalThis.GAME_UI.constGlow(iconRow, 0.8);
             // ── квесты: 2 иконки на дощечке (просил юзер W120) ────────────
             // сюжетная руна + поручения; иконки строятся всегда, видимость
             // СИНХРОНИЗИРУЕТСЯ ПО КАДРАМ (update): руна — только с ВЗЯТЫМ
