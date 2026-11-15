@@ -64,8 +64,19 @@
             // fx, fy, tx, ty, life, total } — тик в update сцены
             A.shots = [];
 
-            const rnd = (a, b) => a + Math.random() * (b - a);
-            const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+            // W125: ГПСЧ эффектов — ОТДЕЛЬНЫЙ от боевого Math.random: частицы
+            // рождаются по кадрам рендера и их число зависит от тайминга —
+            // визуальная случайность не должна сдвигать боевой поток ГПСЧ
+            // (кадровые вызовы делали симуляторы боёв недетерминированными)
+            const fxRndS = { a: 0x9E3779B9 };
+            const fxRnd = () => {
+                fxRndS.a = (fxRndS.a + 0x6D2B79F5) | 0;
+                let t = Math.imul(fxRndS.a ^ (fxRndS.a >>> 15), 1 | fxRndS.a);
+                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+            const rnd = (a, b) => a + fxRnd() * (b - a);
+            const pick = (arr) => arr[(fxRnd() * arr.length) | 0];
             const TAU = Math.PI * 2;
             const easeOut = (k) => 1 - Math.pow(1 - k, 3);
 

@@ -93,13 +93,14 @@
                 _showEnemyCard(id) { if (B && CARDS[id]) { showEnemyCard(id); return true; } return false; },
                 _showEnemyBack() { if (B) { showEnemyBack(); return true; } return false; },
                 _hideEnemyCard() { hideEnemyCard(); return true; },
-                // ловушки (тесты): у руны видно существо, на котором она висит
+                // ловушки (тесты): у руны видно существо, на котором она висит;
+                // eff=null — «засада» (юнит-карта без .trap, W125)
                 trapList: () => ({
-                    p: B.traps.p.map((tr) => ({ eff: tr.def.trap.effect,
+                    p: B.traps.p.map((tr) => ({ eff: tr.def.trap ? tr.def.trap.effect : null,
                         col: tr.unit ? null : tr.col, row: tr.unit ? null : tr.row,
                         unit: tr.unit ? cardIdOf(tr.unit.def) : null,
                         on: tr.unit ? B.units.includes(tr.unit) : null })),
-                    e: B.traps.e.map((tr) => ({ eff: tr.def.trap.effect,
+                    e: B.traps.e.map((tr) => ({ eff: tr.def.trap ? tr.def.trap.effect : null,
                         col: tr.unit ? null : tr.col, row: tr.unit ? null : tr.row,
                         unit: tr.unit ? cardIdOf(tr.unit.def) : null,
                         on: tr.unit ? B.units.includes(tr.unit) : null })),
@@ -153,8 +154,8 @@
                         traps: { p: B.traps.p.length, e: B.traps.e.length },
                         // эффекты висящих ловушек (тесты: «Отмена заклинания/
                         // призыва» и др. — какие ловушки на поле)
-                        trapFx: { p: B.traps.p.map((t) => t.def.trap.effect),
-                            e: B.traps.e.map((t) => t.def.trap.effect) },
+                        trapFx: { p: B.traps.p.map((t) => t.def.trap ? t.def.trap.effect : null),
+                            e: B.traps.e.map((t) => t.def.trap ? t.def.trap.effect : null) },
                         firewalls: B.firewalls.map((f) => ({ side: f.side, row: f.row, left: f.left })),
                         // «Поднятие мёртвых»/«Пытка разума» (тесты): панели
                         raise: { open: !!raisePanel, cards: unitsInDiscard("p") },

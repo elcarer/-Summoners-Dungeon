@@ -442,7 +442,11 @@
                 // приманки, а он отменяет эффекты активируемых им ловушек
                 if (u.def.ability === "noTraps" || u.def.trapCancel) return [toCol, toRow];
                 const foe = u.side === "p" ? "e" : "p";
-                const i = B.traps[foe].findIndex((tr) => tr.def.trap.effect === "lure"
+                // t.def.trap — не у всех ловушек: «засада» (юнит-карта героя
+                // «Засада гоблинов») лежит в B.traps без .trap (W125: крашилась
+                // проверка lure при марше мимо засады)
+                const i = B.traps[foe].findIndex((tr) => tr.def.trap
+                    && tr.def.trap.effect === "lure"
                     && Math.abs(tr.col - fromCol) + Math.abs(tr.row - fromRow) === 1
                     && !unitAt(tr.col, tr.row));
                 if (i < 0) return [toCol, toRow];
