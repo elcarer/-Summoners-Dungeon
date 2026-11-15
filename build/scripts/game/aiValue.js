@@ -40,8 +40,14 @@
                 deadSwapHold: 3,     // «застрявшая»: гейт не пускает N полуходов
                 drawTo: 3,           // короткая рука добирается до
                 drawPlayable: 4,     // …и по числу разыгрываемых на след. ману
-                drawFullMana: 16,    // мана след. хода ≥ — рука до 7
+                drawFullMana: 22,    // мана след. хода ≥ — рука до 7
                 drawAllEnergy: 20,   // энергия ≥ — вся шкала только в карты
+                // W130 (юзер: «меньше карт, больше энергии на первых ходах»,
+                // у второго со старта +2 карты): flooding-правила добора
+                // («до 4 разыгрываемых», «рука до 7», «всё в карты») молчат,
+                // пока не кончился разгон энергии
+                drawRampTurn: 4,     // полуходы < — только разгон (добор до drawTo)
+                drawPlayableMana: 13, // «до 4 разыгрываемых» — только при мане след. хода ≥ (0 = всегда)
                 // ценность своего существа (aiVal) — тюнинг W110 (фитнес 2.5)
                 vAtk: 1.034, vHp: 1, vBld: 0.467, vCrush: 0.923, vThicket: 0.975,
                 vAura: 1.11, vEngine: 0.829, vBuffEcho: 1.119, vMedic: 1.09,
@@ -71,7 +77,7 @@
                 cBoard: 1,          // (ценность своих − угроза чужих)
                 cBase: 1.1,         // урон по базе игрока за ♥
                 cSelfBase: 1.159,     // урон своей базе (штраф/польза)
-                cEnergy: 0.192,      // остаток энергии за ⚡
+                cEnergy: 0.3,      // остаток энергии за ⚡
                 cDraw: 0.982,         // добранная карта
                 cStatic: 0.44,       // несмоделированный эффект (aiCardPower)
                 cLethal: 1000,      // добивание базы игрока в переборе
@@ -240,23 +246,28 @@
             // следующий ход у него будет 12+ маны — рука добивается до 7; при
             // 20+ маны вся шкала идёт только в карты. Энергия не уходит в минус,
             // до 4-го хода накопления в добор не конвертируются.
+            // W130: конец «разгона» энергии (drawRampTurn) и порог маны для
+            // правила «до 4 разыгрываемых» (drawPlayableMana) — тюнируемые
+            // ключи; дефолты (4 / 0) дают прежнее поведение.
             A.enemyDrawPlan = function enemyDrawPlan() {
                 const total = spheresTotal();
                 const nextMana = B.eEnergy + total; // мана следующего хода
                 let eCards = 0;
                 if (B.eHand.length < AI_W.drawTo)
                     eCards = AI_W.drawTo - B.eHand.length;
-                if (B.turnNo >= 4) {
-                    const costs = B.eHand.map((c) => effCost(c, "e")).sort((a, b) => a - b);
-                    let mana = nextMana, playable = 0;
-                    for (const c of costs) { if (c <= mana) { mana -= c; playable++; } else break; }
-                    if (playable < AI_W.drawPlayable)
-                        eCards = Math.max(eCards, AI_W.drawPlayable - playable);
+                if (B.turnNo >= AI_W.drawRampTurn) {
+                    if (nextMana >= AI_W.drawPlayableMana) {
+                        const costs = B.eHand.map((c) => effCost(c, "e")).sort((a, b) => a - b);
+                        let mana = nextMana, playable = 0;
+                        for (const c of costs) { if (c <= mana) { mana -= c; playable++; } else break; }
+                        if (playable < AI_W.drawPlayable)
+                            eCards = Math.max(eCards, AI_W.drawPlayable - playable);
+                    }
+                    if (nextMana >= AI_W.drawFullMana)
+                        eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
+                    if (B.eEnergy >= AI_W.drawAllEnergy)
+                        eCards = HAND_MAX - B.eHand.length; // только карты
                 }
-                if (nextMana >= AI_W.drawFullMana)
-                    eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
-                if (B.eEnergy >= AI_W.drawAllEnergy)
-                    eCards = HAND_MAX - B.eHand.length; // только карты
                 // W105 (юзер): спец-добор «шестерён» под тройку УБРАН —
                 // стратегия сменена: тяжёлые «Сдвиги» выходят сразу
                 // (2–3-й ход, они ждут на клетках и не занимают стол),
@@ -264,7 +275,7 @@
                 // а не удержанием карт; план добора обычный
                 return Math.max(0, Math.min(eCards,
                     HAND_MAX - B.eHand.length,
-                    B.turnNo >= 4 ? total + B.eEnergy : total));
+                    B.turnNo >= AI_W.drawRampTurn ? total + B.eEnergy : total));
             };
 
 
