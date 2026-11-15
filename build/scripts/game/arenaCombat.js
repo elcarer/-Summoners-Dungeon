@@ -219,6 +219,7 @@
                 if ((u.curAtk || 0) < 6) return;
                 const hd = heroDefOf(u.side);
                 if (!hd || hd.ability !== "bigStomp") return;
+                heroAbilUse(u.side, "bigStomp"); // W124
                 const op = u.side === "p" ? "e" : "p";
                 damageBase(op, hd.abilityVal || 1,
                     op === "p"
@@ -242,6 +243,7 @@
                 if (!u || u.def.type !== "unit" || !B.units.includes(u)) return;
                 const hd = heroDefOf(u.side);
                 if (!hd || hd.ability !== "packFrenzy") return;
+                heroAbilUse(u.side, "packFrenzy"); // W124
                 const op = u.side === "p" ? "e" : "p";
                 damageBase(op, hd.abilityVal || 1,
                     op === "p"
@@ -274,6 +276,7 @@
                 const hd = heroDefOf(u.side);
                 if (!hd || hd.ability !== "reactShot") return;
                 if (B.turnSide === u.side) return; // сработало на своём ходу
+                heroAbilUse(u.side, "reactShot"); // W124
                 const op = u.side === "p" ? "e" : "p";
                 const foes = B.units.filter((v) => v.side === op);
                 const k = (Math.random() * (foes.length + 1)) | 0; // + база
@@ -391,6 +394,7 @@
                 // лечится на 1 жизнь (healBase — единая точка лечения базы)
                 const hd = heroDefOf(side);
                 if (hd && hd.ability === "buffHeal") {
+                    heroAbilUse(side, "buffHeal"); // W124
                     healBase(side, hd.abilityVal || 1);
                     sfx("chpoc");
                 }
@@ -497,8 +501,10 @@
                 if (!B || !u || !u.def || u.def.type !== "unit") return;
                 for (const side of ["p", "e"]) {
                     const hd = heroDefOf(side);
-                    if (hd && hd.ability === "walkHeal")
+                    if (hd && hd.ability === "walkHeal") {
+                        heroAbilUse(side, "walkHeal"); // W124
                         healBase(side, hd.abilityVal || 1);
+                    }
                 }
             };
 
@@ -1102,6 +1108,7 @@
                         const hd = heroDefOf(pc.side);
                         if (hd && hd.ability === "firstDiscardReplay") {
                             B.heroFlags.discardReplay[pc.side] = true;
+                            heroAbilUse(pc.side, "firstDiscardReplay"); // W124
                             B.discardReplay = { side: pc.side, id: pc.cardId };
                             const bp = pc.side === "p"
                                 ? { x: 960, y: 840 } : { x: 960, y: 240 };
@@ -1248,6 +1255,7 @@
                         const was = B.heroFlags.toyDiscards[side] || 0;
                         B.heroFlags.toyDiscards[side] = was + ids.length;
                         if (was < 2 && B.heroFlags.toyDiscards[side] >= 2) {
+                            heroAbilUse(side, "secondDiscardDraw"); // W124
                             if (side === "p") {
                                 drawCards(1);
                                 floatText(960, 640, "✧ +1", 0x9ecbe8);
@@ -1265,6 +1273,7 @@
                     // сброшенную карту — свой тик
                     const hdM = heroDefOf(side);
                     if (hdM && hdM.ability === "discardSummonMinus") {
+                        heroAbilUse(side, "discardSummonMinus"); // W124
                         for (let k = 0; k < ids.length; k++) {
                             const own = B.units.filter((u) => u.side === side
                                 && u.def.type === "unit" && u.summonN > 0

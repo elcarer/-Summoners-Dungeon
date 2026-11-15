@@ -21,6 +21,7 @@
                     const hd = heroDefOf(side);
                     if (hd && hd.ability === "firstFrozenExtra") {
                         B.heroFlags.frozenExtra[side] = true;
+                        heroAbilUse(side, "firstFrozenExtra"); // W124
                         const extra = hd.abilityVal || 2;
                         stacks += extra;
                         floatText(960, side === "p" ? 640 : 300,

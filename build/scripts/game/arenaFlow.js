@@ -105,6 +105,7 @@
                 const hd = heroDefOf(side);
                 if (!hd || hd.ability !== "emptyHandDraw") return;
                 B.heroFlags.emptyHand[side] = true;
+                heroAbilUse(side, "emptyHandDraw"); // W124: лог способностей
                 const n = hd.abilityVal || 2;
                 if (side === "p") drawCards(n); else drawEnemy(n);
                 floatText(960, side === "p" ? 640 : 300, `+${n} ⤴`, 0xc9a0ef);
@@ -124,6 +125,7 @@
                 const hd = heroDefOf(side);
                 if (!hd || hd.ability !== "lastCardDraw") return;
                 B.heroFlags.lastCard[side] = true;
+                heroAbilUse(side, "lastCardDraw"); // W124: лог способностей
                 if (side === "p") drawCards(1); else drawEnemy(1);
                 floatText(960, side === "p" ? 640 : 300, "+1 ⤴", 0xef9f8c);
                 sfx("chpoc");
@@ -227,6 +229,7 @@
                     : hd.ability === "startDrawHonorSpell" ? "honorSpell"
                     : hd.ability === "startDrawDelayed" ? "delayed" : null;
                 if (!want) return;
+                heroAbilUse(side, hd.ability); // W124: лог способностей
                 const deck = side === "p" ? B.deck : B.eDeck;
                 const hand = side === "p" ? B.hand : B.eHand;
                 const pool = deck.map((id, i) => ({ id, i, def: CARDS[id] }))

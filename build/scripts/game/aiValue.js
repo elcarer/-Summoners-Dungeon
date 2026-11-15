@@ -75,10 +75,164 @@
                 cDraw: 0.982,         // добранная карта
                 cStatic: 0.44,       // несмоделированный эффект (aiCardPower)
                 cLethal: 1000,      // добивание базы игрока в переборе
+                // ── W124 (юзер): пул врага ИИ видит так же, как игрок —
+                // клик по рубашке колоды (колода+сброс публичны, рука нет).
+                // ВКЛЮЧЁН по распоряжению юзера («у AI тоже должна быть
+                // такая возможность»); feature-лига W124 (pool+syn+дерево
+                // +пер-герои пакетом) показала нейтральность — вреда нет
+                poolOn: 1,
+                poolGapK: 0.5,      // «через клетку» слабеет при стрелках/рывковых в пуле
+                poolMobileN: 3,     // …сколько мобильных карт в пуле считать «много»
+                poolLastCopyK: 1.25, // копий карты в КОЛОДЕ игрока нет — угроза ×(добивание навсегда)
+                poolCopiesK: 0.92,  // копии в колоде есть — угроза ×(вернётся добором)
+                poolCheapN: 6,      // дешёвых существ в пуле ≥ — мина/засада ценнее
+                poolSpellN: 6,      // заклинаний в пуле ≥ — контр-ловушки вперед
+                poolRaceK: 1,       // летальный пул у врага ≥ нашей базы — гонка (1 = обычный порядок групп)
+                // «Искусственный маг» (chaosPlay): платный порог был зашит (2);
+                // теперь тюнируемый ключ, у мага — пер-геройский слой
+                chaosMaxCost: 2,
+                // синтез «способность героя ↔ карты» (W124, юзер): мягкие
+                // прибавки к ценности карт, созвучных способности
+                synOn: 0,
+                synSpell: 0.35, synTrap: 0.4, synGoblin: 0.3, synUnit: 0.2,
+                synPlant: 0.3, synBld: 0.25, synAnimal: 0.3, synSkel: 0.3,
             };
-            A.AI_W = Object.assign({}, A.AI_W_BASE,
-                globalThis.AI_W_OVERRIDE || {});
+            // ── W124 (юзер): пер-геройская адаптация — слой порогов ПОВЕРХ
+            // общего вектора. Ключи «heroId.key» → значение; резолвятся в
+            // Proxy ниже ПОСЛЕ flat-override (тюнер крутит общий вектор,
+            // пер-геройские исключения ложатся сверху). Дефолт пуст —
+            // поведение до W124; заполняется данными лиг/тюнером
+            A.AI_W_HERO_BASE = {};
+            // Живой вектор: база + flat-override (тюнер, globalThis
+            // .AI_W_OVERRIDE) + пер-геройские исключения (globalThis
+            // .AI_W_HERO_OVERRIDE, формат { "decBones.drawAllEnergy": 13 }).
+            // Proxy читает глобалы на КАЖДОЕ обращение — впрыск сима после
+            // загрузки страницы доезжает без переприсваивания (прежде
+            // injectWeights переприсваивал A.AI_W, и const AI_W внутри
+            // aiValue.js держала старый объект — плоские веса до aiVal/
+            // aiThreat доезжали только через перезагрузку страницы).
+            // Герой кресла «e» — через heroDefOf("e") (в симе патчится на
+            // S.seats, так что работает в обоих мирах одинаково).
+            // Override виден и заданный ДО установки (снапшот — офлайн-черки
+            // install(override) восстанавливают globalThis сразу после
+            // install), и живой глобал (впрыск сима после загрузки страницы)
+            const __wOvSnap = Object.assign({}, globalThis.AI_W_OVERRIDE || null);
+            A.AI_W = new Proxy(Object.assign({}, A.AI_W_BASE), {
+                get(t, k) {
+                    if (typeof k !== "string") return t[k];
+                    let v = t[k];
+                    const ov = globalThis.AI_W_OVERRIDE || __wOvSnap;
+                    if (ov && k in ov) v = ov[k];
+                    try {
+                        const ho = globalThis.AI_W_HERO_OVERRIDE;
+                        if (ho) {
+                            const hd = heroDefOf && heroDefOf("e");
+                            const hid = hd && hd.id;
+                            if (hid && (hid + "." + k) in ho) v = ho[hid + "." + k];
+                        }
+                    } catch (e) { /* B ещё не поднят — только база */ }
+                    return v;
+                },
+                set(t, k, val) { t[k] = val; return true; },
+            });
             const AI_W = A.AI_W;
+            // Сумма урона по базе в ПУБЛИЧНОМ пуле игрока (колода+сброс):
+            // руки ИИ не видит, но рубашку колоды игрок кликает — состав
+            // колоды публичен (записано в game-mechanics-cheatsheet).
+            // Мемо на полуход: ключ — turnNo+turnSide, сбрасывается swap'ом
+            // (turnSide снова "enemy" → ключ меняется)
+            A.aiPoolMemo = function aiPoolMemo() {
+                const key = B.turnNo + ":" + B.turnSide;
+                if (B.__pool && B.__pool.key === key) return B.__pool;
+                const deck = {}, all = {};
+                let lethal = 0, mobile = 0, cheap = 0, spells = 0;
+                const count = (src, m) => {
+                    for (const id of src) {
+                        m[id] = (m[id] || 0) + 1;
+                    }
+                };
+                count(B.deck, deck);
+                count(B.deck, all);
+                count(B.discard, all);
+                for (const id of B.discard) deck[id] = (deck[id] || 0); // сброс — не «скоро вернётся»
+                for (const id in all) {
+                    const d = CARDS[id];
+                    if (!d) continue;
+                    if (d.type === "spell" && d.spell && d.spell.baseDmg > 0)
+                        lethal += d.spell.baseDmg * all[id];
+                    if (d.type === "spell") spells += all[id];
+                    if (d.type === "unit" && (d.cost || 0) <= 2) cheap += all[id];
+                    if (d.type === "unit"
+                        && (unitDash(d) > 0 || d.ability === "archer"
+                            || d.steamShot || d.fly || d.siegeFollow))
+                        mobile += all[id];
+                }
+                B.__pool = { key, deck, all, lethal, mobile, cheap, spells };
+                return B.__pool;
+            };
+            // Пул врага (колода+сброс игрока) — «видимость колоды» (W124,
+            // юзер: «у AI тоже должна быть такая возможность»). Хелпер для
+            // всех пул-эффектов; рука остаётся скрытой
+            A.aiEnemyPool = function aiEnemyPool() {
+                return AI_W.poolOn ? aiPoolMemo().all : null;
+            };
+            // Летальный потенциал пула врага: сумма baseDmg его колоды+сброса
+            A.aiEnemyLethal = function aiEnemyLethal() {
+                return AI_W.poolOn ? aiPoolMemo().lethal : 0;
+            };
+            // ── W124 (юзер): синтез «способность героя ↔ карта». Мягкие
+            // прибавки к ценности карт, созвучных способности героя кресла
+            // «e» (только СВОИМ юнитам и своим выборам из поиска). Спека-
+            // режимы (chaosHold, шестерни) не трогает — это только оценки
+            A.aiHeroSyn = function aiHeroSyn(def) {
+                if (!AI_W.synOn || !def) return 0;
+                let h = null;
+                try { h = heroDefOf("e"); } catch (e) { return 0; }
+                const ab = h && h.ability;
+                if (!ab) return 0;
+                let s = 0;
+                if ((ab === "firstSpellDmg" || ab === "strengthSpellDmg"
+                    || ab === "growthSpellDmg" || ab === "firstSpellEnergy")
+                    && def.type === "spell") s += AI_W.synSpell;
+                if ((ab === "trapEcho" || ab === "startDrawTrap"
+                    || ab === "firstTrapEnergy" || ab === "trapReplay")
+                    && def.type === "trap") s += AI_W.synTrap;
+                if ((ab === "goblinChainSummon" || ab === "startDrawGoblin")
+                    && (def.isGoblin || def.creature === "goblin"
+                        || def.race === "goblin")) s += AI_W.synGoblin;
+                if ((ab === "thirdSummonEnergy" || ab === "secondSummonDig"
+                    || ab === "packFrenzy" || ab === "firstSummonAtk"
+                    || ab === "firstSummonHp" || ab === "firstSummonWard")
+                    && def.type === "unit") s += AI_W.synUnit;
+                if ((ab === "startDrawPlant" || ab === "plantEcho")
+                    && (def.plant || def.creature === "plant")) s += AI_W.synPlant;
+                if ((ab === "startDrawBuilding" || ab === "firstBuildingGuard"
+                    || ab === "bldUnits" || ab === "startBuildingPlay")
+                    && def.type === "building") s += AI_W.synBld;
+                if ((ab === "startDrawAnimal" || ab === "packFrenzy")
+                    && def.creature === "animal") s += AI_W.synAnimal;
+                if ((ab === "startDrawSkeleton" || ab === "firstSkeletonDig"
+                    || ab === "firstSkeletonStrike") && def.subtype === "skeleton")
+                    s += AI_W.synSkel;
+                return s;
+            };
+            // ── W124 (юзер): единая оценка поля — та же формула, что у листа
+            // дерева розыгрыша (aiTree.js evalModel), на РЕАЛЬНОМ бое.
+            // «Все решения — её Δ» целиком — следующий этап; сейчас это
+            // общий измеритель (пробы/будущие ветки), поведение не меняет
+            A.evalBoard = function evalBoard() {
+                let own = 0, foe = 0;
+                for (const u of B.units) {
+                    if (u.side === "e") own += aiVal(u);
+                    else foe += aiThreat(u);
+                }
+                // своя база — как «сохранённые жизни» (cSelfBase модели),
+                // энергия — как в модели; урон вражеской базе считается
+                // по факту в местах применения (Δ-оценкой)
+                return own - foe
+                    + AI_W.cSelfBase * (B.enemyBase || 0)
+                    + AI_W.cEnergy * (B.eEnergy || 0);
+            };
             // ── План добора ИИ по шкале конца хода (мягкое правило — просил юзер).
             // Короткая рука добирается до 4; с 4-го хода ИИ считает по стоимостям
             // карты руки, сколько реально разыграет на следующую ману (запас +
@@ -156,6 +310,10 @@
                 if (u.venom) v += 0.4;
                 if (u.berserk) v += 0.3 * u.berserk;
                 if (u.exhuming) v += 0.8 * u.exhuming; // «Выкапливание»: вернётся после смерти
+                // W124 (юзер): синтез «способность героя ↔ карта» — только
+                // СВОИМ юнитам (aiVal зовётся и на чужих для разменов, там
+                // синтез нашего героя неуместен)
+                if (u.side === "e") v += aiHeroSyn(d);
                 return v;
             };
             // W104 (юзер): ОПАСНЫЕ ПОСТРОЙКИ — приоритетные цели уничтожения
@@ -243,6 +401,14 @@
                 if ((u.curAtk || 0) >= AI_W.runMinAtk
                     && (u.curAtk || 0) - (d.atk || 0) >= AI_W.runGap)
                     s *= AI_W.runMult;
+                // W124 (юзер, «видимость колоды»): добивание движка —
+                // НАВСЕГДА, только если в колоде игрока копий больше нет
+                // (сброс вернётся нескоро — пересмешка при пустой колоде);
+                // если копии в колоде есть — убийство отчасти впустую
+                if (AI_W.poolOn && d.type === "unit") {
+                    const dc = aiPoolMemo().deck[cardIdOf(d)] || 0;
+                    s *= dc === 0 ? AI_W.poolLastCopyK : AI_W.poolCopiesK;
+                }
                 return s;
             };
             // Ценность СВОЕГО существа (для жертвы/кокона): жизни и цена
@@ -492,6 +658,19 @@
                     return def.monolith ? 5.5 : 1;
                 }
                 if (def.type === "trap") {
+                    // W124 (юзер, «видимость колоды»): масштабирование под
+                    // состав пула врага — много заклинаний в его колоде/сбросе
+                    // → контр-ловушки вперед даже обычных движков; много
+                    // дешёвых существ → мины/засады раньше обычных ловушек
+                    if (AI_W.poolOn) {
+                        try {
+                            const pm = aiPoolMemo();
+                            if (def.trap.effect === "counterSpell"
+                                && pm.spells >= AI_W.poolSpellN) return 0.9;
+                            if (def.trap.effect === "cellDmg"
+                                && pm.cheap >= AI_W.poolCheapN) return 4.5;
+                        } catch (e) { /* B не поднят — как раньше */ }
+                    }
                     // «Отмена заклинания»/«Отмена призыва» (wis83/wis84) и
                     // «Отражение» (wis120): реактивные ловушки — чем раньше
                     // висят, тем больше шансов поймать розыгрыш (контроль)
@@ -704,7 +883,20 @@
                 if (gapFoe && role !== "wall" && role !== "support"
                     && (gapFoe.def.speed || 1) === 1
                     && row + 1 < GRID && !unitAt(col, row + 1)
-                    && !dash) score += AI_W.sGap;
+                    && !dash) {
+                    // W124 (юзер): правило «через клетку» предполагает, что
+                    // враг доберётся шагом. В пуле игрока (колода+сброс
+                    // публичны) много стрелков/рывковых/летящих — промежуток
+                    // не спасает, вес гейпа ослабевает
+                    let gapW = 1;
+                    if (AI_W.poolOn) {
+                        try {
+                            if (aiPoolMemo().mobile >= AI_W.poolMobileN)
+                                gapW = AI_W.poolGapK;
+                        } catch (e) { /* B не поднят — как раньше */ }
+                    }
+                    score += AI_W.sGap * gapW;
+                }
                 if (def.wolfSummon && row === frontRow) score += 0.4; // ловит урон — зовёт волка
                 if (def.keeperScale) {
                     const animals = B.units.filter((v) => v.side === "e"
@@ -1091,6 +1283,10 @@
             // статы/ауры у существ, урон/усиление/движки у заклинаний.
             A.aiCardPower = function aiCardPower(d) {
                 if (!d) return 0;
+                // W124 (юзер): связки «способность героя ↔ карта» — мягкая
+                // прибавка созвучным картам (поиск/варка/сброс худшей)
+                let syn = 0;
+                try { syn = aiHeroSyn(d); } catch (e) { syn = 0; }
                 if (d.type === "unit") {
                     let s = (d.atk || 0) * 1.25 + (d.hp || 0) + (d.cost || 0) * 0.15;
                     if (d.crush) s += 1.0;
@@ -1143,10 +1339,10 @@
                     if (d.axeArrive) s += 0.3; // tim220: урон соседу врага при появлении
                     // «Сдвиг» (Время): тело придёт позже — сейчас стоит дешевле
                     if (d.delay) s -= 0.5 * d.delay;
-                    return s;
+                    return s + syn;
                 }
                 if (d.type === "building") {
-                    return 1.5 + (d.hp || 0) * 0.4
+                    return 1.5 + (d.hp || 0) * 0.4 + syn
                         + (d.campAura ? 1.5 : 0) + (d.groveAura ? 1.4 : 0)
                         + (d.monolith ? 1.6 : 0) + (d.spellAura ? 1.2 : 0)
                         + (d.treeHomes ? 1.2 : 0) + (d.mycelium ? 0.8 : 0)
@@ -1311,7 +1507,7 @@
                         B ? B.units.filter((u) => u.side === "e"
                             && u.def.type === "unit"
                             && u.bornTurn === B.turnNo).length : 0);
-                    return v;
+                    return v + syn;
                 }
                 if (d.type === "trap") {
                     let v = 2.0 + (d.cost || 0) * 0.2;
@@ -1328,9 +1524,9 @@
                     if (d.trap.effect === "garrisonRise") v += 1.6; // hon194: до 10 Прихожан 2/2 за удар по базе
                     if (d.trap.effect === "ambushRise") v += 1.4; // hon196: Прихожанин + карта в руку за смерть постройки
                     if (d.trap.effect === "timeTrap") v += 1.3; // tim207: существо из игры на 2 хода
-                    return v;
+                    return v + syn;
                 }
-                return 1;
+                return 1 + syn;
             };
             // Верхние N карт колоды ИИ с исходными индексами (верх — последний).
             // Верхние N карт колоды ИИ с исходными индексами (верх — последний).

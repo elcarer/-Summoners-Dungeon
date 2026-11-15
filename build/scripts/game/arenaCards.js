@@ -126,6 +126,20 @@
                 const enc = ENCOUNTERS[B.encId] || ENCOUNTERS.gob;
                 return enc.hero && HEROES[enc.hero] ? HEROES[enc.hero] : null;
             };
+            // ── W124 (юзер): счётчик СРАБОТАВШИХ способностей героев ────────
+            // «пусть лига пишет в лог и использование способностей героев».
+            // B.heroAbil = { p: {способность: N}, e: {...} } — зеркалится
+            // swap()'ом сима вместе с креслами, в snap() уходит в запись боя
+            // под ключом героя. Логирует ТОЛЬКО фактические срабатывания
+            // эффекта (не проверки гейтов)
+            A.heroAbilUse = function heroAbilUse(side, key) {
+                if (!B) return;
+                const ha = B.heroAbil || (B.heroAbil = { p: {}, e: {} });
+                const rec = ha[side] || (ha[side] = {});
+                const hd = heroDefOf(side);
+                const ab = (hd && hd.ability) || key;
+                rec[ab] = (rec[ab] || 0) + 1;
+            };
             // «Скорость N» существа — РАВНОПРАВНАЯ способность (просил юзер:
             // у существ нет «ключевых» способностей, все одинаковы). У
             // большинства карт это ключевое слово ability — "dash1"
@@ -238,6 +252,7 @@
                 hand.push(cardId);
                 markFlyFrom(cardId, side); // прилетит из сброса (анимации руки)
                 B.heroFlags.strReplay[side] = true;
+                heroAbilUse(side, "strengthSpellReplay"); // W124: лог способностей
                 floatText(960, side === "p" ? 640 : 300,
                     `↩ ${GAME_LOC.t(`card.${cardId}.name`)}`, 0x9fd489);
                 sfx("chpoc");
@@ -250,6 +265,7 @@
                 const hd = heroDefOf(side);
                 if (!hd || hd.ability !== "firstSpellEnergy") return;
                 B.heroFlags.spellEnergy[side] = true;
+                heroAbilUse(side, "firstSpellEnergy"); // W124: лог способностей
                 const n = hd.abilityVal || 1;
                 if (side === "p") B.energy += n; else B.eEnergy += n;
                 floatText(960, side === "p" ? 640 : 300, `+${n}⚡`, 0x8cd0ef);
@@ -264,6 +280,7 @@
                 const hd = heroDefOf(side);
                 if (!hd || hd.ability !== "firstTrapEnergy") return;
                 B.heroFlags.trapEnergy[side] = true;
+                heroAbilUse(side, "firstTrapEnergy"); // W124: лог способностей
                 const n = hd.abilityVal || 1;
                 if (side === "p") B.energy += n; else B.eEnergy += n;
                 floatText(960, side === "p" ? 640 : 300, `+${n}⚡`, 0x8cd0ef);
@@ -284,6 +301,7 @@
                 const hd = heroDefOf(side);
                 if (!hd || hd.ability !== "firstElementalDraw") return;
                 B.heroFlags.elementalDraw[side] = true;
+                heroAbilUse(side, "firstElementalDraw"); // W124: лог способностей
                 const n = hd.abilityVal || 1;
                 const hand = side === "p" ? B.hand : B.eHand;
                 if (side === "p") drawCards(n); else drawEnemy(n);
@@ -305,6 +323,7 @@
                 if (!hd || hd.ability !== "firstMageDouble"
                     || B.heroFlags.mageDouble[u.side]) return true;
                 B.heroFlags.mageDouble[u.side] = true;
+                heroAbilUse(u.side, "firstMageDouble"); // W124: лог способностей
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 96, "×2", 0xffd98c);
                 sfx("chpoc");
@@ -328,6 +347,7 @@
                 if (!hd || hd.ability !== "honorRelay"
                     || B.heroFlags.honorRelay[u.side]) return first;
                 B.heroFlags.honorRelay[u.side] = true;
+                heroAbilUse(u.side, "honorRelay"); // W124: лог способностей
                 const p = opts.dead ? { x: 960, y: 0 } : cellXY(u.col, u.row);
                 floatText(p.x, (opts.dead ? (u.side === "p" ? 640 : 300)
                     : p.y - 96), "×2", 0xffd98c);
@@ -497,6 +517,7 @@
                 B.heroFlags.firstCard[side] = true;
                 const hd = heroDefOf(side === "p" ? "e" : "p");
                 if (!hd || hd.ability !== "firstCardVoid") return false;
+                heroAbilUse(side === "p" ? "e" : "p", "firstCardVoid"); // W124
                 return true;
             };
         }

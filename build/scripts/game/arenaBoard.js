@@ -732,6 +732,7 @@
                             B.heroFlags.delayMinus[side] =
                                 (B.heroFlags.delayMinus[side] || 0) + 1;
                             dv -= hd.abilityVal || 1;
+                            heroAbilUse(side, "firstDelayMinus"); // W124
                         }
                     }
                     if (dv > 0) {
@@ -798,6 +799,7 @@
                         if (hdS && hdS.ability === "thirdSummonEnergy") {
                             if (side === "p") B.energy += 1;
                             else B.eEnergy += 1;
+                            heroAbilUse(side, "thirdSummonEnergy"); // W124
                             floatText(960, side === "p" ? 700 : 380, "+1⚡",
                                 0xffd98c);
                             punch(root.hud);
@@ -813,6 +815,7 @@
                         if (hd2 && hd2.ability === "secondSummonDig"
                             && B.units.includes(u)) {
                             addExhuming(u, (u.exhuming || 0) + 1);
+                            heroAbilUse(side, "secondSummonDig"); // W124
                             const gp = cellXY(u.col, u.row);
                             floatText(gp.x, gp.y - 84,
                                 "⛏ " + GAME_LOC.t("spell.exhuming.name"),
@@ -831,6 +834,7 @@
                 if (def.type === "unit") {
                     const hdP = heroDefOf(side);
                     if (hdP && hdP.ability === "summonPain" && B.units.includes(u)) {
+                        heroAbilUse(side, "summonPain"); // W124
                         const pp = cellXY(u.col, u.row);
                         floatText(pp.x, pp.y - 66, "−1♥", 0xef9f8c);
                         punch(u.node);
@@ -877,6 +881,7 @@
                             B.heroFlags.returnPlus[side] =
                                 (B.heroFlags.returnPlus[side] || 0) + 1;
                             rv += hdR.abilityVal || 2;
+                            heroAbilUse(side, "firstReturnPlus"); // W124
                         }
                     }
                     u.ret = rv;
@@ -1150,6 +1155,7 @@
                         const hdS = heroDefOf(side);
                         if (hdS && hdS.ability === "firstSpeedAtk") {
                             B.heroFlags.speedAtk[side] = true;
+                            heroAbilUse(side, "firstSpeedAtk"); // W124
                             u.bonusAtk = (u.bonusAtk || 0) + (hdS.abilityVal || 1);
                             recalcAuras();
                             const anS = u.node.getChildByName("atk");
@@ -1177,6 +1183,7 @@
                                 B.heroFlags.returnPlus[side] =
                                     (B.heroFlags.returnPlus[side] || 0) + 1;
                                 rv += hdR.abilityVal || 2;
+                                heroAbilUse(side, "firstReturnPlus"); // W124
                             }
                         }
                         u.ret = rv;
@@ -1277,6 +1284,7 @@
                         B.heroFirstSummon = true;
                         const hp2 = cellXY(col, row);
                         if (hd.ability === "firstSummonAtk") {
+                            heroAbilUse("p", "firstSummonAtk"); // W124
                             u.bonusAtk += hd.abilityVal;
                             recalcAuras();
                             const an = u.node.getChildByName("atk");
@@ -1284,6 +1292,7 @@
                             floatText(hp2.x, hp2.y - 75, `+${hd.abilityVal}⚔`, 0x9fd489);
                             sfx("chpoc");
                         } else if (hd.ability === "firstSummonHp") {
+                            heroAbilUse("p", "firstSummonHp"); // W124
                             u.hp += hd.abilityVal;
                             recalcAuras();
                             const hn = u.node.getChildByName("hp");
@@ -1293,6 +1302,7 @@
                         } else if (hd.ability === "firstSummonWard") {
                             // Мира: первое призванное существо получает
                             // «Защиту от заклинаний» (u.spellWard)
+                            heroAbilUse("p", "firstSummonWard"); // W124
                             u.spellWard = true;
                             addWardMark(u);
                             floatText(hp2.x, hp2.y - 75,
@@ -1310,6 +1320,7 @@
                         const hd = heroDefOf(side);
                         if (hd && hd.ability === "firstSkeletonDig") {
                             B.heroFlags.skeletonDig[side] = true;
+                            heroAbilUse(side, "firstSkeletonDig"); // W124
                             addExhuming(u, hd.abilityVal || 1);
                             const sp = cellXY(col, row);
                             floatText(sp.x, sp.y - 96,
@@ -1385,6 +1396,7 @@
                         const hd = heroDefOf(side);
                         if (hd && hd.ability === "goblinChainSummon" && isGoblin(def)
                             && def.type === "unit") {
+                            heroAbilUse(side, "goblinChainSummon"); // W124
                             u.bonusAtk += hd.abilityVal || 1;
                             recalcAuras();
                             const an = u.node.getChildByName("atk");
@@ -1414,11 +1426,14 @@
                 // флаг скидки — постройка уже на поле (энергия списана).
                 if (def.type === "building" && !u.token) {
                     const hd = heroDefOf(side);
-                    if (hd && hd.ability === "firstBuildingDiscount")
+                    if (hd && hd.ability === "firstBuildingDiscount") {
                         B.heroFlags.firstBuilding[side] = true;
+                        heroAbilUse(side, "firstBuildingDiscount"); // W124
+                    }
                     if (hd && hd.ability === "firstBuildingGuard"
                         && !B.heroFlags.builtGuard[side]) {
                         B.heroFlags.builtGuard[side] = true;
+                        heroAbilUse(side, "firstBuildingGuard"); // W124
                         addProtect(u);
                     }
                 }

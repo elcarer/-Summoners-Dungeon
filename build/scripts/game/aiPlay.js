@@ -318,6 +318,25 @@
                     if (!alive[id]) delete ha.e[id];
             };
             A.aiPlayBody = async function aiPlayBody() {
+                // ── W124 (юзер): инструментация причин остановки полухода ──
+                // «Пропуск хода с играбельной картой» из отчётов лиг может
+                // быть и СТРАТЕГИЕЙ (придерживание до комбо, ловушки на
+                // чужой ход, хаос-маг), и проблемой (гейты без причины).
+                // Сим читает B.__pass после aiPlay и пишет причину в запись
+                // боя; поведение ИИ это НЕ меняет (чистые счётчики)
+                B.__pass = null;
+                const skipLog = [];
+                const gateSkip = (id, gate) => {
+                    if (skipLog.length < 24) skipLog.push({ id, gate });
+                };
+                const markPass = (reason, aff, raw) => {
+                    B.__pass = {
+                        reason,
+                        aff: aff || 0,          // играбельных «на момент стопа»
+                        raw: raw || 0,          // по карману (до планов/гейтов)
+                        skips: skipLog.slice(),
+                    };
+                };
                 // «Склеп» (dec157): верхняя карта своего сброса играется
                 // СРАЗУ — тем же ходом (у игрока клик по постройке
                 // разыгрывает её автоматом); ИИ берёт её в руку и
@@ -391,7 +410,9 @@
                 // (0–2⚡), дорогие (3+) придерживать в руке — их и вытащит
                 // бесплатный розыгрыш
                 const chaosHold = (heroDefOf("e") || {}).ability === "chaosPlay";
-                const CHAOS_MAX_COST = 2;
+                // W124: порог платного розыгрыха мага — тюнируемый ключ
+                // (был зашит 2; пер-геройский слой может поднять)
+                const CHAOS_MAX_COST = AI_W.chaosMaxCost || 2;
                 // «Бешеные шестерни» (thirdSummonEnergy): W105 (юзер)
                 // сменил стратегию — БОЛЬШЕ НЕ ДЕРЖИМ тройку в руке:
                 // тяжёлые «Сдвиги» (Квадромех и т.п.) выходят сразу,
@@ -478,9 +499,10 @@
                         .map((c, i) => ({ i, id: c, def: CARDS[c] }))
                         .filter((x) => effCost(x.id, "e") <= B.eEnergy
                             // нетопырь по альт-стоимости — тоже играбелен
-                            || (x.def.flyAltCost && altBat))
-                        .filter((x) => !chaosHold || effCost(x.id, "e") <= CHAOS_MAX_COST);
-                    let affordable = rawAff;
+                            || (x.def.flyAltCost && altBat));
+                    skipLog.length = 0; // гейты этой итерации — заново
+                    let affordable = rawAff.filter((x) => !chaosHold
+                        || effCost(x.id, "e") <= CHAOS_MAX_COST);
                     if (plan) {
                         // отыгранные/ушедшие карты сами выпадают из плана
                         // (фильтр по руке); план исчерпан — «хвост» полухода:
@@ -489,10 +511,10 @@
                         plan.left = plan.left.filter((id) => B.eHand.indexOf(id) >= 0);
                         if (plan.done || !plan.left.length) {
                             plan.done = true;
-                            affordable = rawAff.filter(
+                            affordable = affordable.filter(
                                 (x) => plan.hold.indexOf(x.id) < 0);
                         } else {
-                            affordable = rawAff.filter(
+                            affordable = affordable.filter(
                                 (x) => plan.left.indexOf(x.id) >= 0);
                             if (!affordable.length) plan.done = true;
                         }
@@ -514,6 +536,12 @@
                         && (x.def.campAura || x.def.campfire || x.def.sprout
                             || x.def.groveAura || x.def.elementalCircle
                             || x.def.altarSword || x.def.treeHomes);
+                    // W124 (юзер, «видимость колоды»): летальный пакет ВРУЧНУЮ
+                    // виден в пуле врага (колода+сброс публичны) — если его
+                    // хватит на НАШУ базу, гонка: группы раньше дорогих карт
+                    // (bigBank больше не ставит дорогих существ вперед урона)
+                    const race = AI_W.poolOn && AI_W.poolRaceK > 0
+                        && aiEnemyLethal() >= B.enemyBase;
                     if (plan && !plan.done) {
                         // W114: активный план — порядок КАРТ ПЛАНА, остальная
                         // сортировка (группы/банк) не применяется: дерево
@@ -527,6 +555,8 @@
                             : (x.def.monolith && monolithCombo) ? 0.5
                             : aiGroup(x.id, x.def);
                         if (bigBank) {
+                            if (race) return grp(a) - grp(b)
+                                || effCost(b.id, "e") - effCost(a.id, "e");
                             return (isAuraB(a) ? 0 : 1) - (isAuraB(b) ? 0 : 1)
                                 || effCost(b.id, "e") - effCost(a.id, "e")
                                 || grp(a) - grp(b);
@@ -542,6 +572,14 @@
                                 : effCost(b.id, "e") - effCost(a.id, "e"));
                     });
                     if (!affordable.length) {
+                        // W124: стоп «играть нечего» — различаем пустой карман
+                        // и придерживание (хаос-маг / план дерева)
+                        markPass(rawAff.length
+                            ? (chaosHold ? "chaosHold"
+                                : (plan && plan.done && plan.hold.length
+                                    ? "planHold" : "held"))
+                            : "noAffordable",
+                        affordable.length, rawAff.length);
                         if (await tryRefill()) continue;
                         // W103 (юзер): тупик — играть нечего, добирать
                         // неоткуда; МЕНЯЕМ одну карту: самая дорогая «не по
@@ -596,28 +634,28 @@
                             // «Ловушка-пузырь» (wis119) игрока: существо под
                             // пузырём запрещает ИИ играть карту призыва того
                             // же существа (спека юзера) — карту держим
-                            if (def.type === "unit" && bubbleBlocked("e", pick.id)) continue;
+                            if (def.type === "unit" && bubbleBlocked("e", pick.id)) { gateSkip(pick.id, "bubble"); continue; }
                             // «Отряд эльфов» забирает ВСЮ энергию: без запаса в 2⚡
                             // это 0–1/0–1 — карту не переводим (группа 3.5 уже
                             // отодвинула его в конец розыгрыша)
-                            if (def.energyToStats && B.eEnergy - effCost(pick.id, "e") < 2) continue;
+                            if (def.energyToStats && B.eEnergy - effCost(pick.id, "e") < 2) { gateSkip(pick.id, "energyToStats"); continue; }
                             // «Три монолита» — движок добора: без существа в
                             // руке и пары «цена+1» в колоде он пока пустой;
                             // при готовом комбо приоритет ВЫСОКИЙ (W103, юзер:
                             // монолит → юнит рядом → в руке карта дороже)
-                            if (def.monolith && !monolithCombo) continue;
+                            if (def.monolith && !monolithCombo) { gateSkip(pick.id, "monolith"); continue; }
                             // «Круг стихий»: без Элементаля в руке призыв пуст —
                             // постройку держим до подходящей карты
                             if (def.elementalCircle && !B.eHand.some((id) => {
                                 const d = CARDS[id];
                                 return d && d.type === "unit" && d.subtype === "elemental";
-                            })) continue;
+                            })) { gateSkip(pick.id, "elementalCircle"); continue; }
                             // клетка — по правилам связок: строения-ауры соседства
                             // к существам и будущим призывам, прочие в тыл; существа —
                             // рядом с лагерем/костром/заклинателем клинков
                             const spot = def.type === "building"
                                 ? aiBuildingSpot(def) : aiUnitSpot(def);
-                            if (!spot) continue;
+                            if (!spot) { gateSkip(pick.id, "noSpot"); continue; }
                             showEnemyCard(pick.id); // карта врага слева ≥ 1с
                             await delay(enemyPlayDelay());
                             const [col, row] = spot;
@@ -684,7 +722,7 @@
                                 ? altCostSubset(B.eHand, cardId, def.cost || 0)
                                 : null;
                             if (def.flyAltCost && B.eEnergy < effCost(cardId, "e")
-                                && !batAlt) continue; // ни энергии, ни набора
+                                && !batAlt) { gateSkip(cardId, "batAlt"); continue; } // ни энергии, ни набора
                             if (batAlt) {
                                 for (const id of batAlt) {
                                     B.eHand.splice(B.eHand.indexOf(id), 1);
@@ -719,9 +757,9 @@
                             // W60: «Призрачные споры» — КЛЕТОЧНАЯ ловушка,
                             // ставится на общих основаниях ниже (aiTrapSpot)
                             if (def.trap.effect === "castRandom") {
-                                const pu = B.units.filter((v) => v.side === "p" && v.def.type === "unit")
-                                    .sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
-                                if (!pu) continue;
+                            const pu = B.units.filter((v) => v.side === "p" && v.def.type === "unit")
+                                .sort((a, b) => (b.curAtk - a.curAtk) || (a.row - b.row))[0];
+                            if (!pu) { gateSkip(pick.id, "noRuneTarget"); continue; }
                                 showEnemyBack(); // какую руну повесил — загадка (просил юзер)
                                 await delay(enemyPlayDelay());
                                 await enemyFlyCard(cellXY(pu.col, pu.row), { s: 0.3 });
@@ -756,7 +794,7 @@
                             // ловушка — голое убийство за 5⚡; держим до карты
                             if (def.trap.effect === "darkOffering"
                                 && !B.eHand.some((id) =>
-                                    CARDS[id] && CARDS[id].type === "unit")) continue;
+                                    CARDS[id] && CARDS[id].type === "unit")) { gateSkip(pick.id, "darkOffering"); continue; }
                             // «Засадный отряд» (hon196) — на СВОЮ постройку
                             // (переднюю — её чаще атакуют); построек нет —
                             // карту держим
@@ -764,7 +802,7 @@
                                 const blds = B.units.filter((v) => v.side === "e"
                                     && v.def.type === "building")
                                     .sort((a, b) => b.row - a.row);
-                                if (!blds.length) continue;
+                                if (!blds.length) { gateSkip(pick.id, "ambushRise"); continue; }
                                 showEnemyBack();
                                 await delay(enemyPlayDelay());
                                 await enemyFlyCard(cellXY(blds[0].col, blds[0].row),
@@ -798,7 +836,7 @@
                             // — соседство, опутывание — сильнейшего). Если все
                             // варианты небезопасны для своих — карту держим.
                             const spot = aiTrapSpot(def);
-                            if (!spot) continue;
+                            if (!spot) { gateSkip(pick.id, "noTrapSpot"); continue; }
                             showEnemyBack(); // какая ловушка — загадка (просил юзер)
                             await delay(enemyPlayDelay());
                             const [col, row] = spot;
@@ -852,7 +890,7 @@
                             break;
                         }
                         if (def.type === "spell") {
-                            if (!aiSpellPlayable(def)) continue;
+                            if (!aiSpellPlayable(def)) { gateSkip(pick.id, "spellGate"); continue; }
                             // карта врага — лицом слева, пауза ≥ 1с: игрок видит,
                             // что сейчас произойдёт (просил юзер)
                             showEnemyCard(pick.id);
@@ -963,6 +1001,9 @@
                         }
                     }
                     if (!played) {
+                        // W124: стоп «были играбельные, но гейты не пустили
+                        // ни одну» — в skips по каждой карте её гейт
+                        markPass("gated", affordable.length, rawAff.length);
                         // W114: карты активного плана не сыгралась (гейты
                         // реального поля строже модели) — снимаем план;
                         // придержанные планом карты стоят до конца полухода,

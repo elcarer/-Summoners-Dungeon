@@ -407,6 +407,7 @@
                 if (hd && hd.ability === "firstDigReward"
                     && !B.heroFlags.digReward[side]) {
                     B.heroFlags.digReward[side] = true;
+                    heroAbilUse(side, "firstDigReward"); // W124
                     if (side === "p") { drawCards(1); B.energy += 1; }
                     else { drawEnemy(1); B.eEnergy += 1; }
                     floatText(p.x, p.y - 118, "+1⚡ +1", 0xffd98c);

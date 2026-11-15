@@ -142,6 +142,7 @@
                     const hd = heroDefOf(killer.side);
                     if (hd && hd.ability === "firstKillSnipe") {
                         B.heroFlags.killSnipe[killer.side] = true;
+                        heroAbilUse(killer.side, "firstKillSnipe"); // W124
                         const foes = B.units.filter((v) =>
                             v.side === u.side && v.def.type === "unit");
                         if (foes.length) {
@@ -251,6 +252,7 @@
                     if (hd && hd.ability === "firstDeathHeal"
                         && !B.heroFlags.firstDeathHeal[u.side]) {
                         B.heroFlags.firstDeathHeal[u.side] = true;
+                        heroAbilUse(u.side, "firstDeathHeal"); // W124
                         healBase(u.side, 3);
                         sfx("chpoc");
                     }
@@ -329,6 +331,7 @@
                 if (u.def.type === "building") {
                     const hd = heroDefOf(u.side);
                     if (hd && hd.ability === "burnDeath") {
+                        heroAbilUse(u.side, "burnDeath"); // W124
                         const foe = u.side === "p" ? "e" : "p";
                         damageBase(foe, hd.abilityVal || 1, foe === "p"
                             ? { x: 960, y: 830, fill: 0xff5f4e }
@@ -433,6 +436,7 @@
                     discard.push(id);
                     noteDiscard(1, side, [id], "discard");
                 };
+                heroAbilUse(side, hd.ability); // W124: лог способностей героев
                 if (hd.ability === "elemDeathSnipe") {
                     const foes = B.units.filter((v) => v.side !== side);
                     if (foes.length) {
@@ -802,6 +806,7 @@
                     const hd = heroDefOf(target.side === "p" ? "e" : "p");
                     if (hd && hd.ability === "bioReflect") {
                         B.heroFlags.bioHit[target.side === "p" ? "e" : "p"] = true;
+                        heroAbilUse(target.side === "p" ? "e" : "p", "bioReflect"); // W124
                         damageBase(target.side, Math.min(amt, 2),
                             { x: 960, y: target.side === "p" ? 840 : 240,
                               fill: 0xb07ad5 });
@@ -818,6 +823,7 @@
                     && target.summonN > 0) {
                     const hdU = heroDefOf(target.side);
                     if (hdU && hdU.ability === "hurtSummonMinus") {
+                        heroAbilUse(target.side, "hurtSummonMinus"); // W124
                         target.summonN -= 1;
                         summonMarkDraw(target);
                         const up = cellXY(target.col, target.row);
@@ -935,6 +941,7 @@
                         const hd = heroDefOf(raiderSide);
                         if (hd && hd.ability === "firstAttackHeal") {
                             B.heroFlags.attackHeal[raiderSide] = true;
+                            heroAbilUse(raiderSide, "firstAttackHeal"); // W124
                             healBase(raiderSide, hd.abilityVal || 2);
                         }
                     }
@@ -946,6 +953,7 @@
                         const hd = heroDefOf(raiderSide);
                         if (hd && hd.ability === "firstDmgReturn") {
                             B.heroFlags.dmgReturn[raiderSide] = true;
+                            heroAbilUse(raiderSide, "firstDmgReturn"); // W124
                             const own = B.units.filter((v) =>
                                 v.side === raiderSide && v.def.type === "unit");
                             if (own.length) {
@@ -1035,7 +1043,10 @@
                 const hd = heroDefOf(side);
                 if (hd && hd.ability === "throneGuard") {
                     const cur = side === "p" ? B.playerBase : B.enemyBase;
-                    if (cur < 10) n += 1;
+                    if (cur < 10) {
+                        n += 1;
+                        heroAbilUse(side, "throneGuard"); // W124
+                    }
                 }
                 const y = side === "p" ? 840 : 60;
                 if (side === "p") B.playerBase += n;
@@ -1069,7 +1080,10 @@
                 // (как firstBaseHitBuild: «разбирающий — противоположная
                 // сторона»); до редиректов («Дома на деревьях») и отражений
                 const hr = heroDefOf(side === "p" ? "e" : "p");
-                if (hr && hr.ability === "baseRage") amount += hr.abilityVal || 1;
+                if (hr && hr.ability === "baseRage") {
+                    heroAbilUse(side === "p" ? "e" : "p", "baseRage"); // W124
+                    amount += hr.abilityVal || 1;
+                }
                 const house = B.units.find((v) => v.side === side
                     && v.def.type === "building" && v.def.treeHomes);
                 if (house) {
@@ -1098,6 +1112,7 @@
                     const hd = heroDefOf(side === "p" ? "e" : "p");
                     if (hd && hd.ability === "firstBaseHitBuild") {
                         B.heroFlags.baseHitBuild[side === "p" ? "e" : "p"] = true;
+                        heroAbilUse(side === "p" ? "e" : "p", "firstBaseHitBuild"); // W124
                         const blds = B.units.filter((v) =>
                             v.side === side && v.def.type === "building");
                         if (blds.length) {
@@ -1117,6 +1132,7 @@
                     const hdr = heroDefOf(side);
                     if (hdr && hdr.ability === "baseReflect") {
                         B.heroFlags.baseReflect[side] = true;
+                        heroAbilUse(side, "baseReflect"); // W124
                         const op = side === "p" ? "e" : "p";
                         floatText(960, side === "p" ? 800 : 280,
                             "⟲ " + GAME_LOC.t("hero.darklord.name"), 0xb07ad5);

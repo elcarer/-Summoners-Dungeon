@@ -986,6 +986,7 @@
                     if (hd && hd.ability === "trapReplay"
                         && !B.heroFlags.trapReplay[side]) {
                         B.heroFlags.trapReplay[side] = true;
+                        heroAbilUse(side, "trapReplay"); // W124
                         const free = [];
                         for (let r = 0; r < GRID; r++)
                             for (let c = 0; c < GRID; c++)

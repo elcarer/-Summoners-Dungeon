@@ -188,8 +188,8 @@
                 // «Контроль природы» (firstTurnEnergyDown, просил юзер): на
                 // первый ход в бою противник героя получает на 1 энергию
                 // меньше — старт с 0 вместо 1 (дальнейшие ходы как раньше)
-                if (eHeroDef && eHeroDef.ability === "firstTurnEnergyDown") B.energy = 0;
-                if (heroDef.ability === "firstTurnEnergyDown") B.eEnergy = 0;
+                if (eHeroDef && eHeroDef.ability === "firstTurnEnergyDown") { B.energy = 0; heroAbilUse("p", "firstTurnEnergyDown"); } // W124
+                if (heroDef.ability === "firstTurnEnergyDown") { B.eEnergy = 0; heroAbilUse("e", "firstTurnEnergyDown"); } // W124
                 // «Карта сокровищ»: соперник по драфту начинает бой с 3
                 // энергии вместо стандартной 1 (просил юзер)
                 if (encId === "draft") B.eEnergy = 3;
@@ -285,6 +285,7 @@
                 for (const sd of ["p", "e"]) {
                     const hd = sd === "p" ? heroDef : eHeroDef;
                     if (hd && hd.ability === "openTutor" && hd.abilityVal) {
+                        heroAbilUse(sd, "openTutor"); // W124
                         const n = hd.abilityVal;
                         if (sd === "p") drawCards(n); else drawEnemy(n);
                         const hand = sd === "p" ? B.hand : B.eHand;
@@ -303,6 +304,7 @@
                     // после этого сбрасывает n ХУДШИХ карт с руки — «найдите
                     // ценные, избавьтесь от мусора», а не «добор и лотерея»
                     if (hd && hd.ability === "tutorPick" && hd.abilityVal) {
+                        heroAbilUse(sd, "tutorPick"); // W124
                         const n = hd.abilityVal;
                         const deck = sd === "p" ? B.deck : B.eDeck;
                         const hand = sd === "p" ? B.hand : B.eHand;
@@ -352,13 +354,15 @@
                 // (случайное существо из колоды, без энергии)
                 if (heroDef.ability === "greatBattle"
                     || (eHeroDef && eHeroDef.ability === "greatBattle")) {
+                    heroAbilUse("p", "greatBattle"); // W124
+                    heroAbilUse("e", "greatBattle"); // W124
                     greatBattleSummon("p");
                     greatBattleSummon("e");
                 }
                 // «Стройка» (timBuild): в начале боя сторона разыгрывает
                 // случайную постройку С РУКИ бесплатно (просил юзер)
-                if (eHeroDef && eHeroDef.ability === "startBuildingPlay") startBuildingPlay("e");
-                if (heroDef && heroDef.ability === "startBuildingPlay") startBuildingPlay("p");
+                if (eHeroDef && eHeroDef.ability === "startBuildingPlay") { heroAbilUse("e", "startBuildingPlay"); startBuildingPlay("e"); } // W124
+                if (heroDef && heroDef.ability === "startBuildingPlay") { heroAbilUse("p", "startBuildingPlay"); startBuildingPlay("p"); } // W124
                 layoutHand();
                 refreshHud();
                 // W93 (юзер): файтинговая заставка «VS» перед боем — баннер
