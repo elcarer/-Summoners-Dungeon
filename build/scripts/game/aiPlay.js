@@ -467,6 +467,58 @@
                     }
                     if (pot >= B.playerBase && take.length) lethalSet = new Set(take);
                 }
+                // W132 (юзер, «связки с коэффициентами из логов лиг»):
+                // комбо-hold — половинку сильной пары придержать до
+                // партнёра. Партнёр УЖЕ в руке, но паре не хватает энергии:
+                // карту не разыгрываем сейчас (иначе пары навсегда «врозь»
+                // — при встрече в руке ИИ разводил их в 18% полуходов),
+                // ползунок копит под ПАРУ (aiEnergyPlan comboPlanOn) —
+                // следующий полуход выпускает обе. Не держим: lethal-пакет,
+                // карту, которую держим comboHoldMax СВОИХ полуходов подряд
+                // (счётчик ведём сами — holdAge карты считает всю жизнь в
+                // руке, дорогие карты «старые» с рождения), пару, не
+                // влезающую в бюджет следующего полухода; ход не морозим
+                let comboHeldIds = null;
+                const holdSeq = B.__comboHoldAge || (B.__comboHoldAge = {});
+                const comboHoldFilter = (list) => {
+                    comboHeldIds = null;
+                    if (!AI_W.comboOn || !AI_W.comboHoldMax || chaosHold) return list;
+                    // бюджет следующего СВОЕГО полухода при 0 добора
+                    // (spheresTotal на раунд вперёд = +1⚡)
+                    const next = B.eEnergy + A.spheresTotal() + 1;
+                    const out = list.filter((x) => {
+                        if (lethalSet && lethalSet.has(x.id)) return true;
+                        const c = aiComboHand(x.id);
+                        if (!c) return true; // не половинка сильной пары
+                        // партнёр играется вместе с ней сейчас — не держим
+                        if (c.cost <= B.eEnergy - effCost(x.id, "e")) return true;
+                        // сколько ПОДРЯД своих полуходов уже придержали
+                        // (свой полуход — раз в раунд: turnNo сдвигается на 1)
+                        const st = holdSeq[x.id];
+                        const n = st && B.turnNo - st.turn <= 1 ? st.n : 0;
+                        if (n >= AI_W.comboHoldMax) return true;
+                        if (effCost(x.id, "e") + c.cost > next) return true;
+                        return false;
+                    });
+                    if (out.length === list.length) {
+                        for (const k in holdSeq) delete holdSeq[k];
+                        return list;
+                    }
+                    if (!out.length) { // ход не замораживаем
+                        for (const k in holdSeq) delete holdSeq[k];
+                        return list;
+                    }
+                    comboHeldIds = list.filter((x) =>
+                        out.indexOf(x) < 0).map((x) => x.id);
+                    for (const x of list) {
+                        if (out.indexOf(x) < 0) {
+                            const st = holdSeq[x.id];
+                            const n = st && B.turnNo - st.turn <= 1 ? st.n : 0;
+                            holdSeq[x.id] = { turn: B.turnNo, n: n + 1 };
+                        } else delete holdSeq[x.id];
+                    }
+                    return out;
+                };
                 // W114 (юзер, «этап 2 — деревья решений»): план полухода —
                 // перебор порядков и подмножеств играбельных карт на модели
                 // поля (aiTree.js): связки (аура/бафф до призыва, урон до
@@ -480,9 +532,11 @@
                 B.aiPlan = null; // след для проб: план текущего полухода
                 if (AI_W.treeOn > 0 && !lethalSet && !chaosHold
                     && B.eHand.length < HAND_MAX) {
-                    const preAff = B.eHand
+                    const preAff0 = B.eHand
                         .map((c) => ({ id: c, def: CARDS[c] }))
                         .filter((x) => x.def && effCost(x.id, "e") <= B.eEnergy);
+                    // W132: придержанные половинки пар — не кандидаты плана
+                    const preAff = comboHoldFilter(preAff0);
                     if (preAff.length >= AI_W.treeMinCards) {
                         plan = aiPlanTurn(preAff, { monolithCombo });
                         if (plan) {
@@ -519,6 +573,26 @@
                             if (!affordable.length) plan.done = true;
                         }
                     }
+                    // W132: комбо-hold действует и в жадном хвосте полухода
+                    // (плана нет/исчерпан) — удержанные половинки пар не идут.
+                    // Рядом — РЕЗЕРВ энергии под пару: жадный цикл не имеет
+                    // права сжечь ⚡, которые след. полуход тратит на ПАРУ
+                    // (иначе hold бесполезен: энергия уходит дешёвым картам,
+                    // партнёр снова не по карману — связка не сходится)
+                    affordable = comboHoldFilter(affordable);
+                    if (AI_W.comboOn && comboHeldIds && comboHeldIds.length) {
+                        const income = A.spheresTotal() + 1; // доход след. своего
+                        let res = 0;
+                        for (const id of comboHeldIds) {
+                            const c = aiComboHand(id);
+                            if (c) res = Math.max(res,
+                                effCost(id, "e") + c.cost - income);
+                        }
+                        if (res > 0)
+                            affordable = affordable.filter((x) =>
+                                (lethalSet && lethalSet.has(x.id))
+                                || effCost(x.id, "e") <= B.eEnergy - res);
+                    }
                     // W103 (юзер): большой банк энергии (хватает на ДВЕ самые
                     // дорогие играбельные карты) — ДОРОГИЕ идут раньше групп:
                     // дешёвыми не замуровывать стол, клетки кончаются раньше
@@ -531,8 +605,15 @@
                     // W104 (юзер): постройка-аура выходит РАНЬШЕ существ того
                     // же полухода даже при большом банке — иначе лагерь/роща
                     // вставали после уже призыванных и усиливали только
-                    // будущих (в лиге так дважды терялись усиления)
-                    const isAuraB = (x) => x.def.type === "building"
+                    // будущих (в лиге так дважды терялись усиления).
+                    // W132 (причинный анализ позиций): это РАННЯЯ эвристика —
+                    // в ранних раундах «аура первой» даёт +2 медианного
+                    // преимущества (z=2.67), после — нейтральна, в поздних
+                    // ВРЕДИТ (z=−4.8: поздняя аура усиливает некого, существо
+                    // нужнее). auraFirstTurns — до какого РАУНДА гнать ауры
+                    // первыми (99 = всегда, прежнее поведение)
+                    const isAuraB = (x) => B.turnNo <= AI_W.auraFirstTurns
+                        && x.def.type === "building"
                         && (x.def.campAura || x.def.campfire || x.def.sprout
                             || x.def.groveAura || x.def.elementalCircle
                             || x.def.altarSword || x.def.treeHomes);
@@ -548,7 +629,41 @@
                         // уже оценило связки на модели поля
                         const rk = (x) => plan.left.indexOf(x.id);
                         affordable.sort((a, b) => rk(a.id) - rk(b.id));
-                    } else affordable.sort((a, b) => {
+                    } else {
+                    // W132: половинки играбельной пары — вперёд очереди
+                    // (вес лучшей пары карты среди остальных играбельных);
+                    // рядом — определитель эмпирического ПОРЯДКА пар
+                    let comboRank = null;
+                    // жёсткий порядок — только comboHardOn (независимо от
+                    // мягкого ранга comboOrderOn; по умолчанию выкл)
+                    const comboOrderOW = (AI_W.comboOn && AI_W.comboHardOn)
+                        ? aiComboOrderW : null;
+                    if (AI_W.comboOn && AI_W.comboOrderOn) {
+                        comboRank = {};
+                        for (const x of affordable) {
+                            // lethal-пакет — вне конкуренции со связками
+                            if (lethalSet && lethalSet.has(x.id)) {
+                                comboRank[x.id] = 999;
+                                continue;
+                            }
+                            let r = 0;
+                            for (const y of affordable)
+                                if (y !== x) r = Math.max(r, aiComboW(x.id, y.id));
+                            comboRank[x.id] = r;
+                        }
+                    }
+                    affordable.sort((a, b) => {
+                        // W132: эмпирический ПОРЯДОК пар — первое правило
+                        // очереди: «Скелет-лучник до Поля костей» и пр.
+                        // (положительный вес — a раньше b). Не перебивает
+                        // lethal-пакет и гонку баз (темп важнее эмпирики)
+                        if (comboOrderOW && !race
+                            && !(lethalSet && (lethalSet.has(a.id) || lethalSet.has(b.id)))) {
+                            const ow = comboOrderOW(a.id, b.id);
+                            if (ow) return ow > 0 ? -1 : 1;
+                        }
+                        if (comboRank && comboRank[b.id] !== comboRank[a.id])
+                            return comboRank[b.id] - comboRank[a.id];
                         // W110: lethal-пакет — раньше всего; монолит при
                         // готовом комбо (W103, юзер) — следом (группа 0.5)
                         const grp = (x) => lethalSet && lethalSet.has(x.id) ? -1
@@ -571,6 +686,7 @@
                                 ? effCost(a.id, "e") - effCost(b.id, "e")
                                 : effCost(b.id, "e") - effCost(a.id, "e"));
                     });
+                    } // else (без плана)
                     if (!affordable.length) {
                         // W124: стоп «играть нечего» — различаем пустой карман
                         // и придерживание (хаос-маг / план дерева)

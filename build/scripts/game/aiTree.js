@@ -28,9 +28,20 @@
 (function () {
     globalThis.GAME_ARENA.makeAiPlanner = function makeAiPlanner(d) {
         // d: { CARDS, GRID, W, aiVal, aiThreat, aiCardPower, aiGroup,
-        //      aiOwnValue } — W живой (AI_W контекста), остальное —
-        // чистые функции оценок.
+        //      aiOwnValue, comboW } — W живой (AI_W контекста), остальное —
+        // чистые функции оценок; comboW (W132) — вес эмпирической пары
+        // карт (0 — пары нет), может отсутствовать.
         const { CARDS, GRID, W } = d;
+        // W132: бонус последовательности за эмпирические связки AI_COMBOS
+        // (Σ весов пар в seq × comboK; при comboOn=0 — ноль вызовов)
+        const comboBonus = (seq) => {
+            if (!W.comboOn || !d.comboW) return 0;
+            let s = 0;
+            for (let i = 0; i < seq.length; i++)
+                for (let j = i + 1; j < seq.length; j++)
+                    s += d.comboW(seq[i], seq[j]);
+            return W.comboK * s;
+        };
 
         // ── модель поля ─────────────────────────────────────────────────────
         // Юнит модели: { def, side, col, row, hp, curAtk, venom, berserk,
@@ -292,7 +303,8 @@
                 applyCard(m, c, acc, st, snap.altarB, snap);
                 seq.push(c.id);
             }
-            return { seq, score: evalModel(snap, m, acc) };
+            // база честная: с тем же combo-бонусом, что и перебор
+            return { seq, score: evalModel(snap, m, acc) + comboBonus(seq) };
         };
 
         // ── перебор последовательностей (DFS по подмножествам и порядкам) ───
@@ -308,7 +320,7 @@
             const maxLen = Math.max(1, Math.min(W.treeLen | 0, cands.length));
             const costs = cands.map((c) => ({ c, cost: snap.costs[c.id] }));
             const dfs = (m, seq, acc) => {
-                const sc = evalModel(snap, m, acc);
+                const sc = evalModel(snap, m, acc) + comboBonus(seq);
                 if (sc > best.score) { best.score = sc; best.seq = seq.slice(); }
                 if (seq.length >= maxLen || budget.left <= 0) return;
                 for (const { c, cost } of costs) {
@@ -480,6 +492,7 @@
                     A.__planner = globalThis.GAME_ARENA.makeAiPlanner({
                         CARDS, GRID, W: AI_W,
                         aiVal, aiThreat, aiCardPower, aiGroup, aiOwnValue,
+                        comboW: aiComboW, // W132: эмпирические пары AI_COMBOS
                     });
                 }
                 return A.__planner.planFrom(snap, cands, flags);
