@@ -291,6 +291,24 @@
                         score += aiThreat(v) * 0.3;
                 } else if (tr.effect === "ambush" || tr.effect === "ancestor") {
                     if (victim) score += aiThreat(victim) * 0.4;
+                    // W133 (юзер, из причинного анализа логов): «Гоблинская
+                    // засада» — гоблин появится в КАЖДОЙ пустой соседней
+                    // клетке, поэтому свободные соседи клетки (кроме клетки
+                    // жертвы — она займёт свою) — прямая ценность: число
+                    // гоблинов при срабатывании монотонно ведёт к росту
+                    // преимущества (медианы −7…+13, z=7.4), связь
+                    // «свободные при постановке → при срабатывании» r=0.52.
+                    // Край карты штрафуется сам: у него соседей физически
+                    // меньше. Ключ 0 = прежнее поведение
+                    if (tr.effect === "ambush" && AI_W.placeAmbushFreeK) {
+                        let freeN = 0;
+                        for (const [dc, dr] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                            const c2 = col + dc, r2 = row + dr;
+                            if (c2 < 0 || c2 >= GRID || r2 < 0 || r2 >= GRID) continue;
+                            if (!unitAt(c2, r2)) freeN++;
+                        }
+                        score += AI_W.placeAmbushFreeK * freeN;
+                    }
                 } else if (tr.effect === "alliesStrike") {
                     // «Тёмные цепи»: существо на клетке атакуют соседние СВОИ
                     // существа — ценность клетки = суммарная угроза соседей
@@ -326,6 +344,13 @@
                     if (freeAt(cc, r)) spots.push([cc, r]);
                 }
                 if (!front.length && !spots.length) return null;
+                // W133 (юзер, причинный анализ логов): «Гоблинская засада»
+                // без жертвы перед клеткой — ловушка в чистом поле:
+                // постановки vic=0 дают −2.9 остаточной медианы Δadv
+                // против +3.4 у vic=1 (ход-матчинг, z=4.2) — карту держим.
+                // Ключ 0 = прежнее поведение (в чистое поле ставим)
+                if (def.trap.effect === "ambush" && AI_W.placeAmbushHold
+                    && !front.length) return null;
                 let pool;
                 if (front.length) pool = front;
                 else if (def.trap.effect === "lure") {
