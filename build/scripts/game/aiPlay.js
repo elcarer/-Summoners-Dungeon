@@ -745,6 +745,16 @@
                     }
                     let played = false;
                     for (const pick of affordable) {
+                        // W134 (латентный баг, всплыл лигой тренировки):
+                        // план строился по СНАПШОТУ руки, а эффекты этого же
+                        // полухода (chaosFreePlay «Искусственного мага»,
+                        // сброс-поднабор «Возжённого нетопыря», возврат
+                        // «Сброса разума») руку мутируют — pick.i устаревал:
+                        // addUnit(undefined) ронял бой, а splice(pick.i)
+                        // тихо съедал НЕ ТУ карту. Индекс перечитываем по id;
+                        // карту, покинувшую руку, пропускаем
+                        pick.i = B.eHand.indexOf(pick.id);
+                        if (pick.i < 0) { gateSkip(pick.id, "handGone"); continue; }
                         const def = pick.def;
                         if (def.type === "unit" || def.type === "building") {
                             // «Ловушка-пузырь» (wis119) игрока: существо под
@@ -776,7 +786,17 @@
                             await delay(enemyPlayDelay());
                             const [col, row] = spot;
                             await enemyFlyCard(cellXY(col, row)); // полёт к клетке
-                            const cardId = B.eHand[pick.i];
+                            // W134: рука ЖИВАЯ — между планом и исполнением
+                            // её меняют отложенные эффекты (await-анимации
+                            // качают планировщик): резолв по id, покинувшую
+                            // руку карту пропускаем (прежде B.eHand[pick.i]
+                            // давал undefined → addUnit падал)
+                            const cardId = pick.id;
+                            if (B.eHand.indexOf(cardId) < 0) {
+                                gateSkip(cardId, "handGone");
+                                hideEnemyCard();
+                                continue;
+                            }
                             // «Отмена призыва» (wis84) игрока: существо не
                             // появляется, карта и энергия врага потрачены;
                             // «Иссушение почвы» (dec133) — то же для ПОСТРОЕК.
@@ -879,8 +899,13 @@
                                 showEnemyBack(); // какую руну повесил — загадка (просил юзер)
                                 await delay(enemyPlayDelay());
                                 await enemyFlyCard(cellXY(pu.col, pu.row), { s: 0.3 });
-                                const cardId = B.eHand[pick.i];
-                                B.eHand.splice(pick.i, 1);
+                                const cardId = pick.id; // W134: резолв по id (рука живая)
+                                if (B.eHand.indexOf(cardId) < 0) {
+                                    gateSkip(cardId, "handGone");
+                                    hideEnemyCard();
+                                    continue;
+                                }
+                                B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eEnergy -= effCost(cardId, "e");
                                 notePlay("e"); // «Конвейер» (tim225)
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
@@ -923,8 +948,13 @@
                                 await delay(enemyPlayDelay());
                                 await enemyFlyCard(cellXY(blds[0].col, blds[0].row),
                                     { s: 0.3 });
-                                const cardId = B.eHand[pick.i];
-                                B.eHand.splice(pick.i, 1);
+                                const cardId = pick.id; // W134: резолв по id (рука живая)
+                                if (B.eHand.indexOf(cardId) < 0) {
+                                    gateSkip(cardId, "handGone");
+                                    hideEnemyCard();
+                                    continue;
+                                }
+                                B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eEnergy -= effCost(cardId, "e");
                                 notePlay("e"); // «Конвейер» (tim225)
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
@@ -957,7 +987,12 @@
                             await delay(enemyPlayDelay());
                             const [col, row] = spot;
                             await enemyFlyCard(cellXY(col, row), { s: 0.3 });
-                            const cardId = B.eHand[pick.i];
+                            const cardId = pick.id; // W134: резолв по id (рука живая)
+                            if (B.eHand.indexOf(cardId) < 0) {
+                                gateSkip(cardId, "handGone");
+                                hideEnemyCard();
+                                continue;
+                            }
                             // «Искусственный маг» (wtArtMage, W81): ловушка
                             // НЕ ставится (энергия потрачена), взамен
                             // бесплатно разыгрывается другая карта руки
@@ -980,7 +1015,7 @@
                                     break;
                                 }
                             }
-                            B.eHand.splice(pick.i, 1);
+                            B.eHand.splice(B.eHand.indexOf(cardId), 1); // W134: по id (рука живая)
                             B.eEnergy -= effCost(cardId, "e");
                             notePlay("e"); // «Конвейер» (tim225)
                             consumeEpicDiscount(cardId, "e"); // «Архилич»
@@ -1013,7 +1048,12 @@
                             await delay(enemyPlayDelay());
                             await enemyFlyCard({ x: 960, y: 430 },
                                 { s: 0.42, a1: 0 }); // к центру поля и растворяется
-                            const cardId = B.eHand[pick.i];
+                            const cardId = pick.id; // W134: резолв по id (рука живая)
+                            if (B.eHand.indexOf(cardId) < 0) {
+                                gateSkip(cardId, "handGone");
+                                hideEnemyCard();
+                                continue;
+                            }
                             // «Отмена заклинания» (wis83) игрока: эффект не
                             // срабатывает, карта и энергия врага потрачены.
                             // «Магопуты»-герой игрока (W77): первая карта

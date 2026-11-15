@@ -87,6 +87,22 @@
                 // placeAmbushHold — засаду БЕЗ жертвы перед клеткой держать
                 // (vic=0: −2.9 ост.мед против +3.4, z=4.2)
                 placeAmbushFreeK: 0, placeAmbushHold: 0,
+                // W134 (юзер: «ключи со ВСЕЙ информацией о состоянии боя,
+                // на которую AI может повлиять»): позиция юнитов и фаза.
+                // ПРОГРЕСС до чужой базы: марш по рядам (ряд 0 — база
+                // врага, ряд 4 — игрока), press = row/(GRID−1) для наших
+                // ("e" идут вниз к базе игрока), (GRID−1−row)/(GRID−1)
+                // для чужих ("p" идут вверх к нашей). Дефолты 0/1 —
+                // поведение W133 бит-в-бит; значения ищет тренировочная
+                // лига W134 (w134_train.mjs, адаптация AlphaStar)
+                vPressBase: 0,   // aiVal: наш юнит ближе к базе игрока — ценнее
+                tPressBase: 0,   // aiThreat: чужой у НАШЕЙ базы — опаснее
+                tNearK: 0,       // aiThreat: близость чужого к нашим юнитам (манхэттен)
+                cPress: 0,       // aiTree: давление позиций (Σpress своих − Σpress чужих)
+                cSelfLethal: 0,  // aiTree: анти-летал — модель оставила НАШУ базу ≤0
+                lateTurn: 12,    // aiTree: полуход, после которого ресурсы дешевеют
+                cDrawLate: 1,    // …ценность добранной карты (множитель; 1 = всегда)
+                cEnergyLate: 1,  // …ценность остатка энергии (множитель; 1 = всегда)
                 // ценность своего существа (aiVal) — тюнинг W110 (фитнес 2.5)
                 vAtk: 1.034, vHp: 1, vBld: 0.467, vCrush: 0.923, vThicket: 0.975,
                 vAura: 1.11, vEngine: 0.829, vBuffEcho: 1.119, vMedic: 1.09,
@@ -97,8 +113,12 @@
                 runMinAtk: 9,       // разгоны: атака от…
                 runGap: 6,           // …и выше печатной на
                 runMult: 2,        // …угроза УМНОЖАЕТСЯ
-                // клетки призыва (aiSpotScore)
-                sFrontRow: 2, sColFree: 1.526, sOwnAhead: 0.9,
+                // клетки призыва (aiSpotScore). W134: sFrontRow/sColFree
+                // подняты тренировочной лигой (адаптация AlphaStar, юзер):
+                // 51.2% против прежней базы (z=3.05, 16.7 тыс. боёв, оба
+                // кресла) и 53.6% против архива W110 — агрессивнее фронт
+                // и свободные колонки; усреднённая 10×RR — мета стабильна
+                sFrontRow: 3.2, sColFree: 2.2, sOwnAhead: 0.9,
                 sSupportBack: 2.022, sGap: 2.069, sDashKill: 2.522,
                 sKillThreatK: 0.341, sNearKill: 4.527, sCowardAhead: 2.5,
                 sMarkBlock: 3.63,
@@ -530,6 +550,14 @@
                 if (u.venom) v += 0.4;
                 if (u.berserk) v += 0.3 * u.berserk;
                 if (u.exhuming) v += 0.8 * u.exhuming; // «Выкапливание»: вернётся после смерти
+                // W134 (юзер): ПОЗИЦИЯ юнита — прогресс до чужой базы
+                // (наш "e" идёт к ряду GRID−1, чужой "p" — к ряду 0);
+                // постройки не маршируют — их press = 0
+                if (AI_W.vPressBase && d.type === "unit" && u.row != null) {
+                    const pr = (u.side === "e" ? u.row : (GRID - 1) - u.row)
+                        / (GRID - 1);
+                    v *= 1 + AI_W.vPressBase * pr;
+                }
                 // W124 (юзер): синтез «способность героя ↔ карта» — только
                 // СВОИМ юнитам (aiVal зовётся и на чужих для разменов, там
                 // синтез нашего героя неуместен)
@@ -628,6 +656,25 @@
                 if (AI_W.poolOn && d.type === "unit") {
                     const dc = aiPoolMemo().deck[cardIdOf(d)] || 0;
                     s *= dc === 0 ? AI_W.poolLastCopyK : AI_W.poolCopiesK;
+                }
+                // W134 (юзер): ПОЗИЦИЯ чужого юнита — его прогресс к нашей
+                // базе ("p" идёт к ряду 0: чем меньше row, тем ближе) и
+                // близость к любому нашему юниту (манхэттен до ближайшего)
+                if (d.type === "unit" && u.row != null) {
+                    if (AI_W.tPressBase) {
+                        const pr = (u.side === "p" ? (GRID - 1) - u.row : u.row)
+                            / (GRID - 1);
+                        s *= 1 + AI_W.tPressBase * pr;
+                    }
+                    if (AI_W.tNearK && B && B.units) {
+                        let md = 99;
+                        for (const w of B.units) {
+                            if (w.side !== "e" || !w.def) continue;
+                            const dd = Math.abs(w.col - u.col) + Math.abs(w.row - u.row);
+                            if (dd < md) md = dd;
+                        }
+                        if (md < 99) s *= 1 + AI_W.tNearK * (1 - Math.min(md, 6) / 6);
+                    }
                 }
                 return s;
             };

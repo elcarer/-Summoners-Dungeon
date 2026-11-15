@@ -272,18 +272,32 @@
 
         // ── оценка листа ────────────────────────────────────────────────────
         const evalModel = (snap, m, acc) => {
-            let own = 0, foe = 0;
+            let own = 0, foe = 0, press = 0;
             for (const u of m.units) {
-                if (u.side === "e") own += d.aiVal(u);
-                else foe += d.aiThreat(u);
+                if (u.side === "e") {
+                    own += d.aiVal(u);
+                    // W134 (юзер): давление позиции — наш юнит ближе к базе
+                    // игрока (ряд GRID−1); постройки не маршируют
+                    if (u.def && u.def.type === "unit" && u.row != null)
+                        press += u.row / 4;
+                } else {
+                    foe += d.aiThreat(u);
+                    if (u.def && u.def.type === "unit" && u.row != null)
+                        press -= (4 - u.row) / 4;
+                }
             }
+            // W134 (юзер): поздние ресурсы дешевеют — карту/энергию уже не
+            // успеть разыграть с полной отдачей (множители, 1 = всегда)
+            const late = (snap.turnNo || 0) >= W.lateTurn;
             let sc = W.cBoard * (own - foe)
                 + W.cBase * (snap.playerBase - m.pBase)
                 + W.cSelfBase * (m.eBase - snap.enemyBase)
-                + W.cEnergy * m.energy
-                + W.cDraw * acc.drew
-                + W.cStatic * acc.static;
+                + W.cEnergy * m.energy * (late ? W.cEnergyLate : 1)
+                + W.cDraw * acc.drew * (late ? W.cDrawLate : 1)
+                + W.cStatic * acc.static
+                + W.cPress * press;
             if (m.pBase <= 0) sc += W.cLethal;
+            if (m.eBase <= 0) sc -= W.cSelfLethal; // W134: анти-летал
             return sc;
         };
 
@@ -365,6 +379,7 @@
                     })),
                     playerBase: B.playerBase,
                     enemyBase: B.enemyBase,
+                    turnNo: B.turnNo, // W134: фаза боя (поздние ресурсы)
                     eEnergy: B.eEnergy,
                     eHand: B.eHand.slice(),
                     eDiscard: B.eDiscard.slice(),
