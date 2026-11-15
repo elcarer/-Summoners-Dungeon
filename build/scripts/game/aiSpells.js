@@ -8,7 +8,42 @@
             // Флаг spellCasting на всё разрешение заклинания: damageUnit в
             // это время не наносит урон существам с «Защитой от заклинаний»
             // (u.spellWard, просил юзер)
+            // W126: ПРЕДОХРАНИТЕЛЬ ПЕТЕЙ ЭФФЕКТОВ (просил юзер). Лига W126
+            // вскрыла взаимную бесконечную рекурсию: «Общие загадки» (wt273)
+            // применяют эффект другого заклинания руки, НЕ расходуя карту,
+            // а «Высокая мощность» (wt274) кастует заклинание из колоды ДО
+            // её splice — обе половины пары остаются «в игре», и касты ходят
+            // по кругу (загадки → мощность → загадки → …) до RangeError
+            // (бои лиги #584/#3487). Общий сторож для ОБОИХ фуннелов каста
+            // (ИИ enemyCastSpellEffect и игрока applySpellP): три вхождения
+            // одного id в одной цепи легальны быть не могут (в колодах
+            // максимум ×2 копий), а бесконечная петля всегда повторяет
+            // какой-то id. Третий повтор — каскад разрывается спец-ошибкой
+            // {loopFuse}, ВНЕШНИЙ каст её гасит и розыгрыш продолжается
+            // (остаточные флаги энергии — stormAll/drainAll/highPower —
+            // доначислит aiPlay/руна). Другие петли, если вскроются,
+            // ловит тот же сторож. Счётчик B.__fuseCuts — для отчётов.
+            A.castFuseCheck = function castFuseCheck(id) {
+                const chain = A.__castChain || (A.__castChain = []);
+                let n = 0;
+                for (let i = 0; i < chain.length; i++)
+                    if (chain[i] === id) n += 1;
+                if (n >= 2) {
+                    chain.length = 0;
+                    if (B) B.__fuseCuts = (B.__fuseCuts || 0) + 1;
+                    console.warn("W126 предохранитель: петля эффектов разорвана ("
+                        + id + ")");
+                    throw { loopFuse: true, id };
+                }
+                chain.push(id);
+            };
+            A.castFuseExit = function castFuseExit() {
+                const chain = A.__castChain;
+                if (chain && chain.length) chain.pop();
+            };
             A.enemyCastSpellEffect = function enemyCastSpellEffect(def, free = false, focus = null, fromHand = false) {
+                castFuseCheck(cardIdOf(def));
+                const outer = A.__castChain.length === 1; // внешний каст гасит петлю
                 A.spellCasting = true;
                 // чей каст (вложенные повторы сохраняют внешний) — «Зомби-
                 // разбойник» (decRaider): урон заклинанием вражескому существу
@@ -22,8 +57,17 @@
                     ? { x: enemyCard.node.x, y: enemyCard.node.y } : null;
                 fxSpellCast(def, focus, "e", origin);
                 try {
-                    enemyCastSpellEffectInner(def, free, focus, fromHand);
-                } finally { A.spellCasting = false; A.castSide = prevCast; }
+                    if (outer) {
+                        try { enemyCastSpellEffectInner(def, free, focus, fromHand); }
+                        catch (e) { if (!(e && e.loopFuse)) throw e; }
+                    } else {
+                        enemyCastSpellEffectInner(def, free, focus, fromHand);
+                    }
+                } finally {
+                    A.castFuseExit();
+                    A.spellCasting = false;
+                    A.castSide = prevCast;
+                }
             };
             // Скидывание ИИ «любого количества» («Огненный бич»/
             // «Игра в кости», W95): n самых дешёвых карт руки, ИГРАЕМАЯ

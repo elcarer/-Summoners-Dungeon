@@ -364,6 +364,9 @@
             // Флаг spellCasting на всё разрешение: damageUnit в это время не
             // наносит урон существам с «Защитой от заклинаний» (u.spellWard).
             A.applySpellP = function applySpellP(cardId, target, free = false, opts = null) {
+                // W126: предохранитель петель эффектов (см. aiSpells castFuseCheck)
+                castFuseCheck(cardId);
+                const outer = A.__castChain.length === 1; // внешний каст гасит петлю
                 A.spellCasting = true;
                 // чей каст (вложенные повторы сохраняют внешний) — «Зомби-
                 // разбойник» (decRaider): урон заклинанием вражескому существу
@@ -371,8 +374,17 @@
                 const prevCast = A.castSide;
                 A.castSide = "p";
                 try {
+                    if (outer) {
+                        try { return applySpellPInner(cardId, target, free, opts); }
+                        catch (e) { if (!(e && e.loopFuse)) throw e; }
+                        return false; // петля разорвана — эффект не применён
+                    }
                     return applySpellPInner(cardId, target, free, opts);
-                } finally { A.spellCasting = false; A.castSide = prevCast; }
+                } finally {
+                    A.castFuseExit();
+                    A.spellCasting = false;
+                    A.castSide = prevCast;
+                }
             };
             A.applySpellPInner = function applySpellPInner(cardId, target, free = false, opts = null) {
                 const def = CARDS[cardId];
