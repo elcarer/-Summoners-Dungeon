@@ -383,42 +383,67 @@
                 const id = cardIdOf(u.def);
                 const left = u.exhuming - 1;
                 const col = u.col, row = u.row;
-                let cell = !unitAt(col, row) ? [col, row] : null;
-                if (!cell) { // клетку успели занять — ближайшая свободная
-                    const spots = [[-1, 0], [1, 0], [0, -1], [0, 1]]
-                        .map(([dc, dr]) => [col + dc, row + dr])
-                        .filter(([c2, r2]) => c2 >= 0 && c2 < GRID && r2 >= 0
-                            && r2 < GRID && !unitAt(c2, r2));
-                    if (spots.length) cell = spots[(Math.random() * spots.length) | 0];
-                }
-                const p = cellXY(col, row);
-                if (!cell) { // поле забито — вернуться некуда (крайний случай)
-                    floatText(p.x, p.y - 84,
-                        "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0x8a7c5e);
+                // W138: предохранитель петель ВОЗВРАТОВ — расширение сторожа
+                // W126 (castFuseCheck ловит только цепи КАСТОВ; петля
+                // «смерть→возврат» из колоды Акралона (бой 20261117 k=4477:
+                // кости выдавали «Выкапливание» при каждом призыве) кастов
+                // не содержит и прошла бы мимо). Третий возврат ТОГО ЖЕ
+                // юнита (id@клетка) в одном синхронном каскаде — петля:
+                // возврат не совершается (юнит остаётся мёртвым), счётчик
+                // B.__fuseCuts общий с W126 (поле fuse в логах лиги)
+                const fuseId = id + "@" + col + "," + row;
+                const chain = A.__riseChain || (A.__riseChain = []);
+                let n = 0;
+                for (let i = 0; i < chain.length; i++)
+                    if (chain[i] === fuseId) n += 1;
+                if (n >= 2) {
+                    chain.length = 0;
+                    if (B) B.__fuseCuts = (B.__fuseCuts || 0) + 1;
+                    console.warn("W138 предохранитель: петля возвратов разорвана ("
+                        + fuseId + ")");
                     return;
                 }
-                floatText(p.x, p.y - 84,
-                    "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0xc9b98c);
-                sfx("aqua");
-                // «Смерть из-под земли» (firstDigReward, просил юзер):
-                // первое за бой срабатывание «Выкапливания» стороны —
-                // 1 карта и 1 энергия
-                const hd = heroDefOf(side);
-                if (hd && hd.ability === "firstDigReward"
-                    && !B.heroFlags.digReward[side]) {
-                    B.heroFlags.digReward[side] = true;
-                    heroAbilUse(side, "firstDigReward"); // W124
-                    if (side === "p") { drawCards(1); B.energy += 1; }
-                    else { drawEnemy(1); B.eEnergy += 1; }
-                    floatText(p.x, p.y - 118, "+1⚡ +1", 0xffd98c);
-                    sfx("chpoc");
+                chain.push(fuseId);
+                try {
+                    let cell = !unitAt(col, row) ? [col, row] : null;
+                    if (!cell) { // клетку успели занять — ближайшая свободная
+                        const spots = [[-1, 0], [1, 0], [0, -1], [0, 1]]
+                            .map(([dc, dr]) => [col + dc, row + dr])
+                            .filter(([c2, r2]) => c2 >= 0 && c2 < GRID && r2 >= 0
+                                && r2 < GRID && !unitAt(c2, r2));
+                        if (spots.length) cell = spots[(Math.random() * spots.length) | 0];
+                    }
+                    const p = cellXY(col, row);
+                    if (!cell) { // поле забито — вернуться некуда (крайний случай)
+                        floatText(p.x, p.y - 84,
+                            "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0x8a7c5e);
+                        return;
+                    }
+                    floatText(p.x, p.y - 84,
+                        "⛏ " + GAME_LOC.t("spell.exhuming.name"), 0xc9b98c);
+                    sfx("aqua");
+                    // «Смерть из-под земли» (firstDigReward, просил юзер):
+                    // первое за бой срабатывание «Выкапливания» стороны —
+                    // 1 карта и 1 энергия
+                    const hd = heroDefOf(side);
+                    if (hd && hd.ability === "firstDigReward"
+                        && !B.heroFlags.digReward[side]) {
+                        B.heroFlags.digReward[side] = true;
+                        heroAbilUse(side, "firstDigReward"); // W124
+                        if (side === "p") { drawCards(1); B.energy += 1; }
+                        else { drawEnemy(1); B.eEnergy += 1; }
+                        floatText(p.x, p.y - 118, "+1⚡ +1", 0xffd98c);
+                        sfx("chpoc");
+                    }
+                    // noDelay (W82): у существ со «Сдвигом» (nec281/282) возврат
+                    // «Выкапыванием» — СРАЗУ на клетку (выкопали — встал), без
+                    // повторного ухода в значок «Сдвига»
+                    const u2 = addUnit(side, id, cell[0], cell[1],
+                        { rebirth: true, noDelay: true });
+                    if (u2 && left > 0 && B.units.includes(u2)) addExhuming(u2, left);
+                } finally {
+                    chain.pop();
                 }
-                // noDelay (W82): у существ со «Сдвигом» (nec281/282) возврат
-                // «Выкапыванием» — СРАЗУ на клетку (выкопали — встал), без
-                // повторного ухода в значок «Сдвига»
-                const u2 = addUnit(side, id, cell[0], cell[1],
-                    { rebirth: true, noDelay: true });
-                if (u2 && left > 0 && B.units.includes(u2)) addExhuming(u2, left);
             };
 
             // Случайный сброс N карт с руки стороны (Пытка разума, dec125):
