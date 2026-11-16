@@ -627,9 +627,13 @@
             return { x: W + TS * 2, y };
         }
         function spawnBossSquad(st, key) {
-            // лист — эльф (Рост — «древоброд»; своего трёхцветного листа
-            // нет), КРУПНЕЕ обычных отрядов и с багровым свечением охотника
-            const sheet = ctx.heroSheets.growth;
+            // лист — по ПЕРВОЙ стихии героя-босса (Акралон — эльф/Рост,
+            // Матузорг — гоблин/Сила; своего трёхцветного листа нет),
+            // КРУПНЕЕ обычных отрядов и с багровым свечением охотника
+            const hd = globalThis.GAME_DATA.HEROES[
+                globalThis.GAME_DATA.ENCOUNTERS[st.enc].hero];
+            const sheet = ctx.heroSheets[hd && hd.elems[0]]
+                || ctx.heroSheets.growth;
             const sprite = new PIXI.AnimatedSprite(sheet.animations.walk_front, false);
             sprite.anchor.set(0.5, 1);
             sprite.scale.set(0.5);

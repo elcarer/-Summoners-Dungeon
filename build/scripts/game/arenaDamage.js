@@ -7,6 +7,12 @@
     globalThis.GAME_ARENA.installDamage = function installDamage(A) {
         with (A) {
 
+            // Глубина перенаправления «Стража» (sth302, W137): пока
+            // обрабатывается перенаправленный урон, новые перенаправления
+            // запрещены — иначе два соседних стража зациклились бы друг
+            // на друге (damageUnit синхронен, счётчика глубины достаточно)
+            let guardDeep = 0;
+
             A.removeUnit = function removeUnit(u) {
                 const i = B.units.indexOf(u);
                 if (i >= 0) B.units.splice(i, 1);
@@ -710,6 +716,42 @@
                     fxEvent("ward", { x: ap.x, y: ap.y - 14, scale: 0.72 });
                     sfx("chpoc");
                     return;
+                }
+                // «Страж N» (sth302 «Дары Матузорга», W137 — спека юзера):
+                // если СУЩЕСТВО получает урон, дружественные существа по
+                // соседству (верт/гориз) со «Стражем» перенаправляют в
+                // себя до N урона каждый: страж получает урон, союзник —
+                // на ту же величину меньше (метки u.guardG, складываются;
+                // def.guardN — для будущих карт; спека N=1). Постройки не
+                // стражат и не стражатся (только «существо»). Срабатывает
+                // ПОСЛЕ гейтов полного поглощения (spellWard/airShield —
+                // погашенный урон не перенаправляется) и ДО
+                // брони/купола/Некроза/недобитка: «союзник на 1 урон
+                // меньше» — из исходного урона события
+                if (amount > 0 && guardDeep === 0
+                    && target.def.type === "unit") {
+                    let redirected = 0;
+                    const guards = B.units.filter((g) => g !== target
+                        && g.side === target.side && g.def.type === "unit"
+                        && B.units.includes(g)
+                        && Math.abs(g.col - target.col)
+                            + Math.abs(g.row - target.row) === 1
+                        && ((g.def.guardN || 0) + (g.guardG || 0)) > 0);
+                    for (const g of guards) {
+                        if (redirected >= amount) break;
+                        if (!B.units.includes(g)) continue; // страж уже погиб
+                        const take = Math.min(
+                            (g.def.guardN || 0) + (g.guardG || 0),
+                            amount - redirected);
+                        if (take <= 0) continue;
+                        redirected += take;
+                        const gp = cellXY(g.col, g.row);
+                        floatText(gp.x, gp.y - 66, "🛡", 0x8cd0ef);
+                        guardDeep += 1;
+                        try { damageUnit(g, take, killer, snd); }
+                        finally { guardDeep -= 1; }
+                    }
+                    if (redirected > 0) amount -= redirected;
                 }
                 // «Защита N» («Защитный кокон») режет входящий урон до нуля;
                 // споры/огненное дыхание реагируют на ФАКТИЧЕСКИ прошедший урон

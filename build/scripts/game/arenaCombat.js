@@ -78,9 +78,30 @@
                     }
                 } finally { A.fxHint = null; }
             };
-            // «Круговая атака» (grw34): цель наносит 1 урон каждому соседу
-            // (верт/гориз) — существам и постройкам обеих сторон (фикс 1,
-            // аура алтаря не добавляется)
+            // «Пламень N» (sth302 «Дары Матузорга», W137 — спека юзера):
+            // атакуя существо или постройку, носитель наносит N урона ВСЕМ
+            // существам и постройкам в ГОРИЗОНТАЛЬНОМ РЯДУ атакуемого —
+            // обеих сторон (в спеке «всем»); атакующий и атакованный
+            // исключены (прецедент «Поджигателя»). Урон фиксированный
+            // (метки u.flameG, складываются; def.flameOnHit — для будущих
+            // карт), не по curAtk. Удар по базе — без пламени (нет ряда
+            // атакуемого). Стихийный всплеск по ряду — как fireSplash,
+            // способность (abilDmgBump)
+            A.flameSplash = function flameSplash(attacker, target) {
+                if (!attacker || !B.units.includes(attacker) || !target) return;
+                const n = ((attacker.def && attacker.def.flameOnHit) || 0)
+                    + (attacker.flameG || 0);
+                if (!n) return;
+                A.fxHint = "mass"; // массовый урон по ряду — Impact frame
+                try {
+                    for (const v of B.units.slice()) {
+                        if (v === attacker || v === target
+                            || !B.units.includes(v)) continue;
+                        if (v.row !== target.row) continue;
+                        damageUnit(v, abilDmgBump(attacker, n), attacker, "sword");
+                    }
+                } finally { A.fxHint = null; }
+            };
             // «Круговая атака» (grw34): цель наносит 1 урон каждому соседу
             // (верт/гориз) — существам и постройкам обеих сторон (фикс 1,
             // аура алтаря не добавляется)
@@ -430,6 +451,32 @@
                 sfx("step");
                 triggerCellTraps(occ);
                 packFrenzy(u); // «Безумие стаи»: способность кабана сработала
+            };
+
+            // «Откат N» (sth302 «Дары Матузорга», W137 — спека юзера):
+            // после того как существо атакует, оно возвращается на N
+            // клеток назад (ближе к своей базе), ЕСЛИ ТА КЛЕТКА ПУСТА
+            // (метки u.recoilG, складываются; def.recoilOnHit — для
+            // будущих карт; спека N=1). Своих/чужих не расталкивает —
+            // упёрлись, откат остановился. Шаг назад — это перемещение:
+            // ловушки клетки срабатывают (как при толчке кабана). Удар по
+            // базе — не откатывает: существо сразу уходит с поля
+            A.recoilAfterAttack = function recoilAfterAttack(u) {
+                if (!u || !u.def || u.def.type !== "unit"
+                    || !B.units.includes(u)) return;
+                const n = (u.def.recoilOnHit || 0) + (u.recoilG || 0);
+                if (!n) return;
+                const dir = u.side === "p" ? 1 : -1; // к своей базе
+                for (let k = 0; k < n; k++) {
+                    if (!B.units.includes(u)) break; // погиб (ловушка/Ответ)
+                    const r2 = u.row + dir;
+                    if (r2 < 0 || r2 >= GRID || unitAt(u.col, r2)) break;
+                    u.row = r2;
+                    const p = cellXY(u.col, u.row);
+                    glide(u, p.x, p.y);
+                    sfx("step");
+                    triggerCellTraps(u);
+                }
             };
 
             // «Шаман гоблинов»: после призыва бесплатно разыгрывает случайного

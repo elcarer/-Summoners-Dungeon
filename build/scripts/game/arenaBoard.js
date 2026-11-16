@@ -1522,10 +1522,15 @@
                         damageUnit(occ, u.curAtk, u, "sword");
                         crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
                         thicketSplash(u, occ); // «Древоброд глухой чащи»: всплеск
+                        fireSplash(u, occ); // «Поджигатель»: урон соседям атакованного —
+                                            // удар «Скорости» тоже атака (раньше
+                                            // всплеска здесь не было)
+                        flameSplash(u, occ); // «Пламень»: 1 урон всем в ряду атакованного
                         venomApply(u, occ); // «Ядовитость»
                         frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
                         frostNeighbors(u); // «Старший ледовик»: лёд соседям
                         afterAttackPush(u, occ); // «Проросший кабан»
+                        recoilAfterAttack(u); // «Откат»: шаг назад после атаки
                         vampireHeal(u); // «Вампир»: после атаки
                         ogrGrow(u); // «Проросший огр»: +2⚔/+2♥ после атаки
                         bigStomp(u); // «Большой размер»: 6+⚔ атакует — 1 урон базе

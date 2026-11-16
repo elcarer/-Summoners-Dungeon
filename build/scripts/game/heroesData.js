@@ -642,6 +642,18 @@
                    elems: ["growth", "wisdom", "decay"], starter: "akralon",
                    img: "90", ability: "turnElemDiscount", abilityVal: 1,
                    deckMin: 42 },
+        // ── МИРОВОЙ БОСС «Матузорг» (W137, спека юзера) ───────────────────
+        // Второй трёхцветный мировой босс: Сила+Время+Честь (арт
+        // heroes/91.png), 30♥, легендарная. Ведёт себя как «Акралон»
+        // (world.js), только появляется в другой случайной точке
+        // (bossPickStop не даёт двум боссам одну точку). Награда — его
+        // уникальная карта «Дары Матузорга» (ENCOUNTERS.matuzorg.reward).
+        // Способность та же turnElemDiscount — roll по ЕГО стихиям;
+        // deckMin 42, ядро = РОВНО 42 карты
+        matuzorg: { id: "matuzorg", rarity: "legendary", baseHp: 30,
+                    elems: ["strength", "time", "honor"], starter: "matuzorg",
+                    img: "91", ability: "turnElemDiscount", abilityVal: 1,
+                    deckMin: 42 },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon", "tordin"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -697,8 +709,9 @@
         "strRaider", "grwRaider", "wisRaider", "honRaider",
         "decRaider", "timRaider",
         // «Акралон» — МИРОВОЙ босс открытого мира, трёхцветный
-        // Рост+Мудрость+Тлен (W136, спека юзера)
-        "akralon"];
+        // Рост+Мудрость+Тлен (W136, спека юзера); «Матузорг» — второй
+        // мировой босс, трёхцветный Сила+Время+Честь (W137, спека юзера)
+        "akralon", "matuzorg"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

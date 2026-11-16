@@ -810,6 +810,9 @@
             // W136: tri-color Growth+Wisdom+Decay (world boss «Akralon»)
             "card.gwd301.name": "Gifts of Akralon",
             "card.gwd301.desc": "Target creature gains «Grow 1» (+1 attack whenever it takes damage), «Generate 1» (you gain 1 energy whenever this creature moves) and «Vampirism 1» (whenever this creature deals damage, it gains 0/+1)",
+            // W137: tri-color Strength+Time+Honor (world boss «Matuzorg»)
+            "card.sth302.name": "Gifts of Matuzorg",
+            "card.sth302.desc": "Target creature gains «Flame 1» (whenever this creature attacks, it deals 1 damage to all creatures and buildings in the attacked one's row), «Recoil 1» (after this creature attacks, it moves 1 cell back toward its base if that cell is empty) and «Guard 1» (if your creature in an adjacent cell takes damage, this creature redirects 1 of that damage to itself)",
             "hero.necMutant.ability": "Whenever your creature gains an effect, it also gains +1/+1",
             "spell.rot.name": "Necrosis",
             "spell.rot.desc": "This creature takes twice as much damage from all sources; the mark lasts until the target dies",
@@ -995,6 +998,7 @@
             "elem.decay": "Decay",
             "elem.decay.short": "Decay",
             "elem.groWisDec": "Growth + Wisdom + Decay",
+            "elem.strTimHon": "Strength + Time + Honor",
             "elem.honor": "Honor",
             "elem.honor.short": "Honor",
             "elem.time": "Time",
@@ -1331,6 +1335,10 @@
             "enc.akralon.title": "Akralon",
             "hero.akralon.name": "Akralon",
             "hero.akralon.ability": "At the start of each of your turns, one element is chosen at random — Growth, Wisdom or Decay: cards of that element, including multicolor ones containing it, cost 1 less energy this turn. Minimum deck size for your deck is 42",
+            // W137: second world boss «Matuzorg» (open world)
+            "enc.matuzorg.title": "Matuzorg",
+            "hero.matuzorg.name": "Matuzorg",
+            "hero.matuzorg.ability": "At the start of each of your turns, one element is chosen at random — Strength, Time or Honor: cards of that element, including multicolor ones containing it, cost 1 less energy this turn. Minimum deck size for your deck is 42",
             "arena.elemDisc": "Element of the turn: {elem} — cards cost 1⚡ less",
             "world.bossSpawn": "World boss {name} has appeared at the edge of the world!",
             "world.bossLeft": "{name} is leaving the world…",

@@ -779,10 +779,30 @@
         // зеркало «Вампира» dec132, arenaCombat.vampireHeal). Метки —
         // НА ЕДИНИЦЕ поля (u.*G), как crushGrant/axeGrant
         gwd301: { type: "spell", cost: 3,
-                  spell: { target: "anyUnit", gifts: true },
+                  spell: { target: "anyUnit", gifts: true,
+                           grants: { growOnHit: 1, genOnMove: 1, vampHp: 1 } },
                   kind: "buff", // тип эффекта — по спеке юзера (Усиление)
                   rarity: "legendary", elem: "groWisDec",
                   multi: ["growth", "wisdom", "decay"],
                   color: 0x8a76b8, img: "growth_wisdom_decay/301" },
+        // ── ТРЁХЦВЕТ «Сила + Время + Честь» (W137, спека юзера) ──────────
+        // «Дары Матузорга» (sth302): заклинание-усиление — цель получает
+        // «Пламень 1» (атакуя, наносит 1 урон всем существам и постройкам
+        // в горизонтальном ряду атакуемого: flameOnHit —
+        // arenaCombat.flameSplash, зовётся во всех точках атаки рядом с
+        // fireSplash), «Откат 1» (после атаки возвращается на 1 клетку
+        // назад, к своей базе, если та клетка пуста: recoilOnHit —
+        // arenaCombat.recoilAfterAttack) и «Страж 1» (если твоё существо
+        // в соседней клетке получает урон — перенаправляет 1 из этого
+        // урона в себя: guardN — гейт в damageUnit, arenaDamage). Метки
+        // НА ЕДИНИЦЕ поля (u.flameG/recoilG/guardG), набор задаёт
+        // spell.grants (как у gwd301)
+        sth302: { type: "spell", cost: 3,
+                  spell: { target: "anyUnit", gifts: true,
+                           grants: { flameOnHit: 1, recoilOnHit: 1, guardN: 1 } },
+                  kind: "buff",
+                  rarity: "legendary", elem: "strTimHon",
+                  multi: ["strength", "time", "honor"],
+                  color: 0xb08a55, img: "strength_time_honor/302" },
     };
 })();

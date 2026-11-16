@@ -369,9 +369,10 @@
                     return;
                 }
                 if (s.target === "anyUnit" && !s.nova) { // усиление/очарование — лучшему
-                    // «Дары Акралона» (gwd301, W136): три метки лучшему
-                    // своему существу (по угрозе aiThreat) — растёт от
-                    // урона, даёт энергию за шаг, лечится после атаки
+                    // «Дары …» (gwd301 W136 / sth302 W137): метки из
+                    // spell.grants лучшему своему существу (по угрозе
+                    // aiThreat) — набор задаёт карта (Вырастание/
+                    // Генерация/Вампиризм или Пламень/Откат/Страж)
                     if (s.gifts) {
                         const own = spellTargets(B.units.filter((v) => v.side === "e"
                             && v.def.type === "unit"));
@@ -381,12 +382,19 @@
                         if (focus && own.includes(focus)) best = focus;
                         if (!best) return;
                         aimOff(best);
-                        best.growOnHitG = (best.growOnHitG || 0) + 1;
-                        best.genMoveG = (best.genMoveG || 0) + 1;
-                        best.vampHpG = (best.vampHpG || 0) + 1;
+                        const GRANT_LBL = {
+                            growOnHit: "growOnHitG", genOnMove: "genMoveG",
+                            vampHp: "vampHpG", flameOnHit: "flameG",
+                            recoilOnHit: "recoilG", guardN: "guardG",
+                        };
+                        const gr = s.grants || {};
+                        for (const k of Object.keys(gr)) {
+                            const lbl = GRANT_LBL[k];
+                            if (lbl) best[lbl] = (best[lbl] || 0) + gr[k];
+                        }
                         const p = cellXY(best.col, best.row);
                         floatText(p.x, p.y - 66,
-                            GAME_LOC.t("card.gwd301.name"), 0x9fd489);
+                            GAME_LOC.t("card." + cardIdOf(def) + ".name"), 0x9fd489);
                         fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
                         punch(best.node);
                         sfx("chpoc");
