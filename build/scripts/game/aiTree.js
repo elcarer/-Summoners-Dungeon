@@ -77,15 +77,26 @@
             && u.def.type === "unit")
             .sort((a, b) => d.aiVal(b) - d.aiVal(a))[0] || null;
         // клетка призыва в модели: передний ряд, свободная колонка, ауры
-        // соседства; детерминированно (перебор без случайностей)
+        // соседства; детерминированно (перебор без случайностей).
+        // W144 (treeGeomOn, семантика юзера «отключать из дерева, чтобы не
+        // мешали»): 1 — СОБСТВЕННАЯ геометрия модели (литералы 2/1.5/0.9,
+        // дубли боевых sFrontRow/sColFree/sOwnAhead) выключена — размещение
+        // целиком решают тюнируемые боевые ключи (aiUnitSpot), дерево не
+        // подмешивает второй слой и не путает лигу двойным эффектом;
+        // 0 = прежние литералы (бит-в-бит). Аура соседства (+2.2) —
+        // собственный признак модели (не боевой ключ), остаётся
+        const GEOM = W.treeGeomOn
+            ? { front: 0, colFree: 0, jam: 0 }
+            : { front: 2, colFree: 1.5, jam: 0.9 };
         const pickCell = (m, def) => {
             let best = null, bs = -Infinity;
             for (let r = 0; r <= m.back; r++) {
                 for (let c = 0; c < GRID; c++) {
                     if (mAt(m, c, r)) continue;
                     let sc = 0;
-                    if (r === m.back) sc += 2;
-                    if (!m.units.some((u) => u.side === "e" && u.col === c)) sc += 1.5;
+                    if (r === m.back) sc += GEOM.front;
+                    if (!m.units.some((u) => u.side === "e" && u.col === c))
+                        sc += GEOM.colFree;
                     for (const b of m.units) {
                         if (b.side !== "e" || b.def.type !== "building") continue;
                         if (Math.abs(b.col - c) + Math.abs(b.row - r) !== 1) continue;
@@ -95,7 +106,7 @@
                             || b.def.monolith || b.def.sprout || b.def.campfire) sc += 2.2;
                     }
                     if (m.units.some((u) => u.side === "e" && u.col === c && u.row > r))
-                        sc -= 0.9; // затор колонки
+                        sc -= GEOM.jam; // затор колонки
                     if (sc > bs) { bs = sc; best = [c, r]; }
                 }
             }

@@ -601,6 +601,46 @@
                                 (lethalSet && lethalSet.has(x.id))
                                 || effCost(x.id, "e") <= B.eEnergy - res);
                     }
+                    // W144 (юзер: «играть вокруг героя врага»): foeOn —
+                    // редкие «необычные» решения против способности ГЕРОЯ
+                    // противника (не карт): foeVoidBait — «Магопуты»
+                    // отменяют ПЕРВУЮ карту за бой: подставляем самую
+                    // дешёвую играбельную (не lethal — пакет важнее),
+                    // спасая дорогие карты; foeReflectBait — «Тёмный
+                    // владыка» отражает ПЕРВЫЙ урон своей базе: сперва
+                    // дешёвый тычок baseDmg-заклинанием, крупный — следом
+                    // (lethal не трогаем: убивает раньше отражения).
+                    // Итерация сыграет только приманку — affordable
+                    // переформируется, следующие карты пойдут как обычно
+                    if (AI_W.foeOn && affordable.length > 1) {
+                        const fAb = (heroDefOf("p") || {}).ability;
+                        let baitId = null;
+                        if (AI_W.foeVoidBait && fAb === "firstCardVoid"
+                                && !B.heroFlags.firstCard.e) {
+                            const bait = affordable
+                                .filter((x) => !(lethalSet && lethalSet.has(x.id)))
+                                .sort((a, b) => effCost(a.id, "e")
+                                    - effCost(b.id, "e"))[0];
+                            // жертвуем, только если есть что спасать —
+                            // в руке карта дороже приманки
+                            if (bait && B.eHand.some((id) =>
+                                    effCost(id, "e") > effCost(bait.id, "e")))
+                                baitId = bait.id;
+                        } else if (AI_W.foeReflectBait && fAb === "baseReflect"
+                                && !B.heroFlags.baseReflect.p && !lethalSet) {
+                            const bd = affordable
+                                .filter((x) => x.def.spell
+                                    && x.def.spell.baseDmg > 0)
+                                .sort((a, b) => a.def.spell.baseDmg
+                                    - b.def.spell.baseDmg);
+                            if (bd.length >= 2
+                                    && bd[0].def.spell.baseDmg < bd[1].def.spell.baseDmg
+                                    && bd[1].def.spell.baseDmg >= 2)
+                                baitId = bd[0].id;
+                        }
+                        if (baitId)
+                            affordable = affordable.filter((x) => x.id === baitId);
+                    }
                     // W103 (юзер): большой банк энергии (хватает на ДВЕ самые
                     // дорогие играбельные карты) — ДОРОГИЕ идут раньше групп:
                     // дешёвыми не замуровывать стол, клетки кончаются раньше

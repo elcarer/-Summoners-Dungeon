@@ -503,7 +503,9 @@
                 const ownDisc = side === "p" ? B.discard : B.eDiscard;
                 const fp = cellXY(stump.col, stump.row);
                 const fDef = foeDeck.length ? CARDS[foeDeck[foeDeck.length - 1]] : null;
-                if (fDef && (fDef.cost >= 4 || fDef.rarity === "epic")) {
+                // W144: пороги стали ключами panelStumpFoeCost/panelStumpOwnCost
+                if (fDef && (fDef.cost >= AI_W.panelStumpFoeCost
+                    || fDef.rarity === "epic")) {
                     const id = foeDeck.pop();
                     foeDisc.push(id);
                     floatText(fp.x, fp.y - 66, GAME_LOC.t(`card.${id}.name`), 0xffd98c);
@@ -511,7 +513,7 @@
                     return;
                 }
                 const oDef = ownDeck.length ? CARDS[ownDeck[ownDeck.length - 1]] : null;
-                if (oDef && oDef.cost <= 1
+                if (oDef && oDef.cost <= AI_W.panelStumpOwnCost
                     && (oDef.type !== "unit" || oDef.atk + oDef.hp <= 3)) {
                     const id = ownDeck.pop();
                     ownDisc.push(id);

@@ -337,8 +337,10 @@
                         const hand = sd === "p" ? B.hand : B.eHand;
                         const score = (id) => {
                             const d = CARDS[id];
+                            // W144: вес эпика при поиске — ключ panelTutorEpicK
+                            // (был литерал 3; редкость rare осталась +1)
                             return (d.cost || 0)
-                                + (d.rarity === "epic" ? 3
+                                + (d.rarity === "epic" ? AI_W.panelTutorEpicK
                                     : d.rarity === "rare" ? 1 : 0);
                         };
                         // «найти» — n лучших из ВСЕЙ колоды, карты РАЗНЫЕ

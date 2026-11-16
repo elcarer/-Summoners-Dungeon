@@ -895,9 +895,12 @@
                 if (s.summonPoints) { // «Огнелис»/«Огнемедведь» (sg249/250):
                     // Животное в случайную пустую клетку, очки поровну
                     // (лис 4/4, медведь 5/4) — распределение только у игрока
+                    // W144: доля в атаку стала ключом panelSplitAtk
+                    // (ceil при 0.5 = прежние ceil/floor поровну)
+                    const aN = Math.ceil(s.summonPoints
+                        * (AI_W.panelSplitAtk || 0.5));
                     splitSpawn("e", s.summonToken,
-                        Math.ceil(s.summonPoints / 2),
-                        Math.floor(s.summonPoints / 2));
+                        aN, s.summonPoints - aN);
                     sfx("aqua");
                     return;
                 }
@@ -1174,7 +1177,8 @@
                     }
                 }
                 if (s.bloodMoon) { // «Кровавая луна» (dec160): жизни базы — в энергию, базе оставляем 2♥
-                    const n = Math.min(s.bloodMoon || 3, B.enemyBase - 2);
+                    // W144: запас базы стал ключом holdMoonKeep
+                    const n = Math.min(s.bloodMoon || 3, B.enemyBase - AI_W.holdMoonKeep);
                     if (n >= 1) {
                         B.enemyBase -= n; // «потратьте» — не урон
                         B.eEnergy += n;
@@ -1361,7 +1365,9 @@
                         .sort((a, b) => b.sc - a.sc)[0];
                     const own = pick(B.eDiscard), foe = pick(B.discard);
                     // своё ближе; чужое берём, только если заметно сильнее
-                    const k = own && (!foe || own.sc + 0.5 >= foe.sc) ? own : foe;
+                    // W144: буфер стал ключом panelBrewOwnK
+                    const k = own && (!foe || own.sc + AI_W.panelBrewOwnK >= foe.sc)
+                        ? own : foe;
                     if (k) {
                         const disc = B.eDiscard.includes(k.id) ? B.eDiscard : B.discard;
                         disc.splice(disc.indexOf(k.id), 1);

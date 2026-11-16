@@ -233,6 +233,9 @@
                     } else { // нелетально по опасной постройке (дротик без базы)
                         score = 6 * dg + dmg * 0.3 + pos;
                     }
+                    // W144 (statOn): купол (tim234) режет любой урон по цели
+                    // до 1 — «добивание» купольного на деле N ударов, не трать
+                    if (AI_W.statOn && v.dome) score -= AI_W.tDomeK * 5;
                     if (score > bestScore) { bestScore = score; best = v; }
                 }
                 return best;
@@ -518,8 +521,10 @@
                 // «Рождение феникса» (sg244, W60 юзер): ИИ играет её ЧАЩЕ —
                 // уже от 3 построек на поле (свои + чужие): жертв меньше
                 // трёх — карта бесполезна, держим до подходящего поля
+                // W144: порог стал ключом holdPhoenixBld (как в aiGroup)
                 if (s.phoenix
-                    && B.units.filter((v) => v.def.type === "building").length < 3)
+                    && B.units.filter((v) => v.def.type === "building")
+                        .length < AI_W.holdPhoenixBld)
                     return false;
                 // «Огнелис»/«Огнемедведь» (sg249/250): то же — некуда призывать
                 if (s.summonPoints && B.units.length >= 25) return false;
@@ -587,9 +592,10 @@
                         || (v.token && (v.curAtk || 0) + (v.hp || 0) >= 4)))) return false;
                 // «Тёмный контроль» (dec134) — есть чьё-то опасное существо
                 // (угроза 4+): тряпку забирать не окупается даже со скидкой
+                // W144: порог стал ключом holdMindThreat
                 if (s.mindControl && !spellTargets(B.units.filter((v) =>
                     v.side === "p" && v.def.type === "unit"
-                    && aiThreat(v) >= 4)).length) return false;
+                    && aiThreat(v) >= AI_W.holdMindThreat)).length) return false;
                 // «Выбор местности» (dec156) — среди верхних 6 колоды должна
                 // быть постройка, иначе карте нечего принести
                 if (s.terrainScout && !aiTopCards(Math.min(s.terrainScout || 6,
@@ -597,9 +603,10 @@
                     CARDS[m.id] && CARDS[m.id].type === "building")) return false;
                 // «Кровавая луна» (dec160) — только при низкой энергии (1⚡ и
                 // меньше) и запасе базы: ИИ оставляет себе минимум 2♥
+                // W144: пороги стали ключами holdMoonMinE/holdMoonKeep
                 if (s.bloodMoon
-                    && !(B.eEnergy <= 1
-                        && B.enemyBase - 2 >= 1)) return false;
+                    && !(B.eEnergy <= AI_W.holdMoonMinE
+                        && B.enemyBase - AI_W.holdMoonKeep >= 1)) return false;
                 // «Стена костров» — ряд должен окупаться (не на своих, просил
                 // юзер); всем рядам в убыток — карту держим до подходящего поля
                 if (s.firewall && aiFirewallRow() === null) return false;
@@ -624,8 +631,8 @@
                 // «Цветение кристаллов» — разгон: играется при 4+ картах в руке
                 if (s.energyPerHand && B.eHand.length < 4) return false;
                 // «Мозговой штурм» (tim206): полная смена руки +1 карта —
-                // окупается от трёх карт в руке
-                if (s.brainstorm && B.eHand.length < 3) return false;
+                // окупается от трёх карт в руке (W144: порог holdBrainHand)
+                if (s.brainstorm && B.eHand.length < AI_W.holdBrainHand) return false;
                 // «Добыча кристаллов» (tim211) — W105 (юзер): держим, пока
                 // суммарный «Сдвиг» ждущих меньше ТРЁХ — раньше карта не
                 // окупается (энергия должна быть «за все сдвиги» сразу)
@@ -676,10 +683,12 @@
                 // «Плен» (hon197) — карта призыва у игрока уже проверена
                 // гейтом applySpellPInner-зеркала; ИИ-гейт: не жжём 1⚡ ради
                 // жетона/мелочи — удаляемое должно стоить 3+ энергии
+                // W144: порог стал ключом holdCaptivateCost
                 if (s.captivate) {
                     const units = B.hand.filter((id) => CARDS[id]
                         && CARDS[id].type === "unit");
-                    if (!units.some((id) => (CARDS[id].cost || 0) >= 3
+                    if (!units.some((id) => (CARDS[id].cost || 0)
+                            >= AI_W.holdCaptivateCost
                         || CARDS[id].rarity === "epic")) return false;
                 }
                 // «Воскрешение» (hon200) — в сбросе должна быть карта
@@ -704,16 +713,19 @@
                 // «Двойная атака» — берсерк платит жизнь за удар: вешаем
                 // на сильного (3+ урона) и крепкого (3+ жизней), либо на уже
                 // стоящего у базы врага (ряд 3+ — следующий марш в базу)
+                // W144: пороги стали ключами holdBerserkAtk/holdBerserkRow
                 if (s.berserk && !spellTargets(B.units.filter((v) => v.side === "e"
                     && v.def.type === "unit"
-                    && ((v.curAtk >= 3 && v.hp >= 3) || (v.row >= 3 && v.curAtk >= 2)))).length) return false;
+                    && ((v.curAtk >= AI_W.holdBerserkAtk && v.hp >= AI_W.holdBerserkAtk)
+                        || (v.row >= AI_W.holdBerserkRow && v.curAtk >= 2)))).length) return false;
                 // «Запутать руны» — сброс обеих рук: играем, только если у
                 // игрока карт больше, чем останется у нас после розыгрыша
                 if (s.discardHandDraw && B.hand.length <= B.eHand.length - 1) return false;
                 // добор-заклинание — тоже трата энергии; гасим только при полной руке
                 if (s.draw && B.eHand.length >= HAND_MAX) return false;
                 // огнешар при энергии 1..2 почти пуст (урон 0..1) — копим дальше
-                if (s.drainAll && B.eEnergy < 3) return false;
+                // W144: порог стал ключом holdFireballE
+                if (s.drainAll && B.eEnergy < AI_W.holdFireballE) return false;
                 // «Гроза»: после оплаты цены должен остаться хотя бы 1⚡ удара
                 // и хоть одна цель у игрока (иначе энергия сгорит впустую)
                 if (s.stormAll && (B.eEnergy - effCost(cardIdOf(def), "e") < 1
@@ -757,7 +769,9 @@
                 // «Запретные знания» (dec130) — ИИ берёт карты СЕБЕ, теряя
                 // 2♥ базы: играем только со здоровой базой (5+♥) и не
                 // пустой колодой (иначе тратим энергию вхолостую)
-                if (s.forbidden && (B.enemyBase <= 4 || !B.eDeck.length)) return false;
+                // W144: порог стал ключом holdForbiddenHp
+                if (s.forbidden && (B.enemyBase <= AI_W.holdForbiddenHp
+                    || !B.eDeck.length)) return false;
                 // «Негативный поток» — нужна цель: существо или добивание базы
                 if (s.target === "anyUnitOrFoe"
                     && !spellTargets(B.units.filter((v) => v.def.type === "unit")).length
@@ -777,8 +791,10 @@
                     const back = B.eDiscard.filter((id) => CARDS[id] && CARDS[id].type === "building");
                     if (!own.length || !back.length) return false;
                     const fullHp = (v) => (CARDS[cardIdOf(v.def)] || { hp: 0 }).hp;
+                    // W144: порог перезагрузки стал ключом holdExcavateHp
                     const reload = own.some((v) =>
-                        aiDangerBld(v.def) > 0 && fullHp(v) - v.hp >= 2
+                        aiDangerBld(v.def) > 0
+                        && fullHp(v) - v.hp >= AI_W.holdExcavateHp
                         && back.some((id) => id === cardIdOf(v.def)
                             || CARDS[id].cost >= v.def.cost));
                     if (reload) return true;
@@ -925,7 +941,7 @@
                     || s.drainAll || s.fireflies || s.growthHand
                     || s.wolfVolley || s.nova || s.baseHit || s.iceStrike
                     || s.iceSwarm
-                    || (s.dmg || 0) + altarBonus("e") >= 2);
+                    || (s.dmg || 0) + altarBonus("e") >= AI_W.panelReplayMinDmg);
             };
             // Есть ли смысл повторять последнее заклинание («Горящие руны»):
             // оно есть, это не сами руны, оно достойно повтора и применимо

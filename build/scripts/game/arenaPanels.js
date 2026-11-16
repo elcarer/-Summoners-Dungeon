@@ -363,11 +363,23 @@
                 monolithPanel = node;
             };
             A.queueMonolithSearch = function queueMonolithSearch(cost) { monolithQueue.push(cost); pumpMonolithQueue(); };
-            // монолит врага: ИИ не выбирает — берёт первое попавшееся
+            // монолит врага: ИИ не выбирает — берёт первое попавшееся.
+            // W144 (panelMonolithOn): выбор лучшего по aiCardPower среди
+            // подходящих по цене (0 = прежнее «первое попавшееся»)
             A.monolithEnemyTake = function monolithEnemyTake(cost) {
-                const i = B.eDeck.findIndex((id) => CARDS[id].type === "unit" && CARDS[id].cost === cost);
-                if (i < 0) return;
-                B.eHand.push(B.eDeck.splice(i, 1)[0]);
+                const matches = [];
+                B.eDeck.forEach((id, i) => {
+                    if (CARDS[id].type === "unit" && CARDS[id].cost === cost)
+                        matches.push({ id, i });
+                });
+                if (!matches.length) return;
+                let pick = matches[0];
+                if (AI_W.panelMonolithOn && A.aiCardPower) {
+                    for (const m of matches)
+                        if (aiCardPower(CARDS[m.id]) > aiCardPower(CARDS[pick.id]))
+                            pick = m;
+                }
+                B.eHand.push(B.eDeck.splice(pick.i, 1)[0]);
             };
 
             // ── Панель «Пень обряда» (grw11): в начале хода владельца — взгляд
