@@ -76,7 +76,7 @@
             "world.townPre.time": ["Chron", "Tem", "Aeon", "Klep", "Sand", "Vek", "Hor", "Cir"],
             "world.townSuf.time": ["um", "tis", "vekh", "mere", "dra", "sar", "hod", "dial"],
             "dungeon.toastFloor": "Floor {n} cleared!",
-            "dungeon.tipDeck": "Deck",
+            "dungeon.tipDeckN": "Deck ({n})", // W141: deck size in the foe window
             "dungeon.tipBase": "Base HP: {n}",
             "obj.gold": "Gold Pile",
             "obj.chest": "Chest",

@@ -81,7 +81,7 @@
             "world.townPre.time": ["Хро", "Тем", "Эон", "Клеп", "Санд", "Век", "Пес", "Цир"],
             "world.townSuf.time": ["нум", "тис", "вех", "мера", "дра", "сар", "ход", "стек"],
             "dungeon.toastFloor": "Этаж {n} пройден!",
-            "dungeon.tipDeck": "Колода",
+            "dungeon.tipDeckN": "Колода ({n})", // W141: размер колоды в окне противника
             "dungeon.tipBase": "HP базы: {n}",
             "obj.gold": "Куча золота",
             "obj.chest": "Сундук",

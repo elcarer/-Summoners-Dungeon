@@ -44,6 +44,7 @@
         } catch (e) { return null; }
         const sp = new PIXI.Sprite(tex);
         sp.eventMode = "none";
+        sp.__pixelfx = true; // сцены чистят текстуру костров вместе со спрайтом
         const k = (o.size || h) / h;
         sp.scale.set(k);
         // якорь — origin эффекта (meta.origin — его «земля»/центр в кадре):

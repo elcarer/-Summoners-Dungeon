@@ -760,18 +760,31 @@
             // повтор: armTrap зовёт его первым делом.
 
             // ── «Стена костров» (str21) ────────────────────────────────────────
-            // Ряд клетки горит effects/fire.png; в конце каждого хода ВЛАДЕЛЬЦА
-            // (включая ход каста) все существа и строения ряда получают 2 урона
-            // (+ аура алтаря). У каждого каста свой счётчик ходов (left).
+            // Ряд клетки горит (W141, юзер: на каждой клетке ряда — живой
+            // костёр fire/campfire из pixelfx: языки, искры, угли, дым и
+            // тёплый свет; без бандла — прежняя статичная effects/fire.png).
+            // В конце каждого хода ВЛАДЕЛЬЦА (включая ход каста) все существа
+            // и строения ряда получают 2 урона (+ аура алтаря). У каждого
+            // каста свой счётчик ходов (left).
             A.redrawFirewalls = function redrawFirewalls() {
-                root.fireLayer.removeChildren().forEach((n) => n.destroy({ children: true }));
+                root.fireLayer.removeChildren().forEach((n) => n.destroy(
+                    n.__pixelfx // canvas-текстуру костра освобождаем вместе
+                        ? { children: true, texture: true, textureSource: true }
+                        : { children: true }));
                 for (const f of B.firewalls) {
                     for (let col = 0; col < GRID; col++) {
                         const rc = cellRect(col, f.row);
+                        const x = rc.x + rc.w / 2, y = rc.y + rc.h - 4;
+                        // seed/сторона дают клетке свой узнаваемый костёр,
+                        // который переживает перерисовки (снапшот W140 и т.п.)
+                        if (globalThis.GAME_FX && globalThis.GAME_FX.available
+                            && globalThis.GAME_FX.spawn(root.fireLayer, "fire/campfire",
+                                { x, y, size: rc.h + 26,
+                                    seed: f.row * 31 + col * 7 + (f.side === "e" ? 11 : 0) })) continue;
                         const sp = new PIXI.Sprite(uiTex("effects/fire.png"));
                         sp.anchor.set(0.5);
                         sp.scale.set(Math.min(rc.w / sp.texture.width, rc.h / sp.texture.height));
-                        sp.position.set(rc.x + rc.w / 2, rc.y + rc.h / 2);
+                        sp.position.set(x, rc.y + rc.h / 2);
                         sp.eventMode = "none"; // эффект поля не ест клики
                         root.fireLayer.addChild(sp);
                     }

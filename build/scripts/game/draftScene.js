@@ -58,14 +58,48 @@
             return out;
         }
 
+        // ── Оценка карты соперником (W141, юзер: не случайная из двух
+        // оставшихся, а лучшая для уже набранного) ──────────────────────────
+        // Базовая ценность «самой по себе» — те же деньги, что у способности
+        // «Сгусток магии» (tutorPick): стоимость + редкие дороже.
+        function draftValue(id) {
+            const d = CARDS[id];
+            return (d.cost || 0)
+                + (d.rarity === "epic" ? 3 : d.rarity === "rare" ? 1 : 0);
+        }
+        // Синергия с уже взятыми ему картами: общие подтипы (creature/subtype
+        // — гоблины к гоблинам, духи к духам) + поправка на кривую маны
+        // (перекос колоды в дорогое подтягивает дешёвое, и наоборот).
+        function draftSynergy(id) {
+            const d = CARDS[id];
+            const tag = d.creature || d.subtype;
+            let s = 0;
+            if (tag) for (const p of G.draft.ePicks) {
+                const pd = CARDS[p];
+                if ((pd.creature || pd.subtype) === tag) s += 1.2;
+            }
+            const avg = G.draft.ePicks.length
+                ? G.draft.ePicks.reduce((a, p) => a + (CARDS[p].cost || 0), 0)
+                    / G.draft.ePicks.length : 0;
+            if (avg > 3.2 && (d.cost || 0) <= 2) s += 0.6;
+            if (avg > 0 && avg < 2 && (d.cost || 0) >= 4) s += 0.4;
+            return s;
+        }
+        function aiDraftPick(rest) {
+            return rest.reduce((best, k) =>
+                (draftValue(options[k]) + draftSynergy(options[k])
+                    > draftValue(options[best]) + draftSynergy(options[best]))
+                    ? k : best, rest[0]);
+        }
+
         function choose(i) {
             if (phase !== "pick" || !G.draft || !options[i]) return;
             phase = "result";
             lastPicked = i;
             G.draft.picks.push(options[i]);
-            // соперник забирает случайную из двух оставшихся
+            // соперник берёт лучшую из двух оставшихся под свой набор (W141)
             const rest = options.map((_, k) => k).filter((k) => k !== i);
-            lastEnemy = rest[(Math.random() * rest.length) | 0];
+            lastEnemy = aiDraftPick(rest);
             G.draft.ePicks.push(options[lastEnemy]);
             if (ctx.sfx) ctx.sfx("acid");
             rebuild();

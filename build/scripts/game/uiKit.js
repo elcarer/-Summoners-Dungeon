@@ -451,6 +451,12 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         return {
             show,
             hide,
+            // переставить живую копию без перезапуска роста (панель-хозяин
+            // следует за жетоном — W141, окно противника)
+            moveTo(x, y) {
+                if (!zoom || zoom.dead || !zoom.node || zoom.node.destroyed) return;
+                zoom.node.position.set(x, Math.max(yMin, Math.min(yMax, y)));
+            },
             state: () => (zoom && !zoom.dead // dead — до-улитая тикером запись
                 ? { id: zoom.id, scale: Math.round(zoom.cur * 1000) / 1000, target: zoom.tgt }
                 : null),
@@ -606,5 +612,121 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         return GAME_LOC.t(`hero.${heroId}.name`);
     }
 
-    globalThis.GAME_UI = { T, fit, button, chip, cardFace, cardZoomer, addGlow, constGlow, pathFx, backTexOf, dimBg, scrollPane, foeTitle };
+    // Окно противника при наведении (W141, юзер): его карта героя слева,
+    // справа — имя, база и размер колоды, ниже — табличка колоды «N× имя»
+    // (в два столбца, когда карт много); наведение на строку — ПОЛНАЯ карта
+    // вырастает рядом (cardZoomer). Заменяет прежнюю однострочную сводку
+    // «Колода: 2× А, 1× Б…» в подземелье и у отрядов мира. Панель живёт
+    // в ui-слое (дизайн-координаты) и каждый кадр позиционируется вызовом
+    // place(px, py) — точка (px, py) — центр верхушки вражеского жетона.
+    // deck — массив id карт; heroImg — имя листа героя или null.
+    function deckTip(ctx, { title, base, deck, heroImg } = {}) {
+        const counts = new Map();
+        for (const id of deck || []) counts.set(id, (counts.get(id) || 0) + 1);
+        const entries = [...counts.entries()]
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+        const PAD = 14, CARD_S = 0.5, CARD_W = 230 * CARD_S, CARD_H = 338 * CARD_S;
+        const ROW_H = 27, COLS = entries.length > 8 ? 2 : 1, W = 520;
+        const colW = (W - PAD * 2) / COLS;
+        const headH = Math.max(CARD_H, 24 + 8 + 22 + 4 + 22 + 8);
+        const rowsN = Math.ceil(entries.length / COLS);
+        const H = PAD + headH + 10 + rowsN * ROW_H + PAD;
+
+        const node = new PIXI.Container();
+        node.eventMode = "passive"; // сам не ловит, строки таблицы — ловят
+        const bg = new PIXI.Graphics();
+        bg.roundRect(0, 0, W, H, 12);
+        bg.fill({ color: 0x171310, alpha: 0.94 });
+        bg.stroke({ width: 3, color: 0x6b5c40 });
+        node.addChild(bg);
+
+        let hero = false;
+        if (heroImg) {
+            const sp = new PIXI.Sprite(ctx.uiTex(`heroes/${heroImg}.png`));
+            sp.anchor.set(0.5);
+            sp.scale.set(CARD_S);
+            sp.position.set(PAD + CARD_W / 2, PAD + CARD_H / 2);
+            node.addChild(sp);
+            hero = true;
+        }
+        const tx = PAD + CARD_W + 14;
+        const titleT = T(title || "", 24, 0xffe9b0);
+        titleT.position.set(tx, PAD + 2);
+        node.addChild(titleT);
+        const baseT = T(base || "", 18, 0xff9c8c);
+        baseT.position.set(tx, PAD + 34);
+        node.addChild(baseT);
+        const deckT = T(GAME_LOC.t("dungeon.tipDeckN", { n: (deck || []).length }),
+            18, 0xd8c79d);
+        deckT.position.set(tx, PAD + 60);
+        node.addChild(deckT);
+
+        // табличка колоды + ховер-зум полной карты (растёт, как всюду)
+        const zoomer = cardZoomer(ctx, { host: node, from: 0.35, to: 0.92,
+            yMin: -4000, yMax: 4000 }); // координаты локальные — без клампа
+        const rows = [];
+        entries.forEach(([id, n], i) => {
+            const col = i % COLS, rowI = (i / COLS) | 0;
+            const c = new PIXI.Container();
+            c.eventMode = "static";
+            c.hitArea = new PIXI.Rectangle(0, 0, colW, ROW_H);
+            const cnt = T(n + "×", 18, 0xf0c96a);
+            cnt.anchor.set(1, 0.5);
+            cnt.position.set(44, ROW_H / 2);
+            cnt.eventMode = "none";
+            c.addChild(cnt);
+            const name = T(GAME_LOC.t("card." + id + ".name"), 18, 0xd8c79d);
+            name.position.set(56, ROW_H / 2 - 1);
+            name.eventMode = "none";
+            c.addChild(name);
+            const ry = PAD + headH + 10 + rowI * ROW_H;
+            const rx = PAD + col * colW;
+            c.position.set(rx, ry);
+            c.on("pointerover", () => {
+                // зум в локальных координатах панели — по сторону, где есть
+                // место (сторона и позиция пересчитываются в place каждый кадр)
+                zoomRow = { id, ry };
+                rezoom(true);
+            });
+            c.on("pointerout", () => { zoomRow = null; zoomer.hide(); });
+            node.addChild(c);
+            rows.push({ id, node: c });
+        });
+        const zoom = { x: "r" }; // сторона зума — пересчитывается в place
+        let zoomRow = null; // активная строка зума { id, ry }
+        let last = null;
+        function clampZoomY(ry) {
+            // центр зума держим в границах экрана (локальные координаты)
+            const top = last ? last.y : 0;
+            return Math.max(180, Math.min(900, top + ry)) - top;
+        }
+        function zoomLocalX() {
+            return zoom.x === "l" ? -CARD_W - 26 : W + CARD_W + 26;
+        }
+        function rezoom(restart) {
+            if (!zoomRow) return;
+            if (restart) zoomer.show(zoomRow.id, zoomLocalX(),
+                clampZoomY(zoomRow.ry), null, 0.35);
+            else zoomer.moveTo(zoomLocalX(), clampZoomY(zoomRow.ry));
+        }
+        function place(px, py) {
+            const x = Math.max(12, Math.min(1920 - W - 12, px - W / 2));
+            const yRaw = (py - H - 27 < 12) ? py + 33 : py - H - 27;
+            // жетон может быть вне камеры (наведение по координатам) — окно
+            // прижимаем к краю экрана, а не теряем
+            const y = Math.max(12, Math.min(1080 - H - 12, yRaw));
+            node.position.set(x, y);
+            last = { x, y };
+            // зум справа, пока полная карта влезает в экран; иначе — слева
+            zoom.x = (x + W + CARD_W + 136 <= 1920) ? "r" : "l";
+            rezoom(false); // живой зум переставить без перезапуска роста
+        }
+        function destroy() {
+            zoomer.hide(true);
+            node.destroy({ children: true });
+        }
+        return { node, w: W, h: H, rows, hero, zoomer, place, destroy };
+    }
+
+    globalThis.GAME_UI = { T, fit, button, chip, cardFace, cardZoomer, addGlow, constGlow, pathFx, backTexOf, dimBg, scrollPane, foeTitle, deckTip };
 })();

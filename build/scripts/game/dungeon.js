@@ -691,55 +691,32 @@
             G.dungeon.toastT = 2.2;
         }
 
-        // ── Подсказка на врага (наведение курсором): имя энкаунтера + краткое
-        // описание его колоды (состав с копиями) и HP базы. Панель живёт в
-        // ui-слое (дизайн-координаты) и каждый кадр следует за жетоном —
-        // камера может двигаться. Показывает pointermove по клик-зоне карты:
-        // жетоны врагов НЕ интерактивны, чтобы не съедать клики движения.
-        let tip = null; // { enemy, node, h }
-        function deckSummary(enemy) {
-            // колода хранится в враге (кидается при генерации этажа)
-            const deck = enemy.deck;
-            const counts = new Map();
-            for (const id of deck) counts.set(id, (counts.get(id) || 0) + 1);
-            return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-                .map(([id, n]) => `${n}× ${GAME_LOC.t("card." + id + ".name")}`).join(", ");
-        }
+        // ── Подсказка на врага (наведение курсором): W141 (юзер) — окно с
+        // картой героя противника и табличкой его колоды («N× имя», зум
+        // полной карты по наведению на строку) вместо однострочной сводки.
+        // Панель живёт в ui-слое (дизайн-координаты) и каждый кадр следует
+        // за жетоном — камера может двигаться. Показывает pointermove по
+        // клик-зоне карты: жетоны врагов НЕ интерактивны, чтобы не съедать
+        // клики движения.
+        let tip = null; // { enemy, win }
         function showTip(enemy) {
             if (tip && tip.enemy === enemy) return;
             hideTip();
-            const enc = globalThis.GAME_DATA.ENCOUNTERS[enemy.enc] || globalThis.GAME_DATA.ENCOUNTERS.gob;
-            const node = new PIXI.Container();
-            node.eventMode = "none";
-            const title = new PIXI.Text({
-                text: GAME_LOC.t("enc." + enemy.enc + ".title"),
-                style: { fontFamily: "Kereru", fontSize: 24, fill: 0xffe9b0 },
+            const D = globalThis.GAME_DATA;
+            const enc = D.ENCOUNTERS[enemy.enc] || D.ENCOUNTERS.gob;
+            const hd = D.HEROES[enc.hero] || D.HEROES.gob;
+            const win = globalThis.GAME_UI.deckTip(ctx, {
+                title: GAME_LOC.t("enc." + enemy.enc + ".title"),
+                base: GAME_LOC.t("dungeon.tipBase", { n: enc.baseHp }),
+                deck: enemy.deck,
+                heroImg: hd && hd.img ? hd.img : null,
             });
-            const hpLine = new PIXI.Text({
-                text: GAME_LOC.t("dungeon.tipBase", { n: enc.baseHp }),
-                style: { fontFamily: "Kereru", fontSize: 18, fill: 0xff9c8c },
-            });
-            const deck = new PIXI.Text({
-                text: GAME_LOC.t("dungeon.tipDeck") + ": " + deckSummary(enemy),
-                style: { fontFamily: "Kereru", fontSize: 18, fill: 0xd8c79d,
-                    wordWrap: true, wordWrapWidth: 336, breakWords: true },
-            });
-            const w = 372, pad = 15;
-            const h = pad + title.height + 4 + hpLine.height + 6 + deck.height + pad;
-            const g = new PIXI.Graphics();
-            g.roundRect(0, 0, w, h, 12);
-            g.fill({ color: 0x171310, alpha: 0.94 });
-            g.stroke({ width: 3, color: 0x6b5c40 });
-            title.position.set(pad, pad);
-            hpLine.position.set(pad, pad + title.height + 4);
-            deck.position.set(pad, pad + title.height + 8 + hpLine.height);
-            node.addChild(g, title, hpLine, deck);
-            ctx.ui.addChild(node);
-            tip = { enemy, node, h };
+            ctx.ui.addChild(win.node);
+            tip = { enemy, win };
         }
         function hideTip() {
             if (!tip) return;
-            tip.node.destroy({ children: true });
+            tip.win.destroy();
             tip = null;
         }
         function hoverCheck(p) {
@@ -1554,9 +1531,7 @@
                 if (tip && layer) {
                     const sp = layer.toGlobal({ x: tip.enemy.x, y: tip.enemy.y });
                     const p = ctx.ui.toLocal(sp);
-                    const tx = Math.max(12, Math.min(1920 - 384, p.x - 186));
-                    const ty = (p.y - tip.h - 27 < 12) ? p.y + 33 : p.y - tip.h - 27;
-                    tip.node.position.set(tx, ty);
+                    tip.win.place(p.x, p.y);
                 }
                 if (st.toastT > 0) {
                     st.toastT -= dt;
@@ -1912,9 +1887,17 @@
             tipState: () => (tip ? {
                 enc: tip.enemy.enc, boss: !!tip.enemy.boss,
                 title: GAME_LOC.t("enc." + tip.enemy.enc + ".title"),
-                deck: deckSummary(tip.enemy),
-                w: 372, h: tip.h,
+                rows: tip.win.rows.length, // строк таблички колоды (W141)
+                w: tip.win.w, h: tip.win.h,
+                hero: tip.win.hero,       // карта героя в окне
+                rowIds: tip.win.rows.map((r) => r.id),
             } : null),
+            tipZoomShow: (i) => {
+                if (tip && tip.win.rows[i]) tip.win.rows[i].node.emit("pointerover");
+                return !!(tip && tip.win.rows[i]);
+            },
+            tipZoomHide: () => { if (tip) tip.win.zoomer.hide(); return true; },
+            tipZoomState: () => (tip ? tip.win.zoomer.state() : null),
             tipHide: () => hideTip(),
             // ── объекты комнат (тесты): состояние, активное окно, действия ─
             objects: () => (G.dungeon && G.dungeon.objects

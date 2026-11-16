@@ -735,25 +735,15 @@
             floaties.push({ node: t, t: 0 });
         }
 
-        // ── Подсказка на бродячем отряде (просил юзер): КАРТА ПЕРСОНАЖА
-        // героя отряда + инфо-окно с составом колоды — как тутип врага в
-        // подземелье (dungeon.js showTip). Панель живёт в ui-слое и каждый
-        // кадр следует за отрядом; показывается pointermove по клик-зоне
-        // карты, отряды НЕ интерактивны (не съедают клики движения)
-        function squadDeckSummary(encId, deckOverride) {
-            const D = globalThis.GAME_DATA;
-            const enc = D.ENCOUNTERS[encId] || D.ENCOUNTERS.gob;
-            const src = deckOverride || enc.core;
-            const counts = new Map();
-            for (const id of src) counts.set(id, (counts.get(id) || 0) + 1);
-            return [...counts.entries()]
-                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-                .map(([id, n]) => `${n}× ${GAME_LOC.t("card." + id + ".name")}`)
-                .join(", ");
-        }
+        // ── Подсказка на бродячем отряде (просил юзер): W141 — общее окно
+        // противника (GAME_UI.deckTip, как в подземелье): карта героя + имя,
+        // база, размер колоды + табличка колоды с зумом полной карты по
+        // наведению на строку. Панель живёт в ui-слое и каждый кадр следует
+        // за отрядом; показывается pointermove по клик-зоне карты, отряды
+        // НЕ интерактивны (не съедают клики движения)
         function hideSquadTip() {
             if (!tip) return;
-            tip.node.destroy({ children: true });
+            tip.win.destroy();
             tip = null;
         }
         function showSquadTip(s) {
@@ -762,47 +752,17 @@
             const D = globalThis.GAME_DATA;
             const enc = D.ENCOUNTERS[s.enc] || D.ENCOUNTERS.gob;
             const hd = D.HEROES[enc.hero] || D.HEROES.gob;
-            const node = new PIXI.Container();
-            node.eventMode = "none";
-            // карта персонажа героя отряда (слева, 115×169)
-            const heroCard = new PIXI.Sprite(uiTex(`heroes/${hd.img}.png`));
-            heroCard.anchor.set(0, 0);
-            heroCard.scale.set(0.5);
-            heroCard.position.set(0, 0);
-            node.addChild(heroCard);
-            // инфо-панель (справа): имя, HP базы, колода — как в данже.
             // Дикие враги: база с усилением вида, колода — своя (W29)
             const hpN = enc.baseHp
                 + (s.kind === "wild" ? (s.st.hpBonus || 0) : 0);
-            const title = new PIXI.Text({
-                text: GAME_LOC.t("enc." + s.enc + ".title"),
-                style: { fontFamily: "Kereru", fontSize: 24, fill: 0xffe9b0 },
+            const win = globalThis.GAME_UI.deckTip(ctx, {
+                title: GAME_LOC.t("enc." + s.enc + ".title"),
+                base: GAME_LOC.t("dungeon.tipBase", { n: hpN }),
+                deck: s.kind === "wild" ? s.st.deck : enc.core,
+                heroImg: hd && hd.img ? hd.img : null,
             });
-            const hpLine = new PIXI.Text({
-                text: GAME_LOC.t("dungeon.tipBase", { n: hpN }),
-                style: { fontFamily: "Kereru", fontSize: 18, fill: 0xff9c8c },
-            });
-            const deck = new PIXI.Text({
-                text: GAME_LOC.t("dungeon.tipDeck") + ": "
-                    + squadDeckSummary(s.enc,
-                        s.kind === "wild" ? s.st.deck : null),
-                style: { fontFamily: "Kereru", fontSize: 18, fill: 0xd8c79d,
-                    wordWrap: true, wordWrapWidth: 336, breakWords: true },
-            });
-            const w = 372, pad = 15;
-            const h = Math.max(heroCard.height,
-                pad + title.height + 4 + hpLine.height + 6 + deck.height + pad);
-            const g = new PIXI.Graphics();
-            g.roundRect(heroCard.width, 0, w, h, 12);
-            g.fill({ color: 0x171310, alpha: 0.94 });
-            g.stroke({ width: 3, color: 0x6b5c40 });
-            title.position.set(heroCard.width + pad, pad);
-            hpLine.position.set(heroCard.width + pad, pad + title.height + 4);
-            deck.position.set(heroCard.width + pad,
-                pad + title.height + 8 + hpLine.height);
-            node.addChild(g, title, hpLine, deck);
-            ctx.ui.addChild(node);
-            tip = { squad: s, node, h: h + 16 };
+            ctx.ui.addChild(win.node);
+            tip = { squad: s, win };
         }
         // панель следует за отрядом (камера едет) — экранные координаты
         // через мировую матрицу layer + фит ui-канваса
@@ -811,10 +771,7 @@
             const s = tip.squad;
             const g = layer.toGlobal({ x: s.st.x, y: s.st.y });
             const p = ctx.ui.toLocal(g);
-            const wAll = 115 + 372;
-            tip.node.position.set(
-                Math.max(8, Math.min(1920 - wAll - 8, p.x - wAll / 2)),
-                Math.max(8, p.y - 30 - tip.h));
+            tip.win.place(p.x, p.y - 30);
         }
         function hoverSquads(p) {
             let best = null, bd = 1e9;
@@ -2474,11 +2431,17 @@
                 tipState: () => (tip ? {
                     enc: tip.squad.enc,
                     title: GAME_LOC.t("enc." + tip.squad.enc + ".title"),
-                    deck: squadDeckSummary(tip.squad.enc,
-                        tip.squad.kind === "wild" ? tip.squad.st.deck : null),
-                    heroImg: (globalThis.GAME_DATA.ENCOUNTERS[tip.squad.enc]
-                        || {}).hero || null,
+                    rows: tip.win.rows.length, // строк таблички (W141)
+                    w: tip.win.w, h: tip.win.h,
+                    hero: tip.win.hero,
+                    rowIds: tip.win.rows.map((r) => r.id),
                 } : null),
+                tipZoomShow: (i) => {
+                    if (tip && tip.win.rows[i]) tip.win.rows[i].node.emit("pointerover");
+                    return !!(tip && tip.win.rows[i]);
+                },
+                tipZoomHide: () => { if (tip) tip.win.zoomer.hide(); return true; },
+                tipZoomState: () => (tip ? tip.win.zoomer.state() : null),
                 tipHide: () => hideSquadTip(),
                 // пополнить колоду тестово (гейты данжа: вход 16+): карты
                 // стартера героя циклично до нужного размера
