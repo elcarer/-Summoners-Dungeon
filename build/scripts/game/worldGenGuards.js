@@ -421,7 +421,30 @@
                 }
             }
         }
-            return { wanderers, bridgeGuards, decayGuards, wildSpawns };
+            // ── 8f. точки остановки МИРОВЫХ боссов (W136, спека юзера):
+            // 12 РАЗНЫХ свободных клеток, сид-детерминированно, подальше
+            // друг от друга и от старта героя. Босс прилетает за край и
+            // идёт (летит) к ближайшей СВОБОДНОЙ точке (занятость —
+            // по состоянию забега, bossPickStop в world.js)
+            const bossStops = [];
+            {
+                const okStop = (x, y) => x >= 2 && y >= 2
+                    && x < W - 2 && y < H - 2 && rows[y][x] === ".";
+                let tries = 0;
+                while (bossStops.length < 12 && tries++ < 4000) {
+                    const x = 2 + ((rng() * (W - 4)) | 0);
+                    const y = 2 + ((rng() * (H - 4)) | 0);
+                    if (!okStop(x, y)) continue;
+                    let near = false;
+                    for (const p of bossStops)
+                        if (Math.hypot(p.gx - x, p.gy - y) < 10) { near = true; break; }
+                    if (near) continue;
+                    if (spawn && spawn.gx !== undefined
+                        && Math.hypot(spawn.gx - x, spawn.gy - y) < 8) continue;
+                    bossStops.push({ gx: x, gy: y });
+                }
+            }
+            return { wanderers, bridgeGuards, decayGuards, wildSpawns, bossStops };
         },
     };
 })();

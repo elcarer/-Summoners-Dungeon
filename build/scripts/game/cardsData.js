@@ -20,7 +20,8 @@
         globalThis.GAME_CARDS_GROWTH, globalThis.GAME_CARDS_WISDOM,
         globalThis.GAME_CARDS_DECAY, globalThis.GAME_CARDS_HONOR,
         globalThis.GAME_CARDS_TIME, globalThis.GAME_CARDS_MULTI);
-    const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5 };
+    const RARITY_COLORS = { common: 0x9a9a9a, rare: 0x5b9bd5, epic: 0xb07ad5,
+        legendary: 0xe8a33d }; // легендарная — W136 (мировой босс «Акралон»)
 
     // Базовая колода: 12 карт — по 2 копии шести основных (просил юзер).
     const DEFAULT_DECK = [
@@ -206,6 +207,29 @@
             "str19", "str19",   // Алтарь огня
             "dstr291", "dstr291", // Огненный бич
             "dstr292", "dstr292", // Игра в кости
+        ],
+        // W136 (спека юзера): ядро МИРОВОГО босса «Акралон» — РОВНО 42
+        // карты (минимум колоды героя, heroesData.deckMin), трёхцвет
+        // Рост+Мудрость+Тлен. «Дары Акралона» (gwd301) встречаются ТОЛЬКО
+        // здесь (в пулы наград/добора не входят); остальные — обычные
+        // карты трёх стихий
+        akralon: [
+            "gwd301", "gwd301", "gwd301", // Дары Акралона
+            "grw31", "grw31", "grw31",    // Древоброд глухой чащи
+            "grw28", "grw28", "grw28",    // Старейший древоброд
+            "grw18", "grw18", "grw18",    // Похищение энергии
+            "grw19", "grw19", "grw19",    // Защитный кокон
+            "grw25", "grw25", "grw25",    // Цветение кристаллов
+            "wis118", "wis118", "wis118", // Гроза
+            "wis110", "wis110", "wis110", // Весёлый штормовик
+            "wis108", "wis108", "wis108", // Иллюзия
+            "wis106",                     // Облачный шпиль ×1
+            "wis94", "wis94", "wis94",    // Поиск знаний
+            "wis85", "wis85", "wis85",    // Смыв
+            "dec160", "dec160", "dec160", // Кровавая луна
+            "dec157",                     // Склеп ×1
+            "dec143",                     // Разложенные кости ×1
+            "dec134", "dec134", "dec134", // Тёмный контроль
         ],
     };
 

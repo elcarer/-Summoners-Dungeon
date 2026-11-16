@@ -551,6 +551,23 @@
                         onEffectGain(u); // «Изменённый» (W84): полученный «Выстрел»
                         return true;
                     }
+                    if (def.spell.gifts) { // «Дары Акралона» (gwd301, W136):
+                        // цель получает «Вырастание 1» (+1⚔ за полученный
+                        // урон — damageUnit), «Генерацию 1» (+1⚡ владельцу
+                        // за шаг марша/перелёт — genMoveGain) и «Вампиризм 1»
+                        // (+1♥ после нанесения урона — vampireHeal).
+                        // Метки на единице поля, складываются
+                        u.growOnHitG = (u.growOnHitG || 0) + 1;
+                        u.genMoveG = (u.genMoveG || 0) + 1;
+                        u.vampHpG = (u.vampHpG || 0) + 1;
+                        floatText(p.x, p.y - 66,
+                            GAME_LOC.t("card.gwd301.name"), 0x9fd489);
+                        fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
+                        punch(u.node);
+                        sfx("chpoc");
+                        onEffectGain(u); // «Изменённый» (W84): способности цели
+                        return true;
+                    }
                     if (def.spell.axeAmp) { // «Лабрис основателя» (wt279, W81):
                         // цель атакует — бьёт 3 урона случайного врага
                         // (axeStrike зовётся во всех точках атаки). Повторное

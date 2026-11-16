@@ -1565,6 +1565,21 @@
             // занята или край поля — стоит. После перемещения — «Выстрел 1»
             // (siegeShot). Ловушки на свою постройку не триггерят (ловушки
             // ловят только врага). Зовётся из шага марша и «Полёта» существа.
+            // «Генерация N» (gwd301 «Дары Акралона», W136 — спека юзера):
+            // существо ПЕРЕМЕЩАЕТСЯ (шаг марша или «Полёт») — владелец
+            // получает N энергии. Метка на единице поля (u.genMoveG);
+            // def.genOnMove — для будущих карт. Зовётся из тех же точек,
+            // что siegeFollowAct (шаг марша и перелёт в arenaFlow)
+            A.genMoveGain = function genMoveGain(u) {
+                if (!u || u.def.type !== "unit" || !B.units.includes(u)) return;
+                const n = (u.def.genOnMove || 0) + (u.genMoveG || 0);
+                if (!n) return;
+                if (u.side === "p") B.energy += n; else B.eEnergy += n;
+                const p = cellXY(u.col, u.row);
+                floatText(p.x, p.y - 39, `+${n}⚡`, 0xffd98c);
+                sfx("chpoc");
+                punch(root.hud);
+            };
             A.siegeFollowAct = function siegeFollowAct(u, fromCol, fromRow) {
                 if (!B.units.includes(u) || u.def.type !== "unit") return;
                 const dir = u.side === "p" ? -1 : 1;

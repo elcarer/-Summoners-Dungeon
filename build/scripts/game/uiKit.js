@@ -309,7 +309,8 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // honWis, wisTim, timDec, decStr: до сих пор мультицвет был только у
     // strGro (W54), остальные пять падали в гоблинскую), прочие —
     // гоблинская. Массив elems (двухцветный герой) — тоже мультицвет.
-    const MULTI_ELEMS = ["strGro", "groHon", "honWis", "wisTim", "timDec", "decStr"];
+    const MULTI_ELEMS = ["strGro", "groHon", "honWis", "wisTim", "timDec", "decStr",
+        "groWisDec"]; // W136: трёхцвет Рост+Мудрость+Тлен (мировой босс)
     function backTexOf(elem) {
         if (Array.isArray(elem)) {
             return elem.length > 1 ? "card_multi_back.png" : backTexOf(elem[0]);

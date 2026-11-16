@@ -1309,7 +1309,7 @@
         // бродячие отряды у данжей, стражи мостов, стражи Тлена, фильтр
         // «не у старта героя», дикие точки. Тела без изменений, rng
         // общий — раскладка по сиду та же, что до выноса
-        const { wanderers, bridgeGuards, decayGuards, wildSpawns } =
+        const { wanderers, bridgeGuards, decayGuards, wildSpawns, bossStops } =
             globalThis.GAME_WORLDGEN_GUARDS.placeGuards({ rows, pois, W, H, N,
                 rng, ter, zone, ELEMS, T_BRIDGE, T_ROAD, T_MOUNTAIN,
                 T_SWAMP, spawn, poiMask });
@@ -1317,7 +1317,7 @@
         return {
             w: W, h: H, seed,
             ter, zone, rows, pois, spawn, wanderers, bridgeGuards, decayGuards,
-            wildSpawns,
+            wildSpawns, bossStops, // W136: 12 точек остановки мировых боссов
             centers: centers.map((c) => ({ x: Math.round(c.x), y: Math.round(c.y) })),
         };
     }

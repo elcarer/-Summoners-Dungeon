@@ -117,7 +117,8 @@
                     y = (rows >= 3 ? [330, 610, 890] : rows === 2 ? [470, 750] : [540])[rowI];
                     sc = picked === null || isPicked ? 0.5 : 0.42;
                 } else {
-                    x = 510 + i * 450;
+                    // одна фиксированная карта (мировой босс, W136) — по центру
+                    x = options.length === 1 ? 960 : 510 + i * 450;
                     y = 495;
                     sc = picked === null || isPicked ? 0.92 : 0.78;
                 }
@@ -165,9 +166,16 @@
                     // (просил юзер), иначе 3 карты колоды побеждённого
                     draftMode = !!G.rewardDraft;
                     G.rewardDraft = false;
-                    options = draftMode
-                        ? [...new Set(G.rewardDeck || [])].filter((id) => CARDS[id])
-                        : pickThree();
+                    // фиксированная награда мирового босса (W136): его
+                    // уникальная карта, БЕЗ выбора из трёх (спека юзера)
+                    if (G.rewardFixed) {
+                        options = [...G.rewardFixed].filter((id) => CARDS[id]);
+                        G.rewardFixed = null;
+                    } else {
+                        options = draftMode
+                            ? [...new Set(G.rewardDeck || [])].filter((id) => CARDS[id])
+                            : pickThree();
+                    }
                     picked = null;
                     // карта персонажа, завоёванная в этом бою (арена кладёт
                     // G.wonHero) — показывается один раз

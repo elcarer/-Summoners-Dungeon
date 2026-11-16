@@ -35,6 +35,24 @@
                     const hd = heroDefOf(side);
                     if (hd && hd.ability === "wis4SpellDiscount") d += hd.abilityVal || 1;
                 }
+                // «Акралон» (мировой босс, W136): в начале хода владельца
+                // случайно выбранная стихия (roll в upkeep, метка
+                // B.elemDisc[side] {turn, elem}) — карты ЭТОЙ стихии,
+                // включая мультицветные с ней, дешевле на abilityVal.
+                // Метка сравнивается с текущим turnNo: чужой/прошлый ход
+                // скидки не даёт
+                if (B) {
+                    const ed = B.elemDisc && B.elemDisc[side];
+                    if (ed && ed.turn === B.turnNo) {
+                        const hit = def.elem === ed.elem
+                            || (def.multi && def.multi.includes(ed.elem));
+                        if (hit) {
+                            const hd = heroDefOf(side);
+                            if (hd && hd.ability === "turnElemDiscount")
+                                d += hd.abilityVal || 1;
+                        }
+                    }
+                }
                 // «Город мудрости» (wisCity): ПЕРВАЯ сыгранная постройка
                 // стороны стоит на 2 энергии дешевле. Флаг за бой тратится в
                 // addUnit (после реальной постановки), поэтому скидка видна

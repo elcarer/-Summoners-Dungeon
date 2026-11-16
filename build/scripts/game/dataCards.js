@@ -43,6 +43,9 @@
         // W95: ядро врага «Предвратие» («Портал в бездну», Тлен+Сила) —
         // та же симметрия реестра
         decStr: starterCollection(STARTER_DECKS.decStr),
+        // W136: ядро МИРОВОГО босса «Акралон» (Рост+Мудрость+Тлен) —
+        // та же симметрия реестра; gwd301 попадает в реестр через ядро
+        akralon: starterCollection(STARTER_DECKS.akralon),
     };
     // W97: dstr293–295 НЕ в стартере decStr (ядро «Предверия» фиксировано
     // спекой W95) — реестр коллекции дополняется нулями вручную.
@@ -431,7 +434,7 @@
 
     const { ENCOUNTERS, FLOOR_MOBS, FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM,
         FLOOR_MOBS_DECAY, FLOOR_MOBS_HONOR, FLOOR_MOBS_TIME, MOB_TABLES,
-        ENEMY_FILL, ENEMY_FILLS } = globalThis.GAME_ENCOUNTERS;
+        ENEMY_FILL, ENEMY_FILLS, WORLD_BOSSES } = globalThis.GAME_ENCOUNTERS;
     // Подземелья открытого мира: стихия (пул наград/драфта) и кап глубины.
     // У «Подземных ключей» шесть этажей; главарь «Безумный маг» стоит на
     // каждом этаже, как в двух других данжах.
@@ -703,7 +706,7 @@
         DECK_COPIES, REWARD_POOL, REWARD_POOLS, ENCOUNTERS, FLOOR_MOBS,
         FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM, FLOOR_MOBS_DECAY,
         FLOOR_MOBS_HONOR, FLOOR_MOBS_TIME,
-        MOB_TABLES, ENEMY_FILL, ENEMY_FILLS, CAVES,
+        MOB_TABLES, ENEMY_FILL, ENEMY_FILLS, CAVES, WORLD_BOSSES,
         STARTER_DECKS, STARTER_COLLECTIONS, HEROES, HERO_ORDER, HERO_FOE_ORDER,
         caveDeckFor,
         enemyDeck, mobForFloor, ELEM_LOGO, MULTI_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,

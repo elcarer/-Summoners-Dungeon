@@ -604,6 +604,7 @@
                                     if (B.stopped) return;
                                     afterMoved(u, true); // марш-шаг (W65: не событие)
                                     siegeFollowAct(u, flyFromCol, flyFromRow);
+                                    genMoveGain(u); // «Генерация» (W136): перелёт — перемещение
                                     if (checkEnd()) return;
                                     break;
                                 }
@@ -641,6 +642,7 @@
                         if (B.stopped) return;
                         afterMoved(u, true); // марш-шаг: обычное перемещение начала хода (W65)
                         siegeFollowAct(u, fromCol, fromRow); // башня едет следом и стреляет
+                        genMoveGain(u); // «Генерация» (gwd301, W136): шаг марша
                         if (checkEnd()) return;
                     }
                     // «Берсерк» («Двойная атака»): в начале хода владельца —
@@ -770,6 +772,10 @@
                 if (victory && !draft) {
                     // трофеи «1 из 3» берутся из колоды побеждённого (просил юзер)
                     G.rewardDeck = [...new Set(B.eDeckBase || [])].filter((id) => CARDS[id]);
+                    // МИРОВОЙ босс (W136): награда НЕ «1 из 3», а фиксированная
+                    // карта энкаунтера (rewardScene читает G.rewardFixed)
+                    G.rewardFixed = (ENCOUNTERS[B.encId]
+                        && ENCOUNTERS[B.encId].reward) || null;
                     // карта персонажа побеждённого — игроку (просил юзер):
                     // показывается в меню трофея рядом с картами
                     const enc2 = ENCOUNTERS[B.encId] || ENCOUNTERS.gob;
@@ -845,6 +851,12 @@
                             // снят с карты навсегда (состояние — в сейве)
                             if (G.activeEnemy.wander && G.world.wander)
                                 G.world.wander[G.activeEnemy.wander].alive = false;
+                            // мировой босс (W136): побеждён — больше
+                            // никогда не появляется (реестр в сейве мира)
+                            if (G.activeEnemy.worldBoss && G.world) {
+                                G.world.bossKilled = G.world.bossKilled || {};
+                                G.world.bossKilled[G.activeEnemy.enc] = true;
+                            }
                             // дикий враг открытого мира (просил юзер W29):
                             // победа усиливает ВСЕХ одноимённых живых —
                             // +1 макс. жизнь и +1 случайная Редкая карта

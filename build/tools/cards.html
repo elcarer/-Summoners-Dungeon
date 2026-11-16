@@ -512,7 +512,7 @@
         return elem === "growth" ? "../images/ui/card_nature_back.png"
             : elem === "wisdom" ? "../images/ui/card_wisdom_back.png"
             : elem === "decay" ? "../images/ui/card_decay_back.png"
-            : elem === "strGro" ? "../images/ui/card_multi_back.png"
+            : elem === "strGro" || elem === "groWisDec" ? "../images/ui/card_multi_back.png"
                                  : "../images/ui/card_goblin_back.png";
     }
     function renderGrid() {
@@ -978,7 +978,7 @@
         chipSet($("elemBtns"), elems, state.elem, (e) => t("elem." + e));
         chipSet($("typeBtns"), ["unit", "spell", "building", "trap"],
             state.type, (tp) => t("type." + tp));
-        chipSet($("rarityBtns"), ["common", "rare", "epic"],
+        chipSet($("rarityBtns"), ["common", "rare", "epic", "legendary"],
             state.rarity, (r) => t("rarity." + r));
         chipSet($("subBtns"), ["goblin", "animal", "elf", "plant", "elemental",
             "mage", "skeleton", "zombie", "gnome", "human", "ghost", "none"],
@@ -1019,7 +1019,7 @@
             return acc; }, []);
         chipSet($("heroElemBtns"), elems, state.heroElem,
             (e) => t("elem." + e), renderHeroesView);
-        chipSet($("heroRarityBtns"), ["common", "rare", "epic"], state.heroRarity,
+        chipSet($("heroRarityBtns"), ["common", "rare", "epic", "legendary"], state.heroRarity,
             (r) => t("rarity." + r), renderHeroesView);
         $("heroSortSel").value = state.heroSort;
         $("tabCards").className = state.view === "cards" ? "on" : "";

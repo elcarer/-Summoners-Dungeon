@@ -1139,6 +1139,37 @@
         timRaider: { scene: 6, baseHp: 12, elem: "time",
                      hero: "timRaider", wild: "rare", genDeck: "raider",
                      core: [] },
+        // ── МИРОВОЙ БОСС «Акралон» (W136, спека юзера) ────────────────────
+        // НЕ в данжах и таблицах этажей: появляется в открытом мире
+        // раз в 10 игровых дней (мир/world.js, спавн по G.days), сидит на
+        // точке из 12 свободных (map.bossStops), 5 дней, улетает; побеждён
+        // — больше не появляется (world.bossKilled). Ядро = РОВНО его 42
+        // карты (дублирует STARTER_DECKS.akralon — порядок скриптов:
+        // dataEncounters раньше cardsData); добора у него НЕТ (без grow —
+        // enemyDeck играет ядром как есть). Награда — НЕ «1 из 3», а
+        // фиксированная reward (rewardScene читает G.rewardFixed). scene 2 —
+        // фон «Рощи Роста» (своей трёхцветной сцены нет)
+        akralon:   { scene: 2, baseHp: 30, elem: "groWisDec",
+                     hero: "akralon", worldBoss: true,
+                     reward: ["gwd301"],
+                     core: [
+                         "gwd301", "gwd301", "gwd301", // Дары Акралона
+                         "grw31", "grw31", "grw31",    // Древоброд глухой чащи
+                         "grw28", "grw28", "grw28",    // Старейший древоброд
+                         "grw18", "grw18", "grw18",    // Похищение энергии
+                         "grw19", "grw19", "grw19",    // Защитный кокон
+                         "grw25", "grw25", "grw25",    // Цветение кристаллов
+                         "wis118", "wis118", "wis118", // Гроза
+                         "wis110", "wis110", "wis110", // Весёлый штормовик
+                         "wis108", "wis108", "wis108", // Иллюзия
+                         "wis106",                       // Облачный шпиль ×1
+                         "wis94", "wis94", "wis94",    // Поиск знаний
+                         "wis85", "wis85", "wis85",    // Смыв
+                         "dec160", "dec160", "dec160", // Кровавая луна
+                         "dec157",                       // Склеп ×1
+                         "dec143",                       // Разложенные кости ×1
+                         "dec134", "dec134", "dec134", // Тёмный контроль
+                     ] },
     };
 
     // Этаж → какой обычный враг на нём водится: на каждом этаже ОДИН архетип
@@ -1498,5 +1529,8 @@
     globalThis.GAME_ENCOUNTERS = { ENCOUNTERS,
         FLOOR_MOBS, FLOOR_MOBS_GROWTH, FLOOR_MOBS_WISDOM, FLOOR_MOBS_DECAY,
         FLOOR_MOBS_HONOR, FLOOR_MOBS_TIME, MOB_TABLES, ENEMY_FILL, ENEMY_FILLS,
-        FLOOR_MOBS_NEC };
+        FLOOR_MOBS_NEC,
+        // мировые боссы открытого мира (W136): энкаунтеры с worldBoss —
+        // пул лиги симов и мир читают этот список
+        WORLD_BOSSES: ["akralon"] };
 })();

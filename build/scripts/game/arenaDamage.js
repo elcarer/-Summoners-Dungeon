@@ -763,6 +763,26 @@
                     floatText(dp.x, dp.y - 78, "◈", 0x8cd0ef);
                 }
                 target.hp -= amt;
+                // «Вырастание N» (gwd301 «Дары Акралона», W136 — спека
+                // юзера): существо получает +N к урону за каждый
+                // ФАКТИЧЕСКИ полученный урон (погашенный бронёй/куполом
+                // урон жизни не уменьшает — не растит). Метка на единице
+                // поля (u.growOnHitG); def.growOnHit — для будущих карт
+                if (amt > 0 && target.def.type === "unit") {
+                    const gN = (target.def.growOnHit || 0)
+                        + (target.growOnHitG || 0);
+                    if (gN > 0) {
+                        target.bonusAtk = (target.bonusAtk || 0) + gN;
+                        recalcAuras();
+                        const gp = cellXY(target.col, target.row);
+                        const gAtk = target.node.getChildByName("atk");
+                        if (gAtk) gAtk.text = String(target.curAtk);
+                        floatText(gp.x, gp.y - 39, `+${gN}⚔`, 0x9fd489);
+                        fxEvent("buff", { x: gp.x, y: gp.y - 12, scale: 0.7 });
+                        sfx("chpoc");
+                        onBuff(target, gN, 0); // «Белая пуща» (W61)
+                    }
+                }
                 procEnchantFire(killer);
                 procSpores(killer, amt); // «Призрачные споры» отражают урон по базе
                 // «Нулевой образец» (nec287, W83 — спека юзера): когда

@@ -765,5 +765,24 @@
                    rarity: "epic", elem: "decStr",
                    multi: ["decay", "strength"],
                    color: 0xc05a3e, img: "decay_strength/300" },
+        // ── ТРЁХЦВЕТ «Рост + Мудрость + Тлен» (W136, спека юзера) ────────
+        // карты 301+ встречаются ТОЛЬКО в специальных местах (пока —
+        // только в колодах трёхцветных существ: мировой босс «Акралон»);
+        // в пулы наград/добора НЕ входят. elem "groWisDec" — собственная
+        // трёхцветная стихия (рубашка card_multi_back.png), multi — все
+        // три родные стихии (правило колод героев читает его)
+        // «Дары Акралона» (gwd301): заклинание-усиление — цель получает
+        // «Вырастание 1» (+1 к урону за каждый полученный урон:
+        // growOnHit — damageUnit), «Генерация 1» (+1 энергии владельца
+        // за каждый шаг марша/перелёт: genOnMove — arenaFlow) и
+        // «Вампиризм 1» (+1 к жизням после нанесения урона: vampHpG —
+        // зеркало «Вампира» dec132, arenaCombat.vampireHeal). Метки —
+        // НА ЕДИНИЦЕ поля (u.*G), как crushGrant/axeGrant
+        gwd301: { type: "spell", cost: 3,
+                  spell: { target: "anyUnit", gifts: true },
+                  kind: "buff", // тип эффекта — по спеке юзера (Усиление)
+                  rarity: "legendary", elem: "groWisDec",
+                  multi: ["growth", "wisdom", "decay"],
+                  color: 0x8a76b8, img: "growth_wisdom_decay/301" },
     };
 })();

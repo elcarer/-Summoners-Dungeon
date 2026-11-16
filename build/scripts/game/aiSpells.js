@@ -369,6 +369,29 @@
                     return;
                 }
                 if (s.target === "anyUnit" && !s.nova) { // усиление/очарование — лучшему
+                    // «Дары Акралона» (gwd301, W136): три метки лучшему
+                    // своему существу (по угрозе aiThreat) — растёт от
+                    // урона, даёт энергию за шаг, лечится после атаки
+                    if (s.gifts) {
+                        const own = spellTargets(B.units.filter((v) => v.side === "e"
+                            && v.def.type === "unit"));
+                        let best = own.slice()
+                            .sort((a, b) => aiThreat(b) - aiThreat(a)
+                                || a.row - b.row)[0];
+                        if (focus && own.includes(focus)) best = focus;
+                        if (!best) return;
+                        aimOff(best);
+                        best.growOnHitG = (best.growOnHitG || 0) + 1;
+                        best.genMoveG = (best.genMoveG || 0) + 1;
+                        best.vampHpG = (best.vampHpG || 0) + 1;
+                        const p = cellXY(best.col, best.row);
+                        floatText(p.x, p.y - 66,
+                            GAME_LOC.t("card.gwd301.name"), 0x9fd489);
+                        fxEvent("buff", { x: p.x, y: p.y - 12, scale: 0.9 });
+                        punch(best.node);
+                        sfx("chpoc");
+                        return;
+                    }
                     // «Полные колчаны» (gh259, W72): лучшему СТРЕЛКУ
                     // (выстрел станет на 1 больше); стрелков нет —
                     // сильнейшему своему (выстрел 1 всё равно полезен)

@@ -55,6 +55,7 @@
     // бродячие отряды (просил юзер): скорость 0.9 от героевой; агро —
     // 4.5 клетки, поводок погони — 9 клеток от центра своего маршрута
     const WAND_SPEED = HERO_SPEED * 0.9;
+    const BOSS_SPEED = HERO_SPEED * 1.35; // полёт мирового босса (W136)
     const WAND_AGGRO = TS * 4.5;
     const WAND_LEASH = TS * 9;
 
@@ -162,6 +163,9 @@
             // плюс усиление за победы над одноимёнными (уровень вида —
             // в wildLevel). Состав колоды живёт в сейве отряда
             if (!G.world.wildLevel) G.world.wildLevel = {};
+            // мировые боссы (W136): реестр убитых НАВСЕГДА; сам отряд
+            // (G.world.wander["boss:<enc>"]) спавнит bossDayTick
+            if (!G.world.bossKilled) G.world.bossKilled = {};
             {
                 const D = globalThis.GAME_DATA;
                 if (map.wildSpawns) {
@@ -577,16 +581,145 @@
             // дикий враг играет СВОЕЙ колодой — сгенерённой при спавне
             // (9 Обычных стихии + Редкие за победы над одноимёнными);
             // усиление вида — hpBonus к базе (просил юзер W29)
-            const deck = s.kind === "wild" && s.st.deck
+            const deck = (s.kind === "wild" || s.kind === "boss") && s.st.deck
                 ? [...s.st.deck] : D.enemyDeck(s.enc, 1);
             G.activeEnemy = { x: s.st.x, y: s.st.y, enc: s.enc,
                 deck, alive: true, boss: false,
                 wander: s.key, wild: s.kind === "wild",
+                worldBoss: s.kind === "boss", // W136: мировой босс
                 hpBonus: s.kind === "wild" ? (s.st.hpBonus || 0) : 0 };
             if (ctx.sfx) ctx.sfx("rocket"); // начало боя (W34, юзер)
             scenes.go("arena");
         }
 
+        // ── МИРОВЫЕ БОССЫ (W136, спека юзера) ─────────────────────────────
+        // Появляются каждые 10 игровых дней (начиная с 10-го) в случайной
+        // точке края карты, летят к ближайшей свободной из 12 точек
+        // (map.bossStops), сидят 5 дней, улетают за ближайший край.
+        // Реагируют на игрока и преследуют, как бродячие монстры (сидя на
+        // точке — тот же поводок/погоня, что у отрядов). Побеждённый —
+        // больше не появляется (world.bossKilled); награда — фиксированная
+        // карта ENCOUNTERS.<enc>.reward (G.rewardFixed). Полёт — прямой
+        // записью позиции мимо коллизий контроллера (летит над водой/горами)
+        function bossPickStop(gx, gy) {
+            let best = null, bd = Infinity;
+            for (const p of G.world.map.bossStops || []) {
+                let busy = false;
+                for (const k of Object.keys(G.world.wander)) {
+                    if (String(k).indexOf("boss:") !== 0) continue;
+                    const o = G.world.wander[k];
+                    if (!o || !o.alive || !o.stop) continue;
+                    if (o.stop.gx === p.gx && o.stop.gy === p.gy) { busy = true; break; }
+                }
+                if (busy) continue;
+                const dd = Math.hypot(p.gx - gx, p.gy - gy);
+                if (dd < bd) { bd = dd; best = p; }
+            }
+            return best;
+        }
+        function bossExitPoint(x, y) {
+            const W = G.world.map.w * TS, H = G.world.map.h * TS;
+            const dl = x, dr = W - x, dt = y, db = H - y;
+            const m = Math.min(dl, dr, dt, db);
+            if (m === dt) return { x, y: -TS * 2 };
+            if (m === db) return { x, y: H + TS * 2 };
+            if (m === dl) return { x: -TS * 2, y };
+            return { x: W + TS * 2, y };
+        }
+        function spawnBossSquad(st, key) {
+            // лист — эльф (Рост — «древоброд»; своего трёхцветного листа
+            // нет), КРУПНЕЕ обычных отрядов и с багровым свечением охотника
+            const sheet = ctx.heroSheets.growth;
+            const sprite = new PIXI.AnimatedSprite(sheet.animations.walk_front, false);
+            sprite.anchor.set(0.5, 1);
+            sprite.scale.set(0.5);
+            const shadow = new PIXI.Graphics();
+            shadow.ellipse(0, 0, 20, 9.3);
+            shadow.fill({ color: 0x0e140c, alpha: 0.45 });
+            const glow = new PIXI.Sprite(sprite.texture);
+            glow.anchor.set(0.5, 1);
+            glow.scale.set(0.5 * 1.24);
+            glow.tint = 0xff4a30;
+            glow.blendMode = "add";
+            glow.alpha = 0.45;
+            glow.eventMode = "none";
+            const s = { kind: "boss", key, enc: st.enc, st,
+                d: { route: [[st.stop.gx, st.stop.gy]] },
+                wp: 0, path: null, aggro: false, repath: 0, id: null,
+                elem: globalThis.GAME_DATA.ENCOUNTERS[st.enc].elem, glow };
+            s.sprite = sprite;
+            s.shadow = shadow;
+            sprite.position.set(st.x, st.y);
+            sprite.zIndex = st.y;
+            shadow.position.set(st.x, st.y - 13);
+            shadow.zIndex = st.y - 0.5;
+            glow.position.set(st.x, st.y);
+            glow.zIndex = st.y - 0.4;
+            objLayer.addChild(glow);
+            objLayer.addChild(shadow);
+            objLayer.addChild(sprite);
+            s.id = characters.spawn({
+                x: st.x, y: st.y, sprite,
+                anims: sheet.animations,
+                speed: BOSS_SPEED, fps: sheet.fps,
+                halfW: 9, halfH: 7,
+            });
+            ECS.addComponent(world, s.id, "ctrlVI", 0);
+            ECS.addComponent(world, s.id, "ctrlVJ", 0);
+            squads.push(s);
+        }
+        function spawnBoss(enc) {
+            const D = globalThis.GAME_DATA;
+            const W = G.world.map.w, H = G.world.map.h;
+            // случайная точка края (прилетает из-за края карты)
+            const side = (Math.random() * 4) | 0;
+            let gx = 0, gy = 0;
+            if (side === 0) { gx = (Math.random() * W) | 0; gy = 0; }
+            else if (side === 1) { gx = W - 1; gy = (Math.random() * H) | 0; }
+            else if (side === 2) { gx = (Math.random() * W) | 0; gy = H - 1; }
+            else { gx = 0; gy = (Math.random() * H) | 0; }
+            const stop = bossPickStop(gx, gy);
+            if (!stop) return; // все 12 точек заняты (пока босс один — не бывает)
+            const st = {
+                alive: true,
+                x: (gx + 0.5) * TS, y: (gy + 0.5) * TS,
+                enc, deck: [...(D.ENCOUNTERS[enc].core)],
+                phase: "fly",
+                stop: { gx: stop.gx, gy: stop.gy },
+                tx: (stop.gx + 0.5) * TS, ty: (stop.gy + 0.5) * TS,
+                leaveDay: null,
+            };
+            G.world.wander["boss:" + enc] = st;
+            spawnBossSquad(st, "boss:" + enc);
+            floatText(GAME_LOC.t("world.bossSpawn",
+                { name: GAME_LOC.t("hero." + enc + ".name") }),
+                COMPONENTS.positionX[heroId], COMPONENTS.positionY[heroId],
+                0xff6a4e);
+            if (ctx.sfx) ctx.sfx("alert");
+        }
+        function bossDayTick() {
+            const D = globalThis.GAME_DATA;
+            if (!D.WORLD_BOSSES || !G.world.map.bossStops) return;
+            // просидевший 5 дней — улетает за ближайший край
+            for (const s of squads) {
+                if (s.kind !== "boss" || s.gone) continue;
+                if (s.st.phase === "sit" && (G.days || 0) >= s.st.leaveDay) {
+                    s.st.phase = "leave";
+                    s.aggro = false;
+                    const e = bossExitPoint(s.st.x, s.st.y);
+                    s.st.tx = e.x; s.st.ty = e.y;
+                }
+            }
+            // новый цикл: каждые 10 игровых дней, начиная с 10-го
+            const day = G.days || 0;
+            if (day % 10 !== 0 || day < 10) return;
+            for (const enc of D.WORLD_BOSSES) {
+                if (G.world.bossKilled && G.world.bossKilled[enc]) continue;
+                const cur = G.world.wander["boss:" + enc];
+                if (cur && cur.alive) continue;
+                spawnBoss(enc);
+            }
+        }
         function floatText(text, x, y, fill) {
             const t = new PIXI.Text({
                 text, style: { fontFamily: "Kereru", fontSize: 22, fill,
@@ -1408,6 +1541,16 @@
                     ECS.addComponent(world, s.id, "ctrlVJ", 0);
                     squads.push(s);
                 }
+                // мировые боссы (W136): восстановление на карте из сейва
+                // (сидят на точке или летят; убитые — alive:false, не встают)
+                if (G.world.wander) {
+                    for (const k of Object.keys(G.world.wander)) {
+                        if (String(k).indexOf("boss:") !== 0) continue;
+                        const st = G.world.wander[k];
+                        if (!st || !st.alive) continue;
+                        spawnBossSquad(st, k);
+                    }
+                }
                 // жёлтые свечения городов-адресатов писем (пул по городам,
                 // видимость/пульс — в update по GAME_SIDEQ.glowCities)
                 poiGlows = map.pois
@@ -1723,6 +1866,7 @@
                     daysAcc -= 20;
                     G.days = (G.days || 0) + 1;
                     uiHud.userData.dayT.text = String(G.days);
+                    bossDayTick(); // мировые боссы: спавн раз в 10 дней, уход (W136)
                 }
 
                 // всплывающие подписи («Скоро…») — вверх и растворение
@@ -1861,6 +2005,51 @@
                             && performance.now() >= (G.world.battleCool || 0)) {
                             fightSquad(s); return;
                         }
+                        // ── мировой босс в полёте (W136): прямая линия
+                        // к цели, над препятствиями — позиция пишется
+                        // напрямую (контроллер с осями 0 позицию не трогает);
+                        // долетел — сел на точку (leaveDay = +5 дней) или
+                        // улетел за край (alive:false, сцена снимет отряд)
+                        if (s.kind === "boss"
+                            && (s.st.phase === "fly" || s.st.phase === "leave")) {
+                            s.aggro = false;
+                            // РЕАКЦИЯ НА ИГРОКА (спека W136): рядом —
+                            // босс летит НА него прямым полётом (касание —
+                            // бой); ушёл — продолжает путь к точке/краю
+                            const chase = dHero < WAND_AGGRO * 2;
+                            const btx = chase ? hx : s.st.tx;
+                            const bty = chase ? hy : s.st.ty;
+                            const bdx = btx - sx, bdy = bty - sy;
+                            const bd = Math.hypot(bdx, bdy);
+                            const step = Math.max(BOSS_SPEED
+                                * ticker.deltaMS / 1000, 1);
+                            if (bd <= Math.max(step * 1.5, TS / 3)) {
+                                if (s.st.phase === "fly") {
+                                    s.st.phase = "sit";
+                                    s.st.leaveDay = (G.days || 0) + 5;
+                                    s.st.x = s.st.tx; s.st.y = s.st.ty;
+                                } else {
+                                    s.st.alive = false;
+                                    s.gone = true;
+                                }
+                            } else {
+                                s.st.x = sx + bdx / bd * step;
+                                s.st.y = sy + bdy / bd * step;
+                            }
+                            COMPONENTS.positionX[s.id] = s.st.x;
+                            COMPONENTS.positionY[s.id] = s.st.y;
+                            COMPONENTS.ctrlVI[s.id] = 0;
+                            COMPONENTS.ctrlVJ[s.id] = 0;
+                            s.shadow.position.set(s.st.x, s.st.y - 13);
+                            s.shadow.zIndex = s.st.y - 0.5;
+                            s.sprite.position.set(s.st.x, s.st.y);
+                            s.sprite.zIndex = s.st.y;
+                            if (s.glow) {
+                                s.glow.position.set(s.st.x, s.st.y);
+                                s.glow.zIndex = s.st.y - 0.4;
+                            }
+                            continue;
+                        }
                         // дистанция до СВОЕГО маршрута (ближайшая его точка) —
                         // поводок погони: преследуем, но недалеко от маршрута
                         let dRoute = Infinity;
@@ -1877,7 +2066,7 @@
                         // новые погони не срываются (герой отходит в покое).
                         // У диких врагов обнаружение ВДВОЕ больше (просил
                         // юзер W29) — заметят и погонятся раньше стражей
-                        const aggroR = s.kind === "wild"
+                        const aggroR = (s.kind === "wild" || s.kind === "boss")
                             ? WAND_AGGRO * 2 : WAND_AGGRO;
                         const hgx = Math.floor(hx / TS), hgy = Math.floor(hy / TS);
                         const sgx = Math.floor(sx / TS), sgy = Math.floor(sy / TS);
@@ -1942,6 +2131,21 @@
                         COMPONENTS.ctrlVI[s.id] = 0;
                         COMPONENTS.ctrlVJ[s.id] = 0;
                     }
+                }
+                // улетевшие за край мировые боссы — снять с карты (W136);
+                // вернутся в следующем 10-дневном цикле, если не убиты
+                for (let bi = squads.length - 1; bi >= 0; bi--) {
+                    const bs = squads[bi];
+                    if (!bs.gone) continue;
+                    if (bs.id !== null) characters.remove(bs.id);
+                    bs.sprite.destroy();
+                    bs.shadow.destroy();
+                    if (bs.glow) bs.glow.destroy();
+                    squads.splice(bi, 1);
+                    floatText(GAME_LOC.t("world.bossLeft",
+                        { name: GAME_LOC.t("hero." + bs.st.enc + ".name") }),
+                        COMPONENTS.positionX[heroId],
+                        COMPONENTS.positionY[heroId], 0xc9b98c);
                 }
 
                 // арки подземелий — касание (диалог открыт — молчат).

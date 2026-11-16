@@ -626,6 +626,22 @@
         timRaider: { id: "timRaider", rarity: "rare", baseHp: 12,
                      elems: ["time"], starter: "time",
                      img: "65", ability: "emptyHandDraw", abilityVal: 2 },
+        // ── МИРОВОЙ БОСС «Акралон» (W136, спека юзера) ────────────────────
+        // ТРЁХЦВЕТНЫЙ герой Рост+Мудрость+Тлен (арт heroes/90.png), 30♥,
+        // легендарная. Появляется в открытом мире раз в 10 игровых дней
+        // (world.js, boss-логика); награда — фиксированная карта «Дары
+        // Акралона» (ENCOUNTERS.akralon.reward), не «1 из 3». Способность
+        // turnElemDiscount: в начале КАЖДОГО своего хода случайно
+        // выбирается одна из его стихий — карты этой стихии (включая
+        // мультицветные с ней) стоят на 1 энергию дешевле до конца хода
+        // (roll в upkeep, скидка в effCost). deckMin 42 — минимум его
+        // колоды (редактор колоды не даст собрать меньше, когда карта
+        // героя захвачена). Способность работает у обеих сторон, как у
+        // всех персонажей
+        akralon: { id: "akralon", rarity: "legendary", baseHp: 30,
+                   elems: ["growth", "wisdom", "decay"], starter: "akralon",
+                   img: "90", ability: "turnElemDiscount", abilityVal: 1,
+                   deckMin: 42 },
     };
     const HERO_ORDER = ["gorbag", "elmir", "mira", "mortis", "leon", "tordin"];
     // Порядок карт персонажей противников во вкладке «Герои»: гоблинские
@@ -679,7 +695,10 @@
         "decSimple", "timSimple",
         // «Разбойники» — редкие бродячие враги открытого мира (просил юзер W40)
         "strRaider", "grwRaider", "wisRaider", "honRaider",
-        "decRaider", "timRaider"];
+        "decRaider", "timRaider",
+        // «Акралон» — МИРОВОЙ босс открытого мира, трёхцветный
+        // Рост+Мудрость+Тлен (W136, спека юзера)
+        "akralon"];
 
     // Логотипы стихий (images/ui/logo/, 128×128): кнопки фильтров и пр.
     // Имена файлов у стихий неоднородны (growth без «_logo») — маппинг явный.

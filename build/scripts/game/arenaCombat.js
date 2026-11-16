@@ -185,8 +185,13 @@
             // базе) получает 1 жизнь; вызывается из всех точек атаки рядом
             // с остальными хуками (сокрушение/чаща/яд/руна)
             A.vampireHeal = function vampireHeal(u) {
-                if (!u || !u.def || !u.def.vampHeal || !B.units.includes(u)) return;
-                healUnit(u, u.def.vampHeal);
+                // «Вампиризм N» (gwd301 «Дары Акралона», W136 — спека юзера):
+                // метка на единице поля (u.vampHpG) работает как def.vampHeal
+                // («Вампир» dec132) — лечение после нанесения урона
+                if (!u || u.def.type !== "unit" || !B.units.includes(u)) return;
+                const n = (u.def && u.def.vampHeal) || u.vampHpG || 0;
+                if (!n) return;
+                healUnit(u, n);
             };
 
             // «Проросший огр» (sg242, W54 спека юзера): после своей атаки

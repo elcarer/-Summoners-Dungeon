@@ -27,10 +27,16 @@
         // юзер: «16 карт+ — правило для подземелья»), подземелья требуют
         // свои 16+ этаж (просил юзер — dataCards.caveDeckFor); редактор
         // показывает минимум контекста
-        const deckMinNow = () => (G.dungeon && !G.dungeon.city
-            ? globalThis.GAME_DATA.caveDeckFor(
-                G.run && G.run.cave, G.run && G.run.floor ? G.run.floor : 1)
-            : DECK_MIN);
+        // W136: минимум КОЛОДЫ ГЕРОЯ (heroesData.deckMin — у мирового босса
+        // «Акралона» 42) перекрывает контекстный, если больше
+        const deckMinNow = () => {
+            const heroMin = heroDef().deckMin || 0;
+            const ctxMin = G.dungeon && !G.dungeon.city
+                ? globalThis.GAME_DATA.caveDeckFor(
+                    G.run && G.run.cave, G.run && G.run.floor ? G.run.floor : 1)
+                : DECK_MIN;
+            return Math.max(ctxMin, heroMin);
+        };
         let root = null, leftPane = null, rightPane = null, heroesPane = null;
         let tab = "deck"; // вкладка сцены: «Колода» | «Герои» (просил юзер)
         const heroCards = []; // вкладка «Герои»: {id, node} (тесты)
@@ -598,7 +604,7 @@
                 { y: 163, label: t("filter.cost"), key: "cost",
                     opts: [costs.map((v) => ({ value: v, label: String(v) }))] },
                 { y: 208, label: t("filter.rarity"), key: "rarity",
-                    opts: [["common", "rare", "epic"].map((v) => ({ value: v, label: t(`rarity.${v}.short`) }))] },
+                    opts: [["common", "rare", "epic", "legendary"].map((v) => ({ value: v, label: t(`rarity.${v}.short`) }))] },
             ];
             for (const r of rows) {
                 let cx = 700;
