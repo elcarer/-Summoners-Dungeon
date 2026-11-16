@@ -868,7 +868,12 @@
             sub.eventMode = "none";
             c.addChild(sub);
             const startBtn = button(ctx, {
-                tex: "button_menu.png", label: t("obj.startDraft"),
+                // W140 (юзер): у карты с недоигранным драфтом кнопка —
+                // «Продолжить драфт» (продолжение с сохранённого раунда)
+                tex: "button_menu.png",
+                label: t(G.draft && G.draft.objIdx === G.dungeon.objects.indexOf(o)
+                    && G.draft.picks.length > 0
+                    ? "obj.contDraft" : "obj.startDraft"),
                 x: 960, y: top + h - 70, scale: 1,
                 onTap: () => startDraft(o),
             });
@@ -884,7 +889,13 @@
 
         function startDraft(o) {
             closeModal();
-            G.draft = { picks: [], ePicks: [], objIdx: G.dungeon.objects.indexOf(o) };
+            const idx = G.dungeon.objects.indexOf(o);
+            // W140 (юзер): выход из драфта не сбрасывает его — заход в ТА ЖЕ
+            // карту сокровищ продолжит недоигранный драфт (состояние в
+            // G.draft и сейве); чужой/новый объект — свежий драфт
+            if (!G.draft || G.draft.objIdx !== idx || !G.draft.picks.length) {
+                G.draft = { picks: [], ePicks: [], objIdx: idx };
+            }
             // квест «Дно» (W30): участие в драфте — галочка чек-листа
             if (globalThis.GAME_QUESTS) globalThis.GAME_QUESTS.markDraft(G);
             if (ctx.sfx) ctx.sfx();

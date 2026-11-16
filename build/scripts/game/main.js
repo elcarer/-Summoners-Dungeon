@@ -602,6 +602,7 @@
                 this.cityOut = null;
                 this.activeEnemy = null;
                 this.battle = null;
+                this.battleSave = null; // снапшот продолжения боя (W140)
                 this.rewardDeck = null;
                 this.rewardDraft = false;
                 this.draft = null;
@@ -637,6 +638,10 @@
                     dungeonStates: JSON.parse(JSON.stringify(this.dungeonStates || {})),
                     cityStates: JSON.parse(JSON.stringify(this.cityStates || {})),
                     cityOut: this.cityOut || null,
+                    // незавершённый бой и недоигранный драфт продолжаются
+                    // при возврате в игру (W140, просил юзер)
+                    battleSave: this.battleSave || null,
+                    draft: this.draft ? JSON.parse(JSON.stringify(this.draft)) : null,
                     worldPos: this.world.heroPos,
                     worldOut: this.world.out,
                     worldOutCave: this.world.outCave || null,
@@ -824,14 +829,25 @@
         // открытый мир. Одно место для «Продолжить» в меню и «Загрузить»
         // в настройках (просил юзер).
         function applySavedRun(r) {
-            // бой в сейв не входит: из арены выведет её exit() — здесь
-            // только гасим ссылки на врага и накопленные награды драфта
+            // бой продолжается с места выхода (W140, юзер): снапшот несёт
+            // и контекст врага/драфта — арена поднимет бой прямо из него;
+            // снапшота нет — гасим ссылки на врага и накопленные награды
+            if (r.battleSave && r.battleSave.B && r.battleSave.activeEnemy) {
+                G.battleSave = r.battleSave;
+                G.activeEnemy = r.battleSave.activeEnemy;
+                G.draft = r.battleSave.draft || null;
+                G.draftBattle = !!r.battleSave.draftBattle;
+                G.worldFrom = !!r.battleSave.worldFrom;
+            } else {
+                G.battleSave = null;
+                G.activeEnemy = null;
+                G.draft = r.draft || null; // недоигранный драфт — из сейва (W140)
+                G.draftBattle = false;
+                G.worldFrom = false;
+            }
             G.battle = null;
-            G.activeEnemy = null;
             G.rewardDeck = null;
             G.rewardDraft = false;
-            G.draft = null;
-            G.draftBattle = false;
             G.live = true;
             G.hero = { hp: r.hero.hp, maxHp: r.hero.maxHp };
             G.gold = r.gold || 0;
@@ -858,6 +874,12 @@
                 // остывание — мгновенный подъём на этаж выше (остальные
                 // пути входа ставят его же: world.js, спуск dungeon.js)
                 G.dungeon.ladderCoolMs = 2000;
+            // недоигранный драфт (W140) продолжается у СВОЕЙ карты сокровищ:
+            // объект расходован/этаж сменился — драфт гасим (objIdx −1 —
+            // прямой заход без объекта из тестов, его не трогаем)
+            if (G.draft && G.draft.objIdx >= 0 && (!G.dungeon || !G.dungeon.objects
+                || !G.dungeon.objects[G.draft.objIdx]
+                || G.dungeon.objects[G.draft.objIdx].type !== "map")) G.draft = null;
             // города (W30; W70 — ключ «стихия|роль» по флагам состояния,
             // старые ключи-стихии перечитываются в новую схему)
             G.cityStates = {};
@@ -901,12 +923,12 @@
             };
             // сюжетная линия забега
             G.quests = globalThis.GAME_QUESTS.revive(r.quests);
-            // продолжение с середины этажа — в подземелье, иначе — в
-            // открытый мир (герой вышел из пещер или только начал);
-            // решает ОТФИЛЬТРОВАННОЕ состояние (G.dungeon), не сейв.
+            // снапшот боя (W140) — сразу в арену: бой продолжается с того
+            // же места; иначе — с середины этажа в подземелье, из пещер —
+            // в открытый мир (решает ОТФИЛЬТРОВАННОЕ состояние, не сейв).
             // Переход в текущую сцену — транзитом floorSwap (сцены не
             // умеют перезаходить в себя)
-            const target = G.dungeon ? "dungeon" : "world";
+            const target = G.battleSave ? "arena" : (G.dungeon ? "dungeon" : "world");
             if (scenes.current === target) {
                 floorSwap.next = target;
                 scenes.go("floorSwap");

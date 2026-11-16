@@ -48,6 +48,14 @@
                 timeCavePulse("e"); // «Пещера времени»: призыв после марша — значок не тает в этом же ходу
                 await aiPlay();
                 if (B.stopped || B.phase === "over") return;
+                await enemyTurnTail();
+            };
+
+            // Хвост хода врага ПОСЛЕ розыгрышей (W140): вынесен из enemyTurn,
+            // чтобы восстановление боя после выхода могло доиграть полуход
+            // с того же места (arenaSave.enemyResume — aiPlay → хвост),
+            // не повторяя upkeep/марш
+            A.enemyTurnTail = async function enemyTurnTail() {
                 // «Гном-разбойник» (timRaider, W40): рука опустела — 2 карты
                 heroEmptyHandDraw("e");
                 cryptRefund("e"); // «Склеп» врага: не разыгранная карта — назад в сброс

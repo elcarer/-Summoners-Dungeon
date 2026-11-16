@@ -84,6 +84,7 @@
             "obj.map": "Treasure Map",
             "obj.mapDesc": "A secret contest — the draft: 12 times pick 1 of 3 cards into your deck, the rival claims one of the rest. Defeat them in battle and one card of your draft deck joins your collection",
             "obj.startDraft": "Start Draft",
+            "obj.contDraft": "Continue Draft",
             "obj.goldFound": "+{n} gold!",
             "obj.chestFound": "The chest held a card:",
             "obj.take": "Take",

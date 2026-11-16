@@ -78,6 +78,7 @@
                     scheduler.after(1.3, () => { if (root) launchBattle(); });
                 } else {
                     options = pickThree();
+                    G.draft.options = options; // переживает выход из драфта (W140)
                     phase = "pick";
                     lastPicked = -1;
                     lastEnemy = -1;
@@ -97,7 +98,15 @@
         }
 
         function leave() {
-            G.draft = null; // объект не расходован — драфт можно начать заново
+            // W140 (юзер): выход из драфта больше не сбрасывает его —
+            // недоигранный драфт хранится в G.draft (и в сейве забега),
+            // повторный заход в ту же «Карту сокровищ» продолжит раунд.
+            // Тройку храним только для фазы выбора: при «результат»/«собрано»
+            // продолжение начнёт новый раунд честно
+            if (G.draft) G.draft.options = phase === "pick" ? options : null;
+            // сейв сразу: «В главное меню»/F5 после выхода не потеряют
+            // недоигранный драфт (в sd_run он и продолжается, W140)
+            if (G.saveRun && G.live) G.saveRun();
             scenes.go("dungeon");
         }
 
@@ -224,7 +233,20 @@
                 // прямой заход без объекта (консоль/тесты) — драфт всё равно
                 // играбелен: итог просто не найдёт объект, чтобы пометить
                 if (!G.draft) G.draft = { picks: [], ePicks: [], objIdx: -1 };
+                if (G.draft.picks.length > 0) {
+                    // W140 (юзер): продолжение недоигранного драфта — с того
+                    // же раунда и с той же тройкой карт (если выход был в
+                    // фазе выбора); 12/12 — сразу фаза «колода собрана»
+                    options = G.draft.options || pickThree();
+                    G.draft.options = options;
+                    phase = G.draft.picks.length >= DRAFT_ROUNDS ? "built" : "pick";
+                    lastPicked = -1;
+                    lastEnemy = -1;
+                    rebuild();
+                    return;
+                }
                 options = pickThree();
+                G.draft.options = options;
                 phase = "pick";
                 lastPicked = -1;
                 lastEnemy = -1;

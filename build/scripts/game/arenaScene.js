@@ -5,6 +5,68 @@
     globalThis.GAME_ARENA.installScene = function installScene(A) {
         with (A) {
             // ── Сцена ───────────────────────────────────────────────────────────
+            // Каркас поля (фон, слои, HUD): общий для нового боя и
+            // восстановления из снапшота (W140)
+            A.buildArenaRoot = function buildArenaRoot() {
+                root = new PIXI.Container();
+                root.eventMode = "static";
+                // фон арены — нарисованная сцена с сеткой поля (см. curScene)
+                const bg = new PIXI.Sprite(uiTex(`scenes/${curScene}.png`));
+                const s = Math.max(1920 / bg.texture.width, 1080 / bg.texture.height);
+                bg.scale.set(s);
+                bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);
+                root.addChild(bg);
+                root.board = buildBoard();
+                root.addChild(root.board);
+                root.fireLayer = new PIXI.Container(); // «Стена костров» — огонь под жетонами
+                root.addChild(root.fireLayer);
+                // значки «Сдвига» (tim202/203/207) — ПОД жетонами: существо,
+                // дождавшееся появления, рисуется поверх значка
+                root.delayLayer = new PIXI.Container();
+                root.addChild(root.delayLayer);
+                root.unitsLayer = new PIXI.Container();
+                // общий z-order существ и строений: кто ниже по полю (больше row),
+                // тот ближе к зрителю — рисуется поверх (просил юзер: строения
+                // висели поверх существ выше их)
+                root.unitsLayer.sortableChildren = true;
+                root.addChild(root.unitsLayer);
+                root.trapLayer = new PIXI.Container();
+                root.addChild(root.trapLayer);
+                root.cardsLayer = new PIXI.Container();
+                root.addChild(root.cardsLayer);
+                // полёты карт (добор/сброс — анимации руки, просил юзер):
+                // живут ВНЕ cardsLayer, чтобы пересборка руки их не убивала
+                root.cardFxLayer = new PIXI.Container();
+                root.cardFxLayer.eventMode = "none";
+                root.addChild(root.cardFxLayer);
+                root.fx = new PIXI.Container();
+                root.addChild(root.fx);
+                root.hud = buildHud();
+                root.addChild(root.hud);
+                root.on("pointertap", (e) => {
+                    B.taps = (B.taps || 0) + 1;
+                    if (e.target === root && B.phase === "player" && B.selected !== null) {
+                        B.selected = null;
+                        B.spellTarget = false;
+                        layoutHand();
+                        redrawHighlight();
+                        refreshHud();
+                    }
+                    if (e.target === root && B.phase === "player" && B.journeySummon) {
+                        cancelJourneySummon(); // клик мимо поля — призыв в руку
+                    }
+                    if (e.target === root && B.phase === "player" && B.resurrectSummon) {
+                        // клик мимо поля — карта «Воскрешения» возвращается
+                        // в сброс (она из него и была выбрана)
+                        B.discard.push(B.resurrectSummon);
+                        B.resurrectSummon = null;
+                        layoutHand();
+                        redrawHighlight();
+                        refreshHud();
+                    }
+                });
+                ctx.ui.addChild(root);
+            };
             A.enter = function enter() {
                 const encId = G.activeEnemy ? G.activeEnemy.enc : "gob";
                 const enc = ENCOUNTERS[encId] || ENCOUNTERS.gob;
@@ -52,6 +114,15 @@
                 // драфт («Карта сокровищ»): колода игрока — 12 отобранных карт,
                 // НЕ G.deck (настоящая колода в мини-игре не участвует)
                 const pDeck = G.draftBattle && G.draft ? G.draft.picks : G.deck;
+                // W140 (юзер): незавершённый бой продолжается с места выхода.
+                // Снапшот пишут exit()/beforeunload (arenaSave.snapshotBattle),
+                // здесь он съедается — иначе восстановленный бой заснапшотится
+                // при следующем выходе дважды
+                const save = G.battleSave || null;
+                G.battleSave = null;
+                // F5/закрытие страницы (W140): снапшот в сейв — бой
+                // переживёт перезапуск (снимается в exit())
+                window.addEventListener("beforeunload", A.__snapOnUnload);
                 B = {
                     encId, phase: "player", stopped: false, turnNo: 1,
                     // чей ход (p/e): ставят playerTurnStart/enemyTurn.
@@ -185,24 +256,29 @@
                     turnSummons: { p: 0, e: 0 },
                 };
                 G.battle = B;
-                // «Контроль природы» (firstTurnEnergyDown, просил юзер): на
-                // первый ход в бою противник героя получает на 1 энергию
-                // меньше — старт с 0 вместо 1 (дальнейшие ходы как раньше)
-                if (eHeroDef && eHeroDef.ability === "firstTurnEnergyDown") { B.energy = 0; heroAbilUse("p", "firstTurnEnergyDown"); } // W124
-                if (heroDef.ability === "firstTurnEnergyDown") { B.eEnergy = 0; heroAbilUse("e", "firstTurnEnergyDown"); } // W124
-                // «Карта сокровищ»: соперник по драфту начинает бой с 3
-                // энергии вместо стандартной 1 (просил юзер)
-                if (encId === "draft") B.eEnergy = 3;
-                // Стандартный старт обеих сторон (просил юзер): 1 энергия
-                // (выше) и 4 карты в руке; геройские доборы (startDraw*,
-                // heroStartDraw ниже) всегда ЛЯГУТ СВЕРХУ этих четырёх
-                drawCards(4);
-                drawEnemy(4); // у врага раньше было 0 карт — добор только на его ходу
-                // Баланс: ходящий вторым игроку даётся +2 карты
-                // (компенсация за первый ход соперника; просил юзер — было
-                // +1). Пока в игре второй ходит всегда враг — правило
-                // усиливает компьютерных игроков
-                drawEnemy(2);
+                if (!save) {
+                    // ── стартовые эффекты боя (W140): при восстановлении из
+                    // снапшота НЕ повторяются — энергия/руки/флаги боя
+                    // приходят из снапшота ──
+                    // «Контроль природы» (firstTurnEnergyDown, просил юзер): на
+                    // первый ход в бою противник героя получает на 1 энергию
+                    // меньше — старт с 0 вместо 1 (дальнейшие ходы как раньше)
+                    if (eHeroDef && eHeroDef.ability === "firstTurnEnergyDown") { B.energy = 0; heroAbilUse("p", "firstTurnEnergyDown"); } // W124
+                    if (heroDef.ability === "firstTurnEnergyDown") { B.eEnergy = 0; heroAbilUse("e", "firstTurnEnergyDown"); } // W124
+                    // «Карта сокровищ»: соперник по драфту начинает бой с 3
+                    // энергии вместо стандартной 1 (просил юзер)
+                    if (encId === "draft") B.eEnergy = 3;
+                    // Стандартный старт обеих сторон (просил юзер): 1 энергия
+                    // (выше) и 4 карты в руке; геройские доборы (startDraw*,
+                    // heroStartDraw ниже) всегда ЛЯГУТ СВЕРХУ этих четырёх
+                    drawCards(4);
+                    drawEnemy(4); // у врага раньше было 0 карт — добор только на его ходу
+                    // Баланс: ходящий вторым игроку даётся +2 карты
+                    // (компенсация за первый ход соперника; просил юзер — было
+                    // +1). Пока в игре второй ходит всегда враг — правило
+                    // усиливает компьютерных игроков
+                    drawEnemy(2);
+                }
                 moves.length = 0; floats.length = 0; punches.length = 0; // хвосты прошлого боя
                 arrivals.length = 0; shots.length = 0; // порталы появления и стрелы (W59)
                 fxClear(); // эффекты прошлого боя жили в уничтоженном root
@@ -220,64 +296,14 @@
                 unitCard = null;
                 sfx("rocket"); // начало боя
 
-                root = new PIXI.Container();
-                root.eventMode = "static";
-                // фон арены — нарисованная сцена с сеткой поля (см. curScene выше)
-                const bg = new PIXI.Sprite(uiTex(`scenes/${curScene}.png`));
-                const s = Math.max(1920 / bg.texture.width, 1080 / bg.texture.height);
-                bg.scale.set(s);
-                bg.position.set((1920 - bg.texture.width * s) / 2, (1080 - bg.texture.height * s) / 2);
-                root.addChild(bg);
-                root.board = buildBoard();
-                root.addChild(root.board);
-                root.fireLayer = new PIXI.Container(); // «Стена костров» — огонь под жетонами
-                root.addChild(root.fireLayer);
-                // значки «Сдвига» (tim202/203/207) — ПОД жетонами: существо,
-                // дождавшееся появления, рисуется поверх значка
-                root.delayLayer = new PIXI.Container();
-                root.addChild(root.delayLayer);
-                root.unitsLayer = new PIXI.Container();
-                // общий z-order существ и строений: кто ниже по полю (больше row),
-                // тот ближе к зрителю — рисуется поверх (просил юзер: строения
-                // висели поверх существ выше их)
-                root.unitsLayer.sortableChildren = true;
-                root.addChild(root.unitsLayer);
-                root.trapLayer = new PIXI.Container();
-                root.addChild(root.trapLayer);
-                root.cardsLayer = new PIXI.Container();
-                root.addChild(root.cardsLayer);
-                // полёты карт (добор/сброс — анимации руки, просил юзер):
-                // живут ВНЕ cardsLayer, чтобы пересборка руки их не убивала
-                root.cardFxLayer = new PIXI.Container();
-                root.cardFxLayer.eventMode = "none";
-                root.addChild(root.cardFxLayer);
-                root.fx = new PIXI.Container();
-                root.addChild(root.fx);
-                root.hud = buildHud();
-                root.addChild(root.hud);
-                root.on("pointertap", (e) => {
-                    B.taps = (B.taps || 0) + 1;
-                    if (e.target === root && B.phase === "player" && B.selected !== null) {
-                        B.selected = null;
-                        B.spellTarget = false;
-                        layoutHand();
-                        redrawHighlight();
-                        refreshHud();
-                    }
-                    if (e.target === root && B.phase === "player" && B.journeySummon) {
-                        cancelJourneySummon(); // клик мимо поля — призыв в руку
-                    }
-                    if (e.target === root && B.phase === "player" && B.resurrectSummon) {
-                        // клик мимо поля — карта «Воскрешения» возвращается
-                        // в сброс (она из него и была выбрана)
-                        B.discard.push(B.resurrectSummon);
-                        B.resurrectSummon = null;
-                        layoutHand();
-                        redrawHighlight();
-                        refreshHud();
-                    }
-                });
-                ctx.ui.addChild(root);
+                buildArenaRoot();
+                if (save) {
+                    // ── W140: восстановление незавершённого боя ──
+                    // тихая сборка жетонов/ловушек/значков по снапшоту и
+                    // доигрывание полухода (стартовые эффекты ниже пропущены)
+                    A.applyBattleSnapshot(save);
+                    return;
+                }
                 heroStartDraw("p"); // способность героя: добор в начале боя
                 heroStartDraw("e");
                 // «Поиск ответов» (answers, 6-й этаж данжа Времени, просил
@@ -371,8 +397,17 @@
                 startVsIntro(heroDef, eHeroDef, eBase);
             };
 
+            // F5/закрытие страницы (W140): снапшот в сейв — бой переживёт
+            // перезапуск (snapshotBattle сам пишет забег через G.saveRun)
+            A.__snapOnUnload = function () { A.snapshotBattle(); };
+
             A.exit = function exit() {
                 if (B) B.stopped = true;
+                // снапшот ДО teardown (W140): незавершённый бой пишется в
+                // сейв; завершённый — snapshotBattle гасит хвост, чтобы
+                // «Продолжить» не возвращало в оконченный бой
+                A.snapshotBattle();
+                window.removeEventListener("beforeunload", A.__snapOnUnload);
                 window.removeEventListener("pointerup", endCardDrag); // хвост незавершённого drag
                 window.removeEventListener("pointermove", sliderMove); // хвост шкалы
                 window.removeEventListener("pointerup", sliderUp);

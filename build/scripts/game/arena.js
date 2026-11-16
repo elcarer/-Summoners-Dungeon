@@ -50,6 +50,7 @@
         NS.installHud(A);
         NS.installFlow(A);
         NS.installAI(A); // внутри — installAiValue/Target/Spells/Play
+        NS.installSave(A); // снапшот/восстановление боя (W140)
         NS.installActions(A);
         NS.installSpells(A); // заклинания — вторая половина actions (W64)
         NS.installFx(A);

@@ -831,6 +831,91 @@ league_fast.sh (параллельная лига), fast_parity.mjs (сравн�
 - Гигантские league_results (142 МБ) — сравнения только стримом/агрегатами,
   в контекст не читать.
 
+## W140 (2026-11-16) — продолжение драфта и боя через выход/сохранения + проба GPU (просил юзер)
+
+**Драфт не сбрасывается** (draftScene, dungeon): «Уйти» из драфта сохраняет
+G.draft (picks/ePicks/objIdx + текущая тройка options — только в фазе
+выбора), сейв сразу (saveRun в leave — иначе «В главное меню» терял драфт с
+диска). Повторный заход в ту же карту сокровищ: startDraft НЕ пересоздаёт
+G.draft (тот же objIdx + есть picks — продолжение), кнопка окна
+«Продолжить драфт» (loc obj.contDraft RU/EN); чужой объект — свежий драфт.
+enter драфт-сцены: picks>0 → options из G.draft.options (иначе новая
+тройка), 12/12 → сразу фаза «собрано». sd_run теперь несёт `draft`
+(saveRun) — драфт переживает F5; applySavedRun восстанавливает G.draft из
+r.draft и гасит его, если objIdx ≥ 0 и объект карты сокровищ исчез
+(objIdx −1 — прямой заход из тестов, не трогать).
+
+**Бой продолжается с места выхода** (НОВЫЙ arenaSave.js + arenaScene +
+aiPlay + main): snapshotBattle (зывается из arena.exit() и beforeunload)
+отменяет открытые панели выбором по семантике Escape (journey→stump→brew→
+raise→torture→captivate→resurrect→seek→grim→runes→discard→monolith→
+excavate→moon→portal→drop + token/tag/proj + overlay; closeDiscardPanel
+гасит B.discarding — софт-лока конца хода нет) и пишет G.battleSave =
+{v, encId, worldFrom, draftBattle, draft, activeEnemy, mid,
+B: JSON(B, реплейсер)}. Реплейсер: def → id карты (cardIdOf; неизвестный
+деф жетона — целым клоном __def), node/PIXI/функции — вырез, Set →
+{__set}, trap.unit → {__uref:[col,row]}. exit() зовёт снапшот ДО teardown:
+незавершённый бой — в сейв (snapshotBattle сам пишет G.saveRun — диск в
+sync для «Продолжить»), завершённый (finish → phase "over"; battleSave
+гасится и в finish) — стирает хвост. enter() съедает G.battleSave сразу
+(иначе задвоение) и при наличии — путь восстановления: стартовые эффекты
+боя пропущены (if (!save) вокруг firstTurnEnergyDown/драфт-энергии/
+доборов), каркас поля вынесен в buildArenaRoot (общий), applyBattleSnapshot:
+перезапись скаляров снапшотом + B.stopped = false (снапшот снимается ПОСЛЕ
+exit() с stopped=true — без этого все async-потоки замерли) + тихая сборка:
+юниты как простые объекты (hp/curAtk ДО makeUnitNode — цифры верные, без
+портала и аур addUnit), ловушки по id + __uref→unitAt + redrawTraps,
+значки «Сдвига» через delayDrawNode, стена костров + redrawFirewalls,
+метки статусов __drawUnitMarks (бейджи по флагам: frozen/venom/poison/
+entangle/berserk/confuse/ward/ench + штатные refreshProtectMark/
+updateExhumingMark/returnMarkDraw), recalcAuras → layoutHand/
+redrawHighlight/refreshHud. Возобновление по mid: player → баннер;
+playerAnim → доиграть marchSide("p")+returnTick; enemy → enemyResume =
+aiPlay + enemyTurnTail (хвост enemyTurn вынесен в aiPlay.enemyTurnTail —
+возобновление НЕ повторяет upkeep/марш, aiPlay решает заново по текущему
+столу — сыгранные карты в руке не лежат, повторов нет). VS-заставка на
+восстановлении пропускается. sd_run несёт `battleSave`; applySavedRun при
+наличии снапшота поднимает activeEnemy/draft/draftBattle/worldFrom из него
+и ведёт СРАЗУ в арену (target = arena) — «Продолжить» и «Загрузить» оба
+через applySavedRun. resetRun гасит battleSave.
+
+**Проба** probe_w140_save.mjs — 47 проверок ИТОГ OK: драфт (выход/повторный
+заход/та же тройка/reload+блок/round 3), бой (снапшот в sd_run →
+saveBlock/loadBlock → состояние ИДЕНТИЧНО; фаза врага mid=enemy → враг
+доигрывает ход без задвоения upkeep/марша, turnNo 2), F5 (beforeunload
+пишет снапшот → reload → блок → бой продолжился, ИДЕНТИЧНО), итог гасит
+battleSave, драфт-бой (draftBattle/12 карт/enc=draft цел после
+продолжения), экзотика (frozen/venom/poison/entangle/berserk/ward/protect
++ ловушка + «Сдвиг» + стена костров — ИДЕНТИЧНО). ГРАБЛИ пробы: _spawn
+возвращает живой юнит-объект (циклы def/node) — наружу только bool
+(иначе CDP «Object reference chain is too long»); __w140wait обязан
+требовать scenes.current === "arena" (старый B живёт в A после exit —
+ложные проходы); сценарий «снапшот → сейв» должен делать ВЫХОД из боя
+(go("menu")) до saveBlock — saveBlock из живого боя пишет battleSave=null;
+_finish звать только в живом бою (root мёртв в меню).
+
+**GPU-проба** (probe_w140_gpu.mjs, просил юзер «задействовать видеокарту»):
+WebGPU API в headless Chrome 157 НЕ выставлен (navigator.gpu undefined при
+любых флагах; в Node 24 тоже нет — флаг появился позже), но WebGL2 работает
+на РЕАЛЬНОЙ карте (WEBGL_debug_renderer_info: ANGLE D3D11 → NVIDIA GTX
+1060 6GB, не SwiftShader). Замеры (верификация честности: GPU-значения
+сверены с CPU на тех же входах, ср.отклонение 0; readPixels форсирует sync):
+числовое ветвистое ядро 32768 «боёв» × 1000 шагов (33M операций) — GPU
+16.2мс против CPU 828–926мс = ×57 на ЧИСТО числовом ядре; латентность
+мелкого шага (draw+readback) ≈ 0.125мс. ВЫВОД: GPU мощный, но наш бой —
+не числовое ядро, а ~120 полуходов ветвистой JS-логики (объекты, строки,
+таблицы карт, ИИ) — перенос движка на GLSL нереален, а батчить независимые
+бои GPU не может (он исполняет шейдеры, не JS-VM). Лиги/турниры остаются
+на CPU-параллелизме (плато ~54 боёв/с, PAR 32–128); WebGL2-путь открыт,
+если появится действительно числовой узел (массовые матричные оценки).
+
+**How to apply**: восстановление юнитов — ТОЛЬКО тихий путь applyBattleSnapshot
+(addUnit перезапустил бы ауры/геройские/урон по призыву); новая переменная
+состояния боя просто попадает в снапшот автоматически (JSON-реплейсер), но
+PIXI-узлы под ней должны носить ключ node; новая панель выбора — добавить
+в список отмен snapshotBattle (глотать Escape-семантику); флаги async-
+потоков смотрят на B.stopped — восстановление обязано его сбрасывать.
+
 ## W139 (2026-11-16) — правки ядер «Искусственного мага» и «Сонма духов» + проверка «Эльфийский друид»×«Лесной оплот» (просил юзер)
 
 **Правки ядер** (dataEncounters, офлайн-проверка w139_core_check точными
