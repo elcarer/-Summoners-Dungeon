@@ -162,6 +162,19 @@
                 synOn: 0,
                 synSpell: 0.35, synTrap: 0.4, synGoblin: 0.3, synUnit: 0.2,
                 synPlant: 0.3, synBld: 0.25, synAnimal: 0.3, synSkel: 0.3,
+                // W143 (юзер: «колоды играют от сброса — тюнить свой сброс,
+                // знать что и когда сбрасывать»): стратегии сброса. Гейты
+                // dsc*On=0 — прежнее поведение бит-в-бит; 1 — решение
+                // принимает оценщик aiDiscardOne/aiDiscardExp (срабатывания
+                // приёмников сброса против цены потери карты из руки).
+                // K-веса ищет тренировочная лига (группа discard)
+                dscSelfOn: 0,     // «Пытка разума»: оценивать сброс В СЕБЯ
+                dscDropOn: 0,     // «Огненный бич»/«Игра в кости»: число сбросов по ценности
+                dscPickOn: 0,     // выбор ЧТО сбросить (aiDropWorst/переполнение руки >7)
+                dscFoeK: 1,       // ценность снятия карты с руки врага (×)
+                dscKeepK: 0.6,    // цена потери своей карты (× aiCardPower)
+                dscRecvK: 1,      // масштаб срабатываний приёмников сброса (×)
+                dscPortalK: 1,    // ценность бесплатного выхода скинутой карты (×)
             };
             // ── W124 (юзер): пер-геройская адаптация — слой порогов ПОВЕРХ
             // общего вектора. Ключи «heroId.key» → значение; резолвятся в
@@ -1795,6 +1808,111 @@
                     return v + syn;
                 }
                 return 1 + syn;
+            };
+            // ── W143 (юзер: стратегии сброса) ──────────────────────────────
+            // Приёмники сброса (терминология W97 — только kind="discard")
+            // превращают сброс в выгоду: скинутый «Гаргул» (dstr295)
+            // разыгрывается сам, «Мини-портал» (dstr300) выводит скинутый
+            // призыв БЕЗ энергии, «Голодный цербер» (dstr294)/«Корм для
+            // портала» (dstr293)/«Болотная слизь» (wis116)/«Дурное варево»
+            // (dec139)/«Обитаемый могильник» (nec284)/«Каток» (tim236,
+            // discardAtk) качаются за каждую карту, способности героя
+            // («Коробка игрушек»/«Хозяин той стороны») срабатывают от
+            // сброса. Оценки чистые — только чтение боя, без случайностей
+            // (парность лиг); вызываются ТОЛЬКО при гейтах dsc*On=1,
+            // дефолты 0 держат прежнее поведение бит-в-бит
+            // Ценность срабатываний ПРИЁМНИКОВ стороны side на сброс ОДНОЙ
+            // карты id (без цены потери руки); единицы — aiVal
+            A.aiDiscardRecv = function aiDiscardRecv(side, id, def) {
+                if (!B) return 0;
+                const us = B.units;
+                let r = 0;
+                // «Гаргул» на столе: +1/+1 за каждое СБРОШЕННОЕ заклинание
+                if (def && def.type === "spell")
+                    r += us.filter((v) => v.side === side && v.def.gargoyle
+                        && us.includes(v)).length * (AI_W.vAtk + AI_W.vHp);
+                // «Голодный цербер»: +1/+1 за каждую карту владельца
+                r += us.filter((v) => v.side === side && v.def.hungryCerb
+                    && us.includes(v)).length * (AI_W.vAtk + AI_W.vHp);
+                // «Болотная слизь»: +1⚔ за ЛЮБУЮ сброшенную карту (обе стороны)
+                r += us.filter((v) => v.def.slimeGain && us.includes(v)).length
+                    * AI_W.vAtk;
+                // «Дурное варево»: 1 урон базе врага владельца за карту
+                r += us.filter((v) => v.def.evilBrew && us.includes(v)).length
+                    * AI_W.cBase;
+                // «Обитаемый могильник»: Призрак 2/1 за карту владельца
+                r += us.filter((v) => v.side === side && v.def.graveGhost
+                    && us.includes(v)).length * (2 * AI_W.vAtk + AI_W.vHp) * 0.8;
+                // «Корм для портала»: «Призыв 3» случайному своему без «Призыва»
+                r += us.filter((v) => v.side === side && v.def.portalFeed
+                    && us.includes(v)).length * 0.6;
+                // «Каток» (discardAtk): урон = длина сброса — карта в сброс
+                // это его будущая атака
+                r += us.filter((v) => v.side === side && v.def.discardAtk
+                    && us.includes(v)).length * AI_W.vAtk * 0.8;
+                // «Проклятые артефакты» (dec138): карта сохранена постройкой
+                r += us.filter((v) => v.side === side && v.def.relicVault
+                    && us.includes(v)).length * 0.25;
+                // «Коробка игрушек»: вторая сброшенная за ход карта — добор;
+                // «Хозяин той стороны»: тик счётчика «Призыва» за карту
+                try {
+                    const hd = heroDefOf(side);
+                    const was = (B.heroFlags.toyDiscards || { p: 0, e: 0 })[side] || 0;
+                    if (hd && hd.ability === "secondDiscardDraw" && was < 2)
+                        r += AI_W.cDraw;
+                    if (hd && hd.ability === "discardSummonMinus") r += 0.3;
+                } catch (e) { /* B не поднят — как раньше */ }
+                return r;
+            };
+            // Полная ценность сброса карты id стороной side: приёмники −
+            // цена потери карты из руки. Скинутый «Гаргул» (есть свободная
+            // клетка своих рядов) и свой призыв при «Мини-портале» (есть
+            // соседняя клетка, жизнь постройки >1) — НЕ потеря, а бесплатный
+            // выход на поле (× dscPortalK)
+            A.aiDiscardOne = function aiDiscardOne(side, id) {
+                const def = CARDS[id];
+                if (!def) return -0.5;
+                if (!B) return 0;
+                if (id === "dstr295" && freeCells(deployRows(side)).length)
+                    return AI_W.dscPortalK * aiCardPower(def);
+                if (def.type === "unit") {
+                    const portal = B.units.find((v) => v.side === side
+                        && v.def.miniPortal && v.hp > 1 && B.units.includes(v));
+                    if (portal && [[1, 0], [-1, 0], [0, 1], [0, -1]].some((d) => {
+                        const c = portal.col + d[0], r = portal.row + d[1];
+                        return c >= 0 && c < GRID && r >= 0 && r < GRID
+                            && !unitAt(c, r);
+                    }))
+                        return AI_W.dscPortalK * aiCardPower(def);
+                }
+                return aiDiscardRecv(side, id, def) * AI_W.dscRecvK
+                    - AI_W.dscKeepK * aiCardPower(def);
+            };
+            // Ожидание для k СЛУЧАЙНЫХ сбросов с руки стороны side («Пытка
+            // разума»); recvOnly — только приёмники (оценка сброса В
+            // противника: ЕГО приёмники работают против нас)
+            A.aiDiscardExp = function aiDiscardExp(side, k, recvOnly) {
+                if (!B) return 0;
+                const hand = side === "e" ? B.eHand : B.hand;
+                if (!hand.length) return 0;
+                let s = 0;
+                for (const id of hand) {
+                    if (recvOnly) s += aiDiscardRecv(side, id, CARDS[id] || {});
+                    else s += aiDiscardOne(side, id);
+                }
+                return s * Math.min(k, hand.length) / hand.length;
+            };
+            // Средняя сила карты врага по ВИДИМЫМ колоде+сбросу (рука
+            // скрыта — poolOn-видимость W124): оценка снятия карты с его руки
+            A.aiFoeHandAvg = function aiFoeHandAvg() {
+                if (!B) return 1;
+                const ids = (B.eDeck || []).concat(B.eDiscard || []);
+                let s = 0, n = 0;
+                for (const id of ids) {
+                    const d = CARDS[id];
+                    if (d) { s += aiCardPower(d); n++; }
+                }
+                return n ? s / n : 1;
             };
             // Верхние N карт колоды ИИ с исходными индексами (верх — последний).
             // Верхние N карт колоды ИИ с исходными индексами (верх — последний).

@@ -82,12 +82,17 @@
                     return (d.cost || 0) * 10
                         + (A.aiCardPower ? A.aiCardPower(d) : 0);
                 };
+                // W143: dscPickOn — сбрасываем не самые дешёвые, а самые
+                // выгодные к сбросу (приёмники − цена потери; скинутый
+                // гаргул / призыв при мини-портале — в плюс)
+                const score = (i) => (AI_W.dscPickOn && A.aiDiscardOne)
+                    ? -aiDiscardOne(side, hand[i]) : cheap(i);
                 let dropped = 0;
                 for (let k = 0; k < n; k++) {
                     let bi = -1;
                     for (let i = 0; i < hand.length; i++) {
                         if (hand[i] === selfId) continue;
-                        if (bi < 0 || cheap(i) < cheap(bi)) bi = i;
+                        if (bi < 0 || score(i) < score(bi)) bi = i;
                     }
                     if (bi < 0) break; // скидывать нечего (кроме играемой)
                     const id = hand.splice(bi, 1)[0];
@@ -277,8 +282,25 @@
                             - ((a.curAtk || 0) + (a.hp || 0)))[0];
                     if (t) {
                         aimOff(t);
-                        const want = (Math.random()
+                        let want = (Math.random()
                             * Math.min(3, B.eHand.length + 1)) | 0;
+                        // W143: dscDropOn — число сбросов по ценности, а не
+                        // случайное: маржинальная карта (приёмники − цена
+                        // потери) + ценность её урона цели (своё существо
+                        // цель — наоборот, −1♥ за карту)
+                        if (AI_W.dscDropOn && A.aiDiscardOne && B.eHand.length > 1) {
+                            const vals = B.eHand
+                                .filter((x) => x !== cardIdOf(def))
+                                .map((x) => aiDiscardOne("e", x))
+                                .sort((a, b) => b - a);
+                            const dmgV = t.side !== "e"
+                                ? AI_W.tHp : -AI_W.vHp;
+                            want = 0;
+                            for (let i = 0; i < vals.length && i < 2; i++) {
+                                if (vals[i] + dmgV > 0) want = i + 1;
+                                else break;
+                            }
+                        }
                         // урон — по ФАКТИЧЕСКИ скинутым (рука могла быть
                         // только из играемой карты)
                         const n = aiDropWorst("e", want, cardIdOf(def));
@@ -296,8 +318,24 @@
                     const unitsInDisc = B.eDiscard.filter((id) => CARDS[id]
                         && CARDS[id].type === "unit").length;
                     // играемая карта руки скинуться не может
-                    const n = Math.min(unitsInDisc,
+                    let n = Math.min(unitsInDisc,
                         Math.max(0, B.eHand.length - 1));
+                    // W143: dscDropOn — пары, пока маржинальная пара
+                    // (Гоблин 2/2 + приёмники − потеря карты) в плюс
+                    if (AI_W.dscDropOn && A.aiDiscardOne && n > 0
+                        && B.eHand.length > 1) {
+                        const vals = B.eHand
+                            .filter((x) => x !== cardIdOf(def))
+                            .map((x) => aiDiscardOne("e", x))
+                            .sort((a, b) => b - a);
+                        const pair = (2 * AI_W.vAtk + AI_W.vHp) * 0.9;
+                        let nn = 0;
+                        for (let i = 0; i < Math.min(n, vals.length); i++) {
+                            if (vals[i] + pair > 0) nn = i + 1;
+                            else break;
+                        }
+                        n = nn;
+                    }
                     if (n > 0 && any.length) {
                         aimOff(any[0]);
                         const dropped = aiDropWorst("e", n, cardIdOf(def));
@@ -917,8 +955,20 @@
                         refreshHud();
                     }
                 }
-                if (s.mindTorture) { // «Пытка разума»: ИИ всегда выбирает игрока
-                    randomDiscard("p", s.mindTorture);
+                if (s.mindTorture) { // «Пытка разума»: W143 — сброс В СЕБЯ,
+                    // если приёмники (гаргул в руке, мини-портал, цербер…)
+                    // перевешивают выгоду снятия карт с руки врага (минус
+                    // ЕГО приёмники, которые сброс кормит); dscSelfOn=0 —
+                    // прежнее поведение (всегда игрок)
+                    let whom = "p";
+                    if (AI_W.dscSelfOn && B.eHand.length) {
+                        const selfV = aiDiscardExp("e", s.mindTorture);
+                        const foeV = AI_W.dscFoeK * s.mindTorture
+                            * aiFoeHandAvg()
+                            - aiDiscardExp("p", s.mindTorture, true);
+                        if (selfV > foeV) whom = "e";
+                    }
+                    randomDiscard(whom, s.mindTorture);
                 }
                 if (s.forbidden) { // «Запретные знания» (dec130): ИИ берёт себе
                     drawEnemy(s.forbidden.draw);

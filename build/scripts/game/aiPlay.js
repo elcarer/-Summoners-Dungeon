@@ -1142,7 +1142,19 @@
                             // сбрасывается случайно (как панель сброса у игрока);
                             // рубашки улетают в его сброс (W32, анимации руки)
                             while (B.eHand.length > HAND_MAX) {
-                                const sp = B.eHand.splice((Math.random() * B.eHand.length) | 0, 1)[0];
+                                // W143: dscPickOn — сбрасываем самую выгодную
+                                // к сбросу карту (приёмники − цена потери),
+                                // а не случайную
+                                let di = (Math.random() * B.eHand.length) | 0;
+                                if (AI_W.dscPickOn && A.aiDiscardOne
+                                    && B.eHand.length > 1) {
+                                    let bs = null;
+                                    for (let i = 0; i < B.eHand.length; i++) {
+                                        const v = aiDiscardOne("e", B.eHand[i]);
+                                        if (bs === null || v > bs) { bs = v; di = i; }
+                                    }
+                                }
+                                const sp = B.eHand.splice(di, 1)[0];
                                 flyEnemyDiscard();
                                 B.eDiscard.push(sp);
                                 noteDiscard(1, "e", [sp], "discard");

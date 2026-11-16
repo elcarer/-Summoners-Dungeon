@@ -749,8 +749,11 @@
                 // «Поднятие мёртвых» — в своём сбросе должно быть существо
                 if (s.raiseDead && !unitsInDiscard("e").length) return false;
                 // «Пытка разума» — сбрасывать нечего, если рука игрока пуста
-                // (свою ИИ не режет)
-                if (s.mindTorture && !B.hand.length) return false;
+                // (свою ИИ не режет); W143: dscSelfOn — в себя и при пустой
+                // руке врага, если приёмники делают сброс выгодным
+                if (s.mindTorture && !B.hand.length
+                    && !(AI_W.dscSelfOn && B.eHand.length
+                        && aiDiscardExp("e", s.mindTorture) > 0)) return false;
                 // «Запретные знания» (dec130) — ИИ берёт карты СЕБЕ, теряя
                 // 2♥ базы: играем только со здоровой базой (5+♥) и не
                 // пустой колодой (иначе тратим энергию вхолостую)
