@@ -331,7 +331,7 @@
                         if (hand.length) {
                             let wi = 0, ws = Infinity;
                             for (let i = 0; i < hand.length; i++) {
-                                const pv = aiCardPower(CARDS[hand[i]]);
+                                const pv = aiCardPower(CARDS[hand[i]], side);
                                 if (pv < ws) { ws = pv; wi = i; }
                             }
                             const id = hand.splice(wi, 1)[0];

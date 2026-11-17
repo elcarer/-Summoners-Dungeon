@@ -741,7 +741,7 @@
                 let wi = -1, ws = Infinity;
                 for (let i = 0; i < hand.length; i++) {
                     if (hand[i] === exceptId) continue;
-                    const pv = aiCardPower(CARDS[hand[i]]);
+                    const pv = aiCardPower(CARDS[hand[i]], side);
                     if (pv < ws) { ws = pv; wi = i; }
                 }
                 if (wi < 0) return;

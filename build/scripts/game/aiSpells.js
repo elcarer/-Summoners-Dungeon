@@ -80,7 +80,7 @@
                 const cheap = (i) => {
                     const d = CARDS[hand[i]];
                     return (d.cost || 0) * 10
-                        + (A.aiCardPower ? A.aiCardPower(d) : 0);
+                        + (A.aiCardPower ? A.aiCardPower(d, side) : 0);
                 };
                 // W143: dscPickOn — сбрасываем не самые дешёвые, а самые
                 // выгодные к сбросу (приёмники − цена потери; скинутый
@@ -925,7 +925,7 @@
                     // удаляется ДО КОНЦА БОЯ (не в сброс) — самая ценная
                     const units = B.hand.map((id, i) => ({ id, i }))
                         .filter((m) => CARDS[m.id] && CARDS[m.id].type === "unit")
-                        .sort((a, b) => (aiCardPower(CARDS[b.id]) - aiCardPower(CARDS[a.id]))
+                        .sort((a, b) => (aiCardPower(CARDS[b.id], "p") - aiCardPower(CARDS[a.id], "p"))
                             || (b.i - a.i));
                     if (units.length) {
                         const pick = units[0];

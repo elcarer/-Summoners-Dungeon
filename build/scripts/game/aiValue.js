@@ -222,6 +222,20 @@
                 // W144: модель дерева (aiTree pickCell) читает spot-ключи
                 // боя вместо разошедшихся литералов (0 = прежние 2/1.5/0.9)
                 treeGeomOn: 0,
+                // W147 (юзер: «ценность карты зависит от колоды и героя»,
+                // пример — «Паладин света» растёт от заклинаний: в колоде с
+                // обилием заклинаний он ценнее, без них плоский бонус
+                // завышен): динамические поправки к «силе карты» по составу
+                // РОДНОЙ колоды (снимок колода+сброс+рука на полуход,
+                // __deckCtx) и способности героя. Гейт deckCtxOn=0 —
+                // прежнее поведение бит-в-бит; знаки и масштабы ищет
+                // тренировочная лига (группа deck w134_train)
+                deckCtxOn: 0,
+                dcSpellSynK: 0,  // «растёт от заклинаний» × доля заклинаний
+                dcSpellFuelK: 0, // заклинание × доля каст-синергистов
+                dcSubK: 0,       // существо с подтипом × доля сородичей
+                dcCheapK: 0,     // карта ≤2⚡ × доля тяжёлых (≥5⚡) — темп
+                dcHeroK: 0,      // созвучность способности героя (маппинг W124)
             };
             // ── W124 (юзер): пер-геройская адаптация — слой порогов ПОВЕРХ
             // общего вектора. Ключи «heroId.key» → значение; резолвятся в
@@ -403,12 +417,14 @@
             };
             // ── W124 (юзер): синтез «способность героя ↔ карта». Мягкие
             // прибавки к ценности карт, созвучных способности героя кресла
-            // «e» (только СВОИМ юнитам и своим выборам из поиска). Спека-
-            // режимы (chaosHold, шестерни) не трогает — это только оценки
-            A.aiHeroSyn = function aiHeroSyn(def) {
-                if (!AI_W.synOn || !def) return 0;
+            // (только СВОИМ юнитам и своим выборам из поиска). Спека-
+            // режимы (chaosHold, шестерни) не трогает — это только оценки.
+            // W147: тело вынесено в aiHeroSynOf(def, side) — deckCtx зовёт
+            // его БЕЗ гейта synOn и с чужой стороной (герой владельца карты)
+            A.aiHeroSynOf = function aiHeroSynOf(def, side) {
+                if (!def) return 0;
                 let h = null;
-                try { h = heroDefOf("e"); } catch (e) { return 0; }
+                try { h = heroDefOf(side || "e"); } catch (e) { return 0; }
                 const ab = h && h.ability;
                 if (!ab) return 0;
                 let s = 0;
@@ -436,6 +452,9 @@
                     || ab === "firstSkeletonStrike") && def.subtype === "skeleton")
                     s += AI_W.synSkel;
                 return s;
+            };
+            A.aiHeroSyn = function aiHeroSyn(def) {
+                return AI_W.synOn ? aiHeroSynOf(def) : 0;
             };
             // ── W124 (юзер): единая оценка поля — та же формула, что у листа
             // дерева розыгрыша (aiTree.js evalModel), на РЕАЛЬНОМ бое.
@@ -1636,7 +1655,7 @@
             // Раньше ИИ брал САМУЮ ВЕРХНЮЮ карту (или случайную), хотя правила
             // позволяют выбрать из верхних N. Теперь выбираем лучшую по вкладу:
             // статы/ауры у существ, урон/усиление/движки у заклинаний.
-            A.aiCardPower = function aiCardPower(d) {
+            const aiCardPowerRaw = function aiCardPowerRaw(d) {
                 if (!d) return 0;
                 // W124 (юзер): связки «способность героя ↔ карта» — мягкая
                 // прибавка созвучным картам (поиск/варка/сброс худшей)
@@ -1883,6 +1902,85 @@
                 }
                 return 1 + syn;
             };
+            // ── W147 (юзер): контекст состава РОДНОЙ колоды стороны ────────
+            // Снимок «колода + сброс + рука» (≈ исходная колода минус
+            // вышедшие на стол) — доли заклинаний, каст-синергистов
+            // (spellGrow/spellBuffAura/acolyteCast/ghostPortal), сородичей
+            // по подтипу, тяжёлых (≥5⚡) и дешёвых (≤2⚡) карт + способность
+            // героя. Пересчёт ОДИН раз на полуход (кэш ключом
+            // turnNo:turnSide — как у __combos): состав меняется только
+            // добором/сбросами на границах полуходов. Рабочие поля
+            // B.deck/B.eDeck свапаются симом вместе с креслами — привязка
+            // «карта → колода владельца» точна и в проде, и в симе.
+            // Чтения чистые, без Math.random (парность лиг)
+            A.__deckCtx = function __deckCtx(side) {
+                let c = B.__dcCtx;
+                const ck = B.turnNo + ":" + B.turnSide;
+                if (!c || c.key !== ck) { c = { key: ck, map: {} }; B.__dcCtx = c; }
+                if (c.map[side]) return c.map[side];
+                const deck = side === "p" ? B.deck : B.eDeck;
+                const disc = side === "p" ? B.discard : B.eDiscard;
+                const hand = side === "p" ? B.hand : B.eHand;
+                const ids = (deck || []).concat(disc || [], hand || []);
+                const f = { n: ids.length, spell: 0, syn: 0, heavy: 0,
+                    cheap: 0, sub: {}, ab: "" };
+                for (const id of ids) {
+                    const d = CARDS[id];
+                    if (!d) continue;
+                    if (d.type === "spell") f.spell++;
+                    if (d.spellGrow || d.spellBuffAura || d.acolyteCast
+                        || d.ghostPortal) f.syn++;
+                    if ((d.cost || 0) >= 5) f.heavy++;
+                    if ((d.cost || 0) <= 2) f.cheap++;
+                    if (d.type === "unit" && d.subtype)
+                        f.sub[d.subtype] = (f.sub[d.subtype] || 0) + 1;
+                }
+                const n = f.n || 1;
+                f.spell /= n; f.syn /= n; f.heavy /= n; f.cheap /= n;
+                for (const k in f.sub) f.sub[k] /= n;
+                try { const h = heroDefOf(side); f.ab = (h && h.ability) || ""; }
+                catch (e) { /* B не поднят — как раньше */ }
+                c.map[side] = f;
+                return f;
+            };
+            // Поправка к «силе карты» по составу колоды владельца и его
+            // героя. Шесть ключей (дефолты 0, гейт deckCtxOn) — бит-в-бит;
+            // знаки/масштабы ищет тренировочная лига (группа deck).
+            // Сторона владельца карты — второй аргумент aiCardPower
+            // (чужая рука: «Плен», сбросы, aiFoeHandAvg — там зовут с "p")
+            A.__deckCorr = function __deckCorr(d, side) {
+                try {
+                    const f = __deckCtx(side);
+                    let r = 0;
+                    // «Паладин света»-класс: растёт от заклинаний — ценнее
+                    // в колоде с обилием заклинаний, без них — дешевле
+                    if (d.spellGrow || d.spellBuffAura)
+                        r += AI_W.dcSpellSynK * f.spell;
+                    // заклинание — топливо каст-синергистов (аколит, портал
+                    // призраков), которых в колоде много — ценнее
+                    if (d.type === "spell") r += AI_W.dcSpellFuelK * f.syn;
+                    // сородичи по подтипу (люди среди людей, скелеты среди
+                    // скелетов) — аналогия draftSynergy W141
+                    if (d.type === "unit" && d.subtype)
+                        r += AI_W.dcSubK * (f.sub[d.subtype] || 0);
+                    // мелочь (≤2⚡) держит темп тяжёлой колоды (ось W131)
+                    if ((d.cost || 0) <= 2) r += AI_W.dcCheapK * f.heavy;
+                    // созвучность способности героя (маппинг W124) —
+                    // работает и при synOn=0 (оси независимы)
+                    if (AI_W.dcHeroK && f.ab)
+                        r += AI_W.dcHeroK * aiHeroSynOf(d, side);
+                    return r;
+                } catch (e) { return 0; } // B не поднят — как раньше
+            };
+            // «Сила карты» = базовая оценка + поправка deckCtx (если гейт
+            // включён). Все потребители (дерево, сбросы, панели, поиск,
+            // оценки чужой руки) голое имя резолвят через with (A) —
+            // получают обёртку автоматически
+            A.aiCardPower = function aiCardPower(d, side) {
+                const s = aiCardPowerRaw(d);
+                return (AI_W.deckCtxOn && d)
+                    ? s + __deckCorr(d, side || "e") : s;
+            };
             // ── W143 (юзер: стратегии сброса) ──────────────────────────────
             // Приёмники сброса (терминология W97 — только kind="discard")
             // превращают сброс в выгоду: скинутый «Гаргул» (dstr295)
@@ -1948,7 +2046,7 @@
                 if (!def) return -0.5;
                 if (!B) return 0;
                 if (id === "dstr295" && freeCells(deployRows(side)).length)
-                    return AI_W.dscPortalK * aiCardPower(def);
+                    return AI_W.dscPortalK * aiCardPower(def, side);
                 if (def.type === "unit") {
                     const portal = B.units.find((v) => v.side === side
                         && v.def.miniPortal && v.hp > 1 && B.units.includes(v));
@@ -1957,10 +2055,10 @@
                         return c >= 0 && c < GRID && r >= 0 && r < GRID
                             && !unitAt(c, r);
                     }))
-                        return AI_W.dscPortalK * aiCardPower(def);
+                        return AI_W.dscPortalK * aiCardPower(def, side);
                 }
                 return aiDiscardRecv(side, id, def) * AI_W.dscRecvK
-                    - AI_W.dscKeepK * aiCardPower(def);
+                    - AI_W.dscKeepK * aiCardPower(def, side);
             };
             // Ожидание для k СЛУЧАЙНЫХ сбросов с руки стороны side («Пытка
             // разума»); recvOnly — только приёмники (оценка сброса В
@@ -1976,15 +2074,20 @@
                 }
                 return s * Math.min(k, hand.length) / hand.length;
             };
-            // Средняя сила карты врага по ВИДИМЫМ колоде+сбросу (рука
-            // скрыта — poolOn-видимость W124): оценка снятия карты с его руки
+            // Средняя сила карты ВРАГА по ВИДИМЫМ колоде+сбросу (рука
+            // скрыта — poolOn-видимость W124): оценка снятия карты с его
+            // руки. W147: фикс пула — было B.eDeck/B.eDiscard (СВОЯ колода
+            // ИИ), враг ИИ — игрок: его видимая карта B.deck/B.discard.
+            // Баг не был виден: единственный вызов внутри ветки dscSelfOn
+            // (дефолт 0 — не вызывалась). Оценка — с контекстом КОЛОДЫ
+            // владельца (side "p", W147 deckCtx)
             A.aiFoeHandAvg = function aiFoeHandAvg() {
                 if (!B) return 1;
-                const ids = (B.eDeck || []).concat(B.eDiscard || []);
+                const ids = (B.deck || []).concat(B.discard || []);
                 let s = 0, n = 0;
                 for (const id of ids) {
                     const d = CARDS[id];
-                    if (d) { s += aiCardPower(d); n++; }
+                    if (d) { s += aiCardPower(d, "p"); n++; }
                 }
                 return n ? s / n : 1;
             };

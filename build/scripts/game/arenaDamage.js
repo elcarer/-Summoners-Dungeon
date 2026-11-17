@@ -433,9 +433,9 @@
                     for (let i = 1; i < hand.length; i++) {
                         const a = CARDS[hand[i]], b = CARDS[hand[bi]];
                         const ka = (a.cost || 0) * 10
-                            + (A.aiCardPower ? A.aiCardPower(a) : 0);
+                            + (A.aiCardPower ? A.aiCardPower(a, side) : 0);
                         const kb = (b.cost || 0) * 10
-                            + (A.aiCardPower ? A.aiCardPower(b) : 0);
+                            + (A.aiCardPower ? A.aiCardPower(b, side) : 0);
                         if (ka < kb) bi = i;
                     }
                     const id = hand.splice(bi, 1)[0];
