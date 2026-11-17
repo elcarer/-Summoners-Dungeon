@@ -99,11 +99,26 @@
             node.position.set(pp.x + cx, Math.max(320, Math.min(733, pp.y + cy + iy)));
             root.addChild(node);
             zoom = { id, node, cur: 0.5, tgt: 1, base, baseAlpha };
+            // W150 (юзер): рядом с увеличенной картой — окошко описаний
+            // стандартных способностей (справа, не влезает — слева)
+            const box = globalThis.GAME_UI.abilTipOf(id);
+            if (box) {
+                const hw = 168 + 22; // полкарты на полном масштабе + отступ
+                let bx = node.x + hw;
+                if (bx + box.w > 1904) bx = node.x - hw - box.w;
+                bx = Math.max(16, bx);
+                box.node.position.set(bx,
+                    Math.max(16, Math.min(node.y - box.h / 2, 1064 - box.h)));
+                root.addChild(box.node);
+                zoom.box = box.node;
+            }
         }
         function hideZoom(immediate) {
             if (!zoom) return;
             if (immediate) {
                 if (zoom.base && !zoom.base.destroyed) zoom.base.alpha = zoom.baseAlpha;
+                if (zoom.box && !zoom.box.destroyed)
+                    zoom.box.destroy({ children: true }); // окошко способностей
                 zoom.node.destroy({ children: true });
                 zoom = null;
             } else zoom.tgt = 0.5; // плавно уменьшится в update, затем удалится
@@ -839,6 +854,8 @@
                         z.cur = z.tgt;
                         if (z.tgt === 0.5) {
                             if (z.base && !z.base.destroyed) z.base.alpha = z.baseAlpha;
+                            if (z.box && !z.box.destroyed)
+                                z.box.destroy({ children: true }); // окошко способностей
                             z.node.destroy({ children: true });
                             zoom = null;
                         }

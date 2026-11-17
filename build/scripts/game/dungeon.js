@@ -525,7 +525,12 @@
             const c = new PIXI.Container();
             c.position.set(x, y);
             c.addChild(sp);
-            // жёлтое свечение при наведении — правило UI для кнопок (W22)
+            // W150 (юзер): с апгрейда на Pixi 8 контейнер с дефолтным
+            // eventMode "passive" НЕ получает событий от детей — свечение
+            // addGlow при наведении не срабатывало НИ на одной иконке
+            // HUD. «static» возвращает контейнеру события (правило UI
+            // W22: жёлтое свечение при наведении) — как в button()
+            c.eventMode = "static";
             globalThis.GAME_UI.addGlow(ctx, c, sp);
             return c;
         }
@@ -577,13 +582,21 @@
             // иконки; числа в ряд не входят, чтобы ореол не шёл вокруг цифр.
             const iconRow = new PIXI.Container();
             panel.addChild(iconRow);
+            // W150 (юзер): плашка-подсказка «что это и зачем» на иконках
+            // золота/ресурсов — одна на панель, показывается под слотом
+            // (узел кладётся в панель В КОНЦЕ buildHud — поверх кольца героя)
+            const slotTip = globalThis.GAME_UI.hudTipPlate();
             const goldT = new PIXI.Text({ text: "0", style: resStyle });
             {
                 const gicon = new PIXI.Sprite(uiTex("icon_gold.png"));
                 gicon.anchor.set(0.5);
                 gicon.scale.set(0.5); // 72 → 36px
                 gicon.position.set(SLOTS_X[0], ICON_Y);
-                gicon.eventMode = "none";
+                gicon.eventMode = "static"; // наведение — подсказка (W150)
+                gicon.hitArea = new PIXI.Circle(0, 0, 22);
+                gicon.on("pointerover", () =>
+                    slotTip.show(GAME_LOC.t("hud.goldTip"), SLOTS_X[0]));
+                gicon.on("pointerout", () => slotTip.hide());
                 iconRow.addChild(gicon);
                 goldT.anchor.set(0.5);
                 goldT.position.set(SLOTS_X[0], NUM_Y);
@@ -597,7 +610,11 @@
                 icon.anchor.set(0.5);
                 icon.scale.set(0.5);
                 icon.position.set(x, ICON_Y);
-                icon.eventMode = "none";
+                icon.eventMode = "static"; // наведение — подсказка (W150)
+                icon.hitArea = new PIXI.Circle(0, 0, 22);
+                icon.on("pointerover", () => slotTip.show(GAME_LOC.t("hud.resTip",
+                    { name: GAME_LOC.t("res." + e) }), x));
+                icon.on("pointerout", () => slotTip.hide());
                 iconRow.addChild(icon);
                 const num = new PIXI.Text({ text: "0", style: resStyle });
                 num.anchor.set(0.5);
@@ -618,6 +635,12 @@
                 () => { globalThis.GAME_SIDEQ.showReview(ctx); }, 0.62);
             qRune.visible = qSide.visible = false; // до первой синхронизации
             panel.addChild(qRune, qSide);
+            // W150 (юзер): иконки квестов явнее сигнализируют «кнопка» —
+            // при наведении слегка растут (жёлтое свечение уже в hudIcon)
+            for (const q of [qRune, qSide]) {
+                q.on("pointerover", () => { if (!q.destroyed) q.scale.set(1.15); });
+                q.on("pointerout", () => { if (!q.destroyed) q.scale.set(1); });
+            }
             // настройки доступны и из подземелья; «Назад» вернёт сюда.
             // Колода — по кружку героя (как по прежней карте, просил юзер)
             c.addChild(hudIcon("icon_setting.png", 1839, 66, () => {
@@ -683,6 +706,7 @@
                 G.uiReturn = "dungeon";
                 scenes.go("deck");
             });
+            panel.addChild(slotTip.node); // поверх всего (кольцо героя под ней)
             return c;
         }
 
@@ -856,7 +880,10 @@
             });
             c.addChild(startBtn);
             const leaveBtn = button(ctx, {
-                tex: "button_menu.png", label: t("shop.leave"), x: 165, y: 78, scale: 1,
+                tex: "button_menu.png", label: t("shop.leave"),
+                // W150 (юзер): «Уйти» — вниз по центру, ниже панели окна
+                // с отступом (как у магазина/драфта с W115)
+                x: 960, y: top + h + 56, scale: 1,
                 onTap: () => { o.cool = true; closeModal(); },
             });
             c.addChild(leaveBtn);
@@ -1625,6 +1652,14 @@
                 // если дома в плане нет). Подошёл — Глом выходит, идёт к
                 // герою, начинается квестовый диалог. Разошлись —
                 // «остывает» и ждёт (повторный разговор — подойти снова)
+                // W150 (юзер): при открытом окне объекта города (магазин/
+                // кузница/ратуша — st.win) Глом должен стоять. Раньше весь
+                // блок Глома выпадал по гейту !st.win и он продолжал идти
+                // с осями прошлого кадра — окно модально, а спрайт ходит
+                if (st.city && st.glom && glomId !== null && st.win) {
+                    COMPONENTS.ctrlVI[glomId] = 0;
+                    COMPONENTS.ctrlVJ[glomId] = 0;
+                }
                 if (st.city && st.glom && !st.win
                     && globalThis.GAME_QUESTS) {
                     const gl = st.glom;
@@ -1667,7 +1702,12 @@
                                     COMPONENTS.ctrlVJ[glomId] = 0;
                                     globalThis.GAME_QUESTS.talkTo(ctx);
                                 } else if (dHero > TS * 10) {
-                                    gl.state = "idle"; // герой убежал — поводок
+                                    // герой убежал — поводок; гасим оси:
+                                    // раньше они оставались прежними и Глом
+                                    // уходил дальше «своим ходом»
+                                    COMPONENTS.ctrlVI[glomId] = 0;
+                                    COMPONENTS.ctrlVJ[glomId] = 0;
+                                    gl.state = "idle";
                                 } else {
                                     // путь к герою по клеткам (пересчёт
                                     // 0.4с), ось на очередную клетку —
@@ -1743,6 +1783,10 @@
                         G.worldFrom = false; // бой из подземелья — трофей вернёт сюда
                         G.activeEnemy = t.enemy;
                         if (ctx.sfx) ctx.sfx("rocket"); // начало боя (W34)
+                        // W150 (юзер): фон экрана награды — затенённый кадр
+                        // игры на момент старта боя, а не спрайт из меню
+                        if (G.__rewardShot) G.__rewardShot.destroy(true);
+                        G.__rewardShot = globalThis.GAME_UI.sceneShot(ctx);
                         scenes.go("arena");
                         return;
                     }

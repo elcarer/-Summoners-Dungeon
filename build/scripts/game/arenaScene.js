@@ -456,6 +456,8 @@
                         z.cur = z.tgt;
                         if (z.tgt === 0.75) {
                             if (z.base && !z.base.destroyed) z.base.alpha = z.baseAlpha;
+                            if (z.box && !z.box.destroyed)
+                                z.box.destroy({ children: true }); // окошко способностей
                             z.node.destroy({ children: true });
                             ovZoom = null;
                         }

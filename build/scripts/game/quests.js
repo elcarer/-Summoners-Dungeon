@@ -612,10 +612,12 @@
             return b;
         };
         if (cur.kind === "announce") {
-            // отказ: квест остаётся невзятым — Глом предложит снова
-            cur.declineBtn = mkBtn(t("quest.decline"), 960 - 200,
+            // отказ: квест остаётся невзятым — Глом предложит снова.
+            // W150 (юзер): раскладка как во всех остальных меню —
+            // «Принять» слева, «Отказаться» справа (было наоборот)
+            cur.declineBtn = mkBtn(t("quest.decline"), 960 + 200,
                 () => closeDialog(), 0.85);
-            cur.primary = mkBtn(t("quest.accept"), 960 + 200, () => {
+            cur.primary = mkBtn(t("quest.accept"), 960 - 200, () => {
                 G.quests.announced = true;
                 if (G.saveRun) G.saveRun();
                 closeDialog();

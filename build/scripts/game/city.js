@@ -704,7 +704,10 @@
         c.addChild(openBtn);
         const leaveBtn = button(ctx, {
             tex: "button_menu.png", label: t("shop.leave"),
-            x: 165, y: 78, scale: 1,
+            // W150 (юзер): «Уйти» — вниз по центру, ниже панели окна
+            // с отступом (как у магазина/драфта с W115), а не в левом
+            // верхнем углу
+            x: 960, y: top + h + 56, scale: 1,
             onTap: () => { o.cool = true; env.closeModal(); },
         });
         c.addChild(leaveBtn);

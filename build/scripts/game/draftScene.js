@@ -128,6 +128,10 @@
             G.worldFrom = false; // драфт — бой подземелья («Карта сокровищ»)
             G.activeEnemy = { enc: "draft", deck: [...G.draft.ePicks], draft: true };
             G.draft.round = G.draft.picks.length;
+            // W150 (юзер): фон экрана награды — затенённый кадр игры
+            // (сцена драфта) на момент старта боя, а не спрайт из меню
+            if (G.__rewardShot) G.__rewardShot.destroy(true);
+            G.__rewardShot = globalThis.GAME_UI.sceneShot(ctx);
             scenes.go("arena");
         }
 

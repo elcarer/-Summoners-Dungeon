@@ -241,25 +241,18 @@
         const city = keyOf(poi);
         const sq = stateOf(G);
         if (!sq) return { mode: "done" };
+        // W150 (юзер): взятый, но не выполненный квест — «в процессе»,
+        // а не «все поручения выполнены» (раньше remainingTypes возвращал
+        // пустой список и done-ветка срабатывала раньше проверки active)
+        const own = sq.active.find((a) => a.city === city && a.type !== "rare");
+        if (own) return { mode: "done", text: t("sideq.active") };
         const left = remainingTypes(G, city);
         if (!left.length) return { mode: "done", text: t("sideq.done") };
-        const own = sq.active.find((a) => a.city === city && a.type !== "rare");
-        if (own) {
-            const a = own;
-            return {
-                mode: "taken",
-                head: t("sideq.taken"),
-                name: a.type === "hunt"
-                    ? t("sideq.hunt.name")
-                    : t("sideq.letter.name", { city: poiName(G, a.target) }),
-                text: a.type === "hunt"
-                    ? t("sideq.hunt.active", { mob: mobName(a.elem) })
-                    : t("sideq.letter.active", { city: poiName(G, a.target) }),
-                reward: t("sideq.reward", { res: resName(a.elem) }),
-            };
-        }
-        // порядок видов случайный — оба встречаются (выполненные не возобновляются)
-        const type = left[(Math.random() * left.length) | 0];
+        // порядок видов фиксированный (W150, юзер): сначала «Охота на
+        // разбойника», затем «Отнести письмо» (TYPES в этом порядке;
+        // выполненные не возобновляются — остался только letter, значит
+        // охота уже сделана)
+        const type = left[0];
         if (type === "hunt") {
             return {
                 mode: "offer", type,

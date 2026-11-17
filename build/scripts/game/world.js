@@ -597,6 +597,10 @@
                 worldBoss: s.kind === "boss", // W136: мировой босс
                 hpBonus: s.kind === "wild" ? (s.st.hpBonus || 0) : 0 };
             if (ctx.sfx) ctx.sfx("rocket"); // начало боя (W34, юзер)
+            // W150 (юзер): фон экрана награды — затенённый кадр игры
+            // (открытого мира) на момент старта боя, а не спрайт из меню
+            if (G.__rewardShot) G.__rewardShot.destroy(true);
+            G.__rewardShot = globalThis.GAME_UI.sceneShot(ctx);
             scenes.go("arena");
         }
 
@@ -787,10 +791,17 @@
             tip.win.place(p.x, p.y - 30);
         }
         function hoverSquads(p) {
+            // W150 (юзер): зона подсказки — ВЕСЬ спрайт отряда (anchor
+            // 0.5,1, 96×96), а не круг 30px вокруг якоря-ног: раньше окно
+            // ловилось только на нижней части спрайта
             let best = null, bd = 1e9;
             for (const s of squads) {
+                const hw = Math.max(30, s.sprite.width / 2);
+                if (Math.abs(p.x - s.st.x) > hw) continue;
+                const top = s.st.y - s.sprite.height - 8;
+                if (p.y < top || p.y > s.st.y + 12) continue;
                 const d = Math.hypot(s.st.x - p.x, s.st.y - p.y);
-                if (d < 30 && d < bd) { best = s; bd = d; }
+                if (d < bd) { best = s; bd = d; }
             }
             if (best) showSquadTip(best); else hideSquadTip();
         }
@@ -805,7 +816,12 @@
             const c = new PIXI.Container();
             c.position.set(x, y);
             c.addChild(sp);
-            // жёлтое свечение при наведении — правило UI для кнопок (W22)
+            // W150 (юзер): с апгрейда на Pixi 8 контейнер с дефолтным
+            // eventMode "passive" НЕ получает событий от детей — свечение
+            // addGlow при наведении не срабатывало НИ на одной иконке
+            // HUD. «static» возвращает контейнеру события (правило UI
+            // W22: жёлтое свечение при наведении) — как в button()
+            c.eventMode = "static";
             globalThis.GAME_UI.addGlow(ctx, c, sp);
             hudBtns.push(c);
             return c;
@@ -850,13 +866,22 @@
             // иконки; числа в ряд не входят, чтобы ореол не шёл вокруг цифр.
             const iconRow = new PIXI.Container();
             panel.addChild(iconRow);
+            // W150 (юзер): плашка-подсказка «что это и зачем» на иконках
+            // золота/ресурсов — одна на панель, показывается под слотом
+            // (узел кладётся в панель В КОНЦЕ buildHud — поверх кольца героя)
+            const slotTip = globalThis.GAME_UI.hudTipPlate();
+            panel.addChild(slotTip.node);
             const goldT = new PIXI.Text({ text: "0", style: resStyle });
             {
                 const gicon = new PIXI.Sprite(uiTex("icon_gold.png"));
                 gicon.anchor.set(0.5);
                 gicon.scale.set(0.5); // 72 → 36px
                 gicon.position.set(SLOTS_X[0], ICON_Y);
-                gicon.eventMode = "none";
+                gicon.eventMode = "static"; // наведение — подсказка (W150)
+                gicon.hitArea = new PIXI.Circle(0, 0, 22);
+                gicon.on("pointerover", () =>
+                    slotTip.show(GAME_LOC.t("hud.goldTip"), SLOTS_X[0]));
+                gicon.on("pointerout", () => slotTip.hide());
                 iconRow.addChild(gicon);
                 goldT.anchor.set(0.5);
                 goldT.position.set(SLOTS_X[0], NUM_Y);
@@ -870,7 +895,11 @@
                 icon.anchor.set(0.5);
                 icon.scale.set(0.5);
                 icon.position.set(x, ICON_Y);
-                icon.eventMode = "none";
+                icon.eventMode = "static"; // наведение — подсказка (W150)
+                icon.hitArea = new PIXI.Circle(0, 0, 22);
+                icon.on("pointerover", () => slotTip.show(GAME_LOC.t("hud.resTip",
+                    { name: GAME_LOC.t("res." + e) }), x));
+                icon.on("pointerout", () => slotTip.hide());
                 iconRow.addChild(icon);
                 const num = new PIXI.Text({ text: "0", style: resStyle });
                 num.anchor.set(0.5);
@@ -892,6 +921,12 @@
                 () => { globalThis.GAME_SIDEQ.showReview(ctx); }, 0.62);
             qRune.visible = qSide.visible = false; // до первой синхронизации
             panel.addChild(qRune, qSide);
+            // W150 (юзер): иконки квестов явнее сигнализируют «кнопка» —
+            // при наведении слегка растут (жёлтое свечение уже в hudIcon)
+            for (const q of [qRune, qSide]) {
+                q.on("pointerover", () => { if (!q.destroyed) q.scale.set(1.15); });
+                q.on("pointerout", () => { if (!q.destroyed) q.scale.set(1); });
+            }
             // настройки доступны и из мира; «Назад» вернёт сюда. Колода —
             // по кружку героя (как по прежней карте, просил юзер)
             const settingsBtn = hudIcon("icon_setting.png", 1839, 66, () => {
@@ -975,6 +1010,7 @@
                 G.uiReturn = "world";
                 scenes.go("deck");
             });
+            panel.addChild(slotTip.node); // поверх всего (кольцо героя под ней)
             return c;
         }
 

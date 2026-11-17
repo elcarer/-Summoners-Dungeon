@@ -39,6 +39,11 @@
             // бой из открытого мира — в мир, из подземелья — в подземелье
             scheduler.after(0.7, () => {
                 if (root && picked !== null) {
+                    // снимок фона отработал — не держим до следующего боя
+                    if (G.__rewardShot) {
+                        G.__rewardShot.destroy(true);
+                        G.__rewardShot = null;
+                    }
                     scenes.go(G.worldFrom ? "world" : "dungeon");
                     G.worldFrom = false;
                 }
@@ -49,7 +54,17 @@
             if (root) root.destroy({ children: true });
             root = new PIXI.Container();
             root.eventMode = "static";
-            root.addChild(dimBg(ctx, 0.85));
+            // W150 (юзер): фон — затенённый кадр игры (подземелье/открытый
+            // мир на момент старта боя), а не спрайт из главного меню.
+            // Снимка нет (прямой заход из тестов) — штатный коридор
+            if (G.__rewardShot) {
+                root.addChild(new PIXI.Sprite(G.__rewardShot));
+                root.addChild(new PIXI.Graphics()
+                    .rect(0, 0, 1920, 1080)
+                    .fill({ color: 0x000000, alpha: 0.85 }));
+            } else {
+                root.addChild(dimBg(ctx, 0.85));
+            }
             // «Колоды» доступна и здесь (просил юзер): перед выбором трофея
             // можно посмотреть колоду и коллекцию. Кнопка запоминает, откуда
             // вышли — тройка карт при возврате НЕ перекидывается заново.

@@ -295,11 +295,26 @@
                 );
                 overlay.node.addChild(zNode);
                 ovZoom = { id, node: zNode, cur: 0.75, tgt: 1, base, baseAlpha };
+                // W150 (юзер): рядом с увеличенной картой — окошко описаний
+                // стандартных способностей (справа, не влезает — слева)
+                const box = globalThis.GAME_UI.abilTipOf(id);
+                if (box) {
+                    const hw = 168 + 22; // полкарты на полном масштабе + отступ
+                    let bx = zNode.x + hw;
+                    if (bx + box.w > 1904) bx = zNode.x - hw - box.w;
+                    bx = Math.max(16, bx);
+                    box.node.position.set(bx,
+                        Math.max(16, Math.min(zNode.y - box.h / 2, 1064 - box.h)));
+                    overlay.node.addChild(box.node);
+                    ovZoom.box = box.node;
+                }
             };
             A.hideOvZoom = function hideOvZoom(immediate) {
                 if (!ovZoom) return;
                 if (immediate) {
                     if (ovZoom.base && !ovZoom.base.destroyed) ovZoom.base.alpha = ovZoom.baseAlpha;
+                    if (ovZoom.box && !ovZoom.box.destroyed)
+                        ovZoom.box.destroy({ children: true }); // окошко способностей
                     ovZoom.node.destroy({ children: true });
                     ovZoom = null;
                 } else ovZoom.tgt = 0.75; // плавно уменьшится в update, затем удалится

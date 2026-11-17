@@ -257,14 +257,8 @@
     function captureSettingsBg(ctx) {
         const G = ctx.G;
         if (G.__settingsShot) { G.__settingsShot.destroy(true); G.__settingsShot = null; }
-        try {
-            const ui = ctx.ui;
-            const sx = ui.scale.x, sy = ui.scale.y, px = ui.position.x, py = ui.position.y;
-            ui.scale.set(1); ui.position.set(0, 0);
-            const rt = PIXI.RenderTexture.create({ width: 1920, height: 1080 });
-            ctx.app.renderer.render({ container: ui, target: rt, clear: true });
-            ui.scale.set(sx, sy); ui.position.set(px, py);
-            G.__settingsShot = rt;
+        try { // W150: рендер снимка вынесен в общий хелпер GAME_UI.sceneShot
+            G.__settingsShot = globalThis.GAME_UI.sceneShot(ctx);
         } catch (e) { /* снимок не вышел — сцена возьмёт штатную подложку */ }
     }
 

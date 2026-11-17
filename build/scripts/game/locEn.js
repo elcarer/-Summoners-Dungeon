@@ -840,6 +840,29 @@
             "tag.protect": "Guard",
             "tag.counterSpike": "Retaliation",
             "tag.ret": "Return",
+            // W150 (user): standard ability descriptions in the box next
+            // to a zoomed card. Values come from the card def
+            "abil.dash.name": "Speed {n}",
+            "abil.dash.desc1": "Right after being summoned this creature immediately takes 1 action: a step forward or an attack on the enemy in front of it.",
+            "abil.dash.descN": "Right after being summoned this creature immediately takes {n} actions: steps forward or attacks on the enemy in front of it.",
+            "abil.shot.name": "Shot {n}",
+            "abil.shot.desc": "After moving, the creature deals {n} damage to the nearest unit or building ahead in its lane; if the lane is empty — {n} damage to the enemy base.",
+            "abil.delay.name": "Shift {n}",
+            "abil.delay.desc": "The creature will appear on the chosen cell at the start of your turn when the counter expires, if the cell stays free.",
+            "abil.ret.name": "Return {n}",
+            "abil.ret.desc": "After the stated number of turns from being summoned, the creature goes back to its owner's hand.",
+            "abil.prot.name": "Guard {n}",
+            "abil.prot.desc": "All damage dealt to this creature is reduced by the shield value.",
+            "abil.counter.name": "Retaliation {n}",
+            "abil.counter.desc": "An enemy unit attacking this object in melee takes {n} damage.",
+            "abil.crush.name": "Crush",
+            "abil.crush.desc": "Excess attack damage dealt to a unit carries over to the enemy base.",
+            "abil.dig.name": "Exhuming {n}",
+            "abil.dig.desc": "Once after death the creature returns to the same cell without spending energy; the counter drops by 1.",
+            "abil.fly.name": "Flight",
+            "abil.fly.desc": "If there is a free cell behind the attacked unit, the creature flies there instead of attacking.",
+            "abil.berserk.name": "Berserk {n}",
+            "abil.berserk.desc": "Attacks extra times at the start of its turn; each extra attack costs 1 HP.",
             // W73: босс «Белой пущи» (3-й, последний этаж)
             "enc.ghBastion.title": "Forest Bulwark",
             "hero.ghBastion.ability": "All your buildings are additionally treated as units for effects",
@@ -1350,6 +1373,9 @@
             "res.decay": "Scythe of Death",
             "res.honor": "Sun Sign",
             "res.time": "Gear of Eternity",
+            // W150 (user): tooltips on the gold/resource icons in the HUD
+            "hud.goldTip": "Gold — the run's currency: buy cards in shops. Treasure piles, selling cards and quest rewards bring it.",
+            "hud.resTip": "«{name}» resource: a town forge of this element trades 3 of it for a booster. Town commissions bring these.",
             // ── City forge (W40): booster crafting ──────────────────────
             "forge.title": "Forge",
             "forge.desc": "The forge crafts a booster of the «{elem}» element from 3 resources. An opened booster grants 3 common, 2 rare and 1 epic card of the element to the collection.",
@@ -1376,6 +1402,8 @@
             "sideq.leave": "Leave",
             "sideq.taken": "Commission already accepted:",
             "sideq.done": "All commissions of this town are done.",
+            // W150 (user): a commission is accepted but not finished yet
+            "sideq.active": "You are already working on this town's commission.",
             "sideq.huntDone": "Raider defeated: +1 × {res}",
             "sideq.letterDone": "Letter delivered: +1 × {res}",
             // ── Collector — "Rarity Hunt" (W66, user) ────────────────────

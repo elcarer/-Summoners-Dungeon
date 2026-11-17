@@ -415,6 +415,8 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
                     } else z.dead = true; // окно/сцена закрылись
                     if (z.dead) {
                         if (z.base && !z.base.destroyed) z.base.alpha = z.baseAlpha;
+                        if (z.box && !z.box.destroyed)
+                            z.box.destroy({ children: true }); // окошко способностей
                         if (z.node && !z.node.destroyed) z.node.destroy({ children: true });
                         zooms.delete(z);
                     }
@@ -427,6 +429,8 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
             if (!zoom) return;
             if (immediate || zoom.node.destroyed) {
                 if (zoom.base && !zoom.base.destroyed) zoom.base.alpha = zoom.baseAlpha;
+                if (zoom.box && !zoom.box.destroyed)
+                    zoom.box.destroy({ children: true }); // окошко способностей
                 if (!zoom.node.destroyed) zoom.node.destroy({ children: true });
                 zooms.delete(zoom);
                 zoom = null;
@@ -447,6 +451,21 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
             h.addChild(node); // поверх всех карт host-слоя
             zoom = { id, node, cur: fromScale || from, tgt: to, base, baseAlpha };
             zooms.add(zoom);
+            // W150 (юзер): рядом с увеличенной картой — окошко описаний
+            // стандартных способностей; справа, не влезает — слева
+            const box = abilTipOf(id);
+            if (box) {
+                const hw = 168 * to + 22; // полкарты на полном масштабе + отступ
+                let bx = node.x + hw;
+                if (bx + box.w > 1904) bx = node.x - hw - box.w;
+                bx = Math.max(16, bx);
+                box.node.position.set(bx,
+                    Math.max(16, Math.min(node.y - box.h / 2, 1064 - box.h)));
+                h.addChild(box.node);
+                zoom.box = box.node;
+                zoom.boxDX = bx - node.x;
+                zoom.boxDY = box.node.y - node.y;
+            }
         }
         return {
             show,
@@ -456,6 +475,10 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
             moveTo(x, y) {
                 if (!zoom || zoom.dead || !zoom.node || zoom.node.destroyed) return;
                 zoom.node.position.set(x, Math.max(yMin, Math.min(yMax, y)));
+                // окошко способностей следует за копией (панель-хозяин едет)
+                if (zoom.box && !zoom.box.destroyed)
+                    zoom.box.position.set(x + zoom.boxDX,
+                        zoom.node.y + zoom.boxDY);
             },
             state: () => (zoom && !zoom.dead // dead — до-улитая тикером запись
                 ? { id: zoom.id, scale: Math.round(zoom.cur * 1000) / 1000, target: zoom.tgt }
@@ -728,5 +751,121 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         return { node, w: W, h: H, rows, hero, zoomer, place, destroy };
     }
 
-    globalThis.GAME_UI = { T, fit, button, chip, cardFace, cardZoomer, addGlow, constGlow, pathFx, backTexOf, dimBg, scrollPane, foeTitle, deckTip };
+    // ── Плашка-подсказка слотов HUD (W150, юзер): «что это и зачем» ────────
+    // Одна плашка на панель HUD (золото/ресурсы). show(text, slotX) — текст
+    // и позиция ПОД наведённым слотом (плашка не накрывает иконки/числа,
+    // лишь декоративную дощечку квестов), hide гасит
+    function hudTipPlate() {
+        const node = new PIXI.Container();
+        node.name = "hudSlotTip"; // пробы: найти плашку среди детей панели
+        const bg = new PIXI.Graphics();
+        const txt = T("", 20, 0xf3e6c2,
+            { wordWrap: true, wordWrapWidth: 280, breakWords: true,
+                lineHeight: 25 });
+        txt.position.set(14, 11);
+        txt.eventMode = "none";
+        node.addChild(bg, txt);
+        node.alpha = 0;
+        node.eventMode = "none";
+        return {
+            node,
+            show(text, slotX) { // slotX — центр слота в координатах панели
+                txt.text = text;
+                const w = txt.width + 28, h = txt.height + 22;
+                bg.clear();
+                bg.roundRect(0, 0, w, h, 10);
+                bg.fill({ color: 0x171310, alpha: 0.94 });
+                bg.stroke({ width: 3, color: 0x6b5c40 });
+                // не заезжает на кольцо героя (правый край ~211)
+                node.position.set(
+                    Math.max(260, Math.min(slotX - w / 2, 696 - w)), 102);
+                node.alpha = 1;
+            },
+            hide() { node.alpha = 0; },
+        };
+    }
+
+    // ── Окошко описаний стандартных способностей карты (W150, юзер) ────────
+    // Ставится РЯДОМ с увеличенной картой (ховер-зум): список стандартных
+    // эффектов из def («Скорость», «Выстрел», «Сдвиг»…) с описаниями.
+    // Возвращает { node, w, h } или null — способностей нет
+    function abilTipOf(cardId) {
+        const { CARDS } = globalThis.GAME_DATA;
+        const def = CARDS[cardId];
+        if (!def) return null;
+        const rows = [];
+        const dash = def.ability === "dash1" ? 1
+            : def.ability === "dashN" ? (def.abilityVal || 2)
+            : (def.dashN || 0);
+        if (dash) rows.push([GAME_LOC.t("abil.dash.name", { n: dash }),
+            GAME_LOC.t(dash === 1 ? "abil.dash.desc1" : "abil.dash.descN")]);
+        if (def.ability === "archer")
+            rows.push([GAME_LOC.t("abil.shot.name", { n: def.shotDmg || 1 }),
+                GAME_LOC.t("abil.shot.desc", { n: def.shotDmg || 1 })]);
+        if (def.ability === "flyOver")
+            rows.push([GAME_LOC.t("abil.fly.name"), GAME_LOC.t("abil.fly.desc")]);
+        if (def.delay)
+            rows.push([GAME_LOC.t("abil.delay.name", { n: def.delay }),
+                GAME_LOC.t("abil.delay.desc")]);
+        if (def.returnN)
+            rows.push([GAME_LOC.t("abil.ret.name", { n: def.returnN }),
+                GAME_LOC.t("abil.ret.desc")]);
+        if (def.protect)
+            rows.push([GAME_LOC.t("abil.prot.name", { n: def.protect }),
+                GAME_LOC.t("abil.prot.desc")]);
+        if (def.counterSpike)
+            rows.push([GAME_LOC.t("abil.counter.name", { n: def.counterSpike }),
+                GAME_LOC.t("abil.counter.desc")]);
+        if (def.crush)
+            rows.push([GAME_LOC.t("abil.crush.name"), GAME_LOC.t("abil.crush.desc")]);
+        if (def.exhuming)
+            rows.push([GAME_LOC.t("abil.dig.name", { n: def.exhuming }),
+                GAME_LOC.t("abil.dig.desc")]);
+        if (!rows.length) return null;
+        const node = new PIXI.Container();
+        const DW = 330; // ширина колонки описания
+        const nameTs = [], descTs = [];
+        let h = 14;
+        for (const [nm, ds] of rows) {
+            const nt = T(nm, 22, 0xf0c96a,
+                { stroke: { color: 0x241505, width: 4 } });
+            nt.position.set(16, h);
+            nt.eventMode = "none";
+            h += nt.height + 4;
+            const dt = T(ds, 19, 0xf3e6c2,
+                { wordWrap: true, wordWrapWidth: DW, breakWords: true,
+                    lineHeight: 24 });
+            dt.position.set(16, h);
+            dt.eventMode = "none";
+            h += dt.height + 10;
+            node.addChild(nt, dt);
+            nameTs.push(nt); descTs.push(dt);
+        }
+        h += 4;
+        const w = Math.min(362, DW + 32);
+        const bg = new PIXI.Graphics();
+        bg.roundRect(0, 0, w, h, 12);
+        bg.fill({ color: 0x171310, alpha: 0.94 });
+        bg.stroke({ width: 3, color: 0x6b5c40 });
+        node.addChildAt(bg, 0);
+        node.eventMode = "none";
+        return { node, w, h };
+    }
+
+    // ── Снимок текущей сцены в RenderTexture (W150, юзер) ──────────────────
+    // Фон экранов ПОВЕРХ игры (награда): затенённый кадр подземелья/мира,
+    // а не спрайт из меню. Летербокс-трансформ ui на время рендера
+    // снимается (тот же приём, что captureSettingsBg в settingsScene)
+    function sceneShot(ctx) {
+        const ui = ctx.ui;
+        const sx = ui.scale.x, sy = ui.scale.y;
+        const px = ui.position.x, py = ui.position.y;
+        ui.scale.set(1); ui.position.set(0, 0);
+        const rt = PIXI.RenderTexture.create({ width: 1920, height: 1080 });
+        ctx.app.renderer.render({ container: ui, target: rt, clear: true });
+        ui.scale.set(sx, sy); ui.position.set(px, py);
+        return rt;
+    }
+
+    globalThis.GAME_UI = { T, fit, button, chip, cardFace, cardZoomer, addGlow, constGlow, pathFx, backTexOf, dimBg, scrollPane, foeTitle, deckTip, hudTipPlate, abilTipOf, sceneShot };
 })();
