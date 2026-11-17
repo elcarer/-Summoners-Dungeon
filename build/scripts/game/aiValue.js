@@ -48,6 +48,18 @@
                 // пока не кончился разгон энергии
                 drawRampTurn: 2,     // полуходы < — только разгон (добор до drawTo) (W142: 4 → 2)
                 drawPlayableMana: 13, // «до 4 разыгрываемых» — только при мане след. хода ≥ (0 = всегда)
+                // W148 (бэклог исследования ИИ 2026-11-15, юзер: «делай»):
+                // (а) замена мёртвой карты по ГЕЙТАМ, не только по цене —
+                // заклинание с закрытым гейтом (aiSpellPlayable=false:
+                // «нечего применять / переводить зря») не сыграет, даже
+                // когда ИИ дотянется по мане; (б) пороги добора в «деньгах
+                // маны» (drawPlayableMana/drawFullMana/drawAllEnergy)
+                // нормализуются темпом боя — доля выбитых жизней обеих баз:
+                // один и тот же запас маны значит разное в начале и в конце.
+                // Оба гейта 0 = бит-в-бит прежнее поведение.
+                deadSwapGateK: 0,    // бонус «мёртвости» за закрытый гейт (0 = выкл)
+                tempoDrawOn: 0,      // 1 — пороги добора от темпа боя (0 = прежнее)
+                tempoDrawK: 0.6,     // сила сдвига: порог × (1 + K×(темп − ½)); K<0 — flooding раньше
                 // W131 (юзер: «планы на розыгрыш в зависимости от притока
                 // энергии»): планировщик энергии — ИИ оценивает тяжесть своей
                 // колоды (средняя цена пула) и цены руки и копит энергию
@@ -566,20 +578,36 @@
             A.enemyDrawPlan = function enemyDrawPlan() {
                 const total = spheresTotal();
                 const nextMana = B.eEnergy + total; // мана следующего хода
+                // W148: пороги в «деньгах маны» нормализуются темпом боя —
+                // доля выбитых жизней обеих баз (0 = старт, 1 = финиш):
+                // один и тот же запас маны значит разное в начале и в конце.
+                // tempoDrawK со знаком: K>0 — поздняя фаза копит руку
+                // (пороги выше), K<0 — flooding включается раньше.
+                // tempoDrawOn=0 — прежние литералы бит-в-бит.
+                let mPlayable = AI_W.drawPlayableMana,
+                    mFull = AI_W.drawFullMana,
+                    mAll = AI_W.drawAllEnergy;
+                if (AI_W.tempoDrawOn) {
+                    const tempo = Math.min(1, Math.max(0, 1
+                        - (B.playerBase + B.enemyBase)
+                        / (B.playerBaseMax + B.enemyBaseMax)));
+                    const tf = 1 + AI_W.tempoDrawK * (tempo - 0.5);
+                    mPlayable *= tf; mFull *= tf; mAll *= tf;
+                }
                 let eCards = 0;
                 if (B.eHand.length < AI_W.drawTo)
                     eCards = AI_W.drawTo - B.eHand.length;
                 if (B.turnNo >= AI_W.drawRampTurn) {
-                    if (nextMana >= AI_W.drawPlayableMana) {
+                    if (nextMana >= mPlayable) {
                         const costs = B.eHand.map((c) => effCost(c, "e")).sort((a, b) => a - b);
                         let mana = nextMana, playable = 0;
                         for (const c of costs) { if (c <= mana) { mana -= c; playable++; } else break; }
                         if (playable < AI_W.drawPlayable)
                             eCards = Math.max(eCards, AI_W.drawPlayable - playable);
                     }
-                    if (nextMana >= AI_W.drawFullMana)
+                    if (nextMana >= mFull)
                         eCards = Math.max(eCards, HAND_MAX - B.eHand.length);
-                    if (B.eEnergy >= AI_W.drawAllEnergy)
+                    if (B.eEnergy >= mAll)
                         eCards = HAND_MAX - B.eHand.length; // только карты
                 }
                 // W105 (юзер): спец-добор «шестерён» под тройку УБРАН —

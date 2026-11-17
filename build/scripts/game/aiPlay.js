@@ -771,9 +771,28 @@
                                 const held = (B.holdAge && B.holdAge.e[id]) || 0;
                                 const hopeless = c2 > B.eEnergy + AI_W.deadSwapIncK * inc;
                                 const stuck = held >= AI_W.deadSwapHold;
-                                if ((hopeless || stuck)
-                                    && c2 + held > worstScore) {
-                                    worstScore = c2 + held; worst = i2;
+                                // W148 (бэклог исследования ИИ 2026-11-15):
+                                // замена по ГЕЙТАМ, не только по цене —
+                                // заклинание с закрытым гейтом (aiSpellPlayable:
+                                // «нечего применять / переводить зря») не
+                                // сыграет, даже когда ИИ дотянется по мане:
+                                // кандидат в замену сам по себе. Осознанные
+                                // удержания (план дерева, комбо-пара,
+                                // lethal-пакет) мёртвыми не считаются — их
+                                // держит стратегия, а не тупик.
+                                // deadSwapGateK: 0 = прежнее поведение
+                                const d2 = CARDS[id];
+                                const gated = AI_W.deadSwapGateK && d2 && d2.spell
+                                    && !(plan && plan.hold.indexOf(id) >= 0)
+                                    && !(comboHeldIds
+                                        && comboHeldIds.indexOf(id) >= 0)
+                                    && !(lethalSet && lethalSet.has(id))
+                                    && !aiSpellPlayable(d2);
+                                const score = c2 + held
+                                    + (gated ? AI_W.deadSwapGateK : 0);
+                                if ((hopeless || stuck || gated)
+                                    && score > worstScore) {
+                                    worstScore = score; worst = i2;
                                 }
                             });
                             if (worst >= 0) {
