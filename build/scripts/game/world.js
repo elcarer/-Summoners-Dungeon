@@ -544,10 +544,18 @@
 
         // W86 (тесты): каким heroSheets-ключом реально рисуется отряд
         // («Некро-раскопки» — necr/decay, «Белая пуща» — honor, …);
-        // сравнение первой текстуры walk-анимации — имена листов не нужны
+        // сравнение первой текстуры walk-анимации — имена листов не нужны.
+        // W145: мировые боссы ходят СВОИМИ листами из creatureSheets
+        // (dragonA/dragonM) — сканируем и их (heroSheets первым: алиасы
+        // creatureSheets — те же объекты, что и heroSheets)
         const sheetNameOf = (ref) => {
             if (!ref || !ref.animations || !ref.animations.walk_front) return null;
             for (const [k, sh] of Object.entries(ctx.heroSheets)) {
+                if (!sh.animations || !sh.animations.walk_front) continue;
+                if (sh.animations.walk_front[0] === ref.animations.walk_front[0])
+                    return k;
+            }
+            for (const [k, sh] of Object.entries(ctx.creatureSheets || {})) {
                 if (!sh.animations || !sh.animations.walk_front) continue;
                 if (sh.animations.walk_front[0] === ref.animations.walk_front[0])
                     return k;
@@ -627,12 +635,16 @@
             return { x: W + TS * 2, y };
         }
         function spawnBossSquad(st, key) {
-            // лист — по ПЕРВОЙ стихии героя-босса (Акралон — эльф/Рост,
-            // Матузорг — гоблин/Сила; своего трёхцветного листа нет),
-            // КРУПНЕЕ обычных отрядов и с багровым свечением охотника
+            // лист — СВОЙ у мировых боссов (арт юзера, W145: Акралон —
+            // dragonA, Матузорг — dragonM); боссу без своего листа — по
+            // ПЕРВОЙ стихии героя (Акралон — эльф/Рост, Матузорг — гоблин/
+            // Сила), КРУПНЕЕ обычных отрядов и с багровым свечением охотника
+            const BOSS_SHEETS = { akralon: "dragonA", matuzorg: "dragonM" };
             const hd = globalThis.GAME_DATA.HEROES[
                 globalThis.GAME_DATA.ENCOUNTERS[st.enc].hero];
-            const sheet = ctx.heroSheets[hd && hd.elems[0]]
+            const sheet = (BOSS_SHEETS[st.enc]
+                    && ctx.creatureSheets[BOSS_SHEETS[st.enc]])
+                || ctx.heroSheets[hd && hd.elems[0]]
                 || ctx.heroSheets.growth;
             const sprite = new PIXI.AnimatedSprite(sheet.animations.walk_front, false);
             sprite.anchor.set(0.5, 1);
@@ -653,6 +665,7 @@
                 elem: globalThis.GAME_DATA.ENCOUNTERS[st.enc].elem, glow };
             s.sprite = sprite;
             s.shadow = shadow;
+            s.sheetRef = sheet; // W86: ключ листа для тестов
             sprite.position.set(st.x, st.y);
             sprite.zIndex = st.y;
             shadow.position.set(st.x, st.y - 13);

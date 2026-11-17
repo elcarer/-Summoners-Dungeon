@@ -291,6 +291,11 @@
             gnome: heroSheets.time,
             // фигурка Глома в городе (арт юзера, W34): спрайтшит 4×6 кадров
             glom: await assets.loadCharacter("./images/sprites/glom_256"),
+            // листы МИРОВЫХ боссов открытого мира (арт юзера, W145):
+            // Акралон — dragonA, Матузорг — dragonM (мир/world.js,
+            // spawnBossSquad выбирает по энкаунтеру)
+            dragonA: await assets.loadCharacter("./images/sprites/dragonA_256"),
+            dragonM: await assets.loadCharacter("./images/sprites/dragonM_256"),
         };
 
         // ── UI-корень: базовое разрешение 1920×1080, вписывается в окно ────
