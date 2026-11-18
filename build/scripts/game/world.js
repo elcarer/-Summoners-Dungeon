@@ -28,8 +28,8 @@
 // ВРАГИ ТОЧЕК СПАВНА (просил юзер W29) — ~12 на зону в проходимых
 // местах вне маршрутов стражей: стоят на месте (после погони
 // возвращаются), но заметят героя ВДВОЕ дальше (агро ×2); вид — из
-// спавн-пула стихии по редкостным весам, ядро колоды — 9 случайных
-// Обычных карт стихии при спавне, победа над одним усиливает всех
+// спавн-пула стихии по редкостным весам, ядро колоды — 17 случайных
+// Обычных карт стихии при спавне (W151), победа над одним усиливает всех
 // одноимённых (+1 макс. жизнь и +1 Редкая карта в ядро). Все
 // отряды — полноценные персонажи мира: спрайтшиты существ своей стихии,
 // ходят по сетке 4 направлениями (BFS) и разворачиваются как герой
@@ -138,6 +138,7 @@
         // (arenaFlow) снимает его по G.activeEnemy.wander
         function ensureWander() {
             const map = G.world.map;
+            const D = globalThis.GAME_DATA;
             if (!G.world.wander) G.world.wander = {};
             if (map.wanderers) for (let i = 0; i < map.wanderers.length; i++) {
                 const d = map.wanderers[i];
@@ -151,15 +152,24 @@
                 if (!map[list]) continue;
                 for (let j = 0; j < map[list].length; j++) {
                     const d = map[list][j];
-                    if (!guardEncOf(d.elem)) continue; // стихии без стражей нет
+                    const encId = guardEncOf(d.elem);
+                    if (!encId) continue; // стихии без стражей нет
                     const k = kind + ":" + j;
                     if (!G.world.wander[k]) G.world.wander[k] = {
-                        alive: true, x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS };
+                        alive: true, x: (d.gx + 0.5) * TS, y: (d.gy + 0.5) * TS,
+                        // W151 (юзер): колода охранника — фиксированное ядро
+                        // спека + 6 случайных Обычных стихии, детерминировано
+                        // сидом мира и номером точки; состав живёт в сейве
+                        // отряда (тутип и бой показывают одно)
+                        deck: D.guardDeck(d.elem,
+                            D.ENCOUNTERS[encId].core,
+                            (G.world.seed ^ ((j + 1) * 2654435761)) | 0),
+                    };
                 }
             }
             // дикие враги точек спавна (просил юзер W29): вид — из пула
             // стихии по редкостным весам (детерминировано сидом мира и
-            // номером точки), колода — 9 случайных Обычных карт стихии
+            // номером точки), колода — 17 случайных Обычных карт стихии
             // плюс усиление за победы над одноимёнными (уровень вида —
             // в wildLevel). Состав колоды живёт в сейве отряда
             if (!G.world.wildLevel) G.world.wildLevel = {};
@@ -167,7 +177,6 @@
             // (G.world.wander["boss:<enc>"]) спавнит bossDayTick
             if (!G.world.bossKilled) G.world.bossKilled = {};
             {
-                const D = globalThis.GAME_DATA;
                 if (map.wildSpawns) {
                     for (let i = 0; i < map.wildSpawns.length; i++) {
                         const d = map.wildSpawns[i];
@@ -178,7 +187,7 @@
                         const lvl = G.world.wildLevel[enc] || 0;
                         // «разбойники» (редкие дикие, W40): ядро 8 Обычных +
                         // 3 Редких + 1 Эпическая (raiderDeck); «Простые» —
-                        // 9 Обычных + Редкие за уровень (wildDeck)
+                        // 17 Обычных + Редкие за уровень (wildDeck, W151)
                         const rd = D.ENCOUNTERS[enc]
                             && D.ENCOUNTERS[enc].genDeck === "raider";
                         G.world.wander[k] = {
@@ -587,9 +596,10 @@
             };
             G.worldFrom = true; // трофей/поражение ведут в открытый мир
             // дикий враг играет СВОЕЙ колодой — сгенерённой при спавне
-            // (9 Обычных стихии + Редкие за победы над одноимёнными);
-            // усиление вида — hpBonus к базе (просил юзер W29)
-            const deck = (s.kind === "wild" || s.kind === "boss") && s.st.deck
+            // (17 Обычных стихии + Редкие за победы над одноимёнными);
+            // охранники мостов — ядро спека + 6 Обычных (тоже из спавна);
+            // усиление вида — hpBonus к базе (просил юзер W29/W151)
+            const deck = s.st.deck
                 ? [...s.st.deck] : D.enemyDeck(s.enc, 1);
             G.activeEnemy = { x: s.st.x, y: s.st.y, enc: s.enc,
                 deck, alive: true, boss: false,
@@ -769,13 +779,14 @@
             const D = globalThis.GAME_DATA;
             const enc = D.ENCOUNTERS[s.enc] || D.ENCOUNTERS.gob;
             const hd = D.HEROES[enc.hero] || D.HEROES.gob;
-            // Дикие враги: база с усилением вида, колода — своя (W29)
+            // Дикие враги: база с усилением вида (W29); колода — своя
+            // из спавна у диких и охранников (W151), ядро — у прочих
             const hpN = enc.baseHp
                 + (s.kind === "wild" ? (s.st.hpBonus || 0) : 0);
             const win = globalThis.GAME_UI.deckTip(ctx, {
                 title: GAME_LOC.t("enc." + s.enc + ".title"),
                 base: GAME_LOC.t("dungeon.tipBase", { n: hpN }),
-                deck: s.kind === "wild" ? s.st.deck : enc.core,
+                deck: s.st.deck || enc.core,
                 heroImg: hd && hd.img ? hd.img : null,
             });
             ctx.ui.addChild(win.node);

@@ -611,16 +611,17 @@
         return Object.keys(CARDS).filter((id) => CARDS[id].elem === elem
             && CARDS[id].rarity === rarity && CARDS[id].img);
     }
-    // Ядро колоды простого врага: 9 случайных ОБЫЧНЫХ карт стихии
-    // (без повторов, пока карт хватает) + level случайных РЕДКИХ —
-    // усиление за победы над одноимёнными. Детерминировано сидом точки.
+    // Ядро колоды простого врага: 17 случайных ОБЫЧНЫХ карт стихии
+    // (9 базовых + 8 добавочных, просил юзер W151; без повторов, пока
+    // карт хватает) + level случайных РЕДКИХ — усиление за победы над
+    // одноимёнными. Детерминировано сидом точки.
     function wildDeck(elem, level, seed) {
         const rng = wildRng(seed | 0);
         const commons = collectibleOf(elem, "common");
         const deck = [];
         const bag = commons.slice();
-        for (let k = 0; k < 9 && commons.length; k++) {
-            if (!bag.length) bag.push(...commons); // карт меньше 9 — по кругу
+        for (let k = 0; k < 17 && commons.length; k++) {
+            if (!bag.length) bag.push(...commons); // карт меньше 17 — по кругу
             deck.push(bag.splice((rng() * bag.length) | 0, 1)[0]);
         }
         if (level > 0) {
@@ -664,7 +665,25 @@
         }
         return deck;
     }
-    // Состав бустера (кузница города, просил юзер W40): 3 Обычных +
+    // Колода «Охранника мостов» (просил юзер W151): фиксированное ядро
+    // спека + 6 случайных ОБЫЧНЫХ карт стихии (без повторов; карты,
+    // доведённые ядром до капа 3 копий, пропускаются БЕЗ потери слота).
+    // Детерминировано сидом точки: тутип мира и бой показывают один
+    // состав (колода живёт в сейве отряда)
+    function guardDeck(elem, core, seed) {
+        const rng = wildRng((seed | 0) ^ 0x67ee1d5a);
+        const deck = [...core];
+        const bag = collectibleOf(elem, "common").slice();
+        let added = 0;
+        while (added < 6 && bag.length) {
+            const id = bag.splice((rng() * bag.length) | 0, 1)[0];
+            if (deck.filter((c) => c === id).length < 3) {
+                deck.push(id);
+                added++;
+            }
+        }
+        return deck;
+    }
     // 2 Редких + 1 Эпическая карта стихии — без повторов, где хватает
     function boosterCards(elem) {
         const plan = [["common", 3], ["rare", 2], ["epic", 1]];
@@ -714,6 +733,6 @@
         caveDeckFor,
         enemyDeck, mobForFloor, ELEM_LOGO, MULTI_LOGO, SHOP_BUY, SHOP_SELL, rollLootCard,
         wildPool, wildPick, wildDeck, wildRareCard, WILD_WEIGHT,
-        raiderDeck, boosterCards,
+        raiderDeck, guardDeck, boosterCards,
     };
 })();
