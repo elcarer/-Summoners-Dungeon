@@ -296,6 +296,22 @@
                 styleComboComboK: 0.6, styleComboCDraw: 0.4,
                 styleComboCEnergy: 0.25, styleComboTreeMargin: -0.3,
                 styleComboVAtk: -0.15,
+                // W156 (юзер: «стратегии настраиваемы друг против друга
+                // самой игрой, какую из них когда применять»): КНБ-таблица
+                // была ДОПУЩЕНИЕМ спеки — теперь матрица контр-пиков
+                // тюнируема. styleVs<E><R>: E — однозначный стиль врага
+                // (Aggro/Ctrl/Combo — имя стиля с заглавной, как его
+                // собирает aiStyle из имён метрик), R — свой ответ
+                // (Aggro/Ctrl/Combo; Own = не контрпикать, играть свой
+                // сильнейший). Выбор — argmax по строке, порядок важнее
+                // знака. Дефолты = прежняя КНБ (контр-ячейка 1, прочие 0)
+                // — бит-паритет решения.
+                styleVsAggroAggro: 0, styleVsAggroCtrl: 1,
+                styleVsAggroCombo: 0, styleVsAggroOwn: 0,
+                styleVsCtrlAggro: 0, styleVsCtrlCtrl: 0,
+                styleVsCtrlCombo: 1, styleVsCtrlOwn: 0,
+                styleVsComboAggro: 1, styleVsComboCtrl: 0,
+                styleVsComboCombo: 0, styleVsComboOwn: 0,
             };
             // ── W124 (юзер): пер-геройская адаптация — слой порогов ПОВЕРХ
             // общего вектора. Ключи «heroId.key» → значение; резолвятся в
@@ -534,10 +550,16 @@
                 };
             };
             // Выбор стиля матчапа: противник однозначен (разрыв первых двух
-            // его метрик ≥ styleMargin) — контр-стиль по камню-ножницам-бумаге
-            // (агрессия успевает убить комбу, контроль останавливает и
-            // перемалывает агрессию, комба резко выигрывает у контроля);
-            // неоднозначный матчап — свой сильнейший стиль. "" = гейт выкл.
+            // его метрик ≥ styleMargin) — контр-стиль по МАТРИЦЕ КОНТР-
+            // ПИКОВ (W156, юзер: «какую стратегию против какой применять —
+            // решает сама игра»): argmax строки styleVs<E>* — ключей AI_W,
+            // которые лига тюнит турниром; «Own» в строке = не контрпикать,
+            // свой сильнейший. Дефолты матрицы = прежняя КНБ-таблица
+            // (агрессия успевает убить комбу, контроль перемалывает
+            // агрессию, комба резко выигрывает у контроля) — допущение
+            // спеки теперь проверяемо: лига может перевернуть любую
+            // ячейку (например, «против агрессии — комба»).
+            // Неоднозначный матчап — свой сильнейший стиль. "" = гейт выкл.
             A.aiStyle = function aiStyle() {
                 if (!AI_W.styleOn) return "";
                 let c = B.__stylePick;
@@ -545,11 +567,23 @@
                 if (c && c.key === ck) return c.v;
                 const ORDER = ["aggro", "ctrl", "combo"];
                 const top = (mm) => ORDER.slice().sort((a, b) => mm[b] - mm[a]);
+                const cap = (s) => s[0].toUpperCase() + s.slice(1);
                 const my = __styleCtx("e"), foe = __styleCtx("p");
                 const ft = top(foe);
-                const v = (foe[ft[0]] - foe[ft[1]] >= AI_W.styleMargin)
-                    ? { aggro: "ctrl", ctrl: "combo", combo: "aggro" }[ft[0]]
-                    : top(my)[0];
+                let v = top(my)[0];
+                if (foe[ft[0]] - foe[ft[1]] >= AI_W.styleMargin) {
+                    // argmax по строке матрицы; тай-брейк детерминирован
+                    // порядком вставки (aggro, ctrl, combo, own) — парность
+                    // лиг. Own (пустой ответ) → свой сильнейший (v)
+                    const E = cap(ft[0]);
+                    const resp = [];
+                    for (const s of ORDER)
+                        resp.push({ s,
+                            w: AI_W["styleVs" + E + cap(s)] || 0 });
+                    resp.push({ s: "", w: AI_W["styleVs" + E + "Own"] || 0 });
+                    resp.sort((a, b) => b.w - a.w);
+                    v = resp[0].s || v;
+                }
                 B.__stylePick = { key: ck, v };
                 return v;
             };
