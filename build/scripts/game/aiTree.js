@@ -31,7 +31,9 @@
         //      aiOwnValue, comboW } — W живой (AI_W контекста), остальное —
         // чистые функции оценок; comboW (W132) — вес эмпирической пары
         // карт (0 — пары нет), может отсутствовать.
-        const { CARDS, GRID, W } = d;
+        const { CARDS, GRID, W, aiStyleMul = () => 1 } = d;
+        // W154: множитель стиля (aiStyleMul, спека юзера) — опционален:
+        // офлайн-чекеры (check_w114) строят планировщик без него
         // W132: бонус последовательности за эмпирические связки AI_COMBOS
         // (Σ весов пар в seq × comboK; при comboOn=0 — ноль вызовов)
         const comboBonus = (seq) => {
@@ -40,7 +42,7 @@
             for (let i = 0; i < seq.length; i++)
                 for (let j = i + 1; j < seq.length; j++)
                     s += d.comboW(seq[i], seq[j]);
-            return W.comboK * s;
+            return W.comboK * aiStyleMul("comboK") * s; // W154: combo — связки ценнее
         };
 
         // ── модель поля ─────────────────────────────────────────────────────
@@ -301,10 +303,10 @@
             // успеть разыграть с полной отдачей (множители, 1 = всегда)
             const late = (snap.turnNo || 0) >= W.lateTurn;
             let sc = W.cBoard * (own - foe)
-                + W.cBase * (snap.playerBase - m.pBase)
-                + W.cSelfBase * (m.eBase - snap.enemyBase)
-                + W.cEnergy * m.energy * (late ? W.cEnergyLate : 1)
-                + W.cDraw * acc.drew * (late ? W.cDrawLate : 1)
+                + W.cBase * aiStyleMul("cBase") * (snap.playerBase - m.pBase) // W154: стиль
+                + W.cSelfBase * aiStyleMul("cSelfBase") * (m.eBase - snap.enemyBase)
+                + W.cEnergy * aiStyleMul("cEnergy") * m.energy * (late ? W.cEnergyLate : 1)
+                + W.cDraw * aiStyleMul("cDraw") * acc.drew * (late ? W.cDrawLate : 1)
                 + W.cStatic * acc.static
                 + W.cPress * press;
             if (m.pBase <= 0) sc += W.cLethal;
@@ -365,7 +367,8 @@
             dfs(mkModel(snap), [], { static: 0, drew: 0 });
             // план действует, только если он ЯВНО лучше жадной базы
             if (!best.seq.length) return null;
-            if (best.score <= greedy.score + W.treeMargin) return null;
+            if (best.score <= greedy.score + W.treeMargin * aiStyleMul("treeMargin"))
+                return null;
             // treeHold=0: план обязан играть ВСЕ карты-кандидаты (только
             // порядок) — иначе прежнее поведение
             if (!W.treeHold && !cands.every((c) => best.seq.indexOf(c.id) >= 0))
@@ -518,6 +521,7 @@
                     A.__planner = globalThis.GAME_ARENA.makeAiPlanner({
                         CARDS, GRID, W: AI_W,
                         aiVal, aiThreat, aiCardPower, aiGroup, aiOwnValue,
+                        aiStyleMul, // W154: множитель стиля по матчапу
                         comboW: aiComboW, // W132: эмпирические пары AI_COMBOS
                     });
                 }

@@ -259,6 +259,28 @@
                 // несуществующему d.id — канал всегда давал 0; починено)
                 dcBiasOn: 0,     // 0 = таблица не читается (паритет бит-в-бит)
                 dcBiasK: 0,      // масштаб per-card поправки из DC_BIAS
+                // W154 (тройка №10, гипотезы из механики боя; дозы ищет лига):
+                // avoid — обход ЧУЖИХ клеточных ловушек при выборе клетки
+                // призыва («?» на клетке публична, а aiSpotScore их вовсе
+                // не читал): призыв на клетку мины/засады/опутывания
+                // триггерит triggerCellTraps (arenaBoard addUnit), а клетка
+                // ВПЛОТНУЮ к «Лудке» врага теряет первый шаг марша/рывка
+                // (lureRedirect уводит на лудку; сам вход НА лудку безвреден).
+                // Штраф масштабируется ценой карты: дешёвые «разминируют»
+                // (мина одноразовая), дорогие — полный штраф.
+                // ret — угроза чужого со «Возвратом N» (tim215+): юнит уйдёт
+                // с поля после N маршей владельца — добивать досрочно всё
+                // чаще в утиль, угроза падает с долей достижимых атак.
+                // style — СПЕКА ЮЗЕРА («агрессия/контроль/комба,
+                // камень-ножницы-бумага»): классификатор обеих колод
+                // (__styleCtx/aiStyle) выбирает стиль матчапа, поправка
+                // styleK входит множителем aiStyleMul в глобальные веса
+                // (9 точек: vAtk/tAtk/sFrontRow здесь, cBase/cSelfBase/
+                // cEnergy/cDraw/comboK/treeMargin в aiTree.js).
+                // Гейты 0 — прежнее поведение бит-в-бит.
+                trapAvoidOn: 0, sTrapCell: 0, sTrapLure: 0,
+                retOn: 0, tReturnK: 0,
+                styleOn: 0, styleK: 0, styleMargin: 0,
             };
             // ── W124 (юзер): пер-геройская адаптация — слой порогов ПОВЕРХ
             // общего вектора. Ключи «heroId.key» → значение; резолвятся в
@@ -437,6 +459,102 @@
             // Летальный потенциал пула врага: сумма baseDmg его колоды+сброса
             A.aiEnemyLethal = function aiEnemyLethal() {
                 return AI_W.poolOn ? aiPoolMemo().lethal : 0;
+            };
+            // ── W154 (юзер: «стиль по матчапу»: агрессия/контроль/комба) ──────
+            // Классификатор КОЛОДЫ стороны по трём архетипам. Своя видна
+            // целиком (рука+колода+сброс), противник — публично (колода+сброс,
+            // рука скрыта — честность W124). aggro — дешёвые атакеры,
+            // рывковые/стрелки/летуны, летал заклинаниями; ctrl — удаления,
+            // ловушки, тяжёлые карты и постройки; combo — движки связок,
+            // дорогие финишеры, собранные пары AI_COMBOS. Кэш на полуход
+            // (ключ turnNo:turnSide, как у __combos/__deckCtx): состав
+            // меняется только добором/сбросами на границах полуходов.
+            // Чистые чтения, без случайностей (парность лиг).
+            A.__styleCtx = function __styleCtx(side) {
+                let c = B.__styleCtx;
+                const ck = B.turnNo + ":" + B.turnSide;
+                if (!c || c.key !== ck) { c = { key: ck, map: {} }; B.__styleCtx = c; }
+                if (c.map[side]) return c.map[side];
+                const deck = side === "p" ? B.deck : B.eDeck;
+                const disc = side === "p" ? B.discard : B.eDiscard;
+                const hand = side === "p" ? [] : B.eHand; // рука врага скрыта
+                const ids = (deck || []).concat(disc || [], hand || []);
+                const has = {};
+                let cheap = 0, rush = 0, removal = 0, traps = 0, blds = 0,
+                    engines = 0, heavy = 0, lethal = 0;
+                for (const id of ids) {
+                    has[id] = (has[id] || 0) + 1;
+                    const d = CARDS[id];
+                    if (!d) continue;
+                    if (d.type === "unit") {
+                        if ((d.cost || 0) <= 2) cheap++; // темп-атакеры
+                        if (unitDash(d) > 0 || d.ability === "archer" || d.fly
+                            || d.siegeFollow) rush++;
+                    } else if (d.type === "spell") {
+                        const s = d.spell || {};
+                        if (s.baseDmg) lethal += s.baseDmg;
+                        if (s.dmg || s.purge || s.destroy || s.freeze
+                            || s.iceStrike || s.mindControl || s.captivate
+                            || s.stealEnergy || s.cocoon || s.confuse) removal++;
+                    } else if (d.type === "trap") traps++;
+                    else if (d.type === "building") blds++;
+                    if (d.spellGrow || d.spellBuffAura || d.leaderAura
+                        || d.plantEcho || d.buffEcho || d.tradeDraw
+                        || d.medicHeal) engines++;
+                    if ((d.cost || 0) >= 5) heavy++; // финишеры/тяжесть
+                }
+                let pairs = 0;
+                for (const k in A.AI_COMBOS_BASE) {
+                    const pp = k.split("|");
+                    if (has[pp[0]] && has[pp[1]]) pairs++;
+                }
+                const n = Math.max(1, ids.length);
+                return c.map[side] = {
+                    aggro: 0.5 * cheap / n + 0.3 * rush / n
+                        + 0.2 * Math.min(1, lethal / 15),
+                    ctrl: 0.45 * removal / n + 0.3 * traps / n
+                        + 0.25 * Math.min(1, (heavy + blds) / n * 2),
+                    combo: 0.45 * engines / n + 0.35 * Math.min(1, heavy / n * 2)
+                        + 0.2 * Math.min(1, pairs / 3),
+                };
+            };
+            // Выбор стиля матчапа: противник однозначен (разрыв первых двух
+            // его метрик ≥ styleMargin) — контр-стиль по камню-ножницам-бумаге
+            // (агрессия успевает убить комбу, контроль останавливает и
+            // перемалывает агрессию, комба резко выигрывает у контроля);
+            // неоднозначный матчап — свой сильнейший стиль. "" = гейт выкл.
+            A.aiStyle = function aiStyle() {
+                if (!AI_W.styleOn) return "";
+                let c = B.__stylePick;
+                const ck = B.turnNo + ":" + B.turnSide;
+                if (c && c.key === ck) return c.v;
+                const ORDER = ["aggro", "ctrl", "combo"];
+                const top = (mm) => ORDER.slice().sort((a, b) => mm[b] - mm[a]);
+                const my = __styleCtx("e"), foe = __styleCtx("p");
+                const ft = top(foe);
+                const v = (foe[ft[0]] - foe[ft[1]] >= AI_W.styleMargin)
+                    ? { aggro: "ctrl", ctrl: "combo", combo: "aggro" }[ft[0]]
+                    : top(my)[0];
+                B.__stylePick = { key: ck, v };
+                return v;
+            };
+            // Множитель глобального веса по стилю (Δ при K=1): aggro — атакеры
+            // и урон базе ценнее, энергия тратится, добор дешевеет; ctrl —
+            // своя база и удаление угроз дороже, подставляться хуже; combo —
+            // связки/добор ценнее, энергия копится, план принимается охотнее
+            A.aiStyleMul = function aiStyleMul(key) {
+                if (!AI_W.styleOn) return 1;
+                const st = aiStyle();
+                if (!st) return 1;
+                const d = {
+                    aggro: { vAtk: 0.3, cBase: 0.6, cEnergy: -0.4,
+                        sFrontRow: 0.15, cDraw: -0.2 },
+                    ctrl: { cSelfBase: 0.6, tAtk: 0.35, sFrontRow: -0.35,
+                        cEnergy: 0.2, cBase: -0.2 },
+                    combo: { comboK: 0.6, cDraw: 0.4, cEnergy: 0.25,
+                        treeMargin: -0.3, vAtk: -0.15 },
+                }[st][key];
+                return d ? 1 + AI_W.styleK * d : 1;
             };
             // ── W124 (юзер): синтез «способность героя ↔ карта». Мягкие
             // прибавки к ценности карт, созвучных способности героя кресла
@@ -639,7 +757,9 @@
             A.aiVal = function aiVal(u) {
                 if (!u || !u.def) return 0;
                 const d = u.def;
-                let v = (u.curAtk || 0) * AI_W.vAtk + (u.hp || 0) * AI_W.vHp;
+                let v = (u.curAtk || 0) * AI_W.vAtk
+                    * (u.side === "e" ? aiStyleMul("vAtk") : 1) // W154: стиль — СВОИ атакеры
+                    + (u.hp || 0) * AI_W.vHp;
                 if (d.type === "building") v += AI_W.vBld; // стоит, клетку держит
                 if (d.crush) v += AI_W.vCrush;
                 if (d.thicket) v += AI_W.vThicket;
@@ -737,7 +857,8 @@
             A.aiThreat = function aiThreat(u) {
                 if (!u || !u.def) return 0;
                 const d = u.def;
-                let s = (u.curAtk || 0) * AI_W.tAtk + (u.hp || 0) * AI_W.tHp;
+                let s = (u.curAtk || 0) * AI_W.tAtk * aiStyleMul("tAtk")
+                    + (u.hp || 0) * AI_W.tHp; // W154: ctrl — чужие угрозы приоритетнее
                 if (d.crush) s += AI_W.tCrush;
                 if (d.thicket) s += AI_W.tThicket;
                 if (d.siegeDouble) s += 1.2; // «Тараномобиль»: ×2 постройкам/базе
@@ -819,6 +940,17 @@
                         }
                         if (md < 99) s *= 1 + AI_W.tNearK * (1 - Math.min(md, 6) / 6);
                     }
+                }
+                // W154 (retOn): «Возврат N» — чужое существо уйдёт с поля
+                // после N маршей владельца: атак до ухода ≤ ret × скорость
+                // и не больше шагов до нашей базы (ряд+1 — удар по базе с
+                // края). Чем меньше осталось — тем ниже угроза: добивание
+                // досрочно всё чаще в утиль (урон по уходящему пропадает)
+                if (AI_W.retOn && d.type === "unit" && u.ret > 0) {
+                    const spd = d.speed || 1;
+                    const reach = Math.min(u.ret * spd, (u.row || 0) + 1);
+                    s *= Math.max(0.1, 1 - AI_W.tReturnK
+                        * Math.min(0.8, reach / GRID));
                 }
                 return s;
             };
@@ -1184,7 +1316,8 @@
                 const frontRow = rows[rows.length - 1];
                 const role = aiUnitRole(def);
                 let score = 0;
-                if (row === frontRow) score += AI_W.sFrontRow;
+                if (row === frontRow)
+                    score += AI_W.sFrontRow * aiStyleMul("sFrontRow");
                 if (!B.units.some((o) => o.side === "e" && o.col === col))
                     score += AI_W.sColFree;
                 // затор: свои впереди в той же колонке не дают пройти
@@ -1440,6 +1573,24 @@
                 // но не абсолютный (в забитой зоне призываться надо)
                 if (B.units.some((v) => v.side === "e" && v.def.type === "building"
                     && v.col === col && v.row > row)) score -= 2.2;
+                // W154 (trapAvoidOn): ЧУЖИЕ клеточные ловушки — «?» публична.
+                // Призыв на её клетку триггерит ловушку (мина бьёт, опутывание
+                // глушит, засада зовёт гоблинов); штраф × цена карты — дешёвым
+                // можно «разминироваться» (мина одноразовая), дорогим нет.
+                // «Лудка» на самой клетке безвредна (прямой вход ничего не
+                // делает) — опасна СОСЕДНЯЯ: первый шаг марша/рывка уведут
+                // lureRedirect-ом на неё (урон + шаг впустую)
+                if (AI_W.trapAvoidOn) {
+                    const ft = (B.traps && B.traps.p || []).find((t) => !t.unit
+                        && t.col === col && t.row === row
+                        && t.def.trap.effect !== "lure");
+                    if (ft) score -= AI_W.sTrapCell
+                        * Math.min(1, (def.cost || 1) / 4);
+                    if (AI_W.sTrapLure && (B.traps && B.traps.p || []).some((t) =>
+                        !t.unit && t.def.trap.effect === "lure"
+                        && Math.abs(t.col - col) + Math.abs(t.row - row) === 1))
+                        score -= AI_W.sTrapLure;
+                }
                 return score;
             };
             // Клетка призыва существа ИИ: раньше — передний ряд/колонка без своих,
@@ -1607,6 +1758,16 @@
                 if ((def.campAura || def.groveAura || def.monolith
                     || def.elementalCircle || def.altarSword) && !adjFree.length)
                     score -= 3;
+                // W154 (trapAvoidOn): постройка на чужой клеточной ловушке
+                // тоже триггерит её (мины/нейтральные ловят и строения);
+                // лудка-соседка постройке не страшна — она не марширует
+                if (AI_W.trapAvoidOn) {
+                    const ft = (B.traps && B.traps.p || []).find((t) => !t.unit
+                        && t.col === col && t.row === row
+                        && t.def.trap.effect !== "lure");
+                    if (ft) score -= AI_W.sTrapCell
+                        * Math.min(1, (def.cost || 1) / 4);
+                }
                 return score;
             };
             A.aiBuildingSpot = function aiBuildingSpot(def) {
