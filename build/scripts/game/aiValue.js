@@ -280,7 +280,22 @@
                 // Гейты 0 — прежнее поведение бит-в-бит.
                 trapAvoidOn: 0, sTrapCell: 0, sTrapLure: 0,
                 retOn: 0, tReturnK: 0,
-                styleOn: 0, styleK: 0, styleMargin: 0,
+                styleOn: 0, styleK: 1, styleMargin: 0,
+                // W154b (юзер: «у каждой стратегии — СВОИ настраиваемые
+                // ключи»): дельты aiStyleMul — 15 ключей, пакеты под каждую
+                // стратегию; дефолты = бывшие константы литерала, 0 = точка
+                // выключена. styleK — общая сила слоя: дефолт 1 (полные
+                // пакеты; ноль гасил бы весь слой — мутанты групп-пакетов
+                // без мутации styleK стали бы ноу-опами)
+                styleAggroVAtk: 0.3, styleAggroCBase: 0.6,
+                styleAggroCEnergy: -0.4, styleAggroSFrontRow: 0.15,
+                styleAggroCDraw: -0.2,
+                styleCtrlCSelfBase: 0.6, styleCtrlTAtk: 0.35,
+                styleCtrlSFrontRow: -0.35, styleCtrlCEnergy: 0.2,
+                styleCtrlCBase: -0.2,
+                styleComboComboK: 0.6, styleComboCDraw: 0.4,
+                styleComboCEnergy: 0.25, styleComboTreeMargin: -0.3,
+                styleComboVAtk: -0.15,
             };
             // ── W124 (юзер): пер-геройская адаптация — слой порогов ПОВЕРХ
             // общего вектора. Ключи «heroId.key» → значение; резолвятся в
@@ -538,23 +553,32 @@
                 B.__stylePick = { key: ck, v };
                 return v;
             };
-            // Множитель глобального веса по стилю (Δ при K=1): aggro — атакеры
-            // и урон базе ценнее, энергия тратится, добор дешевеет; ctrl —
-            // своя база и удаление угроз дороже, подставляться хуже; combo —
-            // связки/добор ценнее, энергия копится, план принимается охотнее
+            // Множитель глобального веса по стилю. W154b (юзер: «у каждой
+            // стратегии — СВОИ настраиваемые ключи»): дельты — 15 ключей
+            // AI_W (styleAggro*/styleCtrl*/styleCombo* — пакеты под каждую
+            // стратегию, лига тюнит знак и силу каждой точки; 0 = точка
+            // выключена). Карта «вес → свой ключ» статична: aggro —
+            // атакеры и урон базе ценнее, энергия тратится, добор
+            // дешевеет; ctrl — своя база и удаление угроз дороже,
+            // подставляться хуже; combo — связки/добор ценнее, энергия
+            // копится, план принимается охотнее
+            const STYLE_DKEY = {
+                aggro: { vAtk: "styleAggroVAtk", cBase: "styleAggroCBase",
+                    cEnergy: "styleAggroCEnergy",
+                    sFrontRow: "styleAggroSFrontRow", cDraw: "styleAggroCDraw" },
+                ctrl: { cSelfBase: "styleCtrlCSelfBase", tAtk: "styleCtrlTAtk",
+                    sFrontRow: "styleCtrlSFrontRow", cEnergy: "styleCtrlCEnergy",
+                    cBase: "styleCtrlCBase" },
+                combo: { comboK: "styleComboComboK", cDraw: "styleComboCDraw",
+                    cEnergy: "styleComboCEnergy",
+                    treeMargin: "styleComboTreeMargin", vAtk: "styleComboVAtk" },
+            };
             A.aiStyleMul = function aiStyleMul(key) {
                 if (!AI_W.styleOn) return 1;
                 const st = aiStyle();
                 if (!st) return 1;
-                const d = {
-                    aggro: { vAtk: 0.3, cBase: 0.6, cEnergy: -0.4,
-                        sFrontRow: 0.15, cDraw: -0.2 },
-                    ctrl: { cSelfBase: 0.6, tAtk: 0.35, sFrontRow: -0.35,
-                        cEnergy: 0.2, cBase: -0.2 },
-                    combo: { comboK: 0.6, cDraw: 0.4, cEnergy: 0.25,
-                        treeMargin: -0.3, vAtk: -0.15 },
-                }[st][key];
-                return d ? 1 + AI_W.styleK * d : 1;
+                const dk = STYLE_DKEY[st][key];
+                return dk ? 1 + AI_W.styleK * (AI_W[dk] || 0) : 1;
             };
             // ── W124 (юзер): синтез «способность героя ↔ карта». Мягкие
             // прибавки к ценности карт, созвучных способности героя кресла
