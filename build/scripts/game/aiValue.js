@@ -312,6 +312,62 @@
                 styleVsCtrlCombo: 1, styleVsCtrlOwn: 0,
                 styleVsComboAggro: 1, styleVsComboCtrl: 0,
                 styleVsComboCombo: 0, styleVsComboOwn: 0,
+                // W158 (юзер: «попробуй все три варианта поочерёдно… делай
+                // выводы»): СТИЛЬ КАК ГЕЙТ ПЛАНОВ — последняя живая дорога
+                // стилевой оси. Матрица W157 закрыла слой дельт весов (вред
+                // равномерный по всем ячейкам, ~−1.5 п.п. на полной дозе);
+                // осталась гипотеза, что матчапу нужен не другой ВЕС, а другой
+                // РЕЖИМ: выбранный КНБ ответ (aggro/ctrl/combo) переключает
+                // подсистемы ПОЛИТИКИ — план добора, план энергии, связки,
+                // hold-пороги «играть или держать», темп-добор, дерево
+                // розыгрыша — на per-стильные значения plan<Стиль><Ключ>
+                // (резолюция в Proxy AI_W ниже). Веса оценщика не трогаются
+                // вовсе. stylePlanOn — гейт слоя; дефолты plan-ключей =
+                // глобальные дефолты тех же ключей → слой с дефолтами =
+                // бит-паритет с чемпионом.
+                stylePlanOn: 0,
+                // план добора (enemyDrawPlan)
+                planAggroDrawTo: 2, planCtrlDrawTo: 2, planComboDrawTo: 2,
+                planAggroDrawPlayable: 4, planCtrlDrawPlayable: 4, planComboDrawPlayable: 4,
+                planAggroDrawPlayableMana: 13, planCtrlDrawPlayableMana: 13, planComboDrawPlayableMana: 13,
+                planAggroDrawFullMana: 22, planCtrlDrawFullMana: 22, planComboDrawFullMana: 22,
+                planAggroDrawAllEnergy: 20, planCtrlDrawAllEnergy: 20, planComboDrawAllEnergy: 20,
+                planAggroDrawRampTurn: 2, planCtrlDrawRampTurn: 2, planComboDrawRampTurn: 2,
+                // план энергии (aiEnergyPlan)
+                planAggroPlanOn: 1, planCtrlPlanOn: 1, planComboPlanOn: 1,
+                planAggroPlanMinCost: 5, planCtrlPlanMinCost: 5, planComboPlanMinCost: 5,
+                planAggroPlanComboCost: 2, planCtrlPlanComboCost: 2, planComboPlanComboCost: 2,
+                planAggroPlanHeavyAvg: 2.4, planCtrlPlanHeavyAvg: 2.4, planComboPlanHeavyAvg: 2.4,
+                planAggroPlanFloor: 0, planCtrlPlanFloor: 0, planComboPlanFloor: 0,
+                // связки (aiComboHand/aiTree/aiEnergyPlan)
+                planAggroComboOn: 1, planCtrlComboOn: 1, planComboComboOn: 1,
+                planAggroComboMinW: 0.15, planCtrlComboMinW: 0.15, planComboComboMinW: 0.15,
+                planAggroComboHoldMax: 0, planCtrlComboHoldMax: 0, planComboComboHoldMax: 0,
+                planAggroComboOrderOn: 0, planCtrlComboOrderOn: 0, planComboComboOrderOn: 0,
+                planAggroComboHardOn: 1, planCtrlComboHardOn: 1, planComboComboHardOn: 1,
+                planAggroComboPlanOn: 0, planCtrlComboPlanOn: 0, planComboComboPlanOn: 0,
+                planAggroComboK: 0.5, planCtrlComboK: 0.5, planComboComboK: 0.5,
+                planAggroAuraFirstTurns: 4, planCtrlAuraFirstTurns: 4, planComboAuraFirstTurns: 4,
+                // темп-добор (W148)
+                planAggroTempoDrawOn: 0, planCtrlTempoDrawOn: 0, planComboTempoDrawOn: 0,
+                planAggroTempoDrawK: 0.6, planCtrlTempoDrawK: 0.6, planComboTempoDrawK: 0.6,
+                // hold-пороги «играть или держать» (aiSpellPlayable/aiTarget)
+                planAggroHoldMindThreat: 4, planCtrlHoldMindThreat: 4, planComboHoldMindThreat: 4,
+                planAggroHoldForbiddenHp: 4, planCtrlHoldForbiddenHp: 4, planComboHoldForbiddenHp: 4,
+                planAggroHoldMoonKeep: 2, planCtrlHoldMoonKeep: 2, planComboHoldMoonKeep: 2,
+                planAggroHoldMoonMinE: 1, planCtrlHoldMoonMinE: 1, planComboHoldMoonMinE: 1,
+                planAggroHoldFireballE: 3, planCtrlHoldFireballE: 3, planComboHoldFireballE: 3,
+                planAggroHoldBerserkAtk: 3, planCtrlHoldBerserkAtk: 3, planComboHoldBerserkAtk: 3,
+                planAggroHoldBerserkRow: 3, planCtrlHoldBerserkRow: 3, planComboHoldBerserkRow: 3,
+                planAggroHoldPhoenixBld: 3, planCtrlHoldPhoenixBld: 3, planComboHoldPhoenixBld: 3,
+                planAggroHoldBrainHand: 3, planCtrlHoldBrainHand: 3, planComboHoldBrainHand: 3,
+                planAggroHoldCaptivateCost: 3, planCtrlHoldCaptivateCost: 3, planComboHoldCaptivateCost: 3,
+                planAggroHoldExcavateHp: 2, planCtrlHoldExcavateHp: 2, planComboHoldExcavateHp: 2,
+                // дерево розыгрыша (aiTree)
+                planAggroTreeOn: 1, planCtrlTreeOn: 1, planComboTreeOn: 1,
+                planAggroTreeLen: 4, planCtrlTreeLen: 4, planComboTreeLen: 4,
+                planAggroTreeMinCards: 2, planCtrlTreeMinCards: 2, planComboTreeMinCards: 2,
+                planAggroTreeMargin: 0.362, planCtrlTreeMargin: 0.362, planComboTreeMargin: 0.362,
             };
             // ── W124 (юзер): пер-геройская адаптация — слой порогов ПОВЕРХ
             // общего вектора. Ключи «heroId.key» → значение; резолвятся в
@@ -428,6 +484,31 @@
             // install(override) восстанавливают globalThis сразу после
             // install), и живой глобал (впрыск сима после загрузки страницы)
             const __wOvSnap = Object.assign({}, globalThis.AI_W_OVERRIDE || null);
+            // W158: план-ключи — суффиксы «plan<Стиль><Ключ с заглавной
+            // первой буквой>»; при чтении план-ключа с включённым слоем
+            // (styleOn+stylePlanOn) значение берётся у plan<Стиль><Ключ>
+            // выбранного ответа (см. резолюцию в геттере). Стили — как их
+            // отдаёт aiStyle: строчные
+            const PLAN_KEYS = {
+                drawTo: "DrawTo", drawPlayable: "DrawPlayable",
+                drawPlayableMana: "DrawPlayableMana", drawFullMana: "DrawFullMana",
+                drawAllEnergy: "DrawAllEnergy", drawRampTurn: "DrawRampTurn",
+                planOn: "PlanOn", planMinCost: "PlanMinCost",
+                planComboCost: "PlanComboCost", planHeavyAvg: "PlanHeavyAvg",
+                planFloor: "PlanFloor", comboOn: "ComboOn", comboMinW: "ComboMinW",
+                comboHoldMax: "ComboHoldMax", comboOrderOn: "ComboOrderOn",
+                comboHardOn: "ComboHardOn", comboPlanOn: "ComboPlanOn",
+                comboK: "ComboK", auraFirstTurns: "AuraFirstTurns",
+                tempoDrawOn: "TempoDrawOn", tempoDrawK: "TempoDrawK",
+                holdMindThreat: "HoldMindThreat",
+                holdForbiddenHp: "HoldForbiddenHp", holdMoonKeep: "HoldMoonKeep",
+                holdMoonMinE: "HoldMoonMinE", holdFireballE: "HoldFireballE",
+                holdBerserkAtk: "HoldBerserkAtk", holdBerserkRow: "HoldBerserkRow",
+                holdPhoenixBld: "HoldPhoenixBld", holdBrainHand: "HoldBrainHand",
+                holdCaptivateCost: "HoldCaptivateCost", holdExcavateHp: "HoldExcavateHp",
+                treeOn: "TreeOn", treeLen: "TreeLen", treeMinCards: "TreeMinCards",
+                treeMargin: "TreeMargin",
+            };
             A.AI_W = new Proxy(Object.assign({}, A.AI_W_BASE), {
                 get(t, k) {
                     if (typeof k !== "string") return t[k];
@@ -442,6 +523,35 @@
                             if (hid && (hid + "." + k) in ho) v = ho[hid + "." + k];
                         }
                     } catch (e) { /* B ещё не поднят — только база */ }
+                    // W158 (юзер: «стиль как гейт планов»): выбранный КНБ
+                    // ответ переключает подсистемы ПОЛИТИКИ — план<Стиль><Ключ>
+                    // заменяет глобальное значение plan-ключа; веса оценщика
+                    // не тронуты. Гейт stylePlanOn (0 = слой молчит бит-в-бит);
+                    // дефолты plan-ключей = глобальные → слой с дефолтами
+                    // паритетен. Гейты читаем через ту же резолюцию (овверрайд
+                    // кандидата обязан работать), план-значение — тоже.
+                    if (PLAN_KEYS[k]) {
+                        // aiStyle читает B — вне боя плана нет; гасим в
+                        // глобальное значение (страховка, бои не задето:
+                        // канарейки 180 боёв без чтений вне контекста)
+                        try {
+                            const g = (kk) => {
+                                let x = t[kk];
+                                if (ov && kk in ov) x = ov[kk];
+                                return x;
+                            };
+                            if (g("styleOn") && g("stylePlanOn")) {
+                                const st = aiStyle();
+                                if (st) {
+                                    const pk = "plan" + st[0].toUpperCase()
+                                        + st.slice(1) + PLAN_KEYS[k];
+                                    let pv = t[pk];
+                                    if (ov && pk in ov) pv = ov[pk];
+                                    if (pv !== undefined) v = pv;
+                                }
+                            }
+                        } catch (e) { /* B ещё не поднят — глобальное */ }
+                    }
                     return v;
                 },
                 set(t, k, val) { t[k] = val; return true; },
