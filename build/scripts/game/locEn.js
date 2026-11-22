@@ -37,6 +37,7 @@
             "dungeon.ladderExit": "EXIT",
             "world.title": "Overworld",
             "world.hint": "WASD/arrows — move  ·  click the ground to walk  ·  enter the cave to descend",
+            "world.tower.open": "Watchtower: the area is revealed",
             "world.cave": "Goblin Caves",
             "world.caveGrowth": "Growth Grove",
             "world.caveWisdom": "Underground Keys",

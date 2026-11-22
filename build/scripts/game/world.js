@@ -54,6 +54,10 @@
     // вокруг героя, карта открывается по мере исследования (как в HoMM).
     // Радиус обзора в клетках; открытые клетки запоминаются в забеге.
     const FOG_R = 6;
+    // W182 (юзер): наблюдательная башня — подход ближе 3 клеток к центру
+    // 3×3 открывает вокруг неё карту радиусом ~20 клеток (навсегда)
+    const TOWER_TRIGGER = 3.2; // радиус подхода, клетки
+    const TOWER_REVEAL_R = 20; // радиус открытия обзора, клетки
     // W177 (юзер): «мягкий» туман — скруглённые контуры и размытый край
     // (образец — скрин из HoMM). Силуэт неоткрытых клеток рисуется в
     // canvas в половинном масштабе со скруглениями, край размывается
@@ -556,13 +560,15 @@
             return any;
         }
         // круг обзора вокруг героя + площадки обнаруженных POI; сейв-строка
-        // и перерисовка мини-карты — один раз на пачку открытий
-        function revealFog(gx, gy) {
+        // и перерисовка мини-карты — один раз на пачку открытий.
+        // radius — свой радиус (наблюдательная башня открывает ~20 клеток,
+        // W182); по умолчанию — штатный обзор героя FOG_R
+        function revealFog(gx, gy, radius) {
             const map = G.world.map;
             if (!fogSeen || gx < 0 || gy < 0 || gx >= map.w || gy >= map.h)
                 return false;
             let changed = false;
-            const r = FOG_R, r2 = r * r;
+            const r = radius > 0 ? radius : FOG_R, r2 = r * r;
             for (let y = Math.max(0, gy - r); y <= Math.min(map.h - 1, gy + r); y++) {
                 const dy = y - gy;
                 for (let x = Math.max(0, gx - r); x <= Math.min(map.w - 1, gx + r); x++) {
@@ -747,6 +753,20 @@
             c.zIndex = (y0 + s.h) * TS; // низ footprint — y-sort общий
             return c;
         }
+        // наблюдательная башня (W182, юзер): арт 96×103 ≈ 3×3 клетки,
+        // анкер в низ footprint; подписи нет, вход не нужен — подход
+        // к башне открывает обзор (update -> fogTowerTick)
+        function makeTower(poi) {
+            const c = new PIXI.Container();
+            const s = GEN.KIND_SIZE.tower;
+            const x0 = poi.gx - ((s.w - 1) >> 1), y0 = poi.gy - (s.h - 1);
+            const sp = new PIXI.Sprite(ctx.towerTex);
+            sp.anchor.set(0.5, 1);
+            c.addChild(sp);
+            c.position.set((x0 + s.w / 2) * TS, (y0 + s.h) * TS);
+            c.zIndex = (y0 + s.h) * TS; // низ footprint — y-sort общий
+            return c;
+        }
 
         // отряд-страж (просил юзер): полноценный персонаж мира —
         // спрайтшит существ СВОЕЙ стихии, те же анимации ходьбы и
@@ -758,8 +778,11 @@
             // «Белая пуща» (groHon) ходит рыцарем — «они же рыцари даже
             // по названию» (просил юзер), «Некро-раскопки» (timDec) —
             // некромантом necr_256 (просил юзер W86), «Рыжий лес» (strGro)
-            // остаётся гоблином-разбойником; прочее — гоблин, как прежде
-            const sheet = ctx.heroSheets[s.elem]
+            // остаётся гоблином-разбойником; прочее — гоблин, как прежде.
+            // W182: heroSheets.strength — ПАУЧИЙ НАЕЗДНИК (лист игрока),
+            // отряды стихии Силы ходят обычным goblin из creatureSheets
+            const sheet = s.elem === "strength" ? ctx.creatureSheets.goblin
+                : ctx.heroSheets[s.elem]
                 || ctx.heroSheets[s.elem === "groHon" ? "honor"
                     : s.elem === "timDec" ? "decay" : "strength"];
             const sprite = new PIXI.AnimatedSprite(sheet.animations.walk_front, false);
@@ -1295,13 +1318,16 @@
                 g.fill(col);
             }
             box.addChild(g);
-            // точки интереса: столицы/города — цвет крыши стихии, арки — светлые
+            // точки интереса: столицы/города — цвет крыши стихии, арки — светлые,
+            // наблюдательная башня (W182) — каменный серо-голубой
             const p = new PIXI.Graphics();
             for (const poi of map.pois) {
-                const s = (poi.kind === "capital" ? 6 : 4) * MS;
+                const s = (poi.kind === "capital" ? 6
+                    : poi.kind === "tower" ? 5 : 4) * MS;
                 p.rect(poi.gx * MS - s / 2 + MS / 2, poi.gy * MS - s / 2 + MS / 2, s, s);
                 p.fill(poi.kind === "dungeon" ? 0xffe9b0
-                    : poi.kind === "capital" ? 0xffd76a : ROOF[poi.elem]);
+                    : poi.kind === "capital" ? 0xffd76a
+                    : poi.kind === "tower" ? 0xa8c4d8 : ROOF[poi.elem]);
             }
             box.addChild(p);
             // W176: туман войны на мини-карте — чёрный холст поверх
@@ -1500,8 +1526,11 @@
 
         return {
             enter() {
-                if (ctx.music) ctx.music("menu"); // трек мира (пока общий с меню)
+                if (ctx.music) ctx.music("world"); // своя тема открытого мира (W182)
                 const map = ensureMap();
+                // W182: уже обнаруженные наблюдательные башни (звук и
+                // открытие обзора — один раз на башню за забег)
+                if (!G.world.towers) G.world.towers = {};
                 ensureWander(); // жив/мёртв и позиции отрядов (создать/дописать)
                 // самолечение поручений ратуши (W62, юзер): охота без живого
                 // монстра получает нового (состояние вычищено багом шаблона
@@ -1685,7 +1714,8 @@
                 poiNodes = [];
                 for (const poi of map.pois) {
                     const node = poi.kind === "capital" ? makeCapital(poi)
-                        : poi.kind === "town" ? makeTown(poi) : makeCave(poi);
+                        : poi.kind === "town" ? makeTown(poi)
+                        : poi.kind === "tower" ? makeTower(poi) : makeCave(poi);
                     poiNodes.push({ node, poi, x: node.x, y: node.y });
                     objLayer.addChild(node);
                 }
@@ -2039,6 +2069,28 @@
                             drawFog();
                         }
                     } else if (fogSeen && fogViewStale()) drawFog();
+                }
+                // W182 (юзер): наблюдательная башня — подход ближе ~3 клеток
+                // к её центру ОДИН РАЗ открывает карту радиусом ~20 клеток:
+                // характерный сигнал + надпись, факт — в G.world.towers
+                // (переживает перезапуск, повторно башня молчит)
+                if (fogSeen && G.world.towers && G.world.map) {
+                    for (const p of G.world.map.pois) {
+                        if (p.kind !== "tower") continue;
+                        const key = p.gx + ":" + p.gy;
+                        if (G.world.towers[key]) continue;
+                        // центр футпринта 3×3 (якорь — нижняя средняя клетка)
+                        const cx = (p.gx + 0.5) * TS, cy = (p.gy - 0.5) * TS;
+                        if (Math.hypot(cx - hx, cy - hy) > TS * TOWER_TRIGGER)
+                            continue;
+                        G.world.towers[key] = 1;
+                        revealFog(p.gx, p.gy - 1, TOWER_REVEAL_R);
+                        drawFog();
+                        if (ctx.sfx) ctx.sfx("lvlUp"); // сигнал дозорной башни
+                        floatText(GAME_LOC.t("world.tower.open"), cx, cy,
+                            0xcfe0ea);
+                        break;
+                    }
                 }
                 if (ctx.footstep) ctx.footstep(hx, hy); // шаги героя (W34)
                 // (W49) остывание входа в город после выхода — убывающий
@@ -2569,6 +2621,9 @@
                         zoom: camera.cam.zoom,
                         roundPixels: !!ctx.app.renderer.roundPixels, // рябь-фикс
                         heroScale: heroSprite ? heroSprite.scale.x : null,
+                        // W182 (тесты): каким листом ходит герой
+                        // («strength» = паучий наездник арта юзера)
+                        heroSheet: sheetNameOf(ctx.heroSheet),
                         seed: G.world.seed,
                         pois: map ? map.pois.length : 0,
                         speed: heroId !== null ? COMPONENTS.ctrlSpeed[heroId] : null,
@@ -2625,6 +2680,10 @@
                     path = null; // телепорт гасит маршрут клика
                     return true;
                 },
+                // W182 (тесты): герой рисуется ЭТИМ листом creatureSheets?
+                // heroSheetIs("goblin_spider") — паучий наездник у игрока Силы
+                heroSheetIs: (key) => !!(ctx.creatureSheets[key] && ctx.heroSheet
+                    && ctx.creatureSheets[key] === ctx.heroSheet),
                 // W176 (тесты): состояние тумана войны — сколько клеток
                 // открыто, строка сейва, покрытие последней отрисовки,
                 // радиус обзора и холст мини-карты
@@ -2652,6 +2711,14 @@
                         },
                         saved: typeof G.world.fog === "string"
                             ? G.world.fog.length : 0,
+                        // W182 (тесты): башни карты и уже сработавшие
+                        towers: (G.world.map ? G.world.map.pois : [])
+                            .filter((p) => p.kind === "tower")
+                            .map((p) => ({ gx: p.gx, gy: p.gy,
+                                done: !!(G.world.towers
+                                    && G.world.towers[p.gx + ":" + p.gy]) })),
+                        towerRadius: TOWER_REVEAL_R,
+                        towerTrigger: TOWER_TRIGGER,
                         at: (x, y) => !!(fogSeen && G.world.map && x >= 0 && y >= 0
                             && x < G.world.map.w && y < G.world.map.h
                             && fogSeen[y * G.world.map.w + x]),

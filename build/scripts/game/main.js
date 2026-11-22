@@ -176,6 +176,8 @@
                 `./images/tiles/montain/${n}.png`));
         // пещера подземелий: images/tiles/cave.png — 192×136 ≈ 6×4 клетки
         const caveTex = await assets.loadTexture("./images/tiles/cave.png");
+        // наблюдательная башня мира (арт юзера, W182): 96×103 ≈ 3×3 клетки
+        const towerTex = await assets.loadTexture("./images/objects/watchTower.png");
         // города мира: images/sities/<стихия>/{0,1}.png — спрайты юзера
         // (0.png — столица 192×160, 1.png — обычный город 192×128);
         // стихии — ключи ELEM_LOGO (тот же канонический список)
@@ -245,13 +247,15 @@
         say("спрайты…");
         await frame();
         // Герой — лист по стихии забега (выбор при «Новой игре»): Рост —
-        // эльф, Сила — гоблин. Сетка у обоих 256×256, 4 строки ходьбы по
+        // эльф, Сила — гоблин-паучий наездник (арт юзера W182: игрок
+        // стихии Сила ходит goblin_spider, обычный goblin остался
+        // существам поля боя). Сетка у всех 256×256, 4 строки ходьбы по
         // 6 кадров. wait/attack в листах нет — контроллер персонажа в покое
         // замирает в стоп-кадре ходьбы (штатный сценарий play() без строки).
         // Спрайт рисуется в 0.25: фигура ~195px в кадре — те же ~49px роста,
         // что было у рыцаря, и честный пиксельный даунскейл 4→1.
         const heroSheets = {
-            strength: await assets.loadCharacter("./images/sprites/goblin_256"),
+            strength: await assets.loadCharacter("./images/sprites/goblin_spider_256"),
             growth: await assets.loadCharacter("./images/sprites/elf_256"),
             wisdom: await assets.loadCharacter("./images/sprites/sorca_256"), // Мира
             decay: await assets.loadCharacter("./images/sprites/necr_256"), // Мортис
@@ -266,7 +270,12 @@
         // (SPRITE_SCALE арены): медведь ×1.1, древоброд ×1.3, росянка ×0.8
         // (просил юзер).
         const creatureSheets = {
-            goblin: heroSheets.strength,
+            // обычные гоблины — СВОЙ лист (W182): heroSheets.strength теперь
+            // паучий наездник и существам стихии не подходит
+            goblin: await assets.loadCharacter("./images/sprites/goblin_256"),
+            // «Паучий наездник» (str16) — паучий гоблин юзера (W182),
+            // карта указывает лист полем sheet
+            goblin_spider: heroSheets.strength,
             elf: heroSheets.growth,
             wisdom: heroSheets.wisdom, // существа Мудрости — сорка (плейсхолдер)
             necr: heroSheets.decay, // существа Тлена — некр (пока один лист, просил юзер)
@@ -378,10 +387,13 @@
             die: 0.9, crash: 1.0, mine: 0.9, acid: 0.9, rocket: 0.85,
             aqua: 0.8, coins: 0.9, lvlUp: 1.0, enter: 0.9, alert: 0.9,
         };
+        // Музыка сцен (W182, юзер): своя тема у меню, боя, подземелья и
+        // открытого мира (раньше мир делил трек с меню)
         const MUSIC_FILES = {
-            menu: "CoinCreek.mp3",
-            dungeon: "Hearthside Tankard R1.mp3",
-            battle: "Dungeon Run.mp3",
+            menu: "The Quest for the Golden Horn.mp3",
+            dungeon: "The Shadow's Gambit.mp3",
+            battle: "The Charge of the Vanguard.mp3",
+            world: "Whispers of the Enchanted Wood.mp3",
         };
         for (const [name, file] of Object.entries(SFX_FILES)) {
             audio.registerFile(name, "./sound/" + encodeURI(file));
@@ -598,6 +610,9 @@
                     seed: (Math.random() * 0x7fffffff) | 0,
                     fog: null, // W176: туман войны — новый забег с чистого листа
                     heroPos: null, out: false, wander: null, wildLevel: {},
+                    // W182: уже обнаруженные наблюдательные башни (звук и
+                    // открытие обзора — один раз на башню)
+                    towers: {},
                     // стихия, под которую выбрана точка появления: смена
                     // героя («Герои») переносит его в зону новой стихии
                     startElem: h.elems[0],
@@ -672,6 +687,9 @@
                     // (компактная строка рядов), переживает перезапуск
                     worldFog: typeof this.world.fog === "string"
                         ? this.world.fog : null,
+                    // W182: обнаруженные наблюдательные башни (ключ «gx:gy»)
+                    worldTowers: this.world.towers
+                        ? JSON.parse(JSON.stringify(this.world.towers)) : null,
                     quests: this.quests ? {
                         active: this.quests.active,
                         done: { ...(this.quests.done || {}) },
@@ -821,9 +839,10 @@
             moatsCityTex, // мосты городов moats_64.png (64px, 1:1)
             mountainTex, // спрайты гор images/tiles/montain (слой объектов)
             caveTex,     // спрайт пещеры подземелий images/tiles/cave.png
+            towerTex,    // наблюдательная башня images/objects/watchTower.png
             cityTex,     // спрайты городов мира images/sities/<стихия>/{0,1}
             sfx: gameSfx,   // ctx.sfx() — клик UI (step); ctx.sfx("chpoc") — событие
-            music: gameMusic, // музыка сцены: "menu" | "dungeon" | "battle"
+            music: gameMusic, // музыка сцены: "menu" | "world" | "dungeon" | "battle"
             footstep: footstepTick, // шаги героя: сцены тикают позицией героя
             heroHover,        // ctx.heroHover(держатель, спрайт, bigX, bigY)
             applySavedRun,    // подъём забега из сейва — меню «Продолжить» (W64)
@@ -914,6 +933,9 @@
                 // W176: открытые клетки тумана войны (нет в старом сейве —
                 // мир откроется заново вокруг героя)
                 fog: typeof r.worldFog === "string" ? r.worldFog : null,
+                // W182: обнаруженные башни (нет в старом сейве — башни
+                // сработают заново при подходе)
+                towers: r.worldTowers || null,
                 heroPos: r.worldPos || null,
                 out: !!r.worldOut,
                 // W60: вход КАКОГО данжа ждать при out (сейв хранит)

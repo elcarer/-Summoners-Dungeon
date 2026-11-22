@@ -39,6 +39,7 @@
             "dungeon.ladderExit": "ВЫХОД",
             "world.title": "Открытый мир",
             "world.hint": "WASD/стрелки — движение  ·  клик по земле — идти  ·  вход в пещеру — подземелье",
+            "world.tower.open": "Дозорная башня: обзор окрестностей",
             "world.cave": "Гоблинские пещеры",
             "world.caveGrowth": "Роща Роста",
             "world.caveWisdom": "Подземные ключи",

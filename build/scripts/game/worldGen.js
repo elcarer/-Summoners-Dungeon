@@ -67,8 +67,10 @@
     };
     // габариты зданий в клетках (просил юзер): город 5×3, столица 5×4;
     // (gx,gy) POI — якорь-площадь: у города нижняя средняя клетка,
-    // у столицы — центральная. Данж — 6×4 под спрайт пещеры (просил юзер)
-    const KIND_SIZE = { town: { w: 5, h: 3 }, capital: { w: 5, h: 4 }, dungeon: { w: 6, h: 4 } };
+    // у столицы — центральная. Данж — 6×4 под спрайт пещеры (просил юзер);
+    // наблюдательная башня (W182, юзер) — 3×3 под спрайт 96×103
+    const KIND_SIZE = { town: { w: 5, h: 3 }, capital: { w: 5, h: 4 },
+        dungeon: { w: 6, h: 4 }, tower: { w: 3, h: 3 } };
     // минимальная дистанция между якорями POI зоны (просил юзер ×2 к
     // редкости на карте вдвое больше: было 15 на карте 192×128)
     const MIN_POI_DIST = 30;
@@ -730,10 +732,30 @@
                     zonePois.push({ kind: "town", elem: c.elem, gx: x, gy: y });
                 } else if (++tries > 2200) { minD -= 0.5; tries = 0; }
             }
-            // стены зданий вокруг площадей (сами площади свободны)
+            // наблюдательная башня (W182, юзер): ОДНА на зону стихии,
+            // 3×3, примерно в центре области — у столицы, но не в её
+            // футпринте (отступ от якорей POI 9 клеток, затем 6/4).
+            // Подход к башне открывает карту радиусом ~20 клеток
+            // (world.js), дорог к ней не ведём — сеть только для
+            // городов/данжей. Ставится ПОСЛЕ городов, чтобы счётчик
+            // `2 + want` не сбился (2 = столица + данж)
+            {
+                const towerPred = (dmin) => (x, y) =>
+                    placePred("tower", k)(x, y)
+                    && zonePois.every((p) =>
+                        Math.hypot(p.gx - x, p.gy - y) >= dmin);
+                const twr = spiral(zonePois[0].gx, zonePois[0].gy, towerPred(9), 26)
+                    || spiral(zonePois[0].gx, zonePois[0].gy, towerPred(6), 30)
+                    || spiral(zonePois[0].gx, zonePois[0].gy, towerPred(4), 36);
+                if (twr)
+                    zonePois.push({ kind: "tower", elem: c.elem,
+                        gx: twr.x, gy: twr.y });
+            }
+            // стены зданий вокруг площадей (сами площади свободны);
+            // башня непроходима ЦЕЛИКОМ, включая якорь (входов нет)
             for (const p of zonePois) {
                 for (const [fx, fy, isAnchor] of footCells(p.kind, p.gx, p.gy)) {
-                    if (!isAnchor) blocked[fy * W + fx] = 1;
+                    if (!isAnchor || p.kind === "tower") blocked[fy * W + fx] = 1;
                 }
                 markPoiMask(p.kind, p.gx, p.gy); // прудам нельзя (и кольцо)
                 pois.push(p);
@@ -1133,12 +1155,13 @@
             // «Магодром» (wisTim) — дорогой остова МУДРОСТИ (первая
             // стихия сочетания). W82: «Некро-раскопки» (timDec) — остова
             // ВРЕМЕНИ
-            const nodes = pois.filter((p) => p.elem === ELEMS[k]
+            const nodes = pois.filter((p) => p.kind !== "tower"
+                && (p.elem === ELEMS[k]
                 || (p.cave === "sgr" && ELEMS[k] === "strength")
                 || (p.cave === "gh" && ELEMS[k] === "growth")
                 || (p.cave === "hw" && ELEMS[k] === "honor")
                 || (p.cave === "wt" && ELEMS[k] === "wisdom")
-                || (p.cave === "nec" && ELEMS[k] === "time"));
+                || (p.cave === "nec" && ELEMS[k] === "time")));
             const inTree = [0];
             const rest = nodes.map((_, i) => i).slice(1);
             while (rest.length) { // остов Прима по евклиду
@@ -1171,8 +1194,8 @@
         }
         for (const [z1, z2] of ZONE_ADJ) { // межзонные тракты
             let bp = null, bd = Infinity;
-            for (const p of pois) if (p.elem === ELEMS[z1])
-                for (const q of pois) if (q.elem === ELEMS[z2]) {
+            for (const p of pois) if (p.kind !== "tower" && p.elem === ELEMS[z1])
+                for (const q of pois) if (q.kind !== "tower" && q.elem === ELEMS[z2]) {
                     const d = Math.hypot(p.gx - q.gx, p.gy - q.gy);
                     if (d < bd) { bd = d; bp = [p, q]; }
                 }
@@ -1332,6 +1355,7 @@
             if (p.kind === "capital") p.name = GAME_LOC.t(`world.capital.${p.elem}`);
             else if (p.kind === "dungeon")
                 p.name = GAME_LOC.t(ELEM_CAVE_LABEL[p.elem]);
+            else if (p.kind === "tower") continue; // башне имя не нужно
             else {
                 const pre = GAME_LOC.arr(`world.townPre.${p.elem}`);
                 const suf = GAME_LOC.arr(`world.townSuf.${p.elem}`);

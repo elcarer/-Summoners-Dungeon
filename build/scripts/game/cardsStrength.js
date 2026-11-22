@@ -71,6 +71,10 @@
                  color: 0x9c4a3a, img: "strength/15" },
         str16: { type: "unit", cost: 4, atk: 5, hp: 5, speed: 1,
                  creature: "goblin",
+                 // W182 (юзер): «Паучий наездник» ходит листом goblin_spider
+                 // (герой Силы — тоже он); подтип/creature остаются goblin
+                 // (синергии племени считают creature)
+                 sheet: "goblin_spider",
                  subtype: "goblin", // подтип — по спеке юзера (cards.txt)
                  rarity: "common", elem: "strength",
                  color: 0x9c4a3a, img: "strength/16" },
