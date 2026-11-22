@@ -596,6 +596,7 @@
                 // генерация детерминирована им (worldGen.js)
                 this.world = {
                     seed: (Math.random() * 0x7fffffff) | 0,
+                    fog: null, // W176: туман войны — новый забег с чистого листа
                     heroPos: null, out: false, wander: null, wildLevel: {},
                     // стихия, под которую выбрана точка появления: смена
                     // героя («Герои») переносит его в зону новой стихии
@@ -667,6 +668,10 @@
                     // глобальная карта: сейв хранит только сид — карта
                     // регенерируется детерминированно (worldGen.js)
                     worldSeed: this.world.seed,
+                    // W176 (юзер): туман войны — открытые клетки мира
+                    // (компактная строка рядов), переживает перезапуск
+                    worldFog: typeof this.world.fog === "string"
+                        ? this.world.fog : null,
                     quests: this.quests ? {
                         active: this.quests.active,
                         done: { ...(this.quests.done || {}) },
@@ -906,6 +911,9 @@
             // (детерминированная генерация — worldGen.js)
             G.world = {
                 seed: r.worldSeed,
+                // W176: открытые клетки тумана войны (нет в старом сейве —
+                // мир откроется заново вокруг героя)
+                fog: typeof r.worldFog === "string" ? r.worldFog : null,
                 heroPos: r.worldPos || null,
                 out: !!r.worldOut,
                 // W60: вход КАКОГО данжа ждать при out (сейв хранит)

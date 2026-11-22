@@ -743,7 +743,7 @@
             "enc.wtDarkKing.title": "Dark King",
             "hero.wtDarkKing.ability": "Whenever your creature enters the battlefield, it deals 1 damage to itself and 2 damage to a random enemy (creature, building or the opposing base)",
             "enc.wtArtMage.title": "Artificial Mage",
-            "hero.wtArtMage.ability": "When playing a card from hand, cancel its effect and play another random card from hand (energy for that card is spent, for the other one it is not)",
+            "hero.wtArtMage.ability": "When playing the first card from hand each turn, cancel its effect and play another random card from hand (energy for that card is spent, for the other one it is not)",
             // W82 (спека юзера): карты «Некро-раскопок» (Время+Тлен) и
             // враги 1–2-го этажей
             "card.nec281.name": "Necro Gnome",

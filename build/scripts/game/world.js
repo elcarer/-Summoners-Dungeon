@@ -50,6 +50,10 @@
     // Вид — БЕЗ зума (просил юзер): спрайты тайлов в натуральную
     // величину, зум портил и пикселизировал графику; камера ×1
     const TS = 32;
+    // W176 (юзер): «Туман войны» — старт с малым кусочком видимости
+    // вокруг героя, карта открывается по мере исследования (как в HoMM).
+    // Радиус обзора в клетках; открытые клетки запоминаются в забеге.
+    const FOG_R = 6;
     const HERO_SPEED = 136; // 4.25 кл/с — прежний темп в клетках
     const ROAD_SPEED = HERO_SPEED * 1.2; // по дорогам/мостам ×1.2 (просил юзер)
     // бродячие отряды (просил юзер): скорость 0.9 от героевой; агро —
@@ -97,6 +101,15 @@
         let mtnCount = 0; // спрайтов гор построено (тесты)
         let uiHud = null;
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
+        // W176: туман войны — Uint8Array открытых клеток (1 = открыта),
+        // чёрный Graphics над миром, холст тумана на мини-карте и
+        // последняя клетка героя, на которой раскрывали обзор
+        let fogSeen = null;
+        let fogG = null;
+        let fogCell = "";
+        let fogMini = null; // { ctx, tex, MS, dirty } — холст мини-карты
+        let fogStats = null; // последний drawFog (тесты: полосы/окно)
+        let fogWin = null; // прямоугольник последнего покрытия (клетки)
         // W60: во время первой половины «прожига» (кольцо сжимается над
         // миром до смены сцены) герой стоит и триггеры городов/пещер молчат
         let worldLock = false;
@@ -461,6 +474,155 @@
                     && pn.y > ry0 - 256 && pn.y < ry1 + 320;
         }
 
+        // ── ТУМАН ВОЙНЫ (W176, юзер; образец — HoMM) ────────────────────
+        // G.world.fog — компактная строка развёрнутых рядов «row,x0,x1;…»
+        // (забег переживает перезапуск); в памяти — bitmap карты.
+        // Открытые клетки запоминаются навсегда: исследованное не темнеет.
+        function fogDecode(map) {
+            const arr = new Uint8Array(map.w * map.h);
+            const s = G.world.fog;
+            if (typeof s === "string" && s) {
+                for (const seg of s.split(";")) {
+                    const p = seg.split(",");
+                    const r = +p[0], a = +p[1], b = +p[2];
+                    if (!Number.isFinite(r) || !Number.isFinite(a)
+                        || !Number.isFinite(b)) continue;
+                    if (r < 0 || r >= map.h) continue;
+                    const x0 = Math.max(0, Math.min(a, b));
+                    const x1 = Math.min(map.w - 1, Math.max(a, b));
+                    for (let x = x0; x <= x1; x++) arr[r * map.w + x] = 1;
+                }
+            }
+            return arr;
+        }
+        function fogEncode() {
+            const map = G.world.map;
+            const w = map.w, h = map.h;
+            const parts = [];
+            for (let y = 0; y < h; y++) {
+                let x = 0;
+                while (x < w) {
+                    if (!fogSeen[y * w + x]) { x++; continue; }
+                    let x1 = x;
+                    while (x1 + 1 < w && fogSeen[y * w + x1 + 1]) x1++;
+                    parts.push(y + "," + x + "," + x1);
+                    x = x1 + 1;
+                }
+            }
+            return parts.join(";");
+        }
+        // открытие клетки: bitmap + дырка в чёрном холсте мини-карты
+        function setFogCell(x, y) {
+            const map = G.world.map;
+            if (!fogSeen || x < 0 || y < 0 || x >= map.w || y >= map.h) return false;
+            const i = y * map.w + x;
+            if (fogSeen[i]) return false;
+            fogSeen[i] = 1;
+            if (fogMini) {
+                fogMini.ctx.clearRect(x * fogMini.MS, y * fogMini.MS,
+                    fogMini.MS, fogMini.MS);
+                fogMini.dirty = true;
+            }
+            return true;
+        }
+        // площадка POI (город/столица/арка) — 5×3/5×4/6×4 клетки: как только
+        // открыта ЛЮБАЯ её клетка, показываем весь объект целиком (иначе
+        // чёрный туман резал бы спрайт города по краю обзора)
+        function revealPoiFootprints() {
+            const map = G.world.map;
+            let any = false;
+            for (const poi of map.pois) {
+                const f = GEN.KIND_SIZE[poi.kind] || { w: 1, h: 1 };
+                const fx0 = poi.gx - 1, fy0 = poi.gy - 1;
+                const fx1 = poi.gx + f.w, fy1 = poi.gy + f.h;
+                let hit = false;
+                for (let y = Math.max(0, fy0); y <= Math.min(map.h - 1, fy1) && !hit; y++)
+                    for (let x = Math.max(0, fx0); x <= Math.min(map.w - 1, fx1); x++)
+                        if (fogSeen[y * map.w + x]) { hit = true; break; }
+                if (!hit) continue;
+                for (let y = Math.max(0, fy0); y <= Math.min(map.h - 1, fy1); y++)
+                    for (let x = Math.max(0, fx0); x <= Math.min(map.w - 1, fx1); x++)
+                        if (setFogCell(x, y)) any = true;
+            }
+            return any;
+        }
+        // круг обзора вокруг героя + площадки обнаруженных POI; сейв-строка
+        // и перерисовка мини-карты — один раз на пачку открытий
+        function revealFog(gx, gy) {
+            const map = G.world.map;
+            if (!fogSeen || gx < 0 || gy < 0 || gx >= map.w || gy >= map.h)
+                return false;
+            let changed = false;
+            const r = FOG_R, r2 = r * r;
+            for (let y = Math.max(0, gy - r); y <= Math.min(map.h - 1, gy + r); y++) {
+                const dy = y - gy;
+                for (let x = Math.max(0, gx - r); x <= Math.min(map.w - 1, gx + r); x++) {
+                    const dx = x - gx;
+                    if (dx * dx + dy * dy > r2) continue;
+                    if (setFogCell(x, y)) changed = true;
+                }
+            }
+            if (revealPoiFootprints()) changed = true;
+            if (changed) G.world.fog = fogEncode();
+            if (fogMini && fogMini.dirty) {
+                fogMini.tex.source.update();
+                fogMini.dirty = false;
+            }
+            return changed;
+        }
+        // чёрное покрытие мира: прямоугольники только по НЕоткрытым клеткам
+        // окна экрана (запас 8 клеток), ряды сливаются в полосы. Слой —
+        // выше всех объектов мира (деревья/города/отряды/герой), ниже
+        // всплывающих надписей и HUD
+        function drawFog() {
+            if (!fogG || !fogSeen || !G.world.map) return;
+            const map = G.world.map;
+            const [rx0, ry0, rx1, ry1] = visibleRect();
+            const pad = TS * 8;
+            const x0 = Math.max(0, Math.floor((rx0 - pad) / TS));
+            const y0 = Math.max(0, Math.floor((ry0 - pad) / TS));
+            const x1 = Math.min(map.w - 1, Math.ceil((rx1 + pad) / TS));
+            const y1 = Math.min(map.h - 1, Math.ceil((ry1 + pad) / TS));
+            fogG.clear();
+            let runs = 0;
+            for (let y = y0; y <= y1; y++) {
+                const base = y * map.w;
+                let run = -1;
+                for (let x = x0; x <= x1; x++) {
+                    const dark = !fogSeen[base + x];
+                    if (dark && run < 0) run = x;
+                    if ((!dark || x === x1) && run >= 0) {
+                        const end = dark ? x : x - 1;
+                        fogG.rect(run * TS, y * TS, (end - run + 1) * TS, TS);
+                        runs++;
+                        run = -1;
+                    }
+                }
+            }
+            if (runs) fogG.fill({ color: 0x05070b });
+            fogWin = { x0, y0, x1, y1 };
+            fogStats = { runs, x0, y0, x1, y1 };
+        }
+        // камера уехала за пределы прошлого покрытия? (телепорт/долгий
+        // глид камеры: клетка героя не меняется, а экран уезжает)
+        function fogViewStale() {
+            if (!fogWin) return true;
+            const [rx0, ry0, rx1, ry1] = visibleRect();
+            return Math.floor(rx0 / TS) < fogWin.x0 + 1
+                || Math.floor(ry0 / TS) < fogWin.y0 + 1
+                || Math.ceil(rx1 / TS) > fogWin.x1 - 1
+                || Math.ceil(ry1 / TS) > fogWin.y1 - 1;
+        }
+        // инициализация на входе в мир: bitmap из сейва + обзор вокруг героя
+        function fogInit(map, hp) {
+            fogSeen = fogDecode(map);
+            fogCell = "";
+            fogMini = null;
+            const gx = Math.floor(hp.x / TS), gy = Math.floor(hp.y / TS);
+            revealFog(gx, gy); // внутри пишет G.world.fog при открытиях
+            fogCell = gx + ":" + gy;
+        }
+
         // рамка всей карты — один Graphics на всё (не чанкируется)
         function buildMapFrame(map) {
             const g = new PIXI.Graphics();
@@ -807,6 +969,14 @@
             // ловилось только на нижней части спрайта
             let best = null, bd = 1e9;
             for (const s of squads) {
+                // W176: отряд в неоткрытой клетке тумана не подсказывается
+                // (иначе курсор выдавал бы врага сквозь чёрное покрытие)
+                if (fogSeen) {
+                    const map = G.world.map;
+                    const sgx = Math.floor(s.st.x / TS), sgy = Math.floor(s.st.y / TS);
+                    if (!map || sgx < 0 || sgy < 0 || sgx >= map.w || sgy >= map.h
+                        || !fogSeen[sgy * map.w + sgx]) continue;
+                }
                 const hw = Math.max(30, s.sprite.width / 2);
                 if (Math.abs(p.x - s.st.x) > hw) continue;
                 const top = s.st.y - s.sprite.height - 8;
@@ -1076,6 +1246,26 @@
                     : poi.kind === "capital" ? 0xffd76a : ROOF[poi.elem]);
             }
             box.addChild(p);
+            // W176: туман войны на мини-карте — чёрный холст поверх
+            // рельефа/POI, открытые клетки прозрачны (чистятся по мере
+            // исследования; обновление текстуры — в revealFog). Маркер
+            // героя — выше тумана.
+            const fcv = document.createElement("canvas");
+            fcv.width = MW; fcv.height = MH;
+            const fctx = fcv.getContext("2d");
+            fctx.fillStyle = "#05070b";
+            fctx.fillRect(0, 0, MW, MH);
+            if (fogSeen) {
+                for (let y = 0; y < map.h; y++)
+                    for (let x = 0; x < map.w; x++)
+                        if (fogSeen[y * map.w + x])
+                            fctx.clearRect(x * MS, y * MS, MS, MS);
+            }
+            const ftex = PIXI.Texture.from(fcv);
+            const fspr = new PIXI.Sprite(ftex);
+            fspr.eventMode = "none";
+            box.addChild(fspr);
+            fogMini = { ctx: fctx, tex: ftex, MS, dirty: false };
             // маркер героя — белый пульсирующий кружок
             const dot = new PIXI.Graphics();
             dot.circle(0, 0, 3.5 * MS);
@@ -1091,7 +1281,10 @@
         function setMiniMode(m) {
             if (!uiHud || !uiHud.userData.mini) return;
             miniMode = m;
+            const oldFogTex = fogMini ? fogMini.tex : null;
+            fogMini = null;
             uiHud.userData.mini.box.destroy({ children: true });
+            if (oldFogTex) oldFogTex.destroy(true);
             const mini = buildMinimap(m);
             uiHud.addChild(mini.box); // поверх прочего HUD, как при входе
             uiHud.userData.mini = mini;
@@ -1334,6 +1527,9 @@
                     }
                 }
                 G.world.heroPos = { ...hp };
+                // W176 (юзер): туман войны — поднять открытые клетки забега,
+                // раскрыть окрестности героя (до сборки слоёв/мини-карты)
+                fogInit(map, hp);
 
                 // (W46, юзер) поражение/побег в открытом мире: 2с ненападения
                 // С МОМЕНТА ВОЗВРАТА в мир. finish() (arenaFlow) ставит 3с,
@@ -1419,6 +1615,12 @@
                 fxLayer = new PIXI.Container();
                 fxLayer.zIndex = -90;
                 layer.addChild(fxLayer);
+                // W176: чёрное покрытие неоткрытых клеток — над ВСЕМИ
+                // объектами мира (деревья/города/отряды/герой), под
+                // всплывающими надписями (fxLayer) и HUD
+                fogG = new PIXI.Graphics();
+                fogG.zIndex = -92;
+                layer.addChild(fogG);
                 poiNodes = [];
                 for (const poi of map.pois) {
                     const node = poi.kind === "capital" ? makeCapital(poi)
@@ -1664,6 +1866,7 @@
                 camera.update({ deltaMS: 16.7 });
                 updateChunks();
                 updatePoiVisibility();
+                drawFog(); // W176: покрыть неоткрытые клетки экрана
                 uiHud = buildHud();
                 ctx.ui.addChild(uiHud);
                 // W94 (юзер): новая игра входит под играющим «прожигом» —
@@ -1750,11 +1953,28 @@
                 floaties = [];
                 if (layer) { layer.destroy({ children: true }); layer = null; }
                 if (uiHud) { uiHud.destroy({ children: true }); uiHud = null; }
+                // W176: ссылки тумана сгоревшего слоя не держим
+                fogSeen = null; fogG = null; fogMini = null;
+                fogStats = null; fogCell = ""; fogWin = null;
                 worldContainer.visible = false;
             },
             update(ticker) {
                 if (heroId === null || !uiHud) return;
                 const hx = COMPONENTS.positionX[heroId], hy = COMPONENTS.positionY[heroId];
+                // W176: туман войны — новая клетка героя открывает круг
+                // обзора и перерисовывает покрытие (покрытие зависит от
+                // камеры — обновляем и при возврате по старым клеткам)
+                {
+                    const gx = Math.floor(hx / TS), gy = Math.floor(hy / TS);
+                    const key = gx + ":" + gy;
+                    if (key !== fogCell) {
+                        fogCell = key;
+                        if (fogSeen) {
+                            revealFog(gx, gy);
+                            drawFog();
+                        }
+                    } else if (fogSeen && fogViewStale()) drawFog();
+                }
                 if (ctx.footstep) ctx.footstep(hx, hy); // шаги героя (W34)
                 // (W49) остывание входа в город после выхода — убывающий
                 // счётчик МС (тиком здесь), НЕ метка performance.now():
@@ -2339,6 +2559,26 @@
                     COMPONENTS.positionY[heroId] = y;
                     path = null; // телепорт гасит маршрут клика
                     return true;
+                },
+                // W176 (тесты): состояние тумана войны — сколько клеток
+                // открыто, строка сейва, покрытие последней отрисовки,
+                // радиус обзора и холст мини-карты
+                fog: () => {
+                    let seen = 0;
+                    if (fogSeen) for (let i = 0; i < fogSeen.length; i++) seen += fogSeen[i];
+                    return {
+                        seen,
+                        total: G.world.map ? G.world.map.w * G.world.map.h : 0,
+                        radius: FOG_R,
+                        cell: fogCell,
+                        stats: fogStats,
+                        mini: !!fogMini,
+                        saved: typeof G.world.fog === "string"
+                            ? G.world.fog.length : 0,
+                        at: (x, y) => !!(fogSeen && G.world.map && x >= 0 && y >= 0
+                            && x < G.world.map.w && y < G.world.map.h
+                            && fogSeen[y * G.world.map.w + x]),
+                    };
                 },
                 enterCave: (cave) => enterCave(cave),
                 // вход в город: без аргумента — «свой» стартовый (тесты W30),
