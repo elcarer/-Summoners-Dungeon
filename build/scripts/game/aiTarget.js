@@ -361,6 +361,38 @@
                         v.side === "p" && Math.abs(v.col - c2) + Math.abs(v.row - r2) === 1));
                     pool = near.length ? near : spots;
                 } else pool = spots;
+                // W175: «Переговоры» (hon192) — на СВОЁМ upkeep оба теряют
+                // ВСЮ руку и энергию. Играем только при явно выгодном
+                // размене: у противника больше карт/энергии, чем останется
+                // у нас после оплаты (рука и энергия соперника публичны —
+                // состав его руки ИИ по-прежнему не видит).
+                if (def.trap.effect === "grandParley") {
+                    const ownHand = Math.max(0, B.eHand.length - 1);
+                    const ownE = Math.max(0, B.eEnergy - effCost(cardIdOf(def), "e"));
+                    const ownVal = ownHand * AI_W.parleyHandK
+                        + ownE * AI_W.parleyEnergyK;
+                    const foeVal = B.hand.length * AI_W.parleyHandK
+                        + B.energy * AI_W.parleyEnergyK;
+                    if (ownVal > foeVal - AI_W.parleySlack) return null;
+                }
+                // W175: «Котлы со смолой» (hon191) — 4 урона ВСЕМ существам
+                // в ряду у НАШЕЙ базы (свои тоже страдают). Ставим только на
+                // путь марша игрока и только если свой ряд не дороже чужого;
+                // пустой свой ряд — безопасная постановка (ловушка ждёт).
+                if (def.trap.effect === "tarKettles") {
+                    if (!front.length) return null;
+                    const dmg = (def.trap.amount || 4) + altarBonus("e");
+                    let ownLoss = 0, foeGain = 0;
+                    for (const v of B.units) {
+                        if (v.row !== 0 || !effCreature(v)) continue;
+                        const k = v.hp <= dmg ? 1
+                            : 0.4 * (dmg / Math.max(1, v.hp));
+                        if (v.side === "p") foeGain += aiThreat(v) * k;
+                        else ownLoss += aiOwnValue(v) * AI_W.kettlesOwnK * k;
+                    }
+                    if (ownLoss > 0 && ownLoss >= foeGain) return null;
+                    pool = front.slice();
+                }
                 // «Путь грибов»/«Опутывание корней» — на клетку следующего шага
                 // СИЛЬНЕЙШЕГО существа игрока (лучший бегун теряет марш).
                 if ((def.trap.effect === "confuse" || def.trap.effect === "entangle")
@@ -726,6 +758,25 @@
                 // огнешар при энергии 1..2 почти пуст (урон 0..1) — копим дальше
                 // W144: порог стал ключом holdFireballE
                 if (s.drainAll && B.eEnergy < AI_W.holdFireballE) return false;
+                // W175 (юзер: «Огнешар тратит всю энергию на одну цель»):
+                // слив энергии оправдан только ДОБИВАНИЕМ, чья угроза
+                // окупает переплату (overkill × fireballOverK). Без цели
+                // карта сжигала бы всю энергию впустую — держим. Купол
+                // (dome) режет урон до 1 — такую цель не берём.
+                if (s.drainAll) {
+                    const targets = aiDmgTargets(def);
+                    let worth = false;
+                    for (const v of targets) {
+                        if (v.dome) continue;
+                        const dmg = aiDmgFor(def, v, false, false);
+                        if (dmg < v.hp) continue; // не добивает — только сожжёт ⚡
+                        const over = dmg - v.hp; // лишний урон = потерянная энергия
+                        const val = aiThreat(v) + (v.def.type === "building"
+                            ? aiDangerBld(v.def) * AI_W.tDangerBld : 0);
+                        if (val >= over * AI_W.fireballOverK) { worth = true; break; }
+                    }
+                    if (!worth) return false;
+                }
                 // «Гроза»: после оплаты цены должен остаться хотя бы 1⚡ удара
                 // и хоть одна цель у игрока (иначе энергия сгорит впустую)
                 if (s.stormAll && (B.eEnergy - effCost(cardIdOf(def), "e") < 1
