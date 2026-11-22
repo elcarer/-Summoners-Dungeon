@@ -54,6 +54,14 @@
     // вокруг героя, карта открывается по мере исследования (как в HoMM).
     // Радиус обзора в клетках; открытые клетки запоминаются в забеге.
     const FOG_R = 6;
+    // W177 (юзер): «мягкий» туман — скруглённые контуры и размытый край
+    // (образец — скрин из HoMM). Силуэт неоткрытых клеток рисуется в
+    // canvas в половинном масштабе со скруглениями, край размывается
+    // один раз на перерисовку (не каждый кадр), текстура — на спрайте.
+    const FOG_S = 0.5; // масштаб рабочего холста (мир × 0.5)
+    const FOG_ROUND = 11; // радиус скругления полос-клеток, мир px
+    const FOG_BLUR = 3.5; // размытие края на холсте (= 7 мир px)
+    const FOG_INK = "#05070b"; // цвет заливки тумана
     const HERO_SPEED = 136; // 4.25 кл/с — прежний темп в клетках
     const ROAD_SPEED = HERO_SPEED * 1.2; // по дорогам/мостам ×1.2 (просил юзер)
     // бродячие отряды (просил юзер): скорость 0.9 от героевой; агро —
@@ -102,10 +110,11 @@
         let uiHud = null;
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
         // W176: туман войны — Uint8Array открытых клеток (1 = открыта),
-        // чёрный Graphics над миром, холст тумана на мини-карте и
+        // чёрное покрытие над миром, холст тумана на мини-карте и
         // последняя клетка героя, на которой раскрывали обзор
         let fogSeen = null;
-        let fogG = null;
+        let fogG = null; // спрайт мягкого покрытия (W177)
+        let fogSoft = null; // { acv, actx, bcv, bctx, cw, ch, tex } — холсты
         let fogCell = "";
         let fogMini = null; // { ctx, tex, MS, dirty } — холст мини-карты
         let fogStats = null; // последний drawFog (тесты: полосы/окно)
@@ -570,7 +579,32 @@
             }
             return changed;
         }
-        // чёрное покрытие мира: прямоугольники только по НЕоткрытым клеткам
+        // «Мягкое» покрытие мира (W177): силуэт неоткрытых клеток окна
+        // (запас 8 клеток) рисуется полосами со скруглениями в canvas
+        // половинного масштаба, край один раз размывается вторым холстом
+        // и показывается спрайтом. Перерисовка — только при смене клетки
+        // героя/уезде камеры, на кадре фильтров нет.
+        function fogSoftCanvas(cw, ch) {
+            if (fogSoft && fogSoft.cw === cw && fogSoft.ch === ch) return fogSoft;
+            const mk = () => {
+                const cv = document.createElement("canvas");
+                cv.width = cw;
+                cv.height = ch;
+                return { cv, ctx: cv.getContext("2d") };
+            };
+            const a = mk(), b = mk();
+            const tex = PIXI.Texture.from(b.cv);
+            tex.source.scaleMode = "linear"; // мягкий край без «лесенки»
+            const old = fogSoft ? fogSoft.tex : null;
+            fogSoft = { acv: a.cv, actx: a.ctx, bcv: b.cv, bctx: b.ctx,
+                cw, ch, tex };
+            if (fogG) {
+                fogG.texture = tex;
+                if (old) old.destroy(true); // прежняя текстура (ресайз/зум)
+            }
+            return fogSoft;
+        }
+        // покрытие мира: прямоугольники только по НЕоткрытым клеткам
         // окна экрана (запас 8 клеток), ряды сливаются в полосы. Слой —
         // выше всех объектов мира (деревья/города/отряды/герой), ниже
         // всплывающих надписей и HUD
@@ -583,7 +617,18 @@
             const y0 = Math.max(0, Math.floor((ry0 - pad) / TS));
             const x1 = Math.min(map.w - 1, Math.ceil((rx1 + pad) / TS));
             const y1 = Math.min(map.h - 1, Math.ceil((ry1 + pad) / TS));
-            fogG.clear();
+            const cw = Math.max(1, Math.ceil((x1 - x0 + 1) * TS * FOG_S));
+            const ch = Math.max(1, Math.ceil((y1 - y0 + 1) * TS * FOG_S));
+            const soft = fogSoftCanvas(cw, ch);
+            // 1) силуэт: полосы неоткрытых клеток со скруглёнными углами;
+            //    соседние полосы — один путь, внутренних стыков не видно
+            const actx = soft.actx;
+            actx.setTransform(1, 0, 0, 1, 0, 0);
+            actx.clearRect(0, 0, cw, ch);
+            actx.setTransform(FOG_S, 0, 0, FOG_S,
+                -x0 * TS * FOG_S, -y0 * TS * FOG_S);
+            actx.fillStyle = FOG_INK;
+            actx.beginPath();
             let runs = 0;
             for (let y = y0; y <= y1; y++) {
                 const base = y * map.w;
@@ -593,15 +638,28 @@
                     if (dark && run < 0) run = x;
                     if ((!dark || x === x1) && run >= 0) {
                         const end = dark ? x : x - 1;
-                        fogG.rect(run * TS, y * TS, (end - run + 1) * TS, TS);
+                        actx.roundRect(run * TS, y * TS,
+                            (end - run + 1) * TS, TS, FOG_ROUND);
                         runs++;
                         run = -1;
                     }
                 }
             }
-            if (runs) fogG.fill({ color: 0x05070b });
+            if (runs) actx.fill();
+            // 2) край: один гауссов фильтр по всему холсту — чёрное ядро
+            //    уходит в прозрачность полосой ~14 мир px (как в HoMM);
+            //    запас 8 клеток по краям прячет срез размытия за экраном
+            const bctx = soft.bctx;
+            bctx.setTransform(1, 0, 0, 1, 0, 0);
+            bctx.clearRect(0, 0, cw, ch);
+            bctx.filter = "blur(" + FOG_BLUR + "px)";
+            bctx.drawImage(soft.acv, 0, 0);
+            bctx.filter = "none";
+            soft.tex.source.update();
+            fogG.position.set(x0 * TS, y0 * TS);
+            fogG.scale.set(1 / FOG_S);
             fogWin = { x0, y0, x1, y1 };
-            fogStats = { runs, x0, y0, x1, y1 };
+            fogStats = { runs, x0, y0, x1, y1, soft: 1 };
         }
         // камера уехала за пределы прошлого покрытия? (телепорт/долгий
         // глид камеры: клетка героя не меняется, а экран уезжает)
@@ -1615,11 +1673,14 @@
                 fxLayer = new PIXI.Container();
                 fxLayer.zIndex = -90;
                 layer.addChild(fxLayer);
-                // W176: чёрное покрытие неоткрытых клеток — над ВСЕМИ
-                // объектами мира (деревья/города/отряды/герой), под
-                // всплывающими надписями (fxLayer) и HUD
-                fogG = new PIXI.Graphics();
+                // W176: покрытие неоткрытых клеток — над ВСЕМИ объектами
+                // мира (деревья/города/отряды/герой), под всплывающими
+                // надписями (fxLayer) и HUD. W177: спрайт «мягкого»
+                // тумана (скругления + размытый край), текстуру ставит
+                // drawFog; клики не перехватывает
+                fogG = new PIXI.Sprite();
                 fogG.zIndex = -92;
+                fogG.eventMode = "none";
                 layer.addChild(fogG);
                 poiNodes = [];
                 for (const poi of map.pois) {
@@ -1953,8 +2014,12 @@
                 floaties = [];
                 if (layer) { layer.destroy({ children: true }); layer = null; }
                 if (uiHud) { uiHud.destroy({ children: true }); uiHud = null; }
-                // W176: ссылки тумана сгоревшего слоя не держим
-                fogSeen = null; fogG = null; fogMini = null;
+                // W176/W177: ссылки тумана сгоревшего слоя не держим;
+                // текстуры (мягкое покрытие и холст мини-карты) — в утиль,
+                // destroy слоя их не трогает
+                if (fogSoft && fogSoft.tex) fogSoft.tex.destroy(true);
+                if (fogMini && fogMini.tex) fogMini.tex.destroy(true);
+                fogSeen = null; fogG = null; fogSoft = null; fogMini = null;
                 fogStats = null; fogCell = ""; fogWin = null;
                 worldContainer.visible = false;
             },
@@ -2573,12 +2638,39 @@
                         cell: fogCell,
                         stats: fogStats,
                         mini: !!fogMini,
+                        // W177 (тесты): «мягкое» покрытие — размеры холста,
+                        // размытие/скругление и проба альфы в точке мира
+                        soft: fogSoft ? { w: fogSoft.cw, h: fogSoft.ch,
+                            blur: FOG_BLUR, round: FOG_ROUND, scale: FOG_S } : null,
+                        alphaAt: (wx, wy) => {
+                            if (!fogSoft || !fogWin) return -1;
+                            const px = Math.floor((wx - fogWin.x0 * TS) * FOG_S);
+                            const py = Math.floor((wy - fogWin.y0 * TS) * FOG_S);
+                            if (px < 0 || py < 0 || px >= fogSoft.cw
+                                || py >= fogSoft.ch) return -1;
+                            return fogSoft.bctx.getImageData(px, py, 1, 1).data[3];
+                        },
                         saved: typeof G.world.fog === "string"
                             ? G.world.fog.length : 0,
                         at: (x, y) => !!(fogSeen && G.world.map && x >= 0 && y >= 0
                             && x < G.world.map.w && y < G.world.map.h
                             && fogSeen[y * G.world.map.w + x]),
                     };
+                },
+                // W177 (тесты): сколько пикселей холста в полупрозрачной
+                // полосе края (0 < a < 250) — доказательство размытия,
+                // а не жёсткой кромки
+                fogSoftStats: () => {
+                    if (!fogSoft) return null;
+                    const d = fogSoft.bctx.getImageData(0, 0,
+                        fogSoft.cw, fogSoft.ch).data;
+                    let mid = 0, solid = 0;
+                    for (let i = 3; i < d.length; i += 4) {
+                        const a = d[i];
+                        if (a > 250) solid++;
+                        else if (a > 4) mid++;
+                    }
+                    return { mid, solid, w: fogSoft.cw, h: fogSoft.ch };
                 },
                 enterCave: (cave) => enterCave(cave),
                 // вход в город: без аргумента — «свой» стартовый (тесты W30),
