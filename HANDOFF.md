@@ -69,6 +69,19 @@ DECK_MAX/DECK_COPIES, пресеты стартовых, кривая цены) 
 
 ## Текущее состояние
 
+- W184 (2026-11-23) — 14 правок ядер колод (распоряжение юзера): 11
+  ослаблений (sgrBurn/grwBoss/dstrGate/necSoulRiver/dstrMaster/sgrPack/
+  honRebels/necBiothreat/wisBreeze/grwControl/gobMaster) + 3 усиления
+  (hwMagebonds/necMutant/dstrPit) в `dataEncounters.js`; снятие ровно
+  указанного числа копий, остатки х2/х3 сохранены. Лига 10×RR на НОВЫХ
+  сидах 20261127–36 (45 560 боёв, errs 0; сравнение с W181 непарное,
+  Уэлч z; фон сидов +1.18): ослабления сработали у grwBoss (2→24),
+  wisBreeze (11→47), gobMaster (14→27), dstrGate (3→15), sgrPack (5→12),
+  sgrBurn (−4.3, но №1); НЕ сработали у necBiothreat/grwControl; усиления:
+  hwMagebonds 53→31, necMutant 55→42, dstrPit 57→50. №1 — «Горящая
+  местность» (77.5%); разрыв мета 52.4→45.7 п.п. Сверки w184_verify/
+  w184_check.mjs, сравнение w184_league_cmp.mjs, агрегат
+  league_avg_w184.json; бэкап W181 — league_rr10_w181/.
 - W183 (2026-11-23) — подписи названий на крупной мини-карте (поправка
   юзера): в режиме M у точек открытых подземелий/городов/столиц — их имена
   (Kereru 13, обводка; столицы золотым), башни без имён; слой живёт над
