@@ -583,7 +583,35 @@
                 fogMini.tex.source.update();
                 fogMini.dirty = false;
             }
+            // подписи крупной мини-карты: POI, открывшиеся в этой пачке
+            if (fogMini && fogMini.names) addMiniNames(fogMini.names);
             return changed;
+        }
+        // W183: догоняет слой подписей крупной мини-карты — POI без имени
+        // в слое, чья клетка уже открыта, получает текст рядом с точкой
+        // (справа, у правого края — слева). Вызывается из buildMinimap
+        // (вся карта сразу) и из revealFog (новые открытия).
+        function addMiniNames(names) {
+            const map = G.world.map, MS = fogMini.MS;
+            for (const poi of map.pois) {
+                if (poi.kind === "tower" || !poi.name) continue;
+                if (names.shown.has(poi)) continue;
+                if (!fogSeen[poi.gy * map.w + poi.gx]) continue;
+                names.shown.add(poi);
+                const t = new PIXI.Text({ text: poi.name, style: {
+                    fontFamily: "Kereru", fontSize: 13,
+                    fill: poi.kind === "capital" ? 0xffd76a : 0xf0e6c8,
+                    stroke: { color: 0x1c1207, width: 3 } } });
+                t.eventMode = "none";
+                const px = poi.gx * MS + MS / 2,
+                    py = poi.gy * MS + MS / 2,
+                    s = (poi.kind === "capital" ? 6 : 4) * MS / 2;
+                if (px > map.w * MS - 78) { // у правого края — влево от точки
+                    t.anchor.set(1, 0.5);
+                    t.position.set(px - s - 2, py);
+                } else t.position.set(px + s + 2, py);
+                names.cont.addChild(t);
+            }
         }
         // «Мягкое» покрытие мира (W177): силуэт неоткрытых клеток окна
         // (запас 8 клеток) рисуется полосами со скруглениями в canvas
@@ -1350,6 +1378,16 @@
             fspr.eventMode = "none";
             box.addChild(fspr);
             fogMini = { ctx: fctx, tex: ftex, MS, dirty: false };
+            // W183: в крупном режиме у точек — подписи названий уже
+            // открытых (без тумана) подземелий, городов и столиц; новые
+            // открытия дополняют слой в revealFog. Башне имя не нужно
+            // (worldGen), в обычном режиме подписей нет — точки мельче.
+            if (scale === 2 && fogSeen) {
+                const names = { cont: new PIXI.Container(), shown: new Set() };
+                box.addChild(names.cont);
+                fogMini.names = names;
+                addMiniNames(names);
+            }
             // маркер героя — белый пульсирующий кружок
             const dot = new PIXI.Graphics();
             dot.circle(0, 0, 3.5 * MS);
@@ -2697,6 +2735,11 @@
                         cell: fogCell,
                         stats: fogStats,
                         mini: !!fogMini,
+                        // W183 (тесты): подписи крупной мини-карты —
+                        // сколько POI уже показано с именем (null в обычном
+                        // режиме и вне мира)
+                        miniNames: fogMini && fogMini.names
+                            ? fogMini.names.shown.size : null,
                         // W177 (тесты): «мягкое» покрытие — размеры холста,
                         // размытие/скругление и проба альфы в точке мира
                         soft: fogSoft ? { w: fogSoft.cw, h: fogSoft.ch,
