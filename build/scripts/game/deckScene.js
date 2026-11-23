@@ -278,6 +278,7 @@
         // ── ряд чипов фильтров строится в rebuildChips ────────────────────
 
         function rebuildPanes() {
+            if (!root) return; // вне редактора перерисовывать нечего (смоук звал setFilter из меню)
             hideZoom(true); // контент панелей пересобран — старый зум неактуален
             if (leftPane) {
                 const c = buildDeckList();

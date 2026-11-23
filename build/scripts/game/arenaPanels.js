@@ -229,7 +229,7 @@
                 const rest = grimTop.filter((id) => CARDS[id].type !== type);
                 if (taken.length) B.hand.push(...taken);
                 if (rest.length) B.discard.push(...rest);
-                noteDiscard(rest.length, "p", rest); // «Болотная слизь»: пачка в сброс
+                noteDiscard(rest.length, "p", rest, "discard"); // «Болотная слизь»: пачка в сброс
                 sfx("acid");
                 grimStage = "show";
                 layoutHand();

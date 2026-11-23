@@ -62,6 +62,7 @@
             energy: snap.eEnergy,
             hand: snap.eHand.length,
             back: snap.rows.length - 1, // зона призыва «e»: ряды 0..back
+            altarB: snap.altarB || 0, // «Алтарь огня»: бонус живёт в модели
         });
         const mAt = (m, c, r) => m.units.find((u) => u.col === c && u.row === r) || null;
         // урон существу модели: смерть убирает, «Снизошедший» выживает с 1♥
@@ -151,9 +152,16 @@
         // Возвращает true, если хоть что-то смоделировано (иначе ценность
         // карты уходит в статическую часть acc.static). snap — снимок полухода
         // (нужен resurrect: лучшее существо ИЗ СВОЕГО СБРОСА на момент плана).
-        const applyCard = (m, c, acc, st, altarB, snap) => {
+        const applyCard = (m, c, acc, st, _altarB, snap) => {
             const def = c.def;
             const s = def.spell || {};
+            // «Алтарь огня» (spellAura): постройка из ЭТОГО ЖЕ плана усиливает
+            // заклинания позже плана — бонус ведём в модели. Раньше он был
+            // заморожен на старте хода: дерево не видело летальную связку
+            // «алтарь → дротик» и стреляло дротиком по базе, ломая порядок
+            // «алтарь до урона» (просил юзер)
+            if (def.type === "building" && def.spellAura) m.altarB += def.spellAura;
+            const altarB = m.altarB;
             let modeled = false;
             if (def.type === "unit" || def.type === "building") {
                 // «Сдвиг» — придёт позже, сейчас поле не занимает
@@ -358,6 +366,7 @@
                     const m2 = {
                         units: m.units.map(cloneU), pBase: m.pBase, eBase: m.eBase,
                         energy: m.energy - cost, hand: m.hand - 1, back: m.back,
+                        altarB: m.altarB,
                     };
                     const acc2 = { static: acc.static, drew: acc.drew };
                     applyCard(m2, c, acc2, st, snap.altarB, snap);

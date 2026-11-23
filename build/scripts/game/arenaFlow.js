@@ -855,6 +855,19 @@
                     }
                     if (victory) {
                         if (G.activeEnemy) {
+                            // «Продолжить» со снапшотом боя (W140) входит
+                            // напрямую в арену, и activeEnemy — КОПИЯ из сейва,
+                            // не живой враг этажа: снятие копии оставляло врага
+                            // на карте (баг смоука W185). Переводим стрелку на
+                            // живого врага подземелья того же вида на том месте
+                            const foe = G.activeEnemy;
+                            if (!foe.wander && G.dungeon && Array.isArray(G.dungeon.enemies)) {
+                                const live = G.dungeon.enemies.find((e) => e.alive
+                                    && e.enc === foe.enc
+                                    && Math.abs((e.x || 0) - (foe.x || 0)) < 1
+                                    && Math.abs((e.y || 0) - (foe.y || 0)) < 1);
+                                if (live) G.activeEnemy = live;
+                            }
                             G.activeEnemy.alive = false;
                             // бродячий отряд открытого мира: побеждён —
                             // снят с карты навсегда (состояние — в сейве)
