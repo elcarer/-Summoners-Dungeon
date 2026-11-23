@@ -50,6 +50,10 @@
                 // пока не кончился разгон энергии
                 drawRampTurn: 2,     // полуходы < — только разгон (добор до drawTo) (W142: 4 → 2)
                 drawPlayableMana: 19, // «до 4 разыгрываемых» — только при мане след. хода ≥ (0 = всегда)
+                // W181: сдвиг порога «большого банка» (W103: энергии хватает
+                // на две самые дорогие карты → дорогие идут раньше групп).
+                // 0 = прежнее условие; <0 — флип раньше, >0 — позже.
+                bigBankSlack: 0,
                 // W148 (бэклог исследования ИИ 2026-11-15, юзер: «делай»):
                 // (а) замена мёртвой карты по ГЕЙТАМ, не только по цене —
                 // заклинание с закрытым гейтом (aiSpellPlayable=false:
@@ -136,6 +140,31 @@
                 sSupportBack: 2.022, sGap: 5, sDashKill: 2.522,
                 sKillThreatK: 0.341, sNearKill: 4.527, sCowardAhead: 2.5,
                 sMarkBlock: 3.63,
+                // W181 (волна «найти ИИ-чемпиона»): зашитые константы
+                // решений ИИ вынесены в тюнинг. Ось контакта В БАЗЕ — значения
+                // чемпиона #11 j2_kill23@g217 (W181): base −1, loss 0, gate 2,
+                // kill 2.274; остальные ключи — прежние литералы.
+                // Контактный размен при призыве (aiSpotScore):
+                sContactBaseK: -1,   // × база «бой в упор» (стена 0.5 / прочие 0.15)
+                sContactIncomingK: 0.22, // × min(4, атака врага) — «тело/задержка»
+                sTradeLossK: 0,     // × aiThreat(ahead)*0.18 — цена будущей потери
+                sTradeCostGate: 2,  // дорогая карта (cost ≥) в смертельный контакт: штраф
+                sBehindBldPen: 2.2, // призыв за собственной постройкой (застрянет)
+                // Условные бонусы контакта (W181 batch3 — та же ось, что уже
+                // дала сигнал: безусловный бонус снят, условные тюним):
+                sContactSurvK: 1,   // × «новичок выживет» (стена 0.6 / прочие 0.2)
+                sContactWallK: 1,   // × плоский бонус роли «стена» в контакте (0.8)
+                sContactKillK: 2.274,   // × «убьём в ответ» (стена 1.6 / прочие 1.0)
+                sContactChipK: 1,   // × недобитие в контакте (0.2·min(atk,hp))
+                // Реакция на врага у нашей базы (aiSpotScore):
+                sDefendThreatK: 0.12, // × aiThreat(near), ряд ≤2 — защита колонки
+                sDefendRowK: 0.5,   // × (3 − ряд) — ближе к базе опаснее
+                // Стрелок позади своего (W105): штраф за выстрел «в своих»
+                sArcherOwnPen: 2.6,
+                // Выбор цели заклинаний/баффов (aiTarget):
+                tgtPosK: 0.35,      // × (GRID−1−ряд) — ближе к нашей базе опаснее
+                tgtOverKillK: 0.15, // × перерасход урона при добивании
+                buffRowK: 0.2,      // × ряд цели баффа (фронт ценнее)
                 // дерево розыгрыша (W114, юзер — «этап 2: деревья решений
                 // для связок»): перебор порядков/подмножеств играбельных карт
                 // на модели поля (aiTree.js), план действует, если явно лучше
@@ -1558,7 +1587,7 @@
                     // W105 (юзер): позади своего существа/постройки не
                     // ставим — выстрел бьёт ПЕРВОГО на линии, своим
                     // «стрелять в своих же» дороже свободной клетки
-                    if (t && t.side === "e") score -= 2.6;
+                    if (t && t.side === "e") score -= AI_W.sArcherOwnPen;
                     else if (t && t.side === "p") score += 0.8; // есть куда стрелять
                     else if (!t) score += 0.5; // колонка пуста — выстрел в базу
                     // W105 (юзер): стрелок — ближе к своей базе: дольше
@@ -1675,18 +1704,18 @@
                     const incoming = ahead.def.type === "unit" ? ahead.curAtk : 0;
                     const survives = (def.hp || 0) > incoming;
                     if (incoming) {
-                        score += (role === "wall" ? 0.5 : 0.15)
-                            + Math.min(4, incoming) * 0.22; // тело/задержка
-                        score += Math.min(2.2, aiThreat(ahead) * 0.18);
-                        if (survives) score += role === "wall" ? 0.6 : 0.2;
-                        else if ((def.cost || 0) >= 4) score -= 1.2; // дорогого зря теряем
-                        if (role === "wall") score += 0.8;
+                        score += (role === "wall" ? 0.5 : 0.15) * AI_W.sContactBaseK
+                            + Math.min(4, incoming) * AI_W.sContactIncomingK; // тело/задержка
+                        score += Math.min(2.2, aiThreat(ahead) * 0.18 * AI_W.sTradeLossK);
+                        if (survives) score += (role === "wall" ? 0.6 : 0.2) * AI_W.sContactSurvK;
+                        else if ((def.cost || 0) >= AI_W.sTradeCostGate) score -= 1.2; // дорогого зря теряем
+                        if (role === "wall") score += 0.8 * AI_W.sContactWallK;
                     }
                     if (survives && ahead.def.type === "unit" && atk >= ahead.hp) {
-                        score += (role === "wall" ? 1.6 : 1.0)
+                        score += (role === "wall" ? 1.6 : 1.0) * AI_W.sContactKillK
                             + aiThreat(ahead) * AI_W.sKillThreatK; // убьём в ответ
                     } else if (survives && atk > 0) {
-                        score += 0.2 * Math.min(atk, ahead.hp);
+                        score += 0.2 * Math.min(atk, ahead.hp) * AI_W.sContactChipK;
                     }
                     if (ahead.def.type === "building") { // строения не бьют в ответ
                         // W104 (юзер): опасная постройка врага — ломать связку
@@ -1704,8 +1733,8 @@
                 const near = B.units.filter((v) => v.side === "p" && v.col === col)
                     .sort((a, b) => a.row - b.row)[0];
                 if (near) {
-                    if (near.row <= 2) score += (3 - near.row) * 0.5
-                        + Math.min(1.5, aiThreat(near) * 0.12);
+                    if (near.row <= 2) score += (3 - near.row) * AI_W.sDefendRowK
+                        + Math.min(1.5, aiThreat(near) * AI_W.sDefendThreatK);
                     if (near.row - 1 === row) score += 0.6; // прямо на его пути
                 }
                 // «Сдвиг» (Время, просил юзер): метки «Сдвига» — чужие
@@ -1759,7 +1788,7 @@
                 // застрянет за ней до её смерти: марш прямой. Вес заметный,
                 // но не абсолютный (в забитой зоне призываться надо)
                 if (B.units.some((v) => v.side === "e" && v.def.type === "building"
-                    && v.col === col && v.row > row)) score -= 2.2;
+                    && v.col === col && v.row > row)) score -= AI_W.sBehindBldPen;
                 // W154 (trapAvoidOn): ЧУЖИЕ клеточные ловушки — «?» публична.
                 // Призыв на её клетку триггерит ловушку (мина бьёт, опутывание
                 // глушит, засада зовёт гоблинов); штраф × цена карты — дешёвым

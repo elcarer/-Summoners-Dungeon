@@ -132,7 +132,7 @@
                         && att.def.type === "unit" ? att.curAtk : 0;
                     if (incoming && v.hp <= incoming
                         && !(s.buffHp && v.hp + s.buffHp > incoming)) continue;
-                    const rowBonus = v.row * 0.2;
+                    const rowBonus = v.row * AI_W.buffRowK;
                     let score = 0;
                     if (s.buffAtk) {
                         score = (v.curAtk + s.buffAtk) * 1.25 + v.hp * 0.35
@@ -222,12 +222,12 @@
                 for (const v of targets) {
                     const dmg = aiDmgFor(def, v, free, false);
                     if (dmg <= 0) continue;
-                    const pos = (GRID - 1 - v.row) * 0.35; // ближе к нашей базе — опаснее
+                    const pos = (GRID - 1 - v.row) * AI_W.tgtPosK; // ближе к нашей базе — опаснее
                     const dg = v.def.type === "building" ? aiDangerBld(v.def) : 0;
                     let score;
                     if (v.hp <= dmg) { // добивание — единственная причина бить существо
                         score = 14 + aiThreat(v) * 1.1 + pos + dg * 4
-                            - Math.max(0, dmg - v.hp) * 0.15;
+                            - Math.max(0, dmg - v.hp) * AI_W.tgtOverKillK;
                     } else if (baseOk || !dg) {
                         continue; // нелетально по существу — никогда
                     } else { // нелетально по опасной постройке (дротик без базы)
