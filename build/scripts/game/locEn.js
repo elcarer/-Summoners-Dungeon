@@ -122,7 +122,7 @@
             // battle log (W194): HUD button and the played-cards overlay
             "arena.logBtn": "Log",
             "arena.logTitle": "Battle log",
-            "arena.logHint": "Who played each card and at what target",
+            "arena.logHint": "Who played each card, who attacked whom, which traps sprang",
             "arena.logTurn": "Turn",
             "arena.logYou": "You",
             "arena.logFoe": "Enemy",
@@ -130,6 +130,9 @@
             "arena.logOwn": "own",
             "arena.logEnemy": "enemy",
             "arena.logEmpty": "No cards played yet",
+            "arena.logAtk": "attack",
+            "arena.logTrap": "trap",
+            "arena.logBase": "the base",
             "type.unit": "Creature",
             "type.building": "Building",
             "type.spell": "Spell",

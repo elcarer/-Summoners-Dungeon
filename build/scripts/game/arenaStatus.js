@@ -93,6 +93,8 @@
                 A.spellCasting = false;
                 try {
                     const hpBefore = victim.hp;
+                    logPlay(attacker.side, cardIdOf(attacker.def), // W195: журнал — «Ледяной удар»
+                        { u: victim }, "attack");
                     damageUnit(victim, attacker.curAtk, attacker, "sword");
                     crushHit(attacker, attacker.curAtk, hpBefore); // «Сокрушение»
                     thicketSplash(attacker, victim); // «Древоброд глухой чащи»: всплеск вокруг себя

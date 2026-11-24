@@ -358,6 +358,8 @@
             // Запутанное бьёт СВОЮ базу (зеркало baseHit: та же геометрия/цвета,
             // но минус стороне владельца) — база «мешает пройти»
             A.ownBaseHit = function ownBaseHit(u) {
+                logPlay(u.side, cardIdOf(u.def), // W195: журнал — удар по своей базе
+                    { base: true, side: u.side }, "attack");
                 sfx("crash");
                 procEnchantFire(u);
                 procSpores(u, u.curAtk); // споры: удар по базе — тоже нанесение урона
@@ -394,6 +396,8 @@
                 if (occ) { // любой на пути — «как будто вражеский»
                     const p = cellXY(u.col, u.row);
                     floatText(p.x, p.y - 60, "⚔", 0xb07ad5);
+                    logPlay(u.side, cardIdOf(u.def), // W195: журнал — удар запутанного
+                        { u: occ }, "attack");
                     damageUnit(occ, u.curAtk, u, "sword");
                     frostAttack(u, occ); // «Снежный элементаль»: −1⚔ цели
                     frostNeighbors(u); // «Старший ледовик»: лёд соседям-существам
@@ -463,6 +467,8 @@
             // берсерк дублируют этот список) — вынесено для «Крепости»,
             // чья жертва может стоять сбоку, а не прямо на пути
             A.attackMarchTarget = function attackMarchTarget(u, occ) {
+                logPlay(u.side, cardIdOf(u.def), // W195: журнал — атака
+                    { u: occ }, "attack");
                 const hpBefore = occ.hp;
                 damageUnit(occ, u.curAtk, u, "sword");
                 crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
@@ -517,6 +523,8 @@
                         const ahead = u.row + dir;
                         const occ = ahead >= 0 && ahead < GRID ? unitAt(u.col, ahead) : null;
                         if (occ && occ.side !== u.side) {
+                            logPlay(u.side, cardIdOf(u.def), // W195: журнал — атака опутанного
+                                { u: occ }, "attack");
                             const hpBefore = occ.hp;
                             damageUnit(occ, u.curAtk, u, "sword");
                             crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
@@ -567,6 +575,9 @@
                             setWalk(u, true);
                             await delay(0.5 / animK());
                             if (B.stopped || !B.units.includes(u)) break;
+                            logPlay(side, cardIdOf(u.def), // W195: журнал — выпад в базу
+                                { base: true, side: side === "p" ? "e" : "p" },
+                                "attack");
                             baseHit(side, u);
                             triggerAttackTraps(u); // удар по базе — тоже атака (руна)
                             axeStrike(u); // «Лабрис основателя» (wt279, W81)
@@ -612,6 +623,8 @@
                                     if (checkEnd()) return;
                                     break;
                                 }
+                                logPlay(side, cardIdOf(u.def), // W195: журнал — атака марша
+                                    { u: occ }, "attack");
                                 const hpBefore = occ.hp;
                                 damageUnit(occ, u.curAtk, u, "sword");
                                 crushHit(u, u.curAtk, hpBefore); // «Сокрушение»
@@ -672,9 +685,12 @@
                         if (ahead < 0 || ahead >= GRID) {
                             await delay(0.5 / animK()); // атака базы дольше (просил юзер)
                             if (B.stopped || !B.units.includes(u)) break;
+                            logPlay(side, cardIdOf(u.def), // W195: журнал — атака базы берсерком
+                                { base: true, side: side === "p" ? "e" : "p" },
+                                "attack");
                             baseHit(side, u);
                             triggerAttackTraps(u);
-                            axeStrike(u); // «Лабрис основателя» (wt279, W81)
+                        axeStrike(u); // «Лабрис основателя» (wt279, W81)
                         } else {
                             const occ = unitAt(u.col, ahead);
                             if (!occ || occ.side === u.side) break;

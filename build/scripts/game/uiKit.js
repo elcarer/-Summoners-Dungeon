@@ -515,14 +515,16 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         inner.mask = maskG;
 
         const track = new PIXI.Graphics();
-        track.rect(w - 9, 0, 7, h);
-        track.fill({ color: 0x0d0a08, alpha: 0.85 });
-        track.stroke({ width: 1, color: 0x6b5c40 });
+        // канавка приглушённая (W195, юзер): яркая 1px-обводка на тёмном
+        // фоне читалась как «кривая волосная линия» скролла журнала боя
+        track.rect(w - 11, 0, 8, h);
+        track.fill({ color: 0x241c12, alpha: 0.9 });
+        track.stroke({ width: 1, color: 0x6b5c40, alpha: 0.5 });
         track.eventMode = "none";
         root.addChild(track);
 
         const handle = new PIXI.Graphics();
-        handle.roundRect(w - 10, 0, 9, 30, 3);
+        handle.roundRect(w - 14, 0, 12, 30, 4);
         handle.fill(0x9a8a68);
         handle.stroke({ width: 1, color: 0x1c1207 });
         handle.eventMode = "static";
@@ -566,7 +568,9 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
             }
             t = Math.min(1, t);
             handle.visible = track.visible = true;
-            const hh = Math.max(28, (h / contentH) * h);
+            // минимум 90 (W195, юзер): на длинном журнале боя ползунок
+            // сжимался до 28px и выглядел «сломанным» рядом с другими
+            const hh = Math.max(90, (h / contentH) * h);
             handle.scale.y = hh / 30;
             apply();
         }

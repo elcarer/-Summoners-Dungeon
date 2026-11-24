@@ -40,8 +40,11 @@
             // магия») — свои точки. Цель (aim): { u } — существо/постройка
             // (id и сторону запоминаем СРАЗУ — цель может умереть до
             // открытия журнала), { u, u2 } — обе цели «Перемены мест»,
-            // { cell: true } — клетка, null — у карты цели не было
-            A.logPlay = function logPlay(side, cardId, aim) {
+            // { base: true, side } — база (атака), { cell: true } —
+            // клетка, null — цели не было. kind: «play» (розыгрыш,
+            // по умолчанию), «attack» (W195 — атака существа) или
+            // «trap» (W195 — сработала ловушка)
+            A.logPlay = function logPlay(side, cardId, aim, kind) {
                 if (!B.playLog) B.playLog = [];
                 let a = null;
                 if (aim && aim.u && aim.u.def) {
@@ -49,8 +52,10 @@
                     if (aim.u2 && aim.u2.def)
                         a.cardId2 = cardIdOf(aim.u2.def),
                         a.side2 = aim.u2.side;
-                } else if (aim && aim.cell) a = { cell: true };
-                B.playLog.push({ turn: B.turnNo, side, cardId, aim: a });
+                } else if (aim && aim.base) a = { base: true, side: aim.side };
+                else if (aim && aim.cell) a = { cell: true };
+                B.playLog.push({ turn: B.turnNo, side, cardId, aim: a,
+                    kind: kind || "play" });
             };
 
             A.playerTurnStart = async function playerTurnStart() {

@@ -231,6 +231,7 @@
                 sfx("mine");
                 trapEchoOnce(side); // «Роща лоз»: флаг первого срабатывания
                 // тратится — повторять отмену нечего (зеркально клеточным)
+                logPlay(side, cardIdOf(trap.def), null, "trap"); // W195: журнал
                 return trap;
             };
 
@@ -251,6 +252,7 @@
                 if (i < 0) return false;
                 const trap = B.traps[tSide].splice(i, 1)[0];
                 redrawTraps();
+                logPlay(tSide, cardIdOf(trap.def), null, "trap"); // W195: журнал
                 trapTriggered(tSide); // «Зимние духи»/«Путь воды»: сработала защита
                 const p = cellXY(trap.col, trap.row);
                 floatText(p.x, p.y - 60, "?!", 0xe08cd0);
@@ -338,6 +340,8 @@
                 if (i < 0) return;
                 const trap = B.traps[side].splice(i, 1)[0];
                 redrawTraps();
+                logPlay(side, cardIdOf(trap.def), // W195: журнал — сработала ловушка
+                    { u }, "trap");
                 trapTriggered(side); // «Зимние духи»/«Путь воды»: сработала клеточная ловушка
                 const p = cellXY(u.col, u.row);
                 floatText(p.x, p.y - 60, "?!", 0xe08cd0);

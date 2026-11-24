@@ -127,7 +127,7 @@
             // журнал боя (W194 — юзер): кнопка и оверлей со списком розыгрышей
             "arena.logBtn": "Журнал",
             "arena.logTitle": "Журнал боя",
-            "arena.logHint": "Кто разыграл карту и в какую цель",
+            "arena.logHint": "Кто разыграл карту, кого атаковал и какие сработали ловушки",
             "arena.logTurn": "Ход",
             "arena.logYou": "Вы",
             "arena.logFoe": "Враг",
@@ -135,6 +135,9 @@
             "arena.logOwn": "свой",
             "arena.logEnemy": "вражий",
             "arena.logEmpty": "Карты ещё не разыграны",
+            "arena.logAtk": "атака",
+            "arena.logTrap": "ловушка",
+            "arena.logBase": "база",
             "type.unit": "Существо",
             "type.building": "Строение",
             "type.spell": "Заклинание",

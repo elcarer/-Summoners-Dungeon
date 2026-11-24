@@ -219,12 +219,12 @@
                 gear.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("settings"); });
                 c.addChild(gear);
 
-                // журнал боя (W194 — юзер): кнопка-сфера с подписью (как
-                // «Конец хода») рядом с шестерёнкой — открывает скролльный
-                // список всех разыгранных карт: кто разыграл и в какую цель
-                const logBtn = new PIXI.Sprite(uiTex("button_1.png"));
+                // журнал боя (W194 — юзер): кнопка рядом с шестерёнкой —
+                // открывает скролльный список розыгрышей/атак/ловушек;
+                // W195: текстура button_attack (просил юзер)
+                const logBtn = new PIXI.Sprite(uiTex("button_attack.png"));
                 logBtn.anchor.set(0.5);
-                logBtn.scale.set(0.44); // 99×128 → ~44×56
+                logBtn.scale.set(0.3); // 113×210 → ~34×63
                 logBtn.position.set(124, 55);
                 logBtn.eventMode = "static";
                 logBtn.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("log"); });
@@ -385,10 +385,13 @@
                     node.addChild(hint);
                     pane = scrollPane(ctx, {
                         x: OV_PANE.x, y: OV_PANE.y, w: OV_PANE.w, h: OV_PANE.h,
+                        onScroll: () => hideOvZoom(false), // прокрутка — старый зум мимо
                     });
                     grid = new PIXI.Container();
                     const entries = (B.playLog || []).slice().reverse();
                     const ROW_H = 54;
+                    const mark = (s) => s === "p"
+                        ? t("arena.logOwn") : t("arena.logEnemy");
                     entries.forEach((e, i) => {
                         const y = i * ROW_H + 14;
                         const turnT = T(`${t("arena.logTurn")} ${e.turn}`, 25, 0x8a7c5e);
@@ -396,19 +399,30 @@
                         turnT.eventMode = "none";
                         grid.addChild(turnT);
                         const who = e.side === "p" ? t("arena.logYou") : t("arena.logFoe");
-                        const mainT = T(`${who}: ${GAME_LOC.t(`card.${e.cardId}.name`)}`, 27,
+                        const nm = GAME_LOC.t(`card.${e.cardId}.name`);
+                        // W195 (юзер): в журнале ещё и атаки существ,
+                        // и сработавшие ловушки — своим словом в строке
+                        const mainTxt = e.kind === "attack"
+                            ? `${who}: ${nm} — ${t("arena.logAtk")}`
+                            : e.kind === "trap"
+                                ? `${who}: ${t("arena.logTrap")} «${nm}»`
+                                : `${who}: ${nm}`;
+                        const mainT = T(mainTxt, 27,
                             e.side === "p" ? 0xf3e6c2 : 0xef9f8c);
                         mainT.position.set(190, y);
-                        mainT.eventMode = "none";
+                        mainT.eventMode = "static"; // ховер — лицо карты (W195)
+                        mainT.on("pointerover", () => showOvZoom(e.cardId, 190, y, null));
+                        mainT.on("pointerout", () => hideOvZoom(false));
                         grid.addChild(mainT);
                         let tgt = "";
                         let tcol = 0x8a7c5e;
                         if (e.aim && e.aim.cardId) {
-                            const mark = (s) => s === "p"
-                                ? t("arena.logOwn") : t("arena.logEnemy");
                             tgt = `→ ${GAME_LOC.t(`card.${e.aim.cardId}.name`)} (${mark(e.aim.side)})`;
                             if (e.aim.cardId2) // «Перемена мест»: обе цели
                                 tgt += ` ↔ ${GAME_LOC.t(`card.${e.aim.cardId2}.name`)} (${mark(e.aim.side2)})`;
+                            tcol = e.aim.side === "p" ? 0x9fd489 : 0xef9f8c;
+                        } else if (e.aim && e.aim.base) { // W195: удар по базе
+                            tgt = `→ ${t("arena.logBase")} (${mark(e.aim.side)})`;
                             tcol = e.aim.side === "p" ? 0x9fd489 : 0xef9f8c;
                         } else if (e.aim && e.aim.cell) {
                             tgt = `→ ${t("arena.logCell")}`;
