@@ -418,8 +418,6 @@
                         let tcol = 0x8a7c5e;
                         if (e.aim && e.aim.cardId) {
                             tgt = `→ ${GAME_LOC.t(`card.${e.aim.cardId}.name`)} (${mark(e.aim.side)})`;
-                            if (e.aim.cardId2) // «Перемена мест»: обе цели
-                                tgt += ` ↔ ${GAME_LOC.t(`card.${e.aim.cardId2}.name`)} (${mark(e.aim.side2)})`;
                             tcol = e.aim.side === "p" ? 0x9fd489 : 0xef9f8c;
                         } else if (e.aim && e.aim.base) { // W195: удар по базе
                             tgt = `→ ${t("arena.logBase")} (${mark(e.aim.side)})`;
@@ -430,8 +428,28 @@
                         if (tgt) {
                             const tgtT = T(tgt, 27, tcol);
                             tgtT.position.set(640, y);
-                            tgtT.eventMode = "none";
+                            if (e.aim && e.aim.cardId) {
+                                // W196 (юзер): ховер на название цели — лицо
+                                // карты цели (у базы/клетки карты нет)
+                                tgtT.eventMode = "static";
+                                tgtT.on("pointerover",
+                                    () => showOvZoom(e.aim.cardId, 640, y, null));
+                                tgtT.on("pointerout", () => hideOvZoom(false));
+                            } else tgtT.eventMode = "none";
                             grid.addChild(tgtT);
+                            if (e.aim && e.aim.cardId2) {
+                                // «Перемена мест»: вторая цель — отдельным
+                                // текстом, чтобы у каждой цели был свой ховер
+                                const x2 = 640 + tgtT.width + 8;
+                                const tgt2T = T(` ↔ ${GAME_LOC.t(`card.${e.aim.cardId2}.name`)} (${mark(e.aim.side2)})`,
+                                    27, tcol);
+                                tgt2T.position.set(x2, y);
+                                tgt2T.eventMode = "static";
+                                tgt2T.on("pointerover",
+                                    () => showOvZoom(e.aim.cardId2, x2, y, null));
+                                tgt2T.on("pointerout", () => hideOvZoom(false));
+                                grid.addChild(tgt2T);
+                            }
                         }
                     });
                     if (!entries.length) {
