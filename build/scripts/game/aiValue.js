@@ -161,6 +161,42 @@
                 sDefendRowK: 0.5,   // × (3 − ряд) — ближе к базе опаснее
                 // Стрелок позади своего (W105): штраф за выстрел «в своих»
                 sArcherOwnPen: 2.6,
+                // W190 (волна «15 поколений»): вторая партия зашитых констант —
+                // нюансы выбора клетки призыва (aiSpotScore), те же места,
+                // что дали чемпиона #11 (ось контакта W181). Дефолты =
+                // прежние литералы, бит-паритет.
+                sMonolithPairK: 1.6,    // пара «монолит + юнит на 1 дороже»: встать рядом
+                sDashAheadK: 0.9,       // рывок-1/nearSpeed в упор к врагу без добития
+                sDashAheadNK: 1.1,      // рывок-N в упор к врагу без добития
+                sDashFreeK: 0.7,        // рывок-1/nearSpeed, впереди свободно (шагнёт сам)
+                sDashFreeNK: 0.8,       // рывок-N, впереди свободно (плюс 0.25·N зашито)
+                sArcherFoeK: 0.8,       // стрелок: в колонке чужой (есть куда стрелять)
+                sArcherEmptyK: 0.5,     // стрелок: колонка пуста — выстрел в базу
+                sArcherBackK: 0.8,      // стрелок на заднем ряду (дольше стреляет)
+                sArcherFrontPen: 0.7,   // стрелок на переднем ряду (штраф)
+                sAssassinLowK: 1.8,     // убийца: в колонке за ним чужой с 1 ♥
+                sAssassinNearK: 1.0,    // убийца: впереди чужой с hp − atk = 1
+                sCrushFrontK: 1.1,      // «Сокрушение» на переднем ряду
+                sThicketK: 0.5,         // «Чаща» × число чужих соседей
+                sThicketFrontK: 0.5,    // «Чаща» на переднем ряду
+                sThicketOwnPen: 0.4,    // всплеск чащи заденет своих (× число)
+                sPushBackK: 0.6,        // «Отталкивание», впереди чужой
+                sContactCostPen: 1.2,   // дорогая (cost ≥ sTradeCostGate) гибнет в контакте
+                sBldAheadBase: 1.1,     // чужая опасная постройка прямо впереди: база
+                sBldAheadDangerK: 1.7,  // …× aiDangerBld
+                sBldAheadAuraK: 1.2,    // …неопасная аура-постройка (связка маршем)
+                sMarkBlockNeut: 1.2,    // чужая «Сдвиг»-метка на клетке (счётчик > 2)
+                sDelayOwnPen: 2.5,      // СВОЯ «Сдвиг»-метка на клетке (штраф)
+                sDefendPathK: 0.6,      // клетка прямо на пути ближнего игрока
+                sIllusionBase: 0.8,     // «Иллюзия» (wis108): база за сильного соседа
+                sIllusionNbK: 0.22,     // …× aiVal соседа
+                sIllusionEmptyPen: 1.6, // «Иллюзия» без соседа (штраф)
+                sLakeMaidBase: 0.5,     // «Озёрная дева» (wis111): база за соседа
+                sLakeMaidNbK: 0.14,     // …× aiVal соседа
+                sSummonerFreeK: 0.6,    // шаман/духовод × свободные места рядом (макс 2)
+                sWolfLaneK: 0.4,        // «зовёт волка» на переднем ряду (ловит урон)
+                sKeeperRowK: 0.8,       // «Хранитель» (животных ≥ 3) на переднем ряду
+                sEnergyRowK: 0.8,       // energyToStats с запасом ≥ 4 на переднем ряду
                 // Выбор цели заклинаний/баффов (aiTarget):
                 tgtPosK: 0.35,      // × (GRID−1−ряд) — ближе к нашей базе опаснее
                 tgtOverKillK: 0.15, // × перерасход урона при добивании
@@ -1558,7 +1594,7 @@
                         && o.def.type === "building" && o.def.monolith
                         && B.units.includes(o)
                         && Math.abs(o.col - col) + Math.abs(o.row - row) === 1))
-                    score += 1.6;
+                    score += AI_W.sMonolithPairK;
                 const ahead = unitAt(col, row + 1);
                 const atk = def.atk || 0;
                 // W107 (юзер): «Скорость» — СПОСОБНОСТЬ (dash1/dashN-ключи и
@@ -1570,8 +1606,8 @@
                 if (dash === 1) {
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit" && atk >= ahead.hp)
                         score += AI_W.sDashKill + aiThreat(ahead) * AI_W.sKillThreatK;
-                    else if (ahead && ahead.side === "p") score += 0.9;
-                    else if (!ahead) score += 0.7; // сразу шагнёт вперёд
+                    else if (ahead && ahead.side === "p") score += AI_W.sDashAheadK;
+                    else if (!ahead) score += AI_W.sDashFreeK; // сразу шагнёт вперёд
                 }
                 if (dash > 1) {
                     // «Скорость N» (Колесница): две попытки — убить дважды
@@ -1579,8 +1615,8 @@
                     const n = dash;
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit" && atk * n >= ahead.hp)
                         score += AI_W.sDashKill + aiThreat(ahead) * AI_W.sKillThreatK;
-                    else if (ahead && ahead.side === "p") score += 1.1;
-                    else if (!ahead) score += 0.8 + 0.25 * n;
+                    else if (ahead && ahead.side === "p") score += AI_W.sDashAheadNK;
+                    else if (!ahead) score += AI_W.sDashFreeNK + 0.25 * n;
                 }
                 if (def.ability === "archer") {
                     const t = aiNearestInCol("e", col, row);
@@ -1588,14 +1624,14 @@
                     // ставим — выстрел бьёт ПЕРВОГО на линии, своим
                     // «стрелять в своих же» дороже свободной клетки
                     if (t && t.side === "e") score -= AI_W.sArcherOwnPen;
-                    else if (t && t.side === "p") score += 0.8; // есть куда стрелять
-                    else if (!t) score += 0.5; // колонка пуста — выстрел в базу
+                    else if (t && t.side === "p") score += AI_W.sArcherFoeK; // есть куда стрелять
+                    else if (!t) score += AI_W.sArcherEmptyK; // колонка пуста — выстрел в базу
                     // W105 (юзер): стрелок — ближе к своей базе: дольше
                     // идёт до врага, больше выстрелов по подходящим
                     // (или в базу по пустой вертикали)
                     if (rows.length > 1) {
-                        if (row === rows[0]) score += 0.8;
-                        else if (row === frontRow) score -= 0.7;
+                        if (row === rows[0]) score += AI_W.sArcherBackK;
+                        else if (row === frontRow) score -= AI_W.sArcherFrontPen;
                     }
                 }
                 // W109 (юзер): «Герой прошлого» (tim232) — по соседству со
@@ -1607,27 +1643,27 @@
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit"
                         && atk >= ahead.hp)
                         score += AI_W.sNearKill + aiThreat(ahead) * AI_W.sKillThreatK;
-                    else if (ahead && ahead.side === "p") score += 0.9;
-                    else score += 0.7; // рывок сразу шагнёт вперёд
+                    else if (ahead && ahead.side === "p") score += AI_W.sDashAheadK;
+                    else score += AI_W.sDashFreeK; // рывок сразу шагнёт вперёд
                 }
                 if (def.ability === "assassin") {
                     if (B.units.some((v) => v.side === "p" && v.col === col && v.row > row
-                        && v.def.type === "unit" && v.hp === 1)) score += 1.8;
+                        && v.def.type === "unit" && v.hp === 1)) score += AI_W.sAssassinLowK;
                     if (ahead && ahead.side === "p" && ahead.def.type === "unit"
-                        && ahead.hp - atk === 1) score += 1.0;
+                        && ahead.hp - atk === 1) score += AI_W.sAssassinNearK;
                 }
-                if (def.crush && row === frontRow) score += 1.1;
+                if (def.crush && row === frontRow) score += AI_W.sCrushFrontK;
                 if (def.thicket) {
                     const n = B.units.filter((v) => v.side === "p"
                         && Math.abs(v.col - col) + Math.abs(v.row - row) === 1).length;
-                    score += 0.5 * n + (row === frontRow ? 0.5 : 0);
+                    score += AI_W.sThicketK * n + (row === frontRow ? AI_W.sThicketFrontK : 0);
                     if (ahead) { // всплеск бьёт и своих рядом с целью
                         const ownNear = B.units.filter((v) => v.side === "e" && v !== undefined
                             && Math.abs(v.col - ahead.col) + Math.abs(v.row - ahead.row) === 1).length;
-                        score -= 0.4 * ownNear;
+                        score -= AI_W.sThicketOwnPen * ownNear;
                     }
                 }
-                if (def.ability === "pushBack" && ahead && ahead.side === "p") score += 0.6;
+                if (def.ability === "pushBack" && ahead && ahead.side === "p") score += AI_W.sPushBackK;
                 // W104 (юзер): «через клетку» — боевое существо ставим в 2
                 // клетках перед вражеским (клетка между свободна): противник
                 // потратит свой марш на подход (скорость 1 с разбега не
@@ -1659,19 +1695,19 @@
                     }
                     score += AI_W.sGap * gapW;
                 }
-                if (def.wolfSummon && row === frontRow) score += 0.4; // ловит урон — зовёт волка
+                if (def.wolfSummon && row === frontRow) score += AI_W.sWolfLaneK; // ловит урон — зовёт волка
                 if (def.keeperScale) {
                     const animals = B.units.filter((v) => v.side === "e"
                         && v.def.type === "unit" && v.def.creature === "animal").length;
-                    if (animals >= 3 && row === frontRow) score += 0.8;
+                    if (animals >= 3 && row === frontRow) score += AI_W.sKeeperRowK;
                 }
                 if (def.energyToStats
                     && B.eEnergy - effCost(cardIdOf(def), "e") >= 4) {
-                    if (row === frontRow) score += 0.8;
+                    if (row === frontRow) score += AI_W.sEnergyRowK;
                 }
                 if (def.ability === "shaman" || def.ability === "spiritSummoner") {
                     // бесплатный призыв на соседнюю клетку — оставляем место
-                    score += 0.6 * Math.min(2, aiFreeNear(col, row));
+                    score += AI_W.sSummonerFreeK * Math.min(2, aiFreeNear(col, row));
                 }
                 // «Иллюзия» (wis108) копирует статы соседа — ставим рядом с
                 // сильным СВОИМ существом и избегаем пустых клеток
@@ -1682,8 +1718,8 @@
                         if (Math.abs(v.col - col) + Math.abs(v.row - row) !== 1) continue;
                         best = Math.max(best, aiVal(v));
                     }
-                    if (best > 0) score += 0.8 + best * 0.22;
-                    else score -= 1.6;
+                    if (best > 0) score += AI_W.sIllusionBase + best * AI_W.sIllusionNbK;
+                    else score -= AI_W.sIllusionEmptyPen;
                 }
                 // «Озёрная дева» (wis111) копирует способность соседа —
                 // ставим рядом с ценным СВОИМ существом
@@ -1694,7 +1730,7 @@
                         if (Math.abs(v.col - col) + Math.abs(v.row - row) !== 1) continue;
                         best = Math.max(best, aiVal(v));
                     }
-                    if (best > 0) score += 0.5 + best * 0.14;
+                    if (best > 0) score += AI_W.sLakeMaidBase + best * AI_W.sLakeMaidNbK;
                 }
                 // бой в клетке: игрок ходит первым — наш новичок сначала
                 // получает. W104 (юзер): обмен в упор — не приоритет
@@ -1708,7 +1744,7 @@
                             + Math.min(4, incoming) * AI_W.sContactIncomingK; // тело/задержка
                         score += Math.min(2.2, aiThreat(ahead) * 0.18 * AI_W.sTradeLossK);
                         if (survives) score += (role === "wall" ? 0.6 : 0.2) * AI_W.sContactSurvK;
-                        else if ((def.cost || 0) >= AI_W.sTradeCostGate) score -= 1.2; // дорогого зря теряем
+                        else if ((def.cost || 0) >= AI_W.sTradeCostGate) score -= AI_W.sContactCostPen; // дорогого зря теряем
                         if (role === "wall") score += 0.8 * AI_W.sContactWallK;
                     }
                     if (survives && ahead.def.type === "unit" && atk >= ahead.hp) {
@@ -1720,10 +1756,10 @@
                     if (ahead.def.type === "building") { // строения не бьют в ответ
                         // W104 (юзер): опасная постройка врага — ломать связку
                         const dg = aiDangerBld(ahead.def);
-                        score += dg ? 1.1 + 1.7 * dg
+                        score += dg ? AI_W.sBldAheadBase + AI_W.sBldAheadDangerK * dg
                             : 0.8 + ((ahead.def.spellAura || ahead.def.campAura
                                 || ahead.def.monolith || ahead.def.treeHomes
-                                || ahead.def.groveAura) ? 1.2 : 0);
+                                || ahead.def.groveAura) ? AI_W.sBldAheadAuraK : 0);
                     }
                 }
                 // трус — стеной прямо перед существом игрока (его следующий шаг)
@@ -1735,7 +1771,7 @@
                 if (near) {
                     if (near.row <= 2) score += (3 - near.row) * AI_W.sDefendRowK
                         + Math.min(1.5, aiThreat(near) * AI_W.sDefendThreatK);
-                    if (near.row - 1 === row) score += 0.6; // прямо на его пути
+                    if (near.row - 1 === row) score += AI_W.sDefendPathK; // прямо на его пути
                 }
                 // «Сдвиг» (Время, просил юзер): метки «Сдвига» — чужие
                 // занимаем (прибытие задержанного существа противника
@@ -1744,10 +1780,10 @@
                 // свои не трогаем (заблокируем собственный призыв)
                 const pmark = B.delayed && B.delayed.p
                     && B.delayed.p.find((e) => e.col === col && e.row === row);
-                if (pmark) score += pmark.left <= 2 ? AI_W.sMarkBlock : 1.2;
+                if (pmark) score += pmark.left <= 2 ? AI_W.sMarkBlock : AI_W.sMarkBlockNeut;
                 const emark = B.delayed && B.delayed.e
                     && B.delayed.e.find((e) => e.col === col && e.row === row);
-                if (emark) score -= 2.5;
+                if (emark) score -= AI_W.sDelayOwnPen;
                 // W104 (юзер) «Бой во времени»: «Сдвиг»-карта появится через
                 // N тиков (в начале нашего хода, ПЕРЕД маршем) — ставить
                 // значок так, чтобы при появлении враг стоял прямо впереди
