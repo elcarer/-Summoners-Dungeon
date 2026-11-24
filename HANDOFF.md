@@ -69,6 +69,17 @@ DECK_MAX/DECK_COPIES, пресеты стартовых, кривая цены) 
 
 ## Текущее состояние
 
+- W193 (2026-11-24) — **фикс бага юзера: дикие монстры/охранники мира снова
+  листами существ, не героя.** W191 развязала heroSheets/creatureSheets, а
+  makeSquadNode рисовался `heroSheets[s.elem]` — дикие отряды встали листами
+  игрока (мех в зоне Времени, elf_elc в Росте). Фикс: таблица SQUAD_SHEET
+  (elem→creatureSheets: time→gnome, growth→elf, wisdom→wisdom, honor→knight,
+  decay→necr, strength→goblin, groHon→knight, timDec→necr); тот же перенос
+  в мёртвом фолбэке spawnBossSquad. Проба `probe_w193_squadsheets.mjs` 14/14
+  (identity по walk-текстуре, все 6 стихий + мосты, скрины
+  for_work/w193_wild_*.png просмотрены), регресс W191 не задет (герои на
+  своих elf_elc/gnome_ex). Грабль: knight_256 дедуплится PIXI.Assets —
+  sheetNameOf матчит «honor». Детали — docs/journal.md (W193).
 - W192 (2026-11-24) — **5 правок ядер (ослабление верха) + усреднённая
   лига 10×RR на новых сидах** 20261187–96 (45 560 боёв, 0 ошибок, ничьи
   845, fuse 101, первый ~57.0%; сравнение с W190 непарное, Уэлч z).

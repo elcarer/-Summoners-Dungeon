@@ -802,18 +802,20 @@
         // развороты, что у героя (контроллер characters). Спрайт в
         // общий y-sort слой (zIndex по позиции ставит контроллер),
         // под ним — тень, как у героя
+        // W193: отряды и охранники ходят ЛИСТАМИ СУЩЕСТВ своей стихии
+        // (creatureSheets), не листом героя: с W191 листы героев юзера
+        // разъехались с листами существ (elf_elc/mage_o/gnome_ex) — и дикие
+        // монстры стали листами игрока (баг юзера). Мультицветы: «Белая
+        // пуща» (groHon) ходит рыцарем — «они же рыцари даже по названию»
+        // (просил юзер), «Некро-раскопки» (timDec) — некромантом necr_256
+        // (просил юзер W86), «Рыжий лес» (strGro) — гоблином-разбойником;
+        // прочее — гоблин, как прежде
+        const SQUAD_SHEET = { strength: "goblin", growth: "elf",
+            wisdom: "wisdom", decay: "necr", honor: "knight", time: "gnome",
+            groHon: "knight", timDec: "necr" };
         function makeSquadNode(s) {
-            // у мультицветных данжей своей строки в heroSheets нет:
-            // «Белая пуща» (groHon) ходит рыцарем — «они же рыцари даже
-            // по названию» (просил юзер), «Некро-раскопки» (timDec) —
-            // некромантом necr_256 (просил юзер W86), «Рыжий лес» (strGro)
-            // остаётся гоблином-разбойником; прочее — гоблин, как прежде.
-            // W182: heroSheets.strength — ПАУЧИЙ НАЕЗДНИК (лист игрока),
-            // отряды стихии Силы ходят обычным goblin из creatureSheets
-            const sheet = s.elem === "strength" ? ctx.creatureSheets.goblin
-                : ctx.heroSheets[s.elem]
-                || ctx.heroSheets[s.elem === "groHon" ? "honor"
-                    : s.elem === "timDec" ? "decay" : "strength"];
+            const sheet = ctx.creatureSheets[SQUAD_SHEET[s.elem]]
+                || ctx.creatureSheets.goblin;
             const sprite = new PIXI.AnimatedSprite(sheet.animations.walk_front, false);
             sprite.anchor.set(0.5, 1);
             sprite.scale.set(0.375); // как герой (96×96)
@@ -823,12 +825,13 @@
             return { sprite, shadow, sheet };
         }
 
-        // W86 (тесты): каким heroSheets-ключом реально рисуется отряд
-        // («Некро-раскопки» — necr/decay, «Белая пуща» — honor, …);
+        // W86 (тесты): каким листом реально рисуется отряд
+        // («Некро-раскопки» — necr, «Белая пуща» — knight; W193: дикие —
+        // ключи creatureSheets: growth→elf, time→gnome, …);
         // сравнение первой текстуры walk-анимации — имена листов не нужны.
         // W145: мировые боссы ходят СВОИМИ листами из creatureSheets
-        // (dragonA/dragonM) — сканируем и их (heroSheets первым: алиасы
-        // creatureSheets — те же объекты, что и heroSheets)
+        // (dragonA/dragonM) — сканируем heroSheets (некр/паучий наездник —
+        // алиасы героя) и creatureSheets
         const sheetNameOf = (ref) => {
             if (!ref || !ref.animations || !ref.animations.walk_front) return null;
             for (const [k, sh] of Object.entries(ctx.heroSheets)) {
@@ -930,8 +933,8 @@
                 globalThis.GAME_DATA.ENCOUNTERS[st.enc].hero];
             const sheet = (BOSS_SHEETS[st.enc]
                     && ctx.creatureSheets[BOSS_SHEETS[st.enc]])
-                || ctx.heroSheets[hd && hd.elems[0]]
-                || ctx.heroSheets.growth;
+                || ctx.creatureSheets[SQUAD_SHEET[hd && hd.elems[0]]]
+                || ctx.creatureSheets.elf;
             const sprite = new PIXI.AnimatedSprite(sheet.animations.walk_front, false);
             sprite.anchor.set(0.5, 1);
             sprite.scale.set(0.5);
