@@ -115,6 +115,7 @@
         // Животных на поле (включая его самого); тип существа — Животное
         grw22: { type: "unit", cost: 4, atk: 1, hp: 1, speed: 1,
                  creature: "animal", keeperScale: true,
+                 sheet: "elf_elc", // лист героя Роста (арт юзера)
                  subtype: "animal", // подтип — по спеке юзера (cards.txt)
                  rarity: "epic", elem: "growth",
                  color: 0x3f6d3a, img: "growth/62" },
