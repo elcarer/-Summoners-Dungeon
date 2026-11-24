@@ -82,11 +82,13 @@
                     }
                     let score = 0;
                     if (!hit) {
-                        score = u.curAtk * 1.4 + path.length * 0.8;
-                        if (u.curAtk >= B.playerBase) score += 10; // летал в базу
+                        score = u.curAtk * AI_W.wolfCleanAtkK
+                            + path.length * AI_W.wolfCleanPathK;
+                        if (u.curAtk >= B.playerBase) score += AI_W.wolfLethalBonus; // летал в базу
                     } else if (hit.side === "p") {
-                        score = Math.min(u.curAtk, hit.hp) * 0.9 + path.length * 0.6;
-                        if (u.curAtk >= hit.hp) score += 4 + aiThreat(hit) * 0.4;
+                        score = Math.min(u.curAtk, hit.hp) * AI_W.wolfHitK
+                            + path.length * 0.6;
+                        if (u.curAtk >= hit.hp) score += AI_W.wolfKillBonus + aiThreat(hit) * 0.4;
                         if (hit.def.type === "building") score += 0.8;
                     } else {
                         score = -20; // свой на линии — не стреляем сюда
@@ -135,15 +137,19 @@
                     const rowBonus = v.row * AI_W.buffRowK;
                     let score = 0;
                     if (s.buffAtk) {
-                        score = (v.curAtk + s.buffAtk) * 1.25 + v.hp * 0.35
-                            + (s.buffHp || 0) * 0.3 + rowBonus;
-                        if (v.row >= GRID - 1 && v.curAtk + s.buffAtk >= B.playerBase) score += 8;
+                        score = (v.curAtk + s.buffAtk) * AI_W.buffAtkNewK
+                            + v.hp * AI_W.buffHpW
+                            + (s.buffHp || 0) * AI_W.buffHpAddW + rowBonus;
+                        if (v.row >= GRID - 1 && v.curAtk + s.buffAtk >= B.playerBase)
+                            score += AI_W.buffLethalBonus;
                     } else if (s.buffAtkByHp) {
-                        score = v.hp * 1.4 + v.curAtk * 0.5 + rowBonus;
+                        score = v.hp * AI_W.buffByHpHpK
+                            + v.curAtk * AI_W.buffByHpAtkK + rowBonus;
                     } else if (s.berserk) {
-                        score = v.curAtk * 1.3 + v.hp * 0.7 + rowBonus;
-                        if (v.curAtk >= 3) score += 0.8;
-                        if (v.hp >= 3) score += 0.8;
+                        score = v.curAtk * AI_W.buffBerserkAtkK
+                            + v.hp * AI_W.buffBerserkHpK + rowBonus;
+                        if (v.curAtk >= AI_W.buffStrongAtk) score += AI_W.buffStrongBonus;
+                        if (v.hp >= AI_W.buffStrongHp) score += AI_W.buffStrongBonus;
                     } else if (s.venom) {
                         score = v.curAtk * 0.9 + v.hp * 1.0 + rowBonus;
                         if (v.def.speed > 1) score += 1;
@@ -161,7 +167,7 @@
                         score = v.curAtk * 1.2 + v.hp * 0.4 + rowBonus;
                     }
                     if (v.def.leaderAura || v.def.plantEcho || v.def.druidEnergy
-                        || v.def.sisterDraw) score -= 0.4;
+                        || v.def.sisterDraw) score -= AI_W.buffEnginePen;
                     if (score > bestScore) { bestScore = score; best = v; }
                 }
                 return best;
@@ -178,10 +184,10 @@
                     const att = unitAt(v.col, v.row + 1);
                     const incoming = att && att.side === "p" && att.def.type === "unit"
                         ? att.curAtk : 0;
-                    let score = aiOwnValue(v) + incoming * 0.8;
-                    if (incoming) score += 2.5; // кокон на того, кого реально бьют
-                    else score -= 2;
-                    if (incoming && v.hp <= incoming) score += 2;
+                    let score = aiOwnValue(v) + incoming * AI_W.cocoonIncomingK;
+                    if (incoming) score += AI_W.cocoonHitBonus; // кокон на того, кого реально бьют
+                    else score += AI_W.cocoonIdlePen;
+                    if (incoming && v.hp <= incoming) score += AI_W.cocoonDyingBonus;
                     if (score > bestScore) { bestScore = score; best = v; }
                 }
                 return best;
@@ -226,12 +232,13 @@
                     const dg = v.def.type === "building" ? aiDangerBld(v.def) : 0;
                     let score;
                     if (v.hp <= dmg) { // добивание — единственная причина бить существо
-                        score = 14 + aiThreat(v) * 1.1 + pos + dg * 4
+                        score = AI_W.tgtKillBase + aiThreat(v) * AI_W.tgtKillThreatK
+                            + pos + dg * AI_W.tgtDangerBldK
                             - Math.max(0, dmg - v.hp) * AI_W.tgtOverKillK;
                     } else if (baseOk || !dg) {
                         continue; // нелетально по существу — никогда
                     } else { // нелетально по опасной постройке (дротик без базы)
-                        score = 6 * dg + dmg * 0.3 + pos;
+                        score = AI_W.tgtBldNLK * dg + dmg * AI_W.tgtBldDmgK + pos;
                     }
                     // W144 (statOn): купол (tim234) режет любой урон по цели
                     // до 1 — «добивание» купольного на деле N ударов, не трать
@@ -251,21 +258,21 @@
                 let score = 0;
                 const victim = B.units.find((v) => v.side === "p"
                     && v.col === col && v.row === row + 1);
-                if (victim) score += aiThreat(victim) * 0.8;
+                if (victim) score += aiThreat(victim) * AI_W.trapVictimK;
                 if (tr.effect === "cellDmg" || tr.effect === "cellDmgAll"
                     || tr.effect === "cellDmgMin") {
                     if (victim) {
                         if (victim.def.type === "unit" && tr.effect !== "cellDmgMin") {
                             const crowd = B.units.filter((o) => o.side === "p" && o !== victim
                                 && Math.abs(o.col - victim.col) + Math.abs(o.row - victim.row) === 1).length;
-                            score += crowd * (tr.splash || 0) * 0.6;
+                            score += crowd * (tr.splash || 0) * AI_W.trapCrowdK;
                         }
                         // «Яма-ловушка»: урон = меньшему из урона и жизней
                         // жертвы — добивает, только если жизни не больше урона
                         const dmg = tr.effect === "cellDmgMin"
                             ? Math.min(victim.curAtk, victim.hp)
                             : (tr.amount || 0) + altarBonus("e");
-                        if (victim.hp <= dmg) score += 1.5;
+                        if (victim.hp <= dmg) score += AI_W.trapKillBonus;
                     }
                 } else if (tr.effect === "confuse" || tr.effect === "entangle") {
                     if (victim) score += aiThreat(victim) * 1.0 + victim.curAtk * 0.2;
@@ -285,13 +292,13 @@
                     const dmg = (tr.amount || 2) + altarBonus("e");
                     for (const v of B.units) {
                         if (v.col !== col || v.def.type !== "unit") continue;
-                        score += v.side === "p" ? aiThreat(v) * 0.55 : -(v.hp <= dmg
-                            ? 9 : aiThreat(v) * 0.8);
+                        score += v.side === "p" ? aiThreat(v) * AI_W.trapRowShiftFoeK
+                            : -(v.hp <= dmg ? 9 : aiThreat(v) * 0.8);
                     }
                 } else if (tr.effect === "lure") {
                     for (const v of B.units) if (v.side === "p"
                         && Math.abs(v.col - col) + Math.abs(v.row - row) === 1)
-                        score += aiThreat(v) * 0.3;
+                        score += aiThreat(v) * AI_W.trapLureK;
                 } else if (tr.effect === "ambush" || tr.effect === "ancestor") {
                     if (victim) score += aiThreat(victim) * 0.4;
                     // W133 (юзер, из причинного анализа логов): «Гоблинская
@@ -319,7 +326,7 @@
                         && o.def.type === "unit"
                         && Math.abs(o.col - col) + Math.abs(o.row - row) === 1);
                     if (near.length) {
-                        for (const o of near) score += aiThreat(o) * 0.9;
+                        for (const o of near) score += aiThreat(o) * AI_W.trapAlliesK;
                         if (victim) score += 0.5;
                     } else score = 0; // без соседей ловушка мертва
                 }

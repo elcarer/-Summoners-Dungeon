@@ -201,6 +201,41 @@
                 tgtPosK: 0.35,      // × (GRID−1−ряд) — ближе к нашей базе опаснее
                 tgtOverKillK: 0.15, // × перерасход урона при добивании
                 buffRowK: 0.2,      // × ряд цели баффа (фронт ценнее)
+                // W197: третья партия зашитых констант (группа tgt2) — веса
+                // выбора целей урона/баффов/кокона/волков/ловушек
+                // (aiTarget.js; дефолты = прежние литералы, бит-паритет)
+                tgtKillBase: 14,        // база счёта добивания (aiDmgTargetPick)
+                tgtKillThreatK: 1.1,    // …× aiThreat жертвы
+                tgtDangerBldK: 4,       // …× aiDangerBld постройки
+                tgtBldNLK: 6,           // нелетал по опасной постройке: × dg
+                tgtBldDmgK: 0.3,        // …+ урон ×
+                buffAtkNewK: 1.25,      // бафф: новый атакер × (aiBuffPick)
+                buffHpW: 0.35,          // …× жизни цели
+                buffHpAddW: 0.3,        // …+ прибавка жизни ×
+                buffLethalBonus: 8,     // …+ ряд у базы и летал
+                buffByHpHpK: 1.4,       // «Природная мощь»: жизни ×
+                buffByHpAtkK: 0.5,      // …+ атака ×
+                buffBerserkAtkK: 1.3,   // «Двойная атака»: атака ×
+                buffBerserkHpK: 0.7,    // …+ жизни ×
+                buffStrongAtk: 3,       // порог «сильного» (атака)
+                buffStrongHp: 3,        // …и жизни
+                buffStrongBonus: 0.8,   // …бонус за каждого
+                buffEnginePen: 0.4,     // штраф движкам (лидер/эхо/энергия/сёстры)
+                cocoonIncomingK: 0.8,   // кокон: × надвигающийся урон (aiCocoonPick)
+                cocoonHitBonus: 2.5,    // …+ «его реально бьют»
+                cocoonIdlePen: -2,      // …− никто не бьёт
+                cocoonDyingBonus: 2,    // …+ убиваемого
+                wolfCleanAtkK: 1.4,     // волки: чистая колонка × атака (aiWolfPick)
+                wolfCleanPathK: 0.8,    // …+ длина пути ×
+                wolfLethalBonus: 10,    // …+ летал в базу
+                wolfHitK: 0.9,          // удар по существу: min(атака, жизни) ×
+                wolfKillBonus: 4,       // …+ добивание
+                trapVictimK: 0.8,       // ловушка: × aiThreat жертвы (aiTrapScore)
+                trapCrowdK: 0.6,        // мина: × скопление × сплэш
+                trapKillBonus: 1.5,     // …+ добивание жертвы
+                trapLureK: 0.3,         // приманка: × aiThreat соседей
+                trapRowShiftFoeK: 0.55, // снежный ком: × aiThreat чужих в ряду
+                trapAlliesK: 0.9,       // тёмные цепи: × aiThreat своих соседей
                 // дерево розыгрыша (W114, юзер — «этап 2: деревья решений
                 // для связок»): перебор порядков/подмножеств играбельных карт
                 // на модели поля (aiTree.js), план действует, если явно лучше
