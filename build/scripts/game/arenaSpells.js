@@ -1427,11 +1427,23 @@
                 // без позиции цели рождается на карте; считаем ДО эффектов —
                 // сбросы/доборы могли бы пересобрать руку и сдвинуть индексы
                 const origin = handCardCenter(handIdx);
+                // Журнал боя (W194): прицельная цель — резолвим ДО эффектов
+                // (цель может умереть/сойти с клетки). «Перемена мест» —
+                // обе цели; жетон/метка без существа на клетке — клетка
+                const aimAt = target && target.col !== undefined
+                    ? unitAt(target.col, target.row) : null;
+                const aimFirst = target && target.first
+                    && target.first.col !== undefined
+                    ? unitAt(target.first.col, target.first.row) : null;
+                const aim = aimFirst
+                    ? { u: aimFirst, u2: aimAt }
+                    : aimAt ? { u: aimAt }
+                    : target && target.col !== undefined ? { cell: true } : null;
                 // «Магопуты» (firstCardVoid, W77): первая карта игрока за
                 // бой отменяется героем врага — карта и энергия потрачены
                 if (heroVoidFirstCancel("p")) {
                     B.energy -= effCost(cardId, "p", target);
-                    spendCard(handIdx);
+                    spendCard(handIdx, aim); // W194: цель в журнал боя
                     consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                     floatText(960, 640, "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
                     sfx("mine");
@@ -1446,7 +1458,7 @@
                 const cTrap = counterTrapConsume("e", "counterSpell");
                 if (cTrap) {
                     B.energy -= effCost(cardId, "p", target);
-                    spendCard(handIdx);
+                    spendCard(handIdx, aim); // W194: цель в журнал боя
                     consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                     const p = cellXY(cTrap.col, cTrap.row);
                     floatText(p.x, p.y + 66, "✕ " + GAME_LOC.t(`card.${cardId}.name`), 0x8cd0ef);
@@ -1461,7 +1473,7 @@
                     if (!last || last === "str25" || !CARDS[last]
                         || CARDS[last].type !== "spell") return false;
                     B.energy -= effCost(cardId, "p", target);
-                    spendCard(handIdx);
+                    spendCard(handIdx, aim); // W194: цель в журнал боя
                     consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                     heroFirstSpellEnergy("p"); // «Дуновение опасности»
                     heroStrReplay("p", cardId, def); // «Мастера огня»
@@ -1499,7 +1511,7 @@
                     || def.spell.highPower) // «Высокая мощность» (wt274, W80): всю энергию потратил powerAct
                     ? 0 : B.energy - effCost(cardId, "p", target);
                 consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
-                spendCard(handIdx); // при пометке «Сброса разума» вернёт карту в руку
+                spendCard(handIdx, aim); // при пометке «Сброса разума» вернёт карту в руку; цель — в журнал (W194)
                 B.playCtx = null;
                 if (resetHand) confuseRunes("p", resetHand); // обе стороны (спека)
                 if (brainstorm) // сброс остатка руки уже без карты штурма:

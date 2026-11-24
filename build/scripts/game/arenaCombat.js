@@ -939,6 +939,7 @@
                     if (side === "e") {
                         if (!aiSpellPlayable(CARDS[id])) continue;
                         enemyCastSpellEffect(CARDS[id], true); // авто-цели ИИ
+                        logPlay("e", id, A.__aiAim ? { u: A.__aiAim } : null); // W194: журнал
                         deck.splice(deck.indexOf(id), 1);
                         B.eDiscard.push(id);
                         B.eEnergy = 0;
@@ -952,8 +953,12 @@
                     }
                     const t = acolyteTargetFor(id);
                     if (t === null && CARDS[id].spell.target !== "none") continue;
+                    // W194: журнал — цель до эффекта (может умереть от него)
+                    const tu = t && t.col !== undefined ? unitAt(t.col, t.row) : null;
                     if (!applySpellP(id, t, true)) continue;
                     fxSpellCast(id, t, "p");
+                    logPlay("p", id,
+                        tu ? { u: tu } : t && t.col !== undefined ? { cell: true } : null);
                     deck.splice(deck.indexOf(id), 1);
                     B.discard.push(id);
                     B.energy = 0;
@@ -1051,16 +1056,22 @@
                     if (played >= 2) break;
                     const hi = hand.indexOf(id);
                     if (hi < 0) continue; // ушла из руки эффектом соседа-каста
+                    let aim = null; // W194: журнал — цель разыгранной карты
                     if (CARDS[id].type === "spell") {
                         if (side === "p") {
                             const t = acolyteTargetFor(id);
                             if (t === null && CARDS[id].spell.target !== "none")
                                 continue;
+                            const tu = t && t.col !== undefined
+                                ? unitAt(t.col, t.row) : null; // W194: до эффекта
                             if (!applySpellP(id, t, true)) continue;
                             fxSpellCast(id, t, "p");
+                            aim = tu ? { u: tu }
+                                : t && t.col !== undefined ? { cell: true } : null;
                         } else {
                             if (!aiSpellPlayable(CARDS[id])) continue;
                             enemyCastSpellEffect(CARDS[id], true); // авто-цели ИИ
+                            aim = A.__aiAim ? { u: A.__aiAim } : null; // W194
                         }
                         // «Высокая мощность» (wt274, W80), сыгранная двойным
                         // кастом: тоже гасит энергию (в powerAct своя часть)
@@ -1074,11 +1085,13 @@
                         if (!armTrap(side, id, spot.col, spot.row, spot.unit || null))
                             continue; // «Битва умов» врага
                         afterTrapPlaced(side);
+                        aim = spot.unit ? { u: spot.unit } : { cell: true }; // W194
                     }
                     hand.splice(hand.indexOf(id), 1);
                     if (side === "p") B.discard.push(id);
                     else B.eDiscard.push(id);
                     noteDiscard(1, side, [id]);
+                    logPlay(side, id, aim); // W194: журнал разыгранных карт
                     if (CARDS[id].type === "spell") afterSpellPlayed(side);
                     played++;
                     floatText(960, side === "p" ? 640 : 300,
@@ -1728,6 +1741,7 @@
                     floatText(fp.x, fp.y - 60,
                         "✕ " + GAME_LOC.t(`card.${pick.id}.name`), 0x8cd0ef);
                         noteDiscard(1, side, [pick.id]);
+                    logPlay(side, pick.id, null); // W194: журнал (каст отменён)
                     discard.push(pick.id);
                     return;
                 }
@@ -1735,22 +1749,36 @@
                     const last = side === "p" ? B.lastSpell.p : B.lastSpell.e;
                     const ok = last && last !== "str25" && CARDS[last]
                         && CARDS[last].type === "spell";
-                    if (!ok) { discard.push(pick.id); noteDiscard(1, side, [pick.id]); return; } // повтора нет — впустую
+                    if (!ok) { // повтора нет — впустую
+                        noteDiscard(1, side, [pick.id]);
+                        logPlay(side, pick.id, null); // W194: журнал
+                        discard.push(pick.id);
+                        return;
+                    }
                     if (side === "p") { B.lastSpell.p = "str25"; replaySpell(last); }
                     else { B.lastSpell.e = "str25"; enemyReplayLast(); }
                     afterSpellPlayed();
                     noteDiscard(1, side, [pick.id]);
+                    logPlay(side, pick.id, null); // W194: журнал (повтор «Горящими рунами»)
                     discard.push(pick.id);
                     return;
                 }
                 if (side === "p") {
                     const rt = runeTargetP(pick.id, focus);
+                    // W194: журнал — цель свободного каста руны (до эффекта)
+                    const ru = rt && rt.col !== undefined
+                        ? unitAt(rt.col, rt.row) : null;
+                    logPlay("p", pick.id,
+                        ru ? { u: ru }
+                            : rt && rt.col !== undefined ? { cell: true } : null);
                     applySpellP(pick.id, rt, true);
                     fxSpellCast(pick.id, rt, "p");
                     if (def.spell.drainAll || def.spell.stormAll) B.energy = 0; // огнешар/гроза и бесплатно сжигают энергию
                     B.lastSpell.p = pick.id;
                 } else {
                     enemyCastSpellEffect(def, true, focus);
+                    // W194: журнал — цель собрал aimOff (см. aiSpells)
+                    logPlay("e", pick.id, A.__aiAim ? { u: A.__aiAim } : null);
                     if (def.spell.drainAll || def.spell.stormAll) B.eEnergy = 0;
                     B.lastSpell.e = pick.id;
                 }

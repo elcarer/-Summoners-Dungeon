@@ -106,7 +106,13 @@
             A.enemyCastSpellEffectInner = function enemyCastSpellEffectInner(def, free = false, focus = null, fromHand = false) {
                 const s = def.spell;
                 castTargetOff = 0;
-                const aimOff = (u) => { if (u && u.def.targetDiscount) castTargetOff = 1; };
+                // Журнал боя (W194): сброс цели перед эффектами; саму цель
+                // пишет aimOff ниже (единый хук всех веток одиночной цели)
+                A.__aiAim = null;
+                const aimOff = (u) => {
+                    if (u && u.def.targetDiscount) castTargetOff = 1;
+                    if (u) A.__aiAim = u; // W194: чистая регистрация, поведение не меняет
+                };
                 if (s.stormAll) { // «Гроза»: вся оставшаяся энергия — удары по 2
                     // по случайным существам/постройкам игрока; энергию гасит
                     // aiPlay/руна по флагу stormAll (как у drainAll)

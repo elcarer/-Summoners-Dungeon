@@ -33,6 +33,26 @@
                 heroLastCardDraw(side);
             };
 
+            // Журнал разыгранных карт (W194 — юзер). Пишется в точках
+            // розыгрышей обеих сторон: игрок — spendCard (цель передаёт
+            // вызывавший), ИИ — aiPlay/chaosFreePlay рядом с notePlay;
+            // бесплатные касты (руна, «Высокая мощность», «Двойная
+            // магия») — свои точки. Цель (aim): { u } — существо/постройка
+            // (id и сторону запоминаем СРАЗУ — цель может умереть до
+            // открытия журнала), { u, u2 } — обе цели «Перемены мест»,
+            // { cell: true } — клетка, null — у карты цели не было
+            A.logPlay = function logPlay(side, cardId, aim) {
+                if (!B.playLog) B.playLog = [];
+                let a = null;
+                if (aim && aim.u && aim.u.def) {
+                    a = { cardId: cardIdOf(aim.u.def), side: aim.u.side };
+                    if (aim.u2 && aim.u2.def)
+                        a.cardId2 = cardIdOf(aim.u2.def),
+                        a.side2 = aim.u2.side;
+                } else if (aim && aim.cell) a = { cell: true };
+                B.playLog.push({ turn: B.turnNo, side, cardId, aim: a });
+            };
+
             A.playerTurnStart = async function playerTurnStart() {
                 B.turnNo += 1; // шкала подросла: сфер теперь на одну больше
                 B.phase = "anim";
@@ -92,9 +112,10 @@
             };
 
             // ── Действия игрока ────────────────────────────────────────────────
-            A.spendCard = function spendCard(handIdx) { // вынимает карту из руки в сброс
+            A.spendCard = function spendCard(handIdx, aim) { // вынимает карту из руки в сброс
                 const cardId = B.hand[handIdx];
                 notePlay("p"); // «Конвейер» (tim225): разыграна карта с руки
+                logPlay("p", cardId, aim); // журнал разыгранных карт (W194)
                 // «Ярость природы» (Рыжий лес, W54): заклинания/ловушки —
                 // юниты и постройки бьются в addUnit (общая точка сторон)
                 if (CARDS[cardId]
@@ -921,7 +942,7 @@
                             return;
                         }
                         B.energy -= effCost(B.hand[B.selected]); // цена ловушки
-                        const cardId = spendCard(B.selected);
+                        const cardId = spendCard(B.selected, { u }); // W194: цель — объект
                         consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                         // «Магопуты» (W77): первая карта игрока — отменена
                         if (heroVoidFirstCancel("p")) {
@@ -952,7 +973,7 @@
                             return;
                         }
                         B.energy -= effCost(B.hand[B.selected]); // цена ловушки
-                        const cardId = spendCard(B.selected);
+                        const cardId = spendCard(B.selected, { u }); // W194: цель — объект
                         consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                         // «Магопуты» (W77): первая карта игрока — отменена
                         if (heroVoidFirstCancel("p")) {
@@ -979,7 +1000,10 @@
                     const occupant = unitAt(col, row);
                     if (occupant && def.trap.effect !== "entangle") { deselect(); return; }
                     B.energy -= effCost(B.hand[B.selected]); // цена ловушки
-                    const cardId = spendCard(B.selected);
+                    // W194: «Опутывание корней» вешается на клетку С существом —
+                    // цель в журнале тогда существо, иначе сама клетка
+                    const cardId = spendCard(B.selected,
+                        occupant ? { u: occupant } : { cell: true });
                     consumeEpicDiscount(cardId, "p"); // «Архилич»: флаг первой эпик-карты
                     let armed = false;
                     // «Магопуты» (W77): первая карта игрока — отменена

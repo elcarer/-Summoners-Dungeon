@@ -214,6 +214,10 @@
                     eDeck: shuffle([...eBase]),
                     eDeckBase: eBase,
                     eDiscard: [], eHand: [],
+                    // Журнал разыгранных карт (W194 — юзер): пишет logPlay
+                    // в точках розыгрышей обеих сторон; смотрит кнопка
+                    // «Журнал» в HUD боя (оверлей со скролл-списком)
+                    playLog: [],
                     units: [], traps: { p: [], e: [] }, firewalls: [],
                     // «Сдвиг» (стихия Время): отложенные призывы стороны —
                     // { side, cardId, col, row, left, token, node }

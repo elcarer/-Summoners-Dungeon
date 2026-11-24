@@ -219,6 +219,23 @@
                 gear.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("settings"); });
                 c.addChild(gear);
 
+                // журнал боя (W194 — юзер): кнопка-сфера с подписью (как
+                // «Конец хода») рядом с шестерёнкой — открывает скролльный
+                // список всех разыгранных карт: кто разыграл и в какую цель
+                const logBtn = new PIXI.Sprite(uiTex("button_1.png"));
+                logBtn.anchor.set(0.5);
+                logBtn.scale.set(0.44); // 99×128 → ~44×56
+                logBtn.position.set(124, 55);
+                logBtn.eventMode = "static";
+                logBtn.on("pointertap", () => { if (ctx.sfx) ctx.sfx(); openOverlay("log"); });
+                c.addChild(logBtn);
+                const logLabel = T(t("arena.logBtn"), 20, 0xf3e6c2,
+                    { stroke: { color: 0x1c1207, width: 5 } });
+                logLabel.anchor.set(0.5);
+                logLabel.position.set(124, 97);
+                logLabel.eventMode = "none";
+                c.addChild(logLabel);
+
                 // карточка героя (просил юзер): НАД колодой игрока, та же
                 // координата x. Его baseHp — жизни базы игрока. Наведение — рост
                 // до натурального размера (ctx.heroHover); большой вид смещается
@@ -347,6 +364,74 @@
                     });
                     panel.applySound();
                     node.addChild(panel.node);
+                } else if (name === "log") { // журнал разыгранных карт (W194 — юзер):
+                    // кто разыграл и в какую цель (если была); новые сверху
+                    const { T, button, scrollPane } = globalThis.GAME_UI;
+                    const frame = new PIXI.Graphics();
+                    frame.roundRect(285, 81, 1350, 885, 18);
+                    frame.fill({ color: 0x171310, alpha: 0.95 });
+                    frame.stroke({ width: 3, color: 0x6b5c40 });
+                    node.addChild(frame);
+                    const title = T(t("arena.logTitle"), 45, 0xf0c96a,
+                        { stroke: { color: 0x241505, width: 7.5 } });
+                    title.anchor.set(0.5, 0);
+                    title.position.set(960, 105);
+                    title.eventMode = "none";
+                    node.addChild(title);
+                    const hint = T(t("arena.logHint"), 21, 0x8a7c5e);
+                    hint.anchor.set(0.5, 0);
+                    hint.position.set(960, 162);
+                    hint.eventMode = "none";
+                    node.addChild(hint);
+                    pane = scrollPane(ctx, {
+                        x: OV_PANE.x, y: OV_PANE.y, w: OV_PANE.w, h: OV_PANE.h,
+                    });
+                    grid = new PIXI.Container();
+                    const entries = (B.playLog || []).slice().reverse();
+                    const ROW_H = 54;
+                    entries.forEach((e, i) => {
+                        const y = i * ROW_H + 14;
+                        const turnT = T(`${t("arena.logTurn")} ${e.turn}`, 25, 0x8a7c5e);
+                        turnT.position.set(16, y);
+                        turnT.eventMode = "none";
+                        grid.addChild(turnT);
+                        const who = e.side === "p" ? t("arena.logYou") : t("arena.logFoe");
+                        const mainT = T(`${who}: ${GAME_LOC.t(`card.${e.cardId}.name`)}`, 27,
+                            e.side === "p" ? 0xf3e6c2 : 0xef9f8c);
+                        mainT.position.set(190, y);
+                        mainT.eventMode = "none";
+                        grid.addChild(mainT);
+                        let tgt = "";
+                        let tcol = 0x8a7c5e;
+                        if (e.aim && e.aim.cardId) {
+                            const mark = (s) => s === "p"
+                                ? t("arena.logOwn") : t("arena.logEnemy");
+                            tgt = `→ ${GAME_LOC.t(`card.${e.aim.cardId}.name`)} (${mark(e.aim.side)})`;
+                            if (e.aim.cardId2) // «Перемена мест»: обе цели
+                                tgt += ` ↔ ${GAME_LOC.t(`card.${e.aim.cardId2}.name`)} (${mark(e.aim.side2)})`;
+                            tcol = e.aim.side === "p" ? 0x9fd489 : 0xef9f8c;
+                        } else if (e.aim && e.aim.cell) {
+                            tgt = `→ ${t("arena.logCell")}`;
+                        }
+                        if (tgt) {
+                            const tgtT = T(tgt, 27, tcol);
+                            tgtT.position.set(640, y);
+                            tgtT.eventMode = "none";
+                            grid.addChild(tgtT);
+                        }
+                    });
+                    if (!entries.length) {
+                        const empty = T(t("arena.logEmpty"), 30, 0x8a7c5e);
+                        empty.position.set(66, 30);
+                        empty.eventMode = "none";
+                        grid.addChild(empty);
+                    }
+                    pane.setContent(grid, entries.length ? entries.length * ROW_H + 20 : 60);
+                    node.addChild(pane.node);
+                    node.addChild(button(ctx, {
+                        tex: "button_menu.png", label: t("settings.back"), x: 960, y: 1017, scale: 1,
+                        onTap: closeOverlay,
+                    }));
                 } else { // deck / edeck / discard — только просмотр, без редактирования:
                     // колода — ОСТАТОК (B.deck), колода врага — его остаток (B.eDeck),
                     // сброс — лежащие карты (свой B.discard / вражеский B.eDiscard)

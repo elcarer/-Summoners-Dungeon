@@ -207,6 +207,7 @@
                             hand.splice(hi, 1);
                             discard.push(id);
                             noteDiscard(1, side, [id]);
+                            logPlay(side, id, { cell: true }); // W194: журнал (призыв отменён)
                             floatText(960, 500,
                                 "✕ " + GAME_LOC.t(`card.${id}.name`), 0x8cd0ef);
                             return true;
@@ -219,6 +220,7 @@
                         await enemyFlyCard(cellXY(spot[0], spot[1]));
                         hand.splice(hand.indexOf(id), 1);
                         notePlay(side); // «Конвейер» + платит «Визуализатор»
+                        logPlay(side, id, null); // W194: журнал (юнит/постройка — без цели)
                         B.playCtx = { side, cardId: id };
                         addUnit(side, id, spot[0], spot[1]);
                         B.playCtx = null;
@@ -261,6 +263,7 @@
                             { s: 0.3 });
                         hand.splice(hand.indexOf(id), 1);
                         notePlay(side);
+                        logPlay(side, id, unit ? { u: unit } : { cell: true }); // W194: журнал
                         multiFury(id, side);
                         multiValor(id, side);
                         multiWeave(id, side);
@@ -289,6 +292,8 @@
                         multiPortal(id, side); // «Из портала» (Портал в бездну, W95)
                         B.playCtx = { side, cardId: id };
                         enemyCastSpellEffect(d, true); // авто-цели ИИ
+                        // W194: журнал — цель собрал aimOff (см. aiSpells)
+                        logPlay(side, id, A.__aiAim ? { u: A.__aiAim } : null);
                         B.playCtx = null;
                         // внутренние «Огнешар»/«Гроза»/«Древомощь»/«Высокая
                         // мощность» жгут энергию и в бесплатном касте
@@ -893,6 +898,7 @@
                                 B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eEnergy -= effCost(cardId, "e");
                                 notePlay("e"); // «Конвейер» (tim225)
+                                logPlay("e", cardId, { cell: true }); // W194: цель — клетка призыва
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 B.eDiscard.push(cardId);
                                 cryptSettle("e", cardId); // «Склеп»
@@ -916,6 +922,7 @@
                                     B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                     B.eEnergy -= effCost(cardId, "e");
                                     notePlay("e"); // «Конвейер» (tim225)
+                                    logPlay("e", cardId, { cell: true }); // W194: цель — клетка призыва
                                     consumeEpicDiscount(cardId, "e");
                                     B.eDiscard.push(cardId);
                                     cryptSettle("e", cardId);
@@ -956,6 +963,7 @@
                             B.eHand.splice(B.eHand.indexOf(cardId), 1);
                             if (!batAlt) B.eEnergy -= effCost(cardId, "e");
                             notePlay("e"); // «Конвейер» (tim225)
+                            logPlay("e", cardId, null); // W194: журнал (юнит/постройка — без цели)
                             consumeEpicDiscount(cardId, "e"); // «Архилич»
                             // playCtx для «Сброса разума» (decMind): dec146 при
                             // появлении сбрасывает карту; свой выход карты в
@@ -993,6 +1001,7 @@
                                 B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eEnergy -= effCost(cardId, "e");
                                 notePlay("e"); // «Конвейер» (tim225)
+                                logPlay("e", cardId, { u: pu }); // W194: руна — на существо
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 multiFury(cardId, "e"); // «Ярость природы» (Рыжий лес)
                                 multiValor(cardId, "e"); // «Растущая доблесть» (Белая пуща, W62)
@@ -1042,6 +1051,7 @@
                                 B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                 B.eEnergy -= effCost(cardId, "e");
                                 notePlay("e"); // «Конвейер» (tim225)
+                                logPlay("e", cardId, { u: blds[0] }); // W194: засада — на свою постройку
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                                 // «Магопуты»-герой игрока (W77): первая карта
@@ -1090,6 +1100,7 @@
                                     B.eHand.splice(B.eHand.indexOf(cardId), 1);
                                     B.eEnergy -= effCost(cardId, "e");
                                     notePlay("e"); // «Конвейер» (tim225)
+                                    logPlay("e", cardId, { cell: true }); // W194: ловушка — на клетку
                                     consumeEpicDiscount(cardId, "e");
                                     B.eDiscard.push(cardId);
                                     cryptSettle("e", cardId);
@@ -1106,6 +1117,7 @@
                             B.eHand.splice(B.eHand.indexOf(cardId), 1); // W134: по id (рука живая)
                             B.eEnergy -= effCost(cardId, "e");
                             notePlay("e"); // «Конвейер» (tim225)
+                            logPlay("e", cardId, { cell: true }); // W194: ловушка — на клетку
                             consumeEpicDiscount(cardId, "e"); // «Архилич»
                             cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                             multiFury(cardId, "e"); // «Ярость природы» (Рыжий лес, W60)
@@ -1153,6 +1165,7 @@
                                 noteDiscard(1, "e", [cardId]);
                                 B.eEnergy -= effCost(cardId, "e");
                                 notePlay("e"); // «Конвейер» (tim225)
+                                logPlay("e", cardId, null); // W194: журнал (заклинание отменено)
                                 consumeEpicDiscount(cardId, "e"); // «Архилич»
                                 cryptSettle("e", cardId); // «Склеп»: сыгранная карта — в колоду
                                 floatText(960, 500,
@@ -1176,6 +1189,7 @@
                                     noteDiscard(1, "e", [cardId]);
                                     B.eEnergy -= effCost(cardId, "e");
                                     notePlay("e"); // «Конвейер» (tim225)
+                                    logPlay("e", cardId, null); // W194: журнал (заклинание отменено)
                                     consumeEpicDiscount(cardId, "e");
                                     cryptSettle("e", cardId);
                                     floatText(960, 500,
@@ -1219,6 +1233,9 @@
                                 || def.spell.highPower) // «Высокая мощность» (wt274, W80): всю энергию потратил powerAct
                                 ? 0 : B.eEnergy - Math.max(0, effCost(cardId, "e") - tOff);
                             notePlay("e"); // «Конвейер» (tim225)
+                            // W194: журнал — цель заклинания ИИ собрал aimOff
+                            // (эффекты пишут выбранную одиночную цель в __aiAim)
+                            logPlay("e", cardId, A.__aiAim ? { u: A.__aiAim } : null);
                             consumeEpicDiscount(cardId, "e"); // «Архилич»
                             heroFirstSpellEnergy("e"); // «Дуновение опасности»
                             // рука ИИ тоже не больше 7 — излишек панельных доборов
