@@ -1380,8 +1380,8 @@
             "hero.matuzorg.name": "Matuzorg",
             "hero.matuzorg.ability": "At the start of each of your turns, one element is chosen at random — Strength, Time or Honor: cards of that element, including multicolor ones containing it, cost 1 less energy this turn. Minimum deck size for your deck is 42",
             "arena.elemDisc": "Element of the turn: {elem} — cards cost 1⚡ less",
-            "world.bossSpawn": "World boss {name} has appeared at the edge of the world!",
-            "world.bossLeft": "{name} is leaving the world…",
+            // W201: world.bossSpawn/world.bossLeft removed — the player
+            // should not learn about world boss behavior
             // ── Element resources (W40): HUD and forge ───────────────────
             "res.strength": "Buckler of Might",
             "res.growth": "Sprout of Life",

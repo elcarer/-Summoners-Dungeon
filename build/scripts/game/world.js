@@ -1030,11 +1030,8 @@
             };
             G.world.wander["boss:" + enc] = st;
             spawnBossSquad(st, "boss:" + enc);
-            floatText(GAME_LOC.t("world.bossSpawn",
-                { name: GAME_LOC.t("hero." + enc + ".name") }),
-                COMPONENTS.positionX[heroId], COMPONENTS.positionY[heroId],
-                0xff6a4e);
-            if (ctx.sfx) ctx.sfx("alert");
+            // W201 (юзер): всплывающих объявлений о боссах больше нет —
+            // игрок не должен знать об их поведении (было: bossSpawn + alert)
         }
         function bossDayTick() {
             const D = globalThis.GAME_DATA;
@@ -2653,10 +2650,8 @@
                     bs.shadow.destroy();
                     if (bs.glow) bs.glow.destroy();
                     squads.splice(bi, 1);
-                    floatText(GAME_LOC.t("world.bossLeft",
-                        { name: GAME_LOC.t("hero." + bs.st.enc + ".name") }),
-                        COMPONENTS.positionX[heroId],
-                        COMPONENTS.positionY[heroId], 0xc9b98c);
+                    // W201 (юзер): надпись «{name} покидает мир…» убрана —
+                    // игрок не должен знать о поведении боссов
                 }
 
                 // арки подземелий — касание (диалог открыт — молчат).
