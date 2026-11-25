@@ -32,9 +32,10 @@
 (фоны арен с нарисованной сеткой; 3 — подводная пещера Мудрости),
 `images/cards/<elem>/<№>.png` (лица карт), `images/ui/logo/` (логотипы
 стихий — кнопки фильтров), `images/sprites/` — листы
-256×256: goblin_256 (Сила), elf_256 (Рост), sorca_256 (Мудрость),
-necr_256 (Тлен, Мортис), wolf_256 / bear_256 / ent_256 / plant_256
-и элементали water_el_256 / air_el_256 / spirit_256, `images/dungeon_tiles/{goblins_lair,growth_lair,water_lair}`
+256×256 (герои — goblin_spider_256, elf_elc_256, mage_o_256, nec_hor_256,
+kni_hor_256, gnome_ex_256; существа — goblin_256, elf_256, sorca_256,
+necr_256, knight_256, gnome_256, wolf_256 / bear_256 / ent_256 / plant_256
+и элементали water_el_256 / air_el_256 / spirit_256), `images/dungeon_tiles/{goblins_lair,growth_lair,water_lair}`
 (тайлы подземелий 64px: floor/ и walls/), `images/heroes/17.png` …
 `22.png` (карты персонажей «Подземных ключей» — от «Дуновения опасности»
 до «Города мудрости»), `font/Kereru.otf`.
@@ -46,11 +47,13 @@ necr_256 (Тлен, Мортис), wolf_256 / bear_256 / ent_256 / plant_256
 `front / back / right / left` (сверху вниз) по 6 кадров + json-манифест
 (size/columns/fps/animations — формат loadCharacter движка, нейминг как у
 knight_64: `walk_front` и т.д.). Загрузка: в main.js — `heroSheets`
-(strength→goblin, growth→elf, wisdom→sorca; герой карты выбирается по
+(strength→goblin_spider, growth→elf_elc, wisdom→mage_o, decay→nec_hor,
+honor→kni_hor, time→gnome_ex; герой карты выбирается по
 стихии забега `G.elem` в enter() сцен dungeon/world:
 `ctx.heroSheet = ctx.heroSheets[G.elem] || strength`) и
 `creatureSheets` → `ctx.creatureSheets` — реестр листов ПОЛЯ БОЯ:
-goblin/elf/wisdom (по стихиям), wolf, bear (×1.1), ent (×1.3), plant
+goblin/elf/wisdom/necr/knight/gnome (по стихиям; листы героев с ними
+развязаны — W191/W198), wolf, bear (×1.1), ent (×1.3), plant
 (×0.8), элементали water_el/air_el/spirit. Новые листы добавлять
 записью в `creatureSheets` (main.js); карта указывает лист полем
 `def.sheet`, у записи может быть `scale` — множитель к SPRITE_SCALE.

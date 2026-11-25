@@ -57,9 +57,11 @@
                   subtype: "human", // подтип — по спеке юзера (cards.txt)
                   rarity: "common", elem: "honor",
                   color: 0xcfc7b0, img: "honor/168" },
-        // «Конный рыцарь» (hon169): Человек 2/4 со «Скоростью 1» (dash1)
+        // «Конный рыцарь» (hon169): Человек 2/4 со «Скоростью 1» (dash1);
+        // с W198 ходит СВОИМ листом kni_hor_256 (арт юзера), остальные
+        // существа Чести — knight
         hon169: { type: "unit", cost: 3, atk: 2, hp: 4, speed: 1,
-                  creature: "human", sheet: "knight", ability: "dash1",
+                  creature: "human", sheet: "kni_hor", ability: "dash1",
                   subtype: "human", // подтип — по спеке юзера (cards.txt)
                   rarity: "common", elem: "honor",
                   color: 0xcfc7b0, img: "honor/169" },

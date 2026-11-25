@@ -254,12 +254,15 @@
         // замирает в стоп-кадре ходьбы (штатный сценарий play() без строки).
         // Спрайт рисуется в 0.25: фигура ~195px в кадре — те же ~49px роста,
         // что было у рыцаря, и честный пиксельный даунскейл 4→1.
+        // W198 (арт юзера): герой Чести Леон — конный рыцарь kni_hor_256,
+        // герой Тлена Мортис — некромант nec_hor_256. Листы существ этих
+        // стихий остаются прежними (knight/necr) — развязаны ниже.
         const heroSheets = {
             strength: await assets.loadCharacter("./images/sprites/goblin_spider_256"),
             growth: await assets.loadCharacter("./images/sprites/elf_elc_256"),
             wisdom: await assets.loadCharacter("./images/sprites/mage_o_256"), // Мира
-            decay: await assets.loadCharacter("./images/sprites/necr_256"), // Мортис
-            honor: await assets.loadCharacter("./images/sprites/knight_256"), // Леон
+            decay: await assets.loadCharacter("./images/sprites/nec_hor_256"), // Мортис
+            honor: await assets.loadCharacter("./images/sprites/kni_hor_256"), // Леон
             time: await assets.loadCharacter("./images/sprites/gnome_ex_256"), // Тордин
         };
         // Листы существ поля боя. Стандарт: <имя>_256.png — сетка 256×256,
@@ -285,7 +288,12 @@
             // существа Мудрости — сорка (плейсхолдер; новый mage_o —
             // только лист героини)
             wisdom: await assets.loadCharacter("./images/sprites/sorca_256"),
-            necr: heroSheets.decay, // существа Тлена — некр (пока один лист, просил юзер)
+            // существа Тлена — старый некр necr_256 (W198: nec_hor — лист
+            // героя Мортиса, существа стихии не переезжают)
+            necr: await assets.loadCharacter("./images/sprites/necr_256"),
+            // nec_hor — лист героя Тлена (W198, арт юзера); карт с этим
+            // листом нет, запись нужна тест-хуку heroSheetIs
+            nec_hor: heroSheets.decay,
             wolf: await assets.loadCharacter("./images/sprites/wolf_256"),
             bear: { ...(await assets.loadCharacter("./images/sprites/bear_256")), scale: 1.1 },
             ent: { ...(await assets.loadCharacter("./images/sprites/ent_256")), scale: 1.3 },
@@ -299,9 +307,13 @@
             // нетопыри — bat (dec123/132/146: Нетопырь, Вампир, Восставший нетопырь)
             zomb: await assets.loadCharacter("./images/sprites/zomb_256"),
             bat: await assets.loadCharacter("./images/sprites/bat_256"),
-            // лист Чести юзера (просил юзер): все существа стихии (Человек)
-            // пока ходят рыцарем knight_256
+            // лист Чести юзера (просил юзер): существа стихии (Человек)
+            // ходят рыцарем knight_256; «Конный рыцарь» (hon169) — новый
+            // лист kni_hor_256 (W198, арт юзера)
             knight: await assets.loadCharacter("./images/sprites/knight_256"),
+            // kni_hor — лист героя Чести Леона (W198) и «Конного рыцаря»
+            // (hon169 указывает его полем sheet)
+            kni_hor: heroSheets.honor,
             // лист Времени юзера: существа стихии — старый гном gnome_256
             // (tim201–203/209); новый gnome_ex — лист героя (Тордин в мире)
             // и «Базового меха» (tim202, просил юзер)
