@@ -110,6 +110,7 @@
         let chunkClock = 0; // часы LRU (свежесть использования чанка)
         let mapFrame = null; // рамка карты (не чанкируется)
         let poiNodes = null; // [{node,x,y}] — видимость POI вне экрана
+        let pileNodes = null; // [{node,p}] — не подобранные кучки золота (W199)
         let treeCount = 0; // деревьев построено (тесты)
         let mtnCount = 0; // спрайтов гор построено (тесты)
         let uiHud = null;
@@ -794,6 +795,20 @@
             c.addChild(sp);
             c.position.set((x0 + s.w / 2) * TS, (y0 + s.h) * TS);
             c.zIndex = (y0 + s.h) * TS; // низ footprint — y-sort общий
+            return c;
+        }
+
+        // кучка золота открытого мира (W199, юзер): спрайт 64×40 = 2×1
+        // клетки, анкер — низ footprint; проходимость клеток не блокирует
+        // (плоская добыча), подписи/входа нет — подход героя собирает
+        // 1–3 золота (update -> подбор кучек)
+        function makeGoldPile(p) {
+            const c = new PIXI.Container();
+            const sp = new PIXI.Sprite(ctx.goldPileTex);
+            sp.anchor.set(0.5, 1);
+            c.addChild(sp);
+            c.position.set((p.gx + 1) * TS, (p.gy + 1) * TS);
+            c.zIndex = (p.gy + 1) * TS; // низ footprint — y-sort общий
             return c;
         }
 
@@ -1573,6 +1588,8 @@
                 // W182: уже обнаруженные наблюдательные башни (звук и
                 // открытие обзора — один раз на башню за забег)
                 if (!G.world.towers) G.world.towers = {};
+                // W199: подобранные кучки золота (ключ «gx:gy»)
+                if (!G.world.goldTaken) G.world.goldTaken = {};
                 ensureWander(); // жив/мёртв и позиции отрядов (создать/дописать)
                 // самолечение поручений ратуши (W62, юзер): охота без живого
                 // монстра получает нового (состояние вычищено багом шаблона
@@ -1759,6 +1776,15 @@
                         : poi.kind === "town" ? makeTown(poi)
                         : poi.kind === "tower" ? makeTower(poi) : makeCave(poi);
                     poiNodes.push({ node, poi, x: node.x, y: node.y });
+                    objLayer.addChild(node);
+                }
+                // кучки золота (W199): узлы в общем y-sort слое; подобранные
+                // (G.world.goldTaken) при входе не рисуются
+                pileNodes = [];
+                for (const p of map.goldPiles || []) {
+                    if (G.world.goldTaken[p.gx + ":" + p.gy]) continue;
+                    const node = makeGoldPile(p);
+                    pileNodes.push({ node, p });
                     objLayer.addChild(node);
                 }
                 // (W67, юзер) город рядом с точкой появления в НОВОЙ игре:
@@ -2062,6 +2088,7 @@
                 objLayer = null;
                 fxLayer = null;
                 poiNodes = null;
+                pileNodes = null; // W199: узлы кучек ушли со слоем сцены
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
                 heroShadow = null;
                 heroSprite = null;
@@ -2131,6 +2158,32 @@
                         if (ctx.sfx) ctx.sfx("lvlUp"); // сигнал дозорной башни
                         floatText(GAME_LOC.t("world.tower.open"), cx, cy,
                             0xcfe0ea);
+                        break;
+                    }
+                }
+                // W199 (юзер): кучки золота — подход ближе клетки собирает
+                // заготовленные 1–3 золота (сумма кинута при генерации,
+                // переживает сейв): звон монет, всплывающая сумма, факт —
+                // в G.world.goldTaken (перезапуск кучку не возвращает).
+                // Расстояние — до прямоугольника 2×1 клеток (можно зайти
+                // и НА кучку: проход она не блокирует)
+                if (pileNodes && pileNodes.length) {
+                    for (const pn of pileNodes) {
+                        const p = pn.p;
+                        const dx = Math.max(p.gx * TS - hx, 0,
+                            hx - (p.gx + 2) * TS);
+                        const dy = Math.max(p.gy * TS - hy, 0,
+                            hy - (p.gy + 1) * TS);
+                        if (Math.hypot(dx, dy) > TS) continue;
+                        G.world.goldTaken[p.gx + ":" + p.gy] = 1;
+                        G.gold += p.amount;
+                        objLayer.removeChild(pn.node);
+                        pn.node.destroy({ children: true });
+                        pileNodes = pileNodes.filter((q) => q !== pn);
+                        if (ctx.sfx) ctx.sfx("coins");
+                        floatText(GAME_LOC.t("obj.goldFound", { n: p.amount }),
+                            (p.gx + 1) * TS, (p.gy + 1) * TS, 0xf0c96a);
+                        if (G.saveRun) G.saveRun();
                         break;
                     }
                 }
@@ -2700,6 +2753,11 @@
                         pois: m.pois.map((p) => ({ ...p })),
                         wildSpawns: (m.wildSpawns || [])
                             .map((d) => ({ ...d, route: d.route.map((r) => [...r]) })),
+                        // W199 (тесты): кучки золота карты + что уже подобрано
+                        goldPiles: (m.goldPiles || [])
+                            .map((p) => ({ ...p,
+                                taken: !!(G.world.goldTaken
+                                    && G.world.goldTaken[p.gx + ":" + p.gy]) })),
                     };
                 },
                 // слой местности (тайлы images/tiles): коды клеток 0..7

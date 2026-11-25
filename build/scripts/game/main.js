@@ -178,6 +178,9 @@
         const caveTex = await assets.loadTexture("./images/tiles/cave.png");
         // наблюдательная башня мира (арт юзера, W182): 96×103 ≈ 3×3 клетки
         const towerTex = await assets.loadTexture("./images/objects/watchTower.png");
+        // кучки золота открытого мира (арт юзера, W199): 64×40 = 2×1 клетки
+        const goldPileTex = await assets.loadTexture(
+            "./images/resources/gold_pile.png");
         // города мира: images/sities/<стихия>/{0,1}.png — спрайты юзера
         // (0.png — столица 192×160, 1.png — обычный город 192×128);
         // стихии — ключи ELEM_LOGO (тот же канонический список)
@@ -634,6 +637,9 @@
                     // W182: уже обнаруженные наблюдательные башни (звук и
                     // открытие обзора — один раз на башню)
                     towers: {},
+                    // W199: подобранные кучки золота (ключ «gx:gy») —
+                    // раскладка кучек сидозависима, подбор переживает сейв
+                    goldTaken: {},
                     // стихия, под которую выбрана точка появления: смена
                     // героя («Герои») переносит его в зону новой стихии
                     startElem: h.elems[0],
@@ -711,6 +717,9 @@
                     // W182: обнаруженные наблюдательные башни (ключ «gx:gy»)
                     worldTowers: this.world.towers
                         ? JSON.parse(JSON.stringify(this.world.towers)) : null,
+                    // W199: подобранные кучки золота (ключ «gx:gy»)
+                    worldGoldTaken: this.world.goldTaken
+                        ? { ...this.world.goldTaken } : null,
                     quests: this.quests ? {
                         active: this.quests.active,
                         done: { ...(this.quests.done || {}) },
@@ -861,6 +870,7 @@
             mountainTex, // спрайты гор images/tiles/montain (слой объектов)
             caveTex,     // спрайт пещеры подземелий images/tiles/cave.png
             towerTex,    // наблюдательная башня images/objects/watchTower.png
+            goldPileTex, // кучки золота мира images/resources/gold_pile.png
             cityTex,     // спрайты городов мира images/sities/<стихия>/{0,1}
             sfx: gameSfx,   // ctx.sfx() — клик UI (step); ctx.sfx("chpoc") — событие
             music: gameMusic, // музыка сцены: "menu" | "world" | "dungeon" | "battle"
@@ -957,6 +967,9 @@
                 // W182: обнаруженные башни (нет в старом сейве — башни
                 // сработают заново при подходе)
                 towers: r.worldTowers || null,
+                // W199: подобранные кучки золота (нет в старом сейве —
+                // подобранное появится заново, совместимость не ведётся)
+                goldTaken: r.worldGoldTaken || null,
                 heroPos: r.worldPos || null,
                 out: !!r.worldOut,
                 // W60: вход КАКОГО данжа ждать при out (сейв хранит)
