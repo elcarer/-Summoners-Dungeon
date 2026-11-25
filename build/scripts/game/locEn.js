@@ -87,6 +87,7 @@
             "obj.startDraft": "Start Draft",
             "obj.contDraft": "Continue Draft",
             "obj.goldFound": "+{n} gold!",
+            "obj.resFound": "+1 {name}!", // W200: element resource picked up
             "obj.chestFound": "The chest held a card:",
             "obj.take": "Take",
             "obj.takeCard": "Take the card",

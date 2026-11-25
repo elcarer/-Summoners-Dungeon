@@ -92,6 +92,7 @@
             "obj.startDraft": "Начать драфт",
             "obj.contDraft": "Продолжить драфт",
             "obj.goldFound": "+{n} золота!",
+            "obj.resFound": "+1 «{name}»!", // W200: ресурс стихии подобран
             "obj.chestFound": "В сундуке лежала карта:",
             "obj.take": "Забрать",
             "obj.takeCard": "Забрать карту",

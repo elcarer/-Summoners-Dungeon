@@ -111,6 +111,7 @@
         let mapFrame = null; // рамка карты (не чанкируется)
         let poiNodes = null; // [{node,x,y}] — видимость POI вне экрана
         let pileNodes = null; // [{node,p}] — не подобранные кучки золота (W199)
+        let resNodes = null; // [{node,p}] — не собранные ресурсы стихий (W200)
         let treeCount = 0; // деревьев построено (тесты)
         let mtnCount = 0; // спрайтов гор построено (тесты)
         let uiHud = null;
@@ -809,6 +810,23 @@
             c.addChild(sp);
             c.position.set((p.gx + 1) * TS, (p.gy + 1) * TS);
             c.zIndex = (p.gy + 1) * TS; // низ footprint — y-sort общий
+            return c;
+        }
+
+        // ресурс стихии открытого мира (W200, юзер): спрайт 72×72 — тот же
+        // арт res_<стихия>.png, что иконка в HUD, рисуется в ширину клетки
+        // 1×1 (масштаб TS/72), анкер — низ клетки; клетку не блокирует
+        // (плоская добыча), подписи/входа нет — подход героя собирает
+        // 1 ресурс стихии (update -> подбор ресурсов)
+        function makeResNode(p) {
+            const c = new PIXI.Container();
+            const tex = uiTex(`resources/res_${p.elem}.png`);
+            const sp = new PIXI.Sprite(tex);
+            sp.anchor.set(0.5, 1);
+            sp.scale.set(TS / tex.width); // 72px → ширина клетки 32
+            c.addChild(sp);
+            c.position.set((p.gx + 0.5) * TS, (p.gy + 1) * TS);
+            c.zIndex = (p.gy + 1) * TS; // низ клетки — y-sort общий
             return c;
         }
 
@@ -1590,6 +1608,8 @@
                 if (!G.world.towers) G.world.towers = {};
                 // W199: подобранные кучки золота (ключ «gx:gy»)
                 if (!G.world.goldTaken) G.world.goldTaken = {};
+                // W200: собранные ресурсы стихий (ключ «gx:gy»)
+                if (!G.world.resTaken) G.world.resTaken = {};
                 ensureWander(); // жив/мёртв и позиции отрядов (создать/дописать)
                 // самолечение поручений ратуши (W62, юзер): охота без живого
                 // монстра получает нового (состояние вычищено багом шаблона
@@ -1785,6 +1805,15 @@
                     if (G.world.goldTaken[p.gx + ":" + p.gy]) continue;
                     const node = makeGoldPile(p);
                     pileNodes.push({ node, p });
+                    objLayer.addChild(node);
+                }
+                // ресурсы стихий (W200): узлы в общем y-sort слое;
+                // собранные (G.world.resTaken) при входе не рисуются
+                resNodes = [];
+                for (const p of map.resNodes || []) {
+                    if (G.world.resTaken[p.gx + ":" + p.gy]) continue;
+                    const node = makeResNode(p);
+                    resNodes.push({ node, p });
                     objLayer.addChild(node);
                 }
                 // (W67, юзер) город рядом с точкой появления в НОВОЙ игре:
@@ -2089,6 +2118,7 @@
                 fxLayer = null;
                 poiNodes = null;
                 pileNodes = null; // W199: узлы кучек ушли со слоем сцены
+                resNodes = null; // W200: узлы ресурсов ушли со слоем сцены
                 if (heroId !== null) { characters.remove(heroId); heroId = null; }
                 heroShadow = null;
                 heroSprite = null;
@@ -2183,6 +2213,34 @@
                         if (ctx.sfx) ctx.sfx("coins");
                         floatText(GAME_LOC.t("obj.goldFound", { n: p.amount }),
                             (p.gx + 1) * TS, (p.gy + 1) * TS, 0xf0c96a);
+                        if (G.saveRun) G.saveRun();
+                        break;
+                    }
+                }
+                // W200 (юзер): ресурсы стихий — подход ближе клетки
+                // собирает 1 ресурс этой стихии (G.resources, HUD мира
+                // обновляется сам): звук добычи, всплывающая строка,
+                // факт — в G.world.resTaken (перезапуск не возвращает).
+                // Расстояние — до клетки 1×1 (можно зайти и НА ресурс:
+                // проход он не блокирует)
+                if (resNodes && resNodes.length) {
+                    for (const rn of resNodes) {
+                        const p = rn.p;
+                        const dx = Math.max(p.gx * TS - hx, 0,
+                            hx - (p.gx + 1) * TS);
+                        const dy = Math.max(p.gy * TS - hy, 0,
+                            hy - (p.gy + 1) * TS);
+                        if (Math.hypot(dx, dy) > TS) continue;
+                        G.world.resTaken[p.gx + ":" + p.gy] = 1;
+                        if (!G.resources) G.resources = {};
+                        G.resources[p.elem] = (G.resources[p.elem] || 0) + 1;
+                        objLayer.removeChild(rn.node);
+                        rn.node.destroy({ children: true });
+                        resNodes = resNodes.filter((q) => q !== rn);
+                        if (ctx.sfx) ctx.sfx("mine"); // добыча ресурса
+                        floatText(GAME_LOC.t("obj.resFound",
+                            { name: GAME_LOC.t("elem." + p.elem) }),
+                            (p.gx + 0.5) * TS, (p.gy + 1) * TS, 0xf3e6c2);
                         if (G.saveRun) G.saveRun();
                         break;
                     }
@@ -2758,6 +2816,11 @@
                             .map((p) => ({ ...p,
                                 taken: !!(G.world.goldTaken
                                     && G.world.goldTaken[p.gx + ":" + p.gy]) })),
+                        // W200 (тесты): ресурсы стихий карты + что уже собрано
+                        resNodes: (m.resNodes || [])
+                            .map((p) => ({ ...p,
+                                taken: !!(G.world.resTaken
+                                    && G.world.resTaken[p.gx + ":" + p.gy]) })),
                     };
                 },
                 // слой местности (тайлы images/tiles): коды клеток 0..7

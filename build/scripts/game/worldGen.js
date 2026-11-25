@@ -1387,11 +1387,62 @@
             }
         }
 
+        // ── 8g. ресурсы стихий открытого мира (W200, юзер): по 3 штуки в
+        // случайных пустых доступных клетках зоны КАЖДОЙ стихии; размер
+        // 1×1 клетка, спрайт images/resources/res_<стихия>.png (тот же
+        // арт, что иконка в HUD); подход героя собирает 1 ресурс стихии.
+        // Ставятся ПОСЛЕ кучек золота 8f: rng расходуется в конце, поэтому
+        // раскладка отрядов/POI/кучек по сиду не меняется. «Доступная»
+        // клетка — '.' в rows, вне маски POI, не в клетке отряда/дикой
+        // точки/остановки босса/кучки золота (с их клеткой зазора) и не
+        // ближе 3 клеток к точке появления героя (иначе ресурс собирается
+        // сам при старте); между ресурсами зазор в клетку — «раскидать»
+        const resNodes = [];
+        {
+            const occ = new Set();
+            for (const s of [...wanderers, ...bridgeGuards, ...decayGuards,
+                ...wildSpawns, ...bossStops]) occ.add(s.gy * W + s.gx);
+            // клетки кучек золота с их зазором вокруг 2×1 footprint
+            for (const p of goldPiles)
+                for (let fy = p.gy - 1; fy <= p.gy + 1; fy++)
+                    for (let fx = p.gx - 1; fx <= p.gx + 2; fx++)
+                        occ.add(fy * W + fx);
+            const nearSpawn = (x, y) => Object.values(spawn)
+                .some((s) => Math.hypot(x - s.gx, y - s.gy) < 3);
+            const free = (x, y) => {
+                if (x < 2 || y < 2 || x > W - 3 || y > H - 3) return false;
+                const i = y * W + x;
+                if (rows[y][x] !== "." || poiMask[i] || occ.has(i)
+                    || nearSpawn(x, y)) return false;
+                return true;
+            };
+            const cands = ELEMS.map(() => []);
+            for (let y = 2; y < H - 2; y++)
+                for (let x = 2; x < W - 2; x++) {
+                    const i = y * W + x;
+                    if (free(x, y)) cands[zone[i]].push({ x, y });
+                }
+            for (let k = 0; k < ELEMS.length; k++) {
+                const list = cands[k];
+                for (let n = 0; n < 3 && list.length; n++) {
+                    const idx = (rng() * list.length) | 0;
+                    const { x, y } = list[idx];
+                    list.splice(idx, 1);
+                    // зазор вокруг клетки ресурса (соседям не стоять вплотную)
+                    for (let fy = y - 1; fy <= y + 1; fy++)
+                        for (let fx = x - 1; fx <= x + 1; fx++)
+                            occ.add(fy * W + fx);
+                    resNodes.push({ gx: x, gy: y, elem: ELEMS[k] });
+                }
+            }
+        }
+
         return {
             w: W, h: H, seed,
             ter, zone, rows, pois, spawn, wanderers, bridgeGuards, decayGuards,
             wildSpawns, bossStops, // W136: 12 точек остановки мировых боссов
             goldPiles, // W199: кучки золота — по 7 на зону стихии
+            resNodes, // W200: ресурсы стихий — по 3 на зону (1×1, res_*.png)
             centers: centers.map((c) => ({ x: Math.round(c.x), y: Math.round(c.y) })),
         };
     }

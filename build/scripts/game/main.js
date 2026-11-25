@@ -640,6 +640,9 @@
                     // W199: подобранные кучки золота (ключ «gx:gy») —
                     // раскладка кучек сидозависима, подбор переживает сейв
                     goldTaken: {},
+                    // W200: собранные ресурсы стихий (ключ «gx:gy») —
+                    // раскладка сидозависима, подбор переживает сейв
+                    resTaken: {},
                     // стихия, под которую выбрана точка появления: смена
                     // героя («Герои») переносит его в зону новой стихии
                     startElem: h.elems[0],
@@ -720,6 +723,9 @@
                     // W199: подобранные кучки золота (ключ «gx:gy»)
                     worldGoldTaken: this.world.goldTaken
                         ? { ...this.world.goldTaken } : null,
+                    // W200: собранные ресурсы стихий (ключ «gx:gy»)
+                    worldResTaken: this.world.resTaken
+                        ? { ...this.world.resTaken } : null,
                     quests: this.quests ? {
                         active: this.quests.active,
                         done: { ...(this.quests.done || {}) },
@@ -970,6 +976,9 @@
                 // W199: подобранные кучки золота (нет в старом сейве —
                 // подобранное появится заново, совместимость не ведётся)
                 goldTaken: r.worldGoldTaken || null,
+                // W200: собранные ресурсы стихий (нет в старом сейве —
+                // собранное появится заново, совместимость не ведётся)
+                resTaken: r.worldResTaken || null,
                 heroPos: r.worldPos || null,
                 out: !!r.worldOut,
                 // W60: вход КАКОГО данжа ждать при out (сейв хранит)
