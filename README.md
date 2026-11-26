@@ -104,6 +104,9 @@ frontline, как в Stormbound. Первая стихия «Сила» (кра�
 
 ## Управление
 
+- При запуске играет заставка (`build/video/intro.mp4`); пропуск — любая
+  клавиша или клик мыши. Если браузер не даёт звук без нажатия, сначала
+  экран «Нажмите любую клавишу».
 - Клик по карте → клик по подсвеченной клетке — призыв/постройка/ловушка
   (мина — на пустую клетку, руна — на существо); заклинание с прицелом —
   клик по цели. Esc — снять выбор.
@@ -123,11 +126,13 @@ frontline, как в Stormbound. Первая стихия «Сила» (кра�
   world, dungeon, quest, arenaCore + модули арены (Cards/Board/Combat/
   Damage/Traps/Summons/Upkeep/Hand/Panels/Hud/Flow/Actions/Scene/Api +
   aiValue/aiTarget/aiSpells/aiPlay), deckScene, rewardScene, draftScene,
-  settingsScene, main) + арт (`images/ui`, `images/scenes` — арены,
+  settingsScene, introVideo — заставка при запуске, main) + арт
+  (`images/ui`, `images/scenes` — арены,
   `images/sprites` — листы существ, `images/cards` — лица карт,
   `images/dungeon_tiles` — тайлы этажей по данжу (goblins_lair,
   growth_lair, water_lair, necro_lair, honor_lair), `images/tiles` —
-  тайлы местности глобальной карты, `sound`, `tools/cards.html` —
+  тайлы местности глобальной карты, `sound`, `video/intro.mp4` — заставка,
+  `tools/cards.html` —
   картотека и конструктор колод)
 - `for_work/` — рабочие материалы (арт-исходники, тесты) — в git не входят
 - `PLAN.md` — исторический план ранней эпохи (актуальное — HANDOFF.md)

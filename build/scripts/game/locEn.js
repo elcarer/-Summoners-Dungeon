@@ -9,6 +9,8 @@
             "menu.exit": "EXIT",
             "menu.genWorld": "Generating the world map…", // W122: generation screen before entering the world
             "menu.bye": "See you in the depths…",
+            // W202: the intro waits for a gesture — the browser blocks sound without one
+            "intro.pressKey": "Press any key",
             "dungeon.hint": "WASD/arrows — move  ·  click the floor to walk there  ·  touch an enemy — battle",
             "dungeon.floor": "Floor {n}",
             "dungeon.fury": "Nature's Fury: two-color Strength+Growth cards deal 1 damage to the enemy base when played",

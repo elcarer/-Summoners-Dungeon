@@ -1,5 +1,6 @@
-// БУТ «Развернутый Мир»: движок → ассеты → шрифт → мета/настройки →
-// сцены → меню. Базовое разрешение UI — 1920×1080, все координаты
+// БУТ «Развернутый Мир»: настройки → заставка (W202: ролик играет поверх
+// бута) → движок → шрифт → ассеты → мета → сцены → меню (после заставки).
+// Базовое разрешение UI — 1920×1080, все координаты
 // интерфейса заданы прямо в нём; вписывается в окно (letterbox).
 // Коллекция/колода/настройки живут в localStorage (meta.js) и переживают
 // забеги; язык применяется через loc.js при старте и смене в настройках.
@@ -17,7 +18,18 @@
     window.addEventListener("error", (e) => { window.__gameError = String(e.message); });
     window.addEventListener("unhandledrejection", (e) => { window.__gameError = String(e.reason); });
 
+    let intro = null;
     try {
+        // ── Настройки — до всего: язык и громкость нужны заставке ─────────
+        const settings = GAME_META.loadSettings();
+        GAME_LOC.setLang(settings.lang);
+        // ── Заставка (W202, юзер): ролик качается и играет поверх бута,
+        // ассеты грузятся под ним; меню — когда ролик доиграл или пропущен
+        // (конец бута). Устройство и грабли — introVideo.js
+        intro = globalThis.GAME_INTRO_VIDEO.start({
+            volume: Math.max(settings.sound, settings.music) / 12,
+        });
+
         say("ядро движка…");
         await frame();
         const engine = await init();
@@ -346,9 +358,7 @@
         fitUi();
         app.renderer.on("resize", fitUi);
 
-        // ── Настройки и мета (localStorage) ────────────────────────────────
-        const settings = GAME_META.loadSettings();
-        GAME_LOC.setLang(settings.lang);
+        // ── Мета (localStorage); настройки подняты в начале бута ───────────
         const savedMeta = GAME_META.loadMeta();
         const { DEFAULT_DECK, DEFAULT_COLLECTION, HERO_ORDER } = GAME_DATA;
 
@@ -430,6 +440,9 @@
         const unlockAudio = () => { try { audio.unlock(); } catch (e) { /* нет WebAudio */ } };
         window.addEventListener("pointerdown", unlockAudio);
         window.addEventListener("keydown", unlockAudio);
+        // заставка глотает клавиши и клики (до игры не доходят) — жест она
+        // отдаёт сюда, иначе музыка меню молчала бы до следующего клика
+        intro.onGesture(unlockAudio);
 
         // Курсор прячется при игре с клавиатуры и возвращается при движении
         // мыши (W54, юзер): жмёшь клавишу — стрелка исчезает, шевельнул
@@ -1132,11 +1145,17 @@
             }),
             ready: true,
         };
-        scenes.go("menu");
+        // Меню — когда заставка доиграла или пропущена: экран в этот миг
+        // чёрный, затем оверлей растворяется поверх меню. Сцену могли уже
+        // выбрать (консоль, скрипт после __GAME.ready) — меню не навязываем
+        await intro.done;
+        if (!scenes.current) scenes.go("menu");
+        intro.reveal();
         say("");
         boot.remove();
         console.log("[game] готово:", window.__GAME.stats());
     } catch (err) {
+        if (intro) intro.abort(); // ошибка бута должна быть видна, не под роликом
         say("Ошибка загрузки: " + (err && err.message));
         window.__gameError = String((err && err.stack) || err);
         console.error(err);
