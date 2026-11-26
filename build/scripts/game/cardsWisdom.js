@@ -159,7 +159,7 @@
         wis103: { type: "spell", cost: 4,
                   spell: { target: "none", iceSwarm: 5 },
                   kind: "summon", // тип эффекта — по спеке юзера (cards.txt)
-                  rarity: "common", elem: "wisdom",
+                  rarity: "epic", elem: "wisdom",
                   color: 0x4a7ac0, img: "wisdom/103" },
         // «Меч в алтаре»: в начале хода владельца +1♥; когда рядом с ним
         // призывается СВОЁ существо — оно получает +1⚔ за каждую жизнь
