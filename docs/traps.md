@@ -1486,3 +1486,10 @@
   геттеры прототипа, выписывать явно.
 - **Тесты без звука** (правило юзера, AGENTS.md): headless — `--mute-audio`;
   во встроенном браузере до загрузки игры `sd_settings` → sound 0, music 0.
+- **`$!` в Git Bash — номер процесса MSYS, НЕ PID Windows.**
+  `taskkill //PID $!` бьёт мимо: headless-хромы mini.sh/smoke.sh не
+  закрывались и копились; хуже — если в Windows есть процесс с таким
+  номером, закроется ОН (с деревом, //T). PID Windows —
+  `/proc/$!/winpid` (читать сразу после запуска, пока процесс жив);
+  mini.sh, smoke.sh и runtest.sh переведены на него 2026-11-26. Node
+  (`child_process.spawn().pid`) даёт настоящий PID Windows.
