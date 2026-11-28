@@ -208,8 +208,9 @@
         for (let n = 1; n <= 10; n++)
             treeTex.push(await assets.loadTexture(`./images/tiles/trees/${n}.png`));
         // декор местности мира (W204, юзер): images/deco/<стихия>/<n>.png —
-        // по 12 предметов на зону (у Времени 24), порядок =
-        // GAME_WORLDDECO.ITEMS (worldDeco.js); 84 мелких файла —
+        // по 12 предметов на зону (у Времени 24), W205 — болота
+        // (deco/swamp, 12) и вода (deco/water, 24); порядок =
+        // GAME_WORLDDECO.ITEMS (worldDeco.js); 120 мелких файлов —
         // параллельно
         const decoTex = {};
         await Promise.all(Object.entries(GAME_WORLDDECO.files()).map(
