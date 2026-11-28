@@ -52,7 +52,7 @@
         wis88: { type: "spell", cost: 1,
                  spell: { target: "none", debuffEnemyAtkAll: 1 },
                  kind: "debuff", // тип эффекта — по спеке юзера (cards.txt)
-                 rarity: "common", elem: "wisdom",
+                 rarity: "rare", elem: "wisdom",
                  color: 0x4a7ac0, img: "wisdom/88" },
         // «Зимние духи»: когда срабатывает любая ловушка (клеточная, отмена,
         // руна, приманка, ряд), получает +1 к урону навсегда (bonusAtk)
