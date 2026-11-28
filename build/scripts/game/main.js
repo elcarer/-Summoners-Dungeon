@@ -207,6 +207,16 @@
         const treeTex = [];
         for (let n = 1; n <= 10; n++)
             treeTex.push(await assets.loadTexture(`./images/tiles/trees/${n}.png`));
+        // декор местности мира (W204, юзер): images/deco/<стихия>/<n>.png —
+        // по 12 предметов на зону (у Времени 24), порядок =
+        // GAME_WORLDDECO.ITEMS (worldDeco.js); 84 мелких файла —
+        // параллельно
+        const decoTex = {};
+        await Promise.all(Object.entries(GAME_WORLDDECO.files()).map(
+            async ([el, urls]) => {
+                decoTex[el] = await Promise.all(
+                    urls.map((u) => assets.loadTexture(u)));
+            }));
         // лица карт стихий: images/cards/<elem>/<№>.png (def.img в dataCards)
         say("карты…");
         await frame();
@@ -883,6 +893,7 @@
             heroSheet: heroSheets.strength, heroSheets, creatureSheets, G, ui, audio, collide,
             worldSheets, // нарезки листов местности images/tiles (карта мира)
             treeTex,     // спрайты деревьев images/tiles/trees (лесные массивы)
+            decoTex,     // декор местности images/deco/<стихия> (W204)
             roadsTex,    // тайлы дорог images/tiles/roads.png (11 видов)
             moatsTex,    // тайлы мостов images/tiles/moats.png (11 видов)
             moatsCityTex, // мосты городов moats_64.png (64px, 1:1)

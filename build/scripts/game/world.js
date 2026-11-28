@@ -114,6 +114,7 @@
         let resNodes = null; // [{node,p}] — не собранные ресурсы стихий (W200)
         let treeCount = 0; // деревьев построено (тесты)
         let mtnCount = 0; // спрайтов гор построено (тесты)
+        let decoCount = 0; // предметов декора местности построено (W204, тесты)
         let uiHud = null;
         let path = null; // клик-перемещение: очередь центров клеток (мировые px)
         // W176: туман войны — Uint8Array открытых клеток (1 = открыта),
@@ -393,6 +394,16 @@
             if (ctx.worldSheets.swamp)
                 c.addChild(globalThis.GAME_WORLDTILES.renderSwampChunk(
                     map, ctx.worldSheets, TS, x0, y0, swampStats).container);
+            // декор местности (W204, юзер): плоские «наклейки» — на землю
+            // под лесной оверлей и дороги, объекты — в общий y-sort слой
+            const deco = ctx.decoTex && globalThis.GAME_WORLDDECO
+                ? globalThis.GAME_WORLDDECO.renderDecoChunk(map, worldTerr,
+                    ctx.decoTex, TS, G.world.seed, x0, y0)
+                : null;
+            if (deco) {
+                c.addChild(deco.flat);
+                decoCount += deco.count;
+            }
             c.addChild(globalThis.GAME_WORLDTILES.renderForestChunk(
                 map, ctx.worldSheets, TS, x0, y0, woodStats).container);
             if (ctx.roadsTex && ctx.roadsTex.length)
@@ -401,7 +412,7 @@
             if (ctx.moatsTex && ctx.moatsTex.length)
                 c.addChild(globalThis.GAME_WORLDTILES.renderMoatsChunk(
                     map, ctx.moatsTex, TS, x0, y0, moatStats).container);
-            const objs = [];
+            const objs = deco ? [...deco.sprites] : [];
             if (ctx.treeTex && ctx.treeTex.length) {
                 const tr = globalThis.GAME_WORLDTILES.renderTreesChunk(
                     map, ctx.treeTex, TS, G.world.seed, x0, y0);
@@ -1757,6 +1768,7 @@
                 moatStats = { tiles: 0, skipped: 0 };
                 treeCount = 0;
                 mtnCount = 0;
+                decoCount = 0;
                 chunkCache = new Map();
                 chunkRect = "";
                 chunkHolder = new PIXI.Container();
@@ -2795,7 +2807,27 @@
                             : null,
                         trees: treeCount,
                         mountains: mtnCount,
+                        deco: decoCount, // W204: предметов декора построено
                     };
+                },
+                // W204 (тесты): декор АКТИВНЫХ чанков — объекты y-sort
+                // слоя и плоские наклейки чанков, разбивка по стихиям
+                decoCensus: () => {
+                    const out = { obj: 0, flat: 0, byElem: {}, byItem: {} };
+                    const add = (s, kind) => {
+                        out[kind]++;
+                        const el = s.__deco.split(":")[0];
+                        out.byElem[el] = (out.byElem[el] || 0) + 1;
+                        out.byItem[s.__deco] = (out.byItem[s.__deco] || 0) + 1;
+                    };
+                    if (objLayer)
+                        for (const s of objLayer.children) if (s.__deco) add(s, "obj");
+                    if (chunkHolder)
+                        for (const ch of chunkHolder.children)
+                            for (const sub of ch.children)
+                                for (const s of sub.children || [])
+                                    if (s.__deco) add(s, "flat");
+                    return out;
                 },
                 map: () => {
                     const m = G.world.map;
